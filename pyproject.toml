@@ -1,0 +1,27 @@
+[project]
+name = "decktakeoff"
+version = "0.1.0"
+description = "Deck takeoff engine: foundations, framing, hardware, flashing, decking, fasteners, fascia, rail, stairs — with code flags and GSX pricing"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+service = ["fastapi>=0.110", "uvicorn", "python-multipart", "httpx"]
+intake = ["anthropic>=1.5"]
+dev = ["pytest", "fastapi", "httpx", "python-multipart", "anthropic"]
+
+[project.scripts]
+decktakeoff = "decktakeoff.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["decktakeoff*"]
+
+[tool.setuptools.package-data]
+decktakeoff = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,82 @@
+{
+  "job": "9528 Jason Ct \u2014 Deck",
+  "client": "Todd",
+  "site": {
+    "address": "9528 Jason Ct",
+    "city": "Thornton",
+    "state": "CO",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false,
+    "rear_setback_required_ft": 20,
+    "side_setback_required_ft": 5,
+    "deck_to_rear_line_ft": 34,
+    "deck_to_side_line_ft": 9,
+    "tax_rate": 0.085
+  },
+  "geometry": {
+    "width": 12,
+    "depth": 16,
+    "size_mode": "nominal",
+    "height_in": 30,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true
+  },
+  "framing": {
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "4x10",
+        "species": "DF",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Prime+",
+    "color": "Coconut Husk",
+    "profile": "grooved",
+    "fascia": true
+  },
+  "railing": {
+    "system": "Fulton",
+    "color": "Black",
+    "height_in": 36,
+    "sides": [
+      "left",
+      "right",
+      "front"
+    ],
+    "openings": [
+      {
+        "side": "right",
+        "start_in": 0,
+        "length_in": 92,
+        "reason": "concrete step"
+      }
+    ]
+  },
+  "stairs": [],
+  "extras": {
+    "demo_existing": true,
+    "site_extras": [
+      {
+        "item": "Dumpster + portable toilet",
+        "cost": 800
+      }
+    ],
+    "material_factor": 1.0,
+    "gm": 0.45
+  }
+}

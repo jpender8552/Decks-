@@ -1,0 +1,10 @@
+{
+  "job": "Example — 24x14 freestanding on concrete piers, WUI",
+  "site": {"city": "Golden", "ground_snow_psf": 45, "wind_speed_mph": 130, "frost_depth_in": 36, "soil_bearing_psf": 2000, "wui_fire_zone": true},
+  "geometry": {"width": 24, "depth": 14, "height_in": 40, "attachment": "freestanding", "board_direction": "perpendicular", "picture_frame": true},
+  "framing": {"joist_size": "2x10", "joist_species": "SYP", "footing_type": "concrete",
+              "beams": [{"kind": "drop", "size": "(3)2x10", "species": "SYP", "setback_in": 24}]},
+  "decking": {"collection": "Terrain+", "color": "Dark Oak"},
+  "railing": {"system": "Fulton", "color": "Black", "sides": ["left", "right", "front", "rear"]},
+  "stairs": [{"side": "right", "width_in": 42, "landing": "grade", "rails": 1}]
+}
