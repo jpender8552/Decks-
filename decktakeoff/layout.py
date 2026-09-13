@@ -566,13 +566,42 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
 
 
 # ================================================================== whole layout
+def _floor_to(x: float, step: float) -> float:
+    return math.floor(x / step + 1e-9) * step
+
+
+def frame_from_nominal(nom_w: float, nom_d: float, bw: float, gap: float, fascia_t: float, pf: bool, direction: str) -> Tuple[float, float, int, str]:
+    """GSX rule: a "12x16 deck" is 12' x 16' MAX over the fascia. Size the frame down so every field board is a full
+    board and the field boards cut to a clean length. Returns (W, D, rows, note)."""
+    edge = fascia_t + (NOSE if fascia_t else 0.0)
+    if direction == "parallel":
+        # width: field board length rounded down to a whole inch (Jason Ct: 12' -> 11'-0" field boards, 11'-9" frame)
+        deck_w_max = nom_w
+        field = _floor_to(deck_w_max - (2 * (bw + gap) if pf else 0.0), 1.0)   # borders sit inside the nominal; fascia is under the nose
+        W = round((field + (2 * (bw + gap) if pf else 0.0) - 2 * edge) * 16) / 16.0   # to 1/16"
+        # depth: whole rows under the nominal, front border on top, frame rounded down to 1/2"
+        rows = int(math.floor((nom_d - (bw if pf else 0.0) - gap) / (bw + gap) + 1e-9))
+        D = _floor_to(gap + rows * (bw + gap) + (bw if pf else 0.0) - edge, 0.5)
+        note = (f"nominal {ftin(nom_w)} x {ftin(nom_d)} -> frame {ftin(W)} x {ftin(D)}: field boards cut to {ftin(field)}, "
+                f"{rows} full rows, deck over fascia {ftin(W + 2 * edge)} x {ftin(D + edge)}")
+    else:
+        rows = int(math.floor((nom_w - (2 * bw if pf else 0.0) - gap) / (bw + gap) + 1e-9))
+        W = _floor_to(gap + rows * (bw + gap) + (2 * bw if pf else 0.0) - 2 * edge, 0.5)
+        D = _floor_to(nom_d - edge, 0.5)
+        note = f"nominal {ftin(nom_w)} x {ftin(nom_d)} -> frame {ftin(W)} x {ftin(D)}: {rows} full boards across, boards run out from the house"
+    return W, D, rows, note
+
+
 def build_layout(spec: DeckSpec) -> Layout:
     g = spec.geometry
     f = decking_facts(spec.decking.collection)
     fas_t = FASCIA[f["material"]]["thick"] if spec.decking.fascia else 0.0
     notes = []
     W, D = float(g.width_in), float(g.depth_in)
-    if g.board_direction == "parallel":
+    if g.size_mode == "nominal":
+        W, D, rows, note = frame_from_nominal(W, D, f["width"], f["gap"], fas_t, g.picture_frame, g.board_direction)
+        notes.append(note)
+    elif g.board_direction == "parallel":
         D2, rows, dev, note = size_frame_to_boards(D, f["width"], f["gap"], fas_t, g.fit_frame_to_boards)
         notes.append(note)
         D = D2

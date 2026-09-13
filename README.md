@@ -47,8 +47,10 @@ width runs along the house, depth runs out from it. Rail openings and stairs are
 
 ## What it decides (and states)
 
-- **Frame sized to the decking** — the depth is nudged so every field board is a full board (zero rips); the finished
-  dimensions are stated. Boards parallel to the house bear on two picture-frame joists set 5-1/4" from each face.
+- **Nominal size in, frame size out** — "12 x 16" means 12' x 16' max over the fascia. The engine sizes the frame
+  DOWN so every field board is a full board cut to a clean length (Jason Ct: 12 x 16 → 11'-9" x 15'-7 1/2" frame,
+  11'-0" field boards, 33 rows) and states the finished dimensions. Pass `"size_mode": "frame"` to give
+  outside-of-frame dimensions instead. Boards parallel to the house bear on two picture-frame joists set 5-1/4" from each face.
 - **Joists** #1 SYP 2x10 @ 16" OC (12" for PVC) checked against IRC R507.6; intermediate beams are added automatically
   when the depth is beyond the span, and said so.
 - **Beams** drop (4x DF, face 2' back from the rim, cantilever ≤ L/4) or flush (in-plane, joists hang both sides; a

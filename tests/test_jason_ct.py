@@ -21,6 +21,15 @@ def line(t, needle):
     return m[0]
 
 
+def test_nominal_12x16_sizes_to_the_boards(result):
+    t, _, _ = result
+    assert SPEC["geometry"]["width"] == 12 and SPEC["geometry"]["depth"] == 16
+    assert t.layout.finished_w == 141.0            # 11'-9" frame
+    assert t.layout.finished_d == 187.5            # 15'-7 1/2" frame
+    assert abs(t.layout.decking.field_len - 132.0) < 0.01   # field boards cut to 11'-0"
+    assert t.layout.decking.deck_w <= 144 and t.layout.decking.deck_d <= 192
+
+
 def test_frame_geometry(result):
     t, _, _ = result
     fr = t.layout.frame

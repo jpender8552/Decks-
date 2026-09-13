@@ -47,8 +47,9 @@ class Site:
 
 @dataclass
 class Geometry:
-    width_in: float = 144.0              # along the house, outside of frame to outside of frame
-    depth_in: float = 144.0              # house face to outside of front rim
+    width_in: float = 144.0              # along the house. size_mode "nominal": max finished size over the fascia (12' = "a 12x16 deck")
+    depth_in: float = 192.0              # out from the house. size_mode "frame": outside-of-frame dimensions as drawn
+    size_mode: str = "nominal"           # "nominal" (GSX: the engine sizes the frame DOWN to full boards inside the nominal size) | "frame"
     height_in: float = 30.0              # finished deck surface above grade at the LOWEST grade point
     height_high_in: Optional[float] = None   # surface above grade at the highest point (sloped lots), if different
     attachment: str = "ledger"           # "ledger" | "freestanding"

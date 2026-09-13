@@ -22,7 +22,9 @@ defaults and refuses the ones that are rules.
   Post load = post spacing x (half the back-span + cantilever) x design load. Auto-upgrade to DP-75/63, else flag.
 - Ledger: 2x10, LedgerLOK 2 rows 2" from top/bottom staggered 12" OC (count = ceil(L/12) + 1), membrane behind,
   aluminum Z-flash over, end dams, (4) DTT1Z lateral ties.
-- Frame sized to the decking so every board is full width — zero rips. The finished dimensions are stated.
+- Deck sizes are nominal: "12 x 16" is the maximum over the fascia. The frame is sized DOWN to full boards — field
+  boards cut to a whole inch under the nominal less the borders, whole rows under the nominal depth — and the finished
+  frame dimensions are stated (Jason Ct: 12 x 16 → 11'-9" x 15'-7 1/2" frame, 11'-0" field boards, 33 rows).
 
 ## Decking and fastening
 - Composite = hidden clips, 16" OC, one blocking row over the beam. PVC = 12" OC, CONCEALoc, Cortex plugs on

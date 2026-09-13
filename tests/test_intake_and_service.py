@@ -19,7 +19,7 @@ def test_units():
 
 def test_parse_details():
     s = parse_details("11'9 x 15'7.5 deck in Thornton, 30 in high, Prime+ Coconut Husk, Fulton rail black, demo the old deck, 4 steps on the right")
-    assert (s.geometry.width_in, s.geometry.depth_in, s.geometry.height_in) == (141, 187.5, 30)
+    assert (s.geometry.width_in, s.geometry.depth_in, s.geometry.height_in) == (141, 187.5, 30) and s.geometry.size_mode == "nominal"
     assert (s.decking.collection, s.decking.color) == ("Prime+", "Coconut Husk")
     assert s.railing.system == "Fulton" and s.railing.color == "Black"
     assert s.extras.demo_existing and s.stairs[0].side == "right"
