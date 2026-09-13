@@ -172,7 +172,7 @@ def tax_rate_for(city: str, override=None) -> float:
 BOARDS_PALETTE = {
     ("Vintage", "Weathered Teak"): ["#7a6650", "#917b62", "#a58f74", "#b6a186", "#c5b196", "#d1bfa5", "#dccdb6"],
     ("Vintage", "Cypress"): ["#5c3324", "#74432f", "#89523b", "#9b6147", "#ad7256", "#bd8567", "#cc9979"],
-    ("Vintage", "Coastline"): ["#6a6a68", "#7e7e7c", "#919190", "#a3a3a1", "#b3b3b1", "#c2c2c0", "#d0d0ce"],
+    ("Vintage", "Coastline"): ["#5f5e5b", "#6f6e6c", "#7e7d7b", "#8b8a88", "#979694", "#a3a2a0", "#afaeac"],
     ("Vintage", "Mahogany"): ["#4f3325", "#664434", "#7b5541", "#8e654e", "#a0775d", "#b18a6f", "#c19c81"],
     ("Vintage", "English Walnut"): ["#2f2019", "#40302a", "#54413a", "#68524a", "#7c6357", "#8f7565", "#a08874"],
     ("Vintage", "Dark Hickory"): ["#2c2a29", "#333234", "#3a3a3c", "#454546", "#525253", "#5e5e5f", "#6a6a6b"],

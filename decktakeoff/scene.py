@@ -59,23 +59,25 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
     wood = "#6a4225" if (timber and oiled) else ("#a88a5e" if timber else "#b9a479")     # oiled dark walnut · unfinished DF · PT SYP
     return dict(
         timber=dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated"),
-        deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.75, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
-        border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.75, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
-        drink=dict(color=dpal[len(dpal) // 2], palette=dpal, grain=True, rough=0.75),
-        fascia=dict(color=pal[len(pal) // 2 - 1], grain=True, rough=0.75),
-        steel=dict(color="#1c1c1e", metal=0.6, rough=0.45, label="black powder-coat"),
-        cable=dict(color="#c9ccd0", metal=0.9, rough=0.3),
-        concrete=dict(color="#c8c4bb", rough=0.95),
-        stone=dict(color="#9a948b", rough=0.95, label="ledgestone veneer"),
-        stonecap=dict(color="#b3ada2", rough=0.9),
-        house=dict(color="#2a2624" if timber else "#d6c9a8", rough=0.9),
-        roof=dict(color="#2b2422", rough=0.9),
-        privacy=dict(color="#b8b0a2", rough=0.95),
-        glass=dict(color="#7fa6c7", metal=0.2, rough=0.1),
-        ground=dict(color="#7f9a5c", rough=1.0),
-        gravel=dict(color="#a39c90", rough=1.0),
-        water=dict(color="#3f9fd0", metal=0.1, rough=0.1),
-        tub=dict(color="#4a4238", rough=0.7),
+        deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
+        border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
+        drink=dict(color=dpal[len(dpal) // 2], palette=dpal, grain=True, rough=0.7),
+        fascia=dict(color=pal[max(0, len(pal) // 2 - 1)], palette=pal, grain=True, rough=0.7),
+        steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
+        cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
+        concrete=dict(color="#b9b4aa", rough=0.95),
+        stone=dict(color="#8c8478", pattern="stone", rough=0.95, label="ledgestone veneer"),
+        stonecap=dict(color="#a8a297", rough=0.9),
+        house=dict(color="#5b544d" if timber else "#cfc6b4", pattern="lap", rough=0.9),
+        trim=dict(color="#24221f" if timber else "#f2efe8", rough=0.8),
+        roof=dict(color="#2a2624", rough=0.9),
+        privacy=dict(color="#6a625a", pattern="batten", rough=0.9),
+        glass=dict(color="#5f7f99", metal=0.6, rough=0.15),
+        ground=dict(color="#7d9958", pattern="grass", rough=1.0),
+        gravel=dict(color="#857b6e", pattern="gravel", rough=1.0),
+        water=dict(color="#3a93c6", metal=0.2, rough=0.08),
+        tub=dict(color="#3b3531", pattern="batten", rough=0.75),
+        tubrim=dict(color="#dad6cf", rough=0.35),
         hanger=dict(color="#1c1c1e" if spec.framing.hardware_finish == "black" else "#8f9498", metal=0.7, rough=0.5),
     )
 
@@ -99,35 +101,54 @@ def build_scene(L: Layout) -> Scene:
     y_front = max((z.wall_y + z.D) for z in L.zones) * IN
     H_house = zt + 10.0
 
-    # ---------------- site: ground, gravel, house, walls
-    add("ground", -60, W + 60, y_min - 40, y_front + 60, -0.6, 0.0, "ground")
-    add("gravel", -1, W + 1, y_min, y_front + 1.5, 0.0, 0.05, "gravel")
-    # the house: a block behind every zone's wall (the walls jog, so the blocks step), each with its own roof and a 1-1/2' eave
+    # ---------------- site: ground, rock under the deck, the house behind every zone's wall
+    add("ground", -80, W + 80, y_min - 60, y_front + 90, -0.6, 0.0, "ground")
+    for z in L.zones:   # weed barrier + rock under the deck footprint only
+        add("gravel", z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5, 0.0, 0.04, "gravel")
     depth_back = 26.0
+    H_house = zt + 9.5                      # one storey above the deck floor
+    door_h = 6.75
     for zi, z in enumerate(L.zones):
         yw = z.wall_y * IN
         x0h = z.x0 * IN - (3.0 if zi == 0 else 0.0)
         x1h = (z.x0 + z.W) * IN + (3.0 if zi == len(L.zones) - 1 else 0.0)
         add("house", x0h, x1h, yw - depth_back, yw, 0.0, H_house, "house", tag=f"house behind {z.name}")
-        add("roof", x0h - 1.5, x1h + 1.5, yw - depth_back - 1.5, yw + 1.5, H_house, H_house + 0.8, "roof")
+        add("roof", x0h - 1.0, x1h + 1.0, yw - depth_back - 1.0, yw + 1.0, H_house, H_house + 0.55, "roof")
+        add("trim", x0h - 1.0, x1h + 1.0, yw + 0.98, yw + 1.02, H_house - 0.02, H_house + 0.55, "trim", tag="fascia board")
+        # a sliding door at deck level in the middle of every zone; windows either side of it on the wide zones
         cx = (z.x0 + z.W / 2) * IN
-        gw = 6.0 if z.W > 200 else 3.5
-        add("glass", cx - gw / 2, cx + gw / 2, yw - 0.02, yw + 0.02, zt + 0.1, zt + 6.8 if z.W > 200 else zt + 5.0, "glass")
-        add("glass", cx - gw / 2, cx + gw / 2, yw - 0.02, yw + 0.02, max(0.5, zt - 6.0), max(0.5, zt - 6.0) + min(3.5, zt - 1.5) if zt > 4 else 0.5, "glass")
-    # the walls of a recess between zones are the sides of the neighbouring block (drawn explicitly so they cast shadows into the wing)
+        dw = 6.0 if z.W > 120 else 3.0
+        add("trim", cx - dw / 2 - 0.25, cx + dw / 2 + 0.25, yw - 0.05, yw + 0.06, zt + 0.02, zt + door_h + 0.25, "trim")
+        add("glass", cx - dw / 2, cx + dw / 2, yw - 0.02, yw + 0.07, zt + 0.1, zt + door_h, "glass")
+        if dw > 4:
+            add("trim", cx - 0.06, cx + 0.06, yw - 0.02, yw + 0.08, zt + 0.1, zt + door_h, "trim")
+        if z.W > 200:
+            for sx in (-1, 1):
+                wx = cx + sx * (z.W * IN / 4 + 1.0)
+                add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, zt + 2.9, zt + 7.1, "trim")
+                add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, zt + 3.0, zt + 7.0, "glass")
+        if zt >= 7.0:   # walkout level below the deck
+            for sx in (-1, 1) if z.W > 200 else (0,):
+                wx = cx + sx * (z.W * IN / 4 + 1.0)
+                add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, 3.4, 5.6, "trim")
+                add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, 3.5, 5.5, "glass")
+    # the return walls of a recess are the sides of the neighbouring block, drawn so they shade the wing
     for a, b in zip(L.zones, L.zones[1:]):
         ya, yb = a.wall_y * IN, b.wall_y * IN
         if abs(ya - yb) > 0.01:
             xb = b.x0 * IN
-            if ya < yb:   # a is recessed: b's block face at x = xb spans a's recess
+            if ya < yb:
                 add("wall", xb, xb + 0.5, ya, yb, 0.0, H_house, "house", tag=f"return wall {a.name}/{b.name}")
             else:
                 add("wall", xb - 0.5, xb, yb, ya, 0.0, H_house, "house", tag=f"return wall {a.name}/{b.name}")
+    # a privacy wall is an option in the sell package: shown in the finished room (phase 8), on the deck, along that end
     for zi, z in enumerate(L.zones):
         zl = spec.zone_list[zi]
         if zl.privacy_wall:
             side_x = (z.x0 * IN) if zi == 0 else ((z.x0 + z.W) * IN)
-            add("privacy", side_x - 0.5 if zi == 0 else side_x, side_x if zi == 0 else side_x + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 1.0, 0.0, zt + 6.5, "privacy", tag="privacy / lot wall")
+            xa, xb = (side_x - 0.4, side_x) if zi == 0 else (side_x, side_x + 0.4)
+            add("privacy", xa, xb, z.wall_y * IN, (z.wall_y + z.D) * IN, zt - 0.3, zt + 6.75, "privacy", 8, tag="privacy wall (option)")
+            add("trim", xa - 0.03, xb + 0.03, z.wall_y * IN, (z.wall_y + z.D) * IN, zt + 6.75, zt + 6.95, "steel", 8, tag="privacy wall cap")
 
     # ---------------- beams, posts, footings (from the beam lines)
     ft = spec.framing.footing_type
@@ -309,8 +330,9 @@ def build_scene(L: Layout) -> Scene:
         bay = spec.extras.hot_tub_bay_in * IN
         x0 = z.x0 * IN + (z.W * IN - bay) / 2
         y0 = z.wall_y * IN + 1.0
-        add("tub", x0, x0 + bay, y0, y0 + bay, zt, zt + 3.0, "tub", 8, tag="hot tub (by owner)")
-        add("water", x0 + 0.4, x0 + bay - 0.4, y0 + 0.4, y0 + bay - 0.4, zt + 2.7, zt + 2.85, "water", 8)
+        add("tub", x0, x0 + bay, y0, y0 + bay, zt, zt + 2.7, "tub", 8, tag="hot tub (by owner)")
+        add("tubrim", x0 - 0.05, x0 + bay + 0.05, y0 - 0.05, y0 + bay + 0.05, zt + 2.7, zt + 3.0, "tubrim", 8)
+        add("water", x0 + 0.5, x0 + bay - 0.5, y0 + 0.5, y0 + bay - 0.5, zt + 2.75, zt + 2.82, "water", 8)
 
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
                 zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN) for z in L.zones],
@@ -320,24 +342,36 @@ def build_scene(L: Layout) -> Scene:
 
 
 def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
-    """Consecutive post pairs along each run, from the post tags ('front:C+B 3', 'end:right 2', ...)."""
-    runs: Dict[str, List[Tuple[int, float, float]]] = {}
+    """Post pairs that carry a section, per run. A run's posts are tagged 'side N'; the corner post shared with the
+    neighbouring run lives in that run's list, so every collinear CORNER post is added back before pairing, and a gap
+    between two posts is a section only when its length matches one of the run's sections (an opening otherwise)."""
+    runs: Dict[str, List[Tuple[float, float, str]]] = {}
     for p in rl.posts:
-        run, _, idx = p.tag.rpartition(" ")
-        runs.setdefault(run, []).append((int(idx), p.x * IN, p.y * IN))
+        run, _, _ = p.tag.rpartition(" ")
+        runs.setdefault(run, []).append((p.x * IN, p.y * IN, p.kind))
+    corners = [(p.x * IN, p.y * IN) for p in rl.posts if p.kind == "CORNER"]
     pairs = []
     for run, pts in runs.items():
-        pts.sort()
-        # a CORNER post is shared: it was merged into the earlier run, so re-attach the run's first post if missing
-        for (i, x, y), (j, x2, y2) in zip(pts, pts[1:]):
-            pairs.append(((x, y), (x2, y2)))
-    # corner joins: a run whose first index is 2 starts at a merged corner post — find the corner post
-    for run, pts in runs.items():
-        if pts and pts[0][0] > 1:
-            corner = [p for p in rl.posts if p.kind == "CORNER"]
-            if corner:
-                c = min(corner, key=lambda p: math.hypot(p.x * IN - pts[0][1], p.y * IN - pts[0][2]))
-                pairs.append(((c.x * IN, c.y * IN), (pts[0][1], pts[0][2])))
+        horiz = len(pts) < 2 or all(abs(q[1] - pts[0][1]) < 0.02 for q in pts)
+        vert = len(pts) < 2 or all(abs(q[0] - pts[0][0]) < 0.02 for q in pts)
+        if len(pts) < 2:   # a lone post: decide the axis from the corner that shares a coordinate with it
+            horiz = any(abs(c[1] - pts[0][1]) < 0.02 and abs(c[0] - pts[0][0]) > 0.02 for c in corners)
+            vert = not horiz
+        pts2 = list(pts)
+        for c in corners:
+            if (horiz and abs(c[1] - pts[0][1]) < 0.02) or (vert and not horiz and abs(c[0] - pts[0][0]) < 0.02):
+                if not any(abs(c[0] - q[0]) < 0.02 and abs(c[1] - q[1]) < 0.02 for q in pts2):
+                    pts2.append((c[0], c[1], "CORNER"))
+        pts2.sort(key=(lambda q: q[0]) if horiz else (lambda q: q[1]))
+        ctcs = [sec.ctc for sec in rl.sections if sec.side == run]
+        for a, b in zip(pts2, pts2[1:]):
+            d = (abs(b[0] - a[0]) if horiz else abs(b[1] - a[1])) * 12
+            hit = next((i for i, c in enumerate(ctcs) if abs(c - d) < 1.5), None)
+            if hit is None and ctcs:
+                continue            # an opening (concrete step, stair) — no panel
+            if hit is not None:
+                ctcs.pop(hit)
+            pairs.append(((a[0], a[1]), (b[0], b[1])))
     return pairs
 
 
