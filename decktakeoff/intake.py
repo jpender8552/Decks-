@@ -67,6 +67,7 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
                     "hardware_finish": "black" if "black hardware" in low else "ZMAX"})
         if re.search(r"caisson", low):
             fr_["footing_type"] = "caisson"
+        d.setdefault("decking", {}).setdefault("fascia", False)      # timber rims are the finished edge (Eagle's Nest)
     if re.search(r"cable rail|irx|impression rail express", low):
         d.setdefault("railing", {})["system"] = "IRX"
     if re.search(r"drink rail", low):
@@ -113,7 +114,9 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
     if m:
         fr.setdefault("beams", [{"kind": "drop", "size": "4x10", "species": "DF", "setback_in": 24}])
         fr["beams"][0]["size"] = m.group(1).replace(" ", "")
-    if re.search(r"concrete (?:pier|footing|caisson)|sonotube|caisson", low):
+    if re.search(r"caisson", low):
+        fr["footing_type"] = "caisson"
+    elif re.search(r"concrete (?:pier|footing)|sonotube", low):
         fr["footing_type"] = "concrete"
     if re.search(r"diamond pier", low):
         fr["footing_type"] = "diamond_pier"
@@ -177,7 +180,8 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
     if m:
         site["deck_to_side_line_ft"] = float(m.group(1))
     for city in ("thornton", "denver", "aurora", "westminster", "arvada", "broomfield", "northglenn", "commerce city", "brighton", "lakewood",
-                 "littleton", "centennial", "parker", "castle rock", "boulder", "longmont", "golden", "erie", "firestone", "fort collins", "loveland", "colorado springs"):
+                 "littleton", "centennial", "parker", "castle rock", "boulder", "longmont", "golden", "erie", "firestone", "fort collins", "loveland", "colorado springs",
+                 "silverthorne", "frisco", "breckenridge", "dillon", "evergreen", "conifer", "vail", "steamboat springs", "winter park", "estes park"):
         if city in low:
             site["city"] = city.title()
     spec = DeckSpec.from_dict(d)

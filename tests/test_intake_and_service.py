@@ -54,3 +54,15 @@ def test_service_takeoff():
     r = c.post("/takeoff", json={"details": "12x16, 30 in high, Prime+ Coconut Husk"})
     assert r.status_code == 200 and r.json()["summary"]["deck_sf"] > 0
     assert c.post("/takeoff", json={}).status_code == 400
+
+
+def test_parse_eagles_nest_details():
+    from decktakeoff import run
+    s = parse_details("Eagle's Nest in Silverthorne: zone C 12'7 x 23 recessed 14', zone B 14'7 x 9, zone A 28 x 7; 8 ft high, timber frame on caissons, "
+                      "black hardware, Vintage Coastline, cable rail with drink rail, stone bases, hot tub, snow 80 psf, wui, engineered")
+    assert [z.name for z in s.geometry.zones] == ["C", "B", "A"] and s.geometry.zones[0].wall_offset_in == 168
+    assert s.framing.system == "timber" and s.framing.footing_type == "caisson" and s.framing.hardware_finish == "black"
+    assert s.railing.system == "IRX" and s.railing.drink_rail and s.extras.stone_bases and s.extras.engineered and s.extras.hot_tub
+    assert s.site.city == "Silverthorne" and s.site.ground_snow_psf == 80 and s.site.wui_fire_zone and not s.decking.fascia
+    t, f, p = run(s)
+    assert t.layout.deck_sf == 617 and p.tax_rate == 0.08375
