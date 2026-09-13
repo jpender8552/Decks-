@@ -101,7 +101,7 @@ def run_flags(L: Layout) -> List[Flag]:
             add("STOP", "ledger", "ledger cannot attach through brick/stone veneer — freestanding deck or engineered through-bolted standoff", "IRC R507.9.1.1")
         if ex.ledger_on_cantilevered_floor:
             add("ENGINEER", "ledger", "house floor cantilevers past the foundation — ledger attachment to a cantilevered floor needs an engineered detail or a freestanding deck", "IRC R507.9.1")
-        add("CHECK", "ledger", "verify the rim board behind the ledger is solid 2x/LVL/engineered rim (not I-joist web or a hollow band) before LedgerLOKs go in", "IRC R507.9.1.1")
+        add("CHECK", "ledger", "verify the rim board behind the ledger is solid 2x/LVL/engineered rim (not I-joist web or a hollow band) before the ledger fasteners go in", "IRC R507.9.1.1")
         add("INFO", "ledger", f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing", "IRC R507.9.2")
 
     # ---------------- wind
@@ -124,6 +124,14 @@ def run_flags(L: Layout) -> List[Flag]:
             add("CHECK", "fire", "Terrain+ WUI status contradicts itself on timbertech.com — confirm with the dealer before it goes into a fire zone")
     elif f.get("fire", "").lower().startswith("not"):
         add("INFO", "fire", f"{s.decking.collection}: {f['fire']} — fine outside a WUI zone")
+    if site.wui_fire_zone and rl:
+        from .catalog import RAIL_SYSTEMS
+        if RAIL_SYSTEMS.get(rl.system, {}).get("noncombustible", False):
+            add("INFO", "fire", f"{rl.system} rail is noncombustible (Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall)")
+        else:
+            add("CODE", "fire", f"{rl.system} rail is not noncombustible — WUI practice calls for metal/cable rail", "Colorado Wildfire Resiliency Code")
+    if s.is_timber:
+        add("ENGINEER", "engineering", "timber frame (DF #1 4x joists, 6x beams, 8x8 posts) is outside the IRC prescriptive tables — spans here are pre-engineering estimates; the stamped set governs sizes, post locations and caissons", "IRC R301.1.3")
 
     # ---------------- guards & stairs
     hi = max(g.height_in, g.height_high_in or 0)

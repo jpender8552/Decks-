@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import run
 from .intake import parse_details, spec_from_drawing
-from .report import gsx_job_block, order_csv, takeoff_json, takeoff_markdown
+from .report import gsx_job_block, order_csv, quote_markdown, takeoff_json, takeoff_markdown
 from .spec import DeckSpec
 
 
@@ -22,6 +22,7 @@ def main(argv=None):
     ap.add_argument("--price", action="store_true", help="include the internal pricing section")
     ap.add_argument("--gsx", action="store_true", help="also print the gsx-deck-docs job block")
     ap.add_argument("--json", action="store_true", help="print JSON instead of markdown")
+    ap.add_argument("--quote", action="store_true", help="print the client quote (implies --price)")
     a = ap.parse_args(argv)
     base = json.loads(Path(a.spec).read_text()) if a.spec else None
     if a.image:
@@ -32,7 +33,7 @@ def main(argv=None):
         spec = DeckSpec.from_dict(base)
     else:
         ap.error("give a spec JSON, --details, or --image")
-    t, f, p = run(spec, with_pricing=a.price)
+    t, f, p = run(spec, with_pricing=a.price or a.quote)
     md = takeoff_markdown(t, f, p)
     js = takeoff_json(t, f, p)
     if a.out:
@@ -42,13 +43,17 @@ def main(argv=None):
         (out / "order.csv").write_text(order_csv(t))
         (out / "spec.json").write_text(spec.to_json())
         (out / "gsx_job_block.py").write_text(gsx_job_block(t))
-        print(f"wrote {out}/takeoff.md, takeoff.json, order.csv, spec.json, gsx_job_block.py")
+        if p is not None:
+            (out / "quote.md").write_text(quote_markdown(t, p))
+        print(f"wrote {out}/takeoff.md, takeoff.json, order.csv, spec.json, gsx_job_block.py" + (", quote.md" if p is not None else ""))
     if a.json:
         print(json.dumps(js, indent=2, default=str))
     else:
         print(md)
     if a.gsx:
         print(gsx_job_block(t))
+    if a.quote:
+        print(quote_markdown(t, p))
     return 0
 
 

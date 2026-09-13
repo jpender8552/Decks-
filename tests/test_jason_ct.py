@@ -92,7 +92,7 @@ def test_pricing_model(result):
     assert p.gm == 0.45
     assert p.gc == 4 * 187 + 800
     assert p.sell == round((p.materials + p.tax + p.labor) / 0.55 + p.gc)
-    assert p.retail == round((p.sell - p.gc) / 0.93 + p.gc)
+    assert p.retail == round(p.sell / 0.93)          # Eagle's Nest standard: 7% on the whole price
     assert sum(v for _, v in p.allocation) == p.sell
     assert dict(p.labor_lines and [(l[0], l[4]) for l in p.labor_lines])["Railing"] == 35 * 20
 

@@ -1,7 +1,26 @@
 # GSX deck standards encoded in the engine
 
 Every line is a correction Jade Pender made once and does not want to make again. `decktakeoff` treats these as
-defaults and refuses the ones that are rules.
+defaults and refuses the ones that are rules. **Eagle's Nest is the standard** (quote format, pricing method, timber /
+multi-zone / engineered decks); Jason Ct is the dimensional-lumber standard.
+
+## Eagle's Nest (9 Eagle's Nest Ct, Silverthorne — Sep 2026)
+- Plan: zones named left to right facing the house from the yard (C deep wing · B dining terrace at the jog · A lounge),
+  each on its own wall; SF = sum of the zones (617); "along the view" = the total along the house (55'-2").
+- Timber frame: Douglas fir #1, 8x8 posts, 6x12 beams, 4x10 joists at 12", single 4x rims, no fascia, end grain sealed,
+  unfinished (weathers gray); dark walnut oil, two coats on every timber, is an option. Tub bay doubled.
+- Foundation: drilled caissons (20" x 42", rebar, frost 40") with stone-veneer column bases 2'x2' x 3' + 24" cap at every
+  post. All visible hardware black powder-coat.
+- Decking: TimberTech Advanced PVC Vintage (Coastline), square-shoulder, 1/8" gaps, Cortex with color-matched plugs;
+  picture frame and dividers in a contrast color (Dark Hickory); no fascia. Class A / WUI.
+- Rail: TimberTech Impression Rail Express cable, matte black, 36", no bottom rail, posts 6' OC, drink rail (contrast
+  deck board) on top. Rail only on the named edges (view edge + the end); none along a privacy wall.
+- Loads: 80 psf Summit County snow, stamped by a Colorado engineer. Colorado Wildfire Resiliency Code practice: Class A
+  decking, noncombustible rail, metal flashing at every wall.
+- Quote: total investment (financed, no money down, 12 / 18 months no payments, 6.99% / 10 yr monthly) and check or ACH
+  (7% savings); "what the price includes" by scope; engineering $1,800–3,000 at cost, no markup, separate; options as
+  add / deduct priced both ways; "quote, not a contract — a fixed-price proposal follows the stamped engineering";
+  schedule in working days ending "end of construction".
 
 ## Framing
 - Joists: #1 True Frame Joist SYP ground-contact, 2x10 @ 16" OC unless specified (12" OC for TimberTech Advanced PVC).
@@ -56,10 +75,13 @@ defaults and refuses the ones that are rules.
 
 ## Pricing
 - Sell = (materials + tax + labor) / (1 − GM) + general conditions at cost. Default GM 45% (40% floor).
-- General conditions are never marked up, in sell or retail. Retail (financed) = (sell − GC) / 0.93 + GC; show
-  "check or ACH price" and "retail (financed)" with the 6.99% / 10-yr monthly.
+- General conditions are never marked up in the sell. Financed = check/ACH ÷ 0.93 on the whole price (Eagle's Nest:
+  $123,291 → $132,571); the pricebook's `retail_mode` can be set back to `gc_at_cost` for the Jason Ct R5 method.
+  Show "check or ACH price" and "total investment (financed)" with the 6.99% / 10-yr monthly.
 - GC = $4/SF + named site extras at cost.
 - Labor: frame $10/SF, decking & fascia $8/SF, rail $20/LF, Diamond Pier $50/pier, demo $2/SF, stairs $150/riser.
+  Timber: frame $18/SF, PVC + Cortex $9/SF, cable rail $45/LF, drink rail $8/LF, caissons $400, stone bases $600,
+  oil $0.40/SF of timber (all `est.` until the labor sheet says otherwise).
 - Sales tax is destination-based (Thornton 8.5%). Never the supplier's or GSX's city.
 
 ## Documents

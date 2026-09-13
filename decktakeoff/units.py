@@ -67,6 +67,8 @@ def ftin(inches: float, frac: bool = True) -> str:
             ft += 1
             whole = 0
     if ft == 0:
+        if whole == 0 and fr:
+            return f'{sign}{fr.strip()}"'
         return f'{sign}{whole}{fr}"'
     return f"{sign}{ft}'-{whole}{fr}\""
 

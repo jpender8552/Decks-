@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from . import run
 from .intake import parse_details, spec_from_drawing
-from .report import gsx_job_block, order_csv, takeoff_json, takeoff_markdown
+from .report import gsx_job_block, order_csv, quote_markdown, takeoff_json, takeoff_markdown
 from .spec import DeckSpec
 
 app = FastAPI(title="Deck Takeoff Service", version="0.1.0")
@@ -34,6 +34,8 @@ def _run(spec: DeckSpec, with_price: bool, gsx: bool) -> dict:
     out = takeoff_json(t, f, p)
     out["markdown"] = takeoff_markdown(t, f, p)
     out["order_csv"] = order_csv(t)
+    if p is not None:
+        out["quote_markdown"] = quote_markdown(t, p)
     if gsx:
         out["gsx_job_block"] = gsx_job_block(t)
     return out

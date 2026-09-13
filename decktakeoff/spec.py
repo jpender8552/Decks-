@@ -46,6 +46,29 @@ class Site:
 
 
 @dataclass
+class Zone:
+    """One rectangular bay of a jogged / multi-zone deck. Zones are listed LEFT to RIGHT as you stand in the yard facing
+    the house. wall_offset_in: how far this zone's house wall is set BACK from the reference wall (a recessed gable or
+    a jog) — positive = further from the yard, so front edge y = depth_in - wall_offset_in."""
+    name: str = "A"
+    width_in: float = 144.0
+    depth_in: float = 144.0
+    wall_offset_in: float = 0.0
+    label: str = ""                      # "Lounge", "Dining terrace", "Deep wing"
+    privacy_wall: bool = False           # an existing wall along this zone's outer end (no rail there)
+
+
+@dataclass
+class Option:
+    """An upgrade / downgrade priced both ways. Either a spec change (delta re-priced through the engine) or a fixed cost
+    (a site item with no takeoff, e.g. a concrete pad) — or both."""
+    name: str
+    changes: dict = field(default_factory=dict)   # deep-merged over the spec dict, e.g. {"railing": {"system": "Fulton"}}
+    cost: float = 0.0                              # direct cost (materials + labor) of a fixed-cost option
+    note: str = ""
+
+
+@dataclass
 class Geometry:
     width_in: float = 144.0              # along the house. size_mode "nominal": max finished size over the fascia (12' = "a 12x16 deck")
     depth_in: float = 192.0              # out from the house. size_mode "frame": outside-of-frame dimensions as drawn
@@ -59,6 +82,7 @@ class Geometry:
     shape: str = "rectangle"             # anything else is flagged; the engine takes the bounding rectangle
     notches: List[dict] = field(default_factory=list)   # [{"corner":"front-left","w_in":..,"d_in":..}] informational
     levels: int = 1
+    zones: List[Zone] = field(default_factory=list)      # jogged / multi-zone plans (Eagle's Nest). Empty = one rectangle.
 
 
 @dataclass
@@ -73,6 +97,7 @@ class Beam:
 
 @dataclass
 class Framing:
+    system: str = "dimensional"          # "dimensional" (2x SYP, hangers, double rims) | "timber" (DF #1 4x joists, 6x beams, 8x8 posts)
     joist_size: str = "2x10"
     joist_species: str = "SYP"           # "SYP" | "DF" | "SPF" | "HF" | "CEDAR"
     joist_grade: str = "#1 True Frame GC"
@@ -87,6 +112,11 @@ class Framing:
     blocking_rows: Optional[int] = None  # None -> 1 row over each beam (composite), 2 for PVC
     joist_tape: bool = True
     lateral_ties: int = 4                # DTT1Z count (IRC R507.9.2 alternative: 4 x 750 lb)
+    caisson_dia_in: float = 20.0         # footing_type "caisson": drilled pier diameter
+    caisson_depth_in: Optional[float] = None   # None -> frost depth + 2"
+    hardware_finish: str = "ZMAX"        # "ZMAX" | "black" (powder-coat, Outdoor Accents)
+    finish: str = "none"                 # timbers: "none" (unfinished, weathers gray) | "oil" (dark walnut, 2 coats)
+    end_grain_seal: bool = True          # timber frames: seal every cut end
 
 
 @dataclass
@@ -101,6 +131,10 @@ class Decking:
     fascia_color: Optional[str] = None   # None -> field color
     fastener_system: Optional[str] = None      # None -> GSX default by material (composite: Camo EdgeClip; PVC: CONCEALoc)
     face_screw: str = "Starborn Cap-Tor xd 2-3/4\""
+    gap_in: Optional[float] = None       # override the line's field gap (Eagle's Nest: 1/8" on square-shoulder Vintage)
+    border_collection: Optional[str] = None    # contrast picture frame / dividers (None -> field collection)
+    border_color: Optional[str] = None
+    dividers: bool = False               # a divider board at every zone boundary (multi-zone plans)
 
 
 @dataclass
@@ -119,6 +153,10 @@ class Railing:
     sides: List[str] = field(default_factory=lambda: ["left", "right", "front"])
     openings: List[RailOpening] = field(default_factory=list)
     post_kind: str = "surface"           # Fulton = 2" steel post inside the outer rim ply (GSX detail)
+    edges: Optional[List[str]] = None    # multi-zone plans: which outline edges get rail — "front:A", "step:C-B", "end:left", "end:right". None -> every exposed edge
+    drink_rail: bool = False             # deck board on top of the rail (IRX): collection/color below
+    drink_rail_collection: Optional[str] = None
+    drink_rail_color: Optional[str] = None
 
 
 @dataclass
@@ -145,6 +183,13 @@ class Extras:
     lighting: bool = False
     gm: Optional[float] = None           # gross-margin override (default 0.45)
     site_extras: List[dict] = field(default_factory=list)   # [{"item": "Dumpster + portable toilet", "cost": 800}]
+    hot_tub_zone: Optional[str] = None   # zone name carrying the tub (multi-zone); None -> whole deck
+    hot_tub_bay_in: float = 96.0         # tub bay square, doubled joists across it
+    stone_bases: bool = False            # stone-veneer column bases at every post (2'x2' x 3' + 24" cap)
+    engineered: bool = False             # a stamped design is part of the job (quote shows engineering at cost)
+    engineering_fee_low: float = 1800.0
+    engineering_fee_high: float = 3000.0
+    options: List[Option] = field(default_factory=list)
 
 
 @dataclass
@@ -174,6 +219,15 @@ class DeckSpec:
         for k in ("width_ft", "depth_ft"):
             if k in g:
                 g[k.replace("_ft", "_in")] = float(g.pop(k)) * 12
+        zs = []
+        for z in g.get("zones") or []:
+            z = dict(z)
+            for k, unit in (("width", "ft"), ("depth", "ft"), ("wall_offset", "ft")):
+                if k in z and f"{k}_in" not in z:
+                    z[f"{k}_in"] = to_inches(z.pop(k), unit)
+            zs.append(z)
+        if zs:
+            g["zones"] = zs
         d["geometry"] = g
         st = []
         for s in d.get("stairs") or []:
@@ -214,12 +268,34 @@ class DeckSpec:
     def ledger_size(self) -> str:
         return self.framing.ledger_size or self.framing.joist_size
 
+    @property
+    def is_timber(self) -> bool:
+        return self.framing.system == "timber"
+
+    @property
+    def rim_plies(self) -> int:
+        return 1 if self.is_timber else self.framing.rim_plies
+
+    @property
+    def deck_gap(self) -> float:
+        if self.decking.gap_in is not None:
+            return float(self.decking.gap_in)
+        from .catalog import decking_facts
+        return decking_facts(self.decking.collection)["gap"]
+
+    @property
+    def zone_list(self) -> List["Zone"]:
+        """Always at least one zone: a single rectangle becomes zone 'A'."""
+        if self.geometry.zones:
+            return list(self.geometry.zones)
+        return [Zone("A", self.geometry.width_in, self.geometry.depth_in, 0.0)]
+
 
 _TYPE_MAP = {
     "site": Site, "geometry": Geometry, "framing": Framing, "decking": Decking,
     "railing": Railing, "extras": Extras,
 }
-_LIST_MAP = {"beams": Beam, "openings": RailOpening, "stairs": Stair}
+_LIST_MAP = {"beams": Beam, "openings": RailOpening, "stairs": Stair, "zones": Zone, "options": Option}
 
 
 def _build(cls, d: dict):

@@ -7,8 +7,17 @@ every line written the way Decks & Docks sells it with **NET** (drawing count), 
 reason they differ. It also flags setbacks, engineering triggers, snow, wind, fire (WUI), frost, guards and stair
 code, and carries the GSX pricing model (sell / retail / monthly) for the bid.
 
-The engine reproduces the approved 9528 Jason Ct hand takeoff line for line (`tests/test_jason_ct.py`) and encodes
-every framing, fastening and pricing rule in `docs/standards.md`.
+Two GSX jobs are the standards the engine is held to, both as regression tests:
+
+- **Eagle's Nest** (`examples/eagles_nest.json`, `tests/test_eagles_nest.py`) — the standard. A jogged three-zone
+  617 SF timber-frame deck: DF #1 4x10 joists at 12" on 6x12 beams and 8x8 posts, caissons with stone column bases,
+  Vintage Coastline square-shoulder on Cortex with a Dark Hickory border and dividers, IRX cable rail with a drink
+  rail, hot-tub bay, 80 psf Summit County snow, WUI practice, engineered. Quote format with financed / check-ACH
+  pricing, "what the price includes", options priced both ways, engineering at cost.
+- **Jason Ct** (`examples/jason_ct.json`, `tests/test_jason_ct.py`) — the dimensional-lumber standard: 12 x 16 on
+  2x10 SYP, drop 4x10 beam, Diamond Piers, Prime+ on EdgeClips, Fulton rail. Reproduced line for line.
+
+Every framing, fastening and pricing rule is written down in `docs/standards.md`.
 
 ## Quick start
 
@@ -24,6 +33,9 @@ python -m decktakeoff --details "11'9 x 15'7.5 in Thornton, 30 in high, Prime+ C
 # from a drawing / photo (Claude reads it; needs ANTHROPIC_API_KEY or `ant auth login`)
 python -m decktakeoff --image drawing.png --details "Prime+ Coconut Husk, Fulton black, deck is 30 in above grade" --out out/job
 
+# the client quote (Eagle's Nest format)
+python -m decktakeoff examples/eagles_nest.json --quote
+
 # HTTP service
 uvicorn decktakeoff.service:app --port 8000
 #   POST /takeoff    {"spec": {...}} or {"details": "..."}  (+ "price": true, "gsx": true)
@@ -32,9 +44,9 @@ uvicorn decktakeoff.service:app --port 8000
 ```
 
 Outputs (`--out DIR`): `takeoff.md` (design reads, order by category, fastener/connector schedule, cut list, flags,
-pricing), `takeoff.json` (everything, machine-readable), `order.csv` (the D&D order), `spec.json` (the resolved spec)
-and `gsx_job_block.py` — the geometry + BOM block that drops straight into the `gsx-deck-docs` build-set / proposal
-PDF pipeline.
+pricing), `takeoff.json` (everything, machine-readable), `order.csv` (the D&D order), `spec.json` (the resolved spec),
+`quote.md` (the client quote, with `--price`) and `gsx_job_block.py` — the geometry + BOM block that drops straight
+into the `gsx-deck-docs` build-set / proposal PDF pipeline.
 
 ## What goes in
 
@@ -51,12 +63,17 @@ width runs along the house, depth runs out from it. Rail openings and stairs are
   DOWN so every field board is a full board cut to a clean length (Jason Ct: 12 x 16 → 11'-9" x 15'-7 1/2" frame,
   11'-0" field boards, 33 rows) and states the finished dimensions. Pass `"size_mode": "frame"` to give
   outside-of-frame dimensions instead. Boards parallel to the house bear on two picture-frame joists set 5-1/4" from each face.
+- **Zones** — jogged plans are a list of rectangular zones left to right facing the house, each on its own wall
+  (recessed gables via `wall_offset`); the outline (fronts, steps, ends) drives the picture frame and the rail, with a
+  divider board on every zone line. Rail goes on the edges you name (`"front:A"`, `"step:C-B"`, `"end:right"`).
 - **Joists** #1 SYP 2x10 @ 16" OC (12" for PVC) checked against IRC R507.6; intermediate beams are added automatically
-  when the depth is beyond the span, and said so.
+  when the depth is beyond the span, and said so. Timber frames (DF #1 4x10 @ 12", 6x12 beams, 8x8 posts) are checked
+  with NDS-style bending and L/360 estimates and always flagged for the stamped set.
 - **Beams** drop (4x DF, face 2' back from the rim, cantilever ≤ L/4) or flush (in-plane, joists hang both sides; a
   flush beam at the front *is* the front rim). Post spacing from IRC R507.5 on the joist span including the cantilever.
 - **Posts / footings** 6x6 on Diamond Pier DP-50/50 (3,300 lb) via ABA66Z + BC46Z; auto-upgrades to DP-75/63 or flags;
-  concrete piers sized from soil bearing and frost depth when specified.
+  concrete piers sized from soil bearing and frost depth; drilled caissons (diameter, depth, rebar, ready-mix) with
+  optional stone column bases; black powder-coat Outdoor Accents hardware when the job calls for it.
 - **Connections** LUS hangers on every joist end, HUCQ concealed-flange doubles for the 2-ply rims, H2.5AZ at drop
   beams, DTT1Z lateral ties, LedgerLOK 2 rows staggered 12" OC, nails/screws counted by connector.
 - **Waterproofing** membrane + Z-flash + end dams on the ledger, G-Tape 2" on joists/blocking, 4" on rims and beams.
@@ -64,15 +81,17 @@ width runs along the house, depth runs out from it. Rail openings and stairs are
   first row, borders and fascia — counted per joist, per bearing point and per fascia piece. Cortex is refused on
   scalloped Prime+/Prime.
 - **Rail** Fulton 2" steel posts inside the outer rim ply, END / LINE / CORNER typed, 6' and 8' panels chosen and cut
-  lengths stated, rail LF = actual rail for labor, openings for concrete steps and stairs.
+  lengths stated, rail LF = actual rail for labor, openings for concrete steps and stairs. IRX cable rail: posts 6' OC,
+  top rail + cable kit per section, no bottom rail, drink-rail board and brackets on top.
 - **Stairs** riser count and height (≤ 7-3/4"), tread depth from two deck boards, 2x12 stringers @ 12" OC for composite
   treads, LSCZ connectors, treads/risers, stair panels and posts, handrail when 4+ risers, landing pad.
 - **Flags** (internal, never in client documents): setback violations, easements, HOA; engineering when tables don't
   apply (snow > 40 psf, hot tub, roof, > 10' high, spans/cantilevers exceeded, veneer or cantilevered-floor ledgers);
   wind ≥ 120 mph connector requirements; WUI product compliance; frost depth for concrete; guards over 30"; stair
   geometry and landings. See `docs/codes.md`.
-- **Pricing** sell = (materials + destination tax + labor) / (1 − GM) + general conditions at cost; retail (financed)
-  = (sell − GC) / 0.93 + GC; 6.99% / 10-yr monthly; client allocation summing exactly to the sell.
+- **Pricing** check/ACH = (materials + destination tax + labor) / (1 − GM) + general conditions at cost; financed =
+  check ÷ 0.93 (12 / 18-month no-payment, 6.99% / 10-yr monthly); "what the price includes" summing exactly to the
+  price; options priced both ways by re-running the engine with the change; engineering shown at cost, no markup.
 
 ## Layout
 
@@ -98,7 +117,8 @@ tests/
 
 ## Honest limits
 
-- Rectangles (one level). L-shapes and multi-level decks are taken off on the bounding rectangle and flagged.
+- One level. Jogged plans are handled as zones; true L-shapes (a wing running along a return wall) are best entered as
+  zones with a recessed wall, and multi-level decks are one spec per level.
 - Span tables are 2021 IRC prescriptive values; above 40 psf snow or 40 psf live the engine scales and flags for a
   stamped design — it never invents a span.
 - Prices marked `est.` in the pricebook are placeholders; pull the latest D&D quote before the number goes on a bid.

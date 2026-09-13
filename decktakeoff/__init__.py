@@ -4,11 +4,11 @@ from .spec import DeckSpec
 from .takeoff import build_takeoff, Takeoff
 from .flags import run_flags
 from .pricing import price
-from .report import takeoff_markdown, takeoff_json, order_csv, gsx_job_block
+from .report import takeoff_markdown, takeoff_json, order_csv, gsx_job_block, quote_markdown
 from .intake import parse_details, spec_from_drawing
 
 __all__ = ["DeckSpec", "build_takeoff", "Takeoff", "run_flags", "price", "takeoff_markdown", "takeoff_json", "order_csv",
-           "gsx_job_block", "parse_details", "spec_from_drawing", "run"]
+           "gsx_job_block", "quote_markdown", "parse_details", "spec_from_drawing", "run"]
 __version__ = "0.1.0"
 
 

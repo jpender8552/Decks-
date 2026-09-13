@@ -86,11 +86,14 @@ LUMBER = {  # nominal -> (actual b, actual d)
     "2x4": (1.5, 3.5), "2x6": (1.5, 5.5), "2x8": (1.5, 7.25), "2x10": (1.5, 9.25), "2x12": (1.5, 11.25),
     "4x4": (3.5, 3.5), "4x6": (3.5, 5.5), "4x8": (3.5, 7.25), "4x10": (3.5, 9.25), "4x12": (3.5, 11.25),
     "6x6": (5.5, 5.5), "6x8": (5.5, 7.25), "6x10": (5.5, 9.25), "6x12": (5.5, 11.25),
+    "8x8": (7.5, 7.5), "8x10": (7.5, 9.5), "8x12": (7.5, 11.5),
 }
 LUMBER_STOCK_FT = {"2x6": [8, 10, 12, 14, 16, 20], "2x8": [8, 10, 12, 14, 16, 20], "2x10": [8, 10, 12, 14, 16, 20, 24],
                    "2x12": [8, 10, 12, 14, 16, 20, 24], "4x8": [8, 10, 12, 16, 20], "4x10": [8, 10, 12, 16, 20], "4x12": [8, 10, 12, 16, 20],
-                   "6x6": [8, 10, 12, 16], "6x8": [8, 10, 12, 16], "6x10": [8, 10, 12, 16], "6x12": [8, 10, 12, 16]}
-SPECIES_NAMES = {"SYP": "#1 True Frame Joist SYP GC", "DF": "Douglas Fir #2", "SPF": "SPF #2", "HF": "Hem-Fir #2", "CEDAR": "Western Cedar #2"}
+                   "6x6": [8, 10, 12, 16], "6x8": [8, 10, 12, 16], "6x10": [8, 10, 12, 16, 20], "6x12": [8, 10, 12, 16, 20],
+                   "8x8": [8, 10, 12, 16], "8x10": [8, 10, 12, 16], "8x12": [8, 10, 12, 16]}
+SPECIES_NAMES = {"SYP": "#1 True Frame Joist SYP GC", "DF": "Douglas Fir #2", "SPF": "SPF #2", "HF": "Hem-Fir #2", "CEDAR": "Western Cedar #2",
+                 "DF#1": "Douglas Fir #1 timber (S4S, end grain sealed)"}
 
 
 def actual(nominal: str):
@@ -111,8 +114,13 @@ def parse_beam(size: str):
 
 
 # ---------------------------------------------------------------- connectors
-HANGER_FOR_JOIST = {"2x6": "LUS26Z", "2x8": "LUS28Z", "2x10": "LUS28Z", "2x12": "LUS210Z"}
-HANGER_NAILS = {"LUS26Z": (4, 4), "LUS28Z": (6, 4), "LUS210Z": (8, 6)}       # (10d 3" into header, 10d x 1-1/2" into joist)
+HANGER_FOR_JOIST = {"2x6": "LUS26Z", "2x8": "LUS28Z", "2x10": "LUS28Z", "2x12": "LUS210Z",
+                    "4x8": "HU48", "4x10": "HU410", "4x12": "HU412"}
+HANGER_NAILS = {"LUS26Z": (4, 4), "LUS28Z": (6, 4), "LUS210Z": (8, 6),        # (10d 3" into header, 10d x 1-1/2" into joist)
+                "HU48": (14, 6), "HU410": (18, 8), "HU412": (22, 8)}          # 16d into header, 10d x 1-1/2" into joist
+TIMBER_BEAM_TIE = "A35Z"           # joist-to-timber-beam framing angle, 2 per joist (engineer may substitute)
+TIMBER_CAP = {"8x8": "CCQ88SDS2.5", "6x6": "CCQ66SDS2.5"}   # column caps; 6x beam on 8x8 post uses the 8x8 cap with the beam centred
+TIMBER_BASE = {"8x8": "ABU88Z", "6x6": "ABU66Z"}
 DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ212-2-SDS"}
 TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
@@ -139,11 +147,17 @@ def post_cap(post: str, beam_size: str) -> str:
 
 # ---------------------------------------------------------------- railing
 RAIL_SYSTEMS = {
+    "IRX": dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_allow=0.0, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
+                cable=True, max_ctc=72.0, noncombustible=True,
+                note="TimberTech Impression Rail Express cable: 2\" aluminum posts, top rail, stainless cable infill, no bottom rail; posts 6' OC max"),
     "Fulton": dict(panels={72: 69.5, 96: 93.5}, post_w=2.0, bracket_allow=0.25, heights=[36, 42],
                    post_types=["END", "LINE", "CORNER", "STAIR"], note="2\" steel posts inside the outer rim ply; brackets, caps, skirts and screws ship with the posts"),
-    "Impression": dict(panels={72: 70.0, 96: 94.0}, post_w=2.5, bracket_allow=0.25, heights=[36, 42], post_types=["POST"], note="aluminum"),
-    "Classic Composite": dict(panels={72: 68.0, 96: 92.0}, post_w=5.5, bracket_allow=0.5, heights=[36, 42], post_types=["POST"], note="composite sleeve over 4x4"),
+    "Impression": dict(panels={72: 70.0, 96: 94.0}, post_w=2.5, bracket_allow=0.25, heights=[36, 42], post_types=["POST"], noncombustible=True, note="aluminum"),
+    "Classic Composite": dict(panels={72: 68.0, 96: 92.0}, post_w=5.5, bracket_allow=0.5, heights=[36, 42], post_types=["POST"], noncombustible=False, note="composite sleeve over 4x4"),
 }
+RAIL_SYSTEMS["Fulton"]["noncombustible"] = True
+RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
+RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]
 
 
 def tax_rate_for(city: str, override=None) -> float:

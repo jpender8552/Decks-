@@ -242,3 +242,66 @@ def stair_geometry(total_rise_in: float, width_in: float, composite_treads: bool
         notes.append("riser under 4\" — check with the deck height; maybe a single step or a landing instead")
     return StairGeometry(total_rise_in, risers, round(riser, 3), treads, tread_in, run, length, stock, stringers,
                          risers >= HANDRAIL_MIN_RISERS, total_rise_in > GUARD_TRIGGER_HEIGHT, notes)
+
+
+# ------------------------------------------------------------- solid-sawn timber (pre-engineering estimate, NDS-style)
+# Douglas Fir-Larch reference design values (NDS supplement). Dimension lumber (2"-4" thick) #1; Beams & Stringers (5"+ thick) #1;
+# Posts & Timbers #1. Fb/E in psi. Adjusted: Cd 1.15 (snow), Cr 1.15 (repetitive joists), CF size factor approximated.
+TIMBER_DESIGN = {
+    "DF#1": {"dim": dict(Fb=1000, E=1.7e6, Fv=180), "bs": dict(Fb=1350, E=1.6e6, Fv=170), "pt": dict(Fc=1200, E=1.6e6)},
+    "DF":   {"dim": dict(Fb=900, E=1.6e6, Fv=180), "bs": dict(Fb=875, E=1.3e6, Fv=170), "pt": dict(Fc=700, E=1.3e6)},
+    "SYP":  {"dim": dict(Fb=1250, E=1.6e6, Fv=175), "bs": dict(Fb=1350, E=1.5e6, Fv=165), "pt": dict(Fc=1100, E=1.5e6)},
+}
+CD_SNOW = 1.15
+CR_REP = 1.15
+
+
+def _cf(depth_in: float, width_in: float) -> float:
+    """NDS size factor (dimension lumber) / B&S depth factor approximation."""
+    if width_in >= 5:
+        return min(1.0, (12.0 / depth_in) ** (1 / 9)) if depth_in > 12 else 1.0
+    return {3.5: 1.5, 5.5: 1.4, 7.25: 1.2, 9.25: 1.1, 11.25: 1.0}.get(depth_in, 1.0)
+
+
+def timber_allowable_span(size: str, species: str, w_plf: float, repetitive: bool, defl: float = 360.0) -> Tuple[float, str]:
+    """Simply supported allowable span (in) for a solid-sawn member under a uniform load, bending vs L/defl.
+    Returns (span, governing)."""
+    plies, nom, b, d = parse_beam(size)
+    grp = "bs" if b >= 5 else "dim"
+    v = TIMBER_DESIGN.get(species, TIMBER_DESIGN["DF#1"])[grp]
+    Fb = v["Fb"] * CD_SNOW * _cf(d, b) * (CR_REP if repetitive and b < 5 else 1.0)
+    S = plies * b * d * d / 6.0
+    I = plies * b * d ** 3 / 12.0
+    w = w_plf / 12.0                                   # lb/in
+    L_bend = math.sqrt(8 * Fb * S / w)                 # M = wL^2/8 <= Fb*S
+    L_defl = (384 * v["E"] * I / (5 * defl * w)) ** (1 / 3)   # 5wL^4/384EI <= L/defl
+    if L_bend <= L_defl:
+        return L_bend, "bending"
+    return L_defl, f"L/{defl:.0f} deflection"
+
+
+def check_timber_joist(size: str, species: str, spacing: float, span_in: float, total_psf: float) -> SpanCheck:
+    w = total_psf * spacing / 12.0
+    allow, gov = timber_allowable_span(size, species, w, repetitive=True)
+    return SpanCheck("joist", size, species, spacing, span_in, allow, allow, total_psf, span_in <= allow + 0.5,
+                     f"timber pre-engineering estimate ({gov} governs) — stamped design required")
+
+
+def check_timber_beam(size: str, species: str, trib_depth_in: float, post_spacing_in: float, total_psf: float) -> SpanCheck:
+    w = total_psf * trib_depth_in / 12.0
+    allow, gov = timber_allowable_span(size, species, w, repetitive=False)
+    return SpanCheck("beam", size, species, post_spacing_in, post_spacing_in, allow, allow, total_psf, post_spacing_in <= allow + 0.5,
+                     f"timber pre-engineering estimate ({gov} governs) — stamped design required")
+
+
+def timber_post_capacity_lb(size: str, species: str, height_in: float) -> float:
+    """NDS column capacity (Euler-adjusted Fc') for a solid post."""
+    b, d = LUMBER[size]
+    v = TIMBER_DESIGN.get(species, TIMBER_DESIGN["DF#1"])["pt"]
+    Fc = v["Fc"] * CD_SNOW
+    le_d = height_in / min(b, d)
+    FcE = 0.822 * v["E"] / le_d ** 2
+    c = 0.8
+    r = FcE / Fc
+    Cp = (1 + r) / (2 * c) - math.sqrt(((1 + r) / (2 * c)) ** 2 - r / c)
+    return Fc * Cp * b * d

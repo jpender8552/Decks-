@@ -38,7 +38,13 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
     t = text or ""
     low = t.lower()
     g = d.setdefault("geometry", {})
-    m = re.search(_DIMPAIR, low)
+    zones = []
+    for zm in re.finditer(r"zone\s+([a-z])\s*[:\-]?\s*(?P<a>" + _DIM1 + r")\s*(?:x|×|by)\s*(?P<b>" + _DIM1 + r")(?:[^.;,]*?(?:recess|set back|offset)\D{0,6}(?P<off>\d+(?:\.\d+)?)\s*(?:'|ft)?)?", low):
+        zones.append({"name": zm.group(1).upper(), "width_in": _ft(zm.group("a")) * 12, "depth_in": _ft(zm.group("b")) * 12,
+                      "wall_offset_in": float(zm.group("off") or 0) * 12})
+    if zones:
+        g["zones"] = zones
+    m = None if zones else re.search(_DIMPAIR, low)
     if m:
         a, b = _ft(m.group("a")), _ft(m.group("b"))
         # convention: first number along the house (width), second out from the house (depth) unless told otherwise
@@ -54,6 +60,21 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
     m = re.search(r"(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(?:high|tall|off (?:the )?grade|above grade)", low)
     if m and "height_in" not in g:
         g["height_in"] = float(m.group(1)) * 12
+    if re.search(r"timber frame|timber[- ]framed|4x10 joist|6x12 beam|8x8 post", low):
+        fr_ = d.setdefault("framing", {})
+        fr_.update({"system": "timber", "joist_size": "4x10", "joist_species": "DF", "joist_grade": "#1", "joist_spacing_in": 12.0, "post_size": "8x8",
+                    "beams": [{"kind": "drop", "size": "6x12", "species": "DF", "setback_in": 24}], "ledger_fastener": "1/2 bolt", "joist_tape": False,
+                    "hardware_finish": "black" if "black hardware" in low else "ZMAX"})
+        if re.search(r"caisson", low):
+            fr_["footing_type"] = "caisson"
+    if re.search(r"cable rail|irx|impression rail express", low):
+        d.setdefault("railing", {})["system"] = "IRX"
+    if re.search(r"drink rail", low):
+        d.setdefault("railing", {})["drink_rail"] = True
+    if re.search(r"stone (?:column )?bases?", low):
+        d.setdefault("extras", {})["stone_bases"] = True
+    if re.search(r"engineer", low):
+        d.setdefault("extras", {})["engineered"] = True
     if re.search(r"free.?standing|floating|no ledger", low):
         g["attachment"] = "freestanding"
     if re.search(r"perpendicular|boards? run(?:ning)? (?:out|away)", low):
@@ -167,7 +188,7 @@ def parse_details(text: str, base: Optional[dict] = None) -> DeckSpec:
 # ---------------------------------------------------------------- drawing intake (Claude vision)
 SPEC_SCHEMA = {
     "type": "object", "additionalProperties": False,
-    "required": ["width_ft", "depth_ft", "height_in", "attachment", "board_direction", "picture_frame", "stairs", "rail_sides",
+    "required": ["width_ft", "depth_ft", "height_in", "attachment", "board_direction", "picture_frame", "stairs", "rail_sides", "zones",
                  "rail_openings", "beam_kind", "beam_setback_ft", "decking_collection", "decking_color", "rail_system", "rail_color",
                  "notes", "confidence", "unreadable"],
     "properties": {
@@ -188,6 +209,11 @@ SPEC_SCHEMA = {
         "decking_color": {"type": "string"},
         "rail_system": {"type": "string"},
         "rail_color": {"type": "string"},
+        "zones": {"type": "array", "description": "jogged / multi-zone plans: rectangular bays LEFT to RIGHT facing the house; empty for one rectangle",
+                  "items": {"type": "object", "additionalProperties": False, "required": ["name", "width_ft", "depth_ft", "wall_offset_ft", "label", "privacy_wall"],
+                            "properties": {"name": {"type": "string"}, "width_ft": {"type": "number"}, "depth_ft": {"type": "number"},
+                                           "wall_offset_ft": {"type": "number", "description": "how far this zone's house wall is set back from the reference wall; 0 if in line"},
+                                           "label": {"type": "string"}, "privacy_wall": {"type": "boolean"}}}},
         "notes": {"type": "array", "items": {"type": "string"}, "description": "every dimension, callout, and assumption read from the drawing"},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
         "unreadable": {"type": "array", "items": {"type": "string"}, "description": "things the drawing should show but you could not read"},
@@ -249,6 +275,9 @@ def spec_from_extraction(x: dict, details: str = "", base: Optional[dict] = None
         g["board_direction"] = x["board_direction"]
     if "picture_frame" in x:
         g["picture_frame"] = bool(x["picture_frame"])
+    if x.get("zones"):
+        g["zones"] = [{"name": z["name"], "width_in": z["width_ft"] * 12, "depth_in": z["depth_ft"] * 12, "wall_offset_in": z.get("wall_offset_ft", 0) * 12,
+                       "label": z.get("label", ""), "privacy_wall": bool(z.get("privacy_wall"))} for z in x["zones"]]
     fr = d.setdefault("framing", {})
     if x.get("beam_kind") in ("drop", "flush"):
         b = {"kind": x["beam_kind"], "size": "4x10" if x["beam_kind"] == "drop" else "(2)2x10", "species": "DF" if x["beam_kind"] == "drop" else "SYP"}
