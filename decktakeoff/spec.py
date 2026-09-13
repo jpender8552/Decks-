@@ -41,7 +41,7 @@ class Site:
     deck_to_side_line_ft: Optional[float] = None
     easements: List[str] = field(default_factory=list)   # e.g. ["10' utility easement along rear"]
     hoa: bool = False
-    tax_rate: Optional[float] = None     # destination combined sales-tax rate; None -> lookup by city
+    tax_rate: Optional[float] = None     # None -> pricebook standing rate (4% on factored materials); set for a destination rate
     notes: str = ""
 
 
@@ -90,9 +90,11 @@ class Beam:
     kind: str = "drop"                   # "drop" (under the joists, joists cantilever past) | "flush" (in-plane, joists hang)
     size: str = "4x10"                   # "4x10", "(2)2x10", "(3)2x10", "4x12", "6x10" ...
     species: str = "DF"                  # "DF" | "SYP" | "SPF" | "HF"
-    setback_in: Optional[float] = 24.0   # beam FACE back from the front rim face (drop) / beam CL from rim face (flush)
+    setback_in: Optional[float] = 24.0   # beam FACE back from the front rim face (drop) / beam CL back from the front rim face (flush)
     post_spacing_max_in: Optional[float] = None   # None -> from span table
-    position_in: Optional[float] = None  # explicit CL from house face (overrides setback)
+    position_in: Optional[float] = None  # explicit CL from the house face (overrides setback; single-zone only)
+    zones: Optional[List[str]] = None    # multi-zone plans: which zones this beam runs under (None = all). A drop beam at the same
+                                         # setback in adjacent zones is one continuous beam line with shared posts.
 
 
 @dataclass
@@ -181,8 +183,10 @@ class Extras:
     ledger_on_cantilevered_floor: bool = False
     privacy_wall: bool = False
     lighting: bool = False
-    gm: Optional[float] = None           # gross-margin override (default 0.45)
-    site_extras: List[dict] = field(default_factory=list)   # [{"item": "Dumpster + portable toilet", "cost": 800}]
+    gm: Optional[float] = None           # gross-margin override (default 42.5%, 40% floor)
+    material_factor: Optional[float] = None    # None -> pricebook 1.15 (owner: materials +15%)
+    site_extras: List[dict] = field(default_factory=list)   # [{"item": "Dumpster + portable toilet", "cost": 800}] (per-SF GC method)
+    general_conditions: List[dict] = field(default_factory=list)   # itemized GC at cost [{"item","amount","why"}]; empty -> $4/SF + site_extras
     hot_tub_zone: Optional[str] = None   # zone name carrying the tub (multi-zone); None -> whole deck
     hot_tub_bay_in: float = 96.0         # tub bay square, doubled joists across it
     stone_bases: bool = False            # stone-veneer column bases at every post (2'x2' x 3' + 24" cap)

@@ -1,34 +1,232 @@
 {
   "job": "Eagle's Nest 617 SF deck",
   "client": "Dave & Julie Wirth",
-  "site": {"address": "9 Eagle's Nest Court", "city": "Silverthorne", "state": "CO", "ground_snow_psf": 80, "wind_speed_mph": 115,
-           "frost_depth_in": 40, "soil_bearing_psf": 2000, "wui_fire_zone": true, "notes": "Summit County snow design 80 psf"},
-  "geometry": {"height_in": 96, "attachment": "ledger", "board_direction": "parallel", "picture_frame": true,
-               "zones": [
-                 {"name": "C", "label": "Deep wing", "width": "12'-7\"", "depth": 23, "wall_offset": 14, "privacy_wall": true},
-                 {"name": "B", "label": "Dining terrace", "width": "14'-7\"", "depth": 9, "wall_offset": 0},
-                 {"name": "A", "label": "Lounge", "width": 28, "depth": 7, "wall_offset": 0}
-               ]},
-  "framing": {"system": "timber", "joist_size": "4x10", "joist_species": "DF", "joist_grade": "#1", "joist_spacing_in": 12,
-              "ledger_fastener": "1/2 bolt",
-              "beams": [{"kind": "drop", "size": "6x12", "species": "DF", "setback_in": 24}],
-              "post_size": "8x8", "footing_type": "caisson", "caisson_dia_in": 20, "caisson_depth_in": 42,
-              "hardware_finish": "black", "finish": "none", "end_grain_seal": true, "joist_tape": false},
-  "decking": {"brand": "TimberTech", "collection": "Vintage", "color": "Coastline", "profile": "square", "gap_in": 0.125, "fascia": false,
-              "fastener_system": "Cortex", "border_collection": "Vintage", "border_color": "Dark Hickory", "dividers": true},
-  "railing": {"system": "IRX", "color": "Matte Black", "height_in": 36, "edges": ["front:C", "front:B", "front:A", "end:right"],
-              "drink_rail": true, "drink_rail_collection": "Vintage", "drink_rail_color": "Dark Hickory"},
+  "site": {
+    "address": "9 Eagle's Nest Court",
+    "city": "Silverthorne",
+    "state": "CO",
+    "ground_snow_psf": 80,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 40,
+    "soil_bearing_psf": 2000,
+    "wui_fire_zone": true,
+    "notes": "Summit County criteria by choice (80 psf roof snow, 40\" frost, 115 mph, seismic B); 2025 CWRC Class 2 practice; NO permit (owner election 6 Sep 2026). Front lot line 25' off the deck edge; the west lot line is the privacy wall (deck sits at it).",
+    "zip": "80498",
+    "deck_to_rear_line_ft": 25,
+    "rear_setback_required_ft": 25,
+    "deck_to_side_line_ft": 0,
+    "side_setback_required_ft": 0,
+    "easements": []
+  },
+  "geometry": {
+    "height_in": 96,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true,
+    "zones": [
+      {
+        "name": "C",
+        "label": "Deep wing",
+        "width": 12.6,
+        "depth": 23,
+        "wall_offset": 16,
+        "privacy_wall": true
+      },
+      {
+        "name": "B",
+        "label": "Dining terrace",
+        "width": 14.6,
+        "depth": 9,
+        "wall_offset": 2
+      },
+      {
+        "name": "A",
+        "label": "Lounge",
+        "width": 28,
+        "depth": 7,
+        "wall_offset": 0
+      }
+    ]
+  },
+  "framing": {
+    "system": "timber",
+    "joist_size": "4x10",
+    "joist_species": "DF",
+    "joist_grade": "#1",
+    "joist_spacing_in": 12,
+    "ledger_fastener": "LedgerLOK 6",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "6x12",
+        "species": "DF",
+        "setback_in": 33.25
+      },
+      {
+        "kind": "flush",
+        "size": "6x12",
+        "species": "DF",
+        "setback_in": 144,
+        "zones": [
+          "C"
+        ]
+      }
+    ],
+    "post_size": "8x8",
+    "footing_type": "caisson",
+    "caisson_dia_in": 20,
+    "caisson_depth_in": 42,
+    "hardware_finish": "black",
+    "finish": "none",
+    "end_grain_seal": true,
+    "joist_tape": false
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Vintage",
+    "color": "Coastline",
+    "profile": "square",
+    "gap_in": 0.125,
+    "fascia": false,
+    "fastener_system": "Cortex",
+    "border_collection": "Vintage",
+    "border_color": "Dark Hickory",
+    "dividers": true
+  },
+  "railing": {
+    "system": "IRX",
+    "color": "Matte Black",
+    "height_in": 36,
+    "edges": [
+      "front:C",
+      "front:B",
+      "front:A",
+      "end:right"
+    ],
+    "drink_rail": true,
+    "drink_rail_collection": "Vintage",
+    "drink_rail_color": "Dark Hickory"
+  },
   "stairs": [],
-  "extras": {"demo_existing": true, "hot_tub": true, "hot_tub_zone": "C", "hot_tub_bay_in": 96, "stone_bases": true, "engineered": true,
-             "engineering_fee_low": 1800, "engineering_fee_high": 3000,
-             "options": [
-               {"name": "Fortress Evolution steel frame", "cost": 1000, "note": "in place of the timber joists — priced as an adder"},
-               {"name": "Dark walnut oil finish on all timbers", "changes": {"framing": {"finish": "oil"}}},
-               {"name": "Concrete pad under the deck", "cost": 9500},
-               {"name": "Privacy wall, Hardie board & batten — 23'", "cost": 4100},
-               {"name": "Privacy wall, aluminum slats — 23'", "cost": 6900},
-               {"name": "TimberTech Fulton Rail in place of the IRX cable rail", "changes": {"railing": {"system": "Fulton", "color": "Black", "drink_rail": false}}},
-               {"name": "No stone column bases", "changes": {"extras": {"stone_bases": false}}},
-               {"name": "No drink rail", "changes": {"railing": {"drink_rail": false}}}
-             ]}
+  "extras": {
+    "demo_existing": true,
+    "hot_tub": true,
+    "hot_tub_zone": "C",
+    "hot_tub_bay_in": 96,
+    "stone_bases": true,
+    "engineered": true,
+    "engineering_fee_low": 1800,
+    "engineering_fee_high": 3000,
+    "options": [
+      {
+        "name": "Fortress Evolution steel frame",
+        "cost": 1132,
+        "note": "Fortress Evolution galvanized-steel joists in place of the 4x10 Douglas fir joists; material difference only \u2014 Henry to quote"
+      },
+      {
+        "name": "Dark walnut oil finish on all timbers",
+        "changes": {
+          "framing": {
+            "finish": "oil"
+          }
+        }
+      },
+      {
+        "name": "Concrete pad under the deck",
+        "cost": 10210.28,
+        "note": "4\" broom-finish slab on the 617 SF footprint, poured after the caissons \u2014 owner-set $17,757"
+      },
+      {
+        "name": "Privacy wall, Hardie board & batten \u2014 23'",
+        "cost": 4368.53
+      },
+      {
+        "name": "Privacy wall, aluminum slats \u2014 23'",
+        "cost": 7327.0
+      },
+      {
+        "name": "TimberTech Fulton Rail in place of the IRX cable rail",
+        "changes": {
+          "railing": {
+            "system": "Fulton",
+            "color": "Black"
+          }
+        }
+      },
+      {
+        "name": "No stone column bases",
+        "changes": {
+          "extras": {
+            "stone_bases": false
+          }
+        }
+      },
+      {
+        "name": "No drink rail",
+        "changes": {
+          "railing": {
+            "drink_rail": false
+          }
+        }
+      }
+    ],
+    "demo_sf": 451.6,
+    "general_conditions": [
+      {
+        "item": "Project management & supervision \u2014 20 hr",
+        "amount": 1700,
+        "why": "layout, holds, engineer + D&D coordination, QC gates"
+      },
+      {
+        "item": "Mobilization / demobilization \u2014 trailer, tools, lift",
+        "amount": 800,
+        "why": "Littleton to Silverthorne"
+      },
+      {
+        "item": "811 utility locate + survey day",
+        "amount": 250,
+        "why": ""
+      },
+      {
+        "item": "Dumpster 20 yd \u2014 demo + construction",
+        "amount": 650,
+        "why": ""
+      },
+      {
+        "item": "Portable toilet",
+        "amount": 200,
+        "why": ""
+      },
+      {
+        "item": "Material delivery \u2014 D&D Denver to Silverthorne, 2 drops",
+        "amount": 700,
+        "why": "boom truck for the timbers"
+      },
+      {
+        "item": "Equipment \u2014 20\" auger rig, lift day for the 6x12s",
+        "amount": 600,
+        "why": ""
+      },
+      {
+        "item": "Site protection \u2014 Ram Board, plywood paths, tarps, tree protection",
+        "amount": 250,
+        "why": ""
+      },
+      {
+        "item": "Mountain travel / per diem \u2014 15 crew-days",
+        "amount": 1500,
+        "why": ""
+      },
+      {
+        "item": "Final clean, magnet sweep x 2",
+        "amount": 150,
+        "why": ""
+      },
+      {
+        "item": "Contingency",
+        "amount": 400,
+        "why": ""
+      }
+    ]
+  }
 }

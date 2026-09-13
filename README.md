@@ -9,11 +9,13 @@ code, and carries the GSX pricing model (sell / retail / monthly) for the bid.
 
 Two GSX jobs are the standards the engine is held to, both as regression tests:
 
-- **Eagle's Nest** (`examples/eagles_nest.json`, `tests/test_eagles_nest.py`) — the standard. A jogged three-zone
-  617 SF timber-frame deck: DF #1 4x10 joists at 12" on 6x12 beams and 8x8 posts, caissons with stone column bases,
-  Vintage Coastline square-shoulder on Cortex with a Dark Hickory border and dividers, IRX cable rail with a drink
-  rail, hot-tub bay, 80 psf Summit County snow, WUI practice, engineered. Quote format with financed / check-ACH
-  pricing, "what the price includes", options priced both ways, engineering at cost.
+- **Eagle's Nest** (`examples/eagles_nest.json`, `tests/test_eagles_nest.py`) — the standard, rebuilt from the
+  Session-Handoff v32 model. A jogged three-zone 617.2 SF timber-frame deck: DF #1 4x10 joists at 12" on one
+  continuous 6x12 drop beam 3' back (6 posts) and a 6x12 flush beam in the deep wing (2 posts), 8 caissons with stone
+  column bases, black hardware, Vintage Coastline square-shoulder on Cortex with a Dark Hickory border and dividers,
+  IRX cable rail on 9 bays with a drink rail, hot-tub bay, 80 psf Summit County snow, WUI practice, engineered. The
+  engine reproduces the handoff's order and lands within 1% of its $123,291 check / $132,571 financed, with the
+  option menu priced both ways.
 - **Jason Ct** (`examples/jason_ct.json`, `tests/test_jason_ct.py`) — the dimensional-lumber standard: 12 x 16 on
   2x10 SYP, drop 4x10 beam, Diamond Piers, Prime+ on EdgeClips, Fulton rail. Reproduced line for line.
 
@@ -89,9 +91,11 @@ width runs along the house, depth runs out from it. Rail openings and stairs are
   apply (snow > 40 psf, hot tub, roof, > 10' high, spans/cantilevers exceeded, veneer or cantilevered-floor ledgers);
   wind ≥ 120 mph connector requirements; WUI product compliance; frost depth for concrete; guards over 30"; stair
   geometry and landings. See `docs/codes.md`.
-- **Pricing** check/ACH = (materials + destination tax + labor) / (1 − GM) + general conditions at cost; financed =
-  check ÷ 0.93 (12 / 18-month no-payment, 6.99% / 10-yr monthly); "what the price includes" summing exactly to the
-  price; options priced both ways by re-running the engine with the change; engineering shown at cost, no markup.
+- **Pricing** check/ACH = (materials × 1.15 + 4% tax + rate-card labor) ÷ (1 − 42.5% GM) + itemized general
+  conditions at cost; financed = check ÷ 0.93 (12 / 18-month no-payment, 6.99% / 10-yr monthly); "what the price
+  includes" at sell values summing exactly to the price; options as full installed deltas both ways by re-running the
+  engine with the change; engineering shown as a range at cost, outside the price. Factor, tax, GM and GC method are
+  per-job overrides (Jason Ct: 1.0 / 8.5% / 45% / $4 per SF).
 
 ## Layout
 

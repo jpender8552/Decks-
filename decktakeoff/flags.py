@@ -70,7 +70,10 @@ def run_flags(L: Layout) -> List[Flag]:
         if c.note:
             add("ENGINEER", "engineering", f"{b.label}: {c.note}", "IRC Table R507.5")
         if b.kind == "drop" and b.cantilever > eng.CANTILEVER_RATIO * b.back_span + 0.5:
-            add("STOP", "engineering", f"cantilever {ftin(b.cantilever)} > L/4 of {ftin(b.back_span)} back-span", "IRC R507.5 / R507.6")
+            if ex.engineered:
+                add("ENGINEER", "engineering", f"cantilever {ftin(b.cantilever)} > L/4 of the {ftin(b.back_span)} back-span — owner-directed, in the stamped set", "IRC R507.5 / R507.6")
+            else:
+                add("STOP", "engineering", f"cantilever {ftin(b.cantilever)} > L/4 of {ftin(b.back_span)} back-span", "IRC R507.5 / R507.6")
         if b.kind == "flush" and b.depth + 0.01 < actual(fr.joist_size)[1]:
             add("CODE", "engineering", f"flush beam {b.size} is shallower than the {fr.joist_size} joists it carries — beam depth must be >= joist depth", "IRC R507.5 note")
     ok, mx = fr.post_height_check
@@ -102,7 +105,8 @@ def run_flags(L: Layout) -> List[Flag]:
         if ex.ledger_on_cantilevered_floor:
             add("ENGINEER", "ledger", "house floor cantilevers past the foundation — ledger attachment to a cantilevered floor needs an engineered detail or a freestanding deck", "IRC R507.9.1")
         add("CHECK", "ledger", "verify the rim board behind the ledger is solid 2x/LVL/engineered rim (not I-joist web or a hollow band) before the ledger fasteners go in", "IRC R507.9.1.1")
-        add("INFO", "ledger", f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing", "IRC R507.9.2")
+        if not s.is_timber:
+            add("INFO", "ledger", f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing", "IRC R507.9.2")
 
     # ---------------- wind
     v = site.wind_speed_mph

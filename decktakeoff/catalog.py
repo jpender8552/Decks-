@@ -115,13 +115,13 @@ def parse_beam(size: str):
 
 # ---------------------------------------------------------------- connectors
 HANGER_FOR_JOIST = {"2x6": "LUS26Z", "2x8": "LUS28Z", "2x10": "LUS28Z", "2x12": "LUS210Z",
-                    "4x8": "HU48", "4x10": "HU410", "4x12": "HU412"}
+                    "4x8": "LUS48Z", "4x10": "LUS410Z", "4x12": "LUS410Z"}
 HANGER_NAILS = {"LUS26Z": (4, 4), "LUS28Z": (6, 4), "LUS210Z": (8, 6),        # (10d 3" into header, 10d x 1-1/2" into joist)
-                "HU48": (14, 6), "HU410": (18, 8), "HU412": (22, 8)}          # 16d into header, 10d x 1-1/2" into joist
-TIMBER_BEAM_TIE = "A35Z"           # joist-to-timber-beam framing angle, 2 per joist (engineer may substitute)
-TIMBER_CAP = {"8x8": "CCQ88SDS2.5", "6x6": "CCQ66SDS2.5"}   # column caps; 6x beam on 8x8 post uses the 8x8 cap with the beam centred
-TIMBER_BASE = {"8x8": "ABU88Z", "6x6": "ABU66Z"}
-DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ212-2-SDS"}
+                "LUS48Z": (6, 4), "LUS410Z": (8, 6)}
+TIMBER_BEAM_TIE = "A35Z"           # (legacy) framing angle; the Eagle's Nest standard uses H2.5AZ at the drop beam
+TIMBER_CAP = {"8x8": ("CCQ68SDS2.5", "ECCQ68SDS2.5"), "6x6": ("CCQ66SDS2.5", "ECCQ66SDS2.5")}   # (intermediate, beam-end) column caps
+TIMBER_BASE = {"8x8": ("APB88_black", "ABU88Z"), "6x6": ("ABU66Z_black", "ABU66Z")}                # (black, galvanized)
+DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ212-2-SDS", "4x8": "HUC410", "4x10": "HUC410", "4x12": "HUC410"}
 TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
 POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"}}
@@ -148,8 +148,8 @@ def post_cap(post: str, beam_size: str) -> str:
 # ---------------------------------------------------------------- railing
 RAIL_SYSTEMS = {
     "IRX": dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_allow=0.0, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
-                cable=True, max_ctc=72.0, noncombustible=True,
-                note="TimberTech Impression Rail Express cable: 2\" aluminum posts, top rail, stainless cable infill, no bottom rail; posts 6' OC max"),
+                cable=True, max_ctc=96.0, noncombustible=True,
+                note="TimberTech Impression Rail Express cable: aluminum posts, top rail, stainless cable infill, no bottom rail; 8' kits cut to bay, posts on the divider lines"),
     "Fulton": dict(panels={72: 69.5, 96: 93.5}, post_w=2.0, bracket_allow=0.25, heights=[36, 42],
                    post_types=["END", "LINE", "CORNER", "STAIR"], note="2\" steel posts inside the outer rim ply; brackets, caps, skirts and screws ship with the posts"),
     "Impression": dict(panels={72: 70.0, 96: 94.0}, post_w=2.5, bracket_allow=0.25, heights=[36, 42], post_types=["POST"], noncombustible=True, note="aluminum"),

@@ -76,12 +76,39 @@ def takeoff_markdown(t: Takeoff, flags: Optional[List[Flag]] = None, pricing: Op
         w("")
     if pricing is not None:
         w("## Pricing (INTERNAL)")
-        w(f"- Materials ${pricing.materials:,.2f} · tax {pricing.tax_rate:.2%} ${pricing.tax:,.2f} · labor ${pricing.labor:,.2f} · GC ${pricing.gc:,.2f} (at cost)")
+        w("| | |")
+        w("|---|---:|")
+        w(f"| Materials (raw) | ${pricing.materials:,.2f} |")
+        w(f"| Materials x {pricing.material_factor:g} | ${pricing.materials_factored:,.2f} |")
+        w(f"| Sales tax {pricing.tax_rate:.2%} on factored materials | ${pricing.tax:,.2f} |")
+        w(f"| Labor (rate card) | ${pricing.labor:,.2f} |")
+        w(f"| Work (carries the margin) | ${pricing.work:,.2f} |")
+        w(f"| General conditions at cost | ${pricing.gc:,.2f} |")
+        w(f"| Cost | ${pricing.cost:,.2f} |")
+        w(f"| **Sell — check or ACH** at {pricing.gm:.1%} GM | **${pricing.sell:,.0f}** (${pricing.sell_per_sf:,.2f}/SF) |")
+        w(f"| Sell at the 40% floor | ${pricing.sell_floor:,.0f} |")
+        w(f"| **Financed** (÷ 0.93) | **${pricing.retail:,.0f}** · ${pricing.monthly:,.0f}/mo at 6.99% / 10 yr |")
+        w(f"| Gross profit | ${pricing.gp:,.0f} |")
+        if pricing.engineering:
+            w(f"| Engineering (outside the price, at cost) | ${pricing.engineering[0]:,.0f}–${pricing.engineering[1]:,.0f} |")
+        w("")
+        w("Labor:")
         for i, q, u, r, e in pricing.labor_lines:
-            w(f"  - {i}: {q:g} {u} × ${r:g} = ${e:,.2f}")
-        w(f"- **Sell (check or ACH) ${pricing.sell:,.0f}** at {pricing.gm:.1%} GM · floor ${pricing.sell_floor:,.0f} at 40% · GP ${pricing.gp:,.0f}")
-        w(f"- **Retail (financed) ${pricing.retail:,.0f}** · ${pricing.monthly:,.0f}/mo at 6.99% / 10 yr")
-        w("- What the price includes: " + " · ".join(f"{k} ${v:,.0f}" for k, v in pricing.allocation))
+            w(f"- {i}: {q:g} {u} × ${r:g} = ${e:,.2f}")
+        w("")
+        w("General conditions (at cost, no margin):")
+        for i, a, why in pricing.gc_lines:
+            w(f"- {i}: ${a:,.0f}" + (f" — {why}" if why else ""))
+        w("")
+        w("What the price includes (sell values): " + " · ".join(f"{k} ${v:,.0f}" for k, v in pricing.allocation))
+        if pricing.options:
+            w("")
+            w("Options (full installed deltas — cost / check / financed):")
+            for o in pricing.options:
+                w(f"- {o.name}: cost {o.cost:+,.0f} → check {o.check:+,.0f} / financed {o.financed:+,.0f}" + (f" — {o.note}" if o.note else ""))
+        if pricing.dealer_fee_note:
+            w("")
+            w(f"Open: {pricing.dealer_fee_note}")
         w("")
     return "\n".join(out)
 

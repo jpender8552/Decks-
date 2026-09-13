@@ -14,7 +14,9 @@ from .units import ftin
 
 PF_INSET = 5.25       # picture-frame joist centre from the frame face for 2x framing (1-1/2" gap inboard of a double rim)
 RIM_PLY = 1.5
-CAISSON_STANDOFF = 3.0  # caisson top ~1" above grade + standoff base
+CAISSON_STANDOFF = 7.0  # caisson 6" above grade + 1" standoff base (Eagle's Nest: post = 96 - 1 - 9.25 - 11.5 - 7 = 67.25")
+OVERHANG_NO_FASCIA = 1.5   # boards overhang the exposed rim 1-1/2" when there is no fascia (Eagle's Nest)
+BLOCK_MAX_SPACING = 48.0   # timber frames: a blocking row so no unblocked joist run between supports exceeds 4' 
 LEDGER_T = 1.5
 RAIL_POST_INSET = 2.5 # 2" Fulton post against the inside of the OUTER rim ply -> centre 2.5" in from the frame face
 BEAM_HOLD_IN = 0.5    # drop beam held 1/2" inside the rim faces
@@ -42,6 +44,38 @@ class BeamLayout:
     check: eng.SpanCheck
     cap: str
     label: str = ""
+    post_len: float = 0.0
+
+
+@dataclass
+class BeamLine:
+    """A beam line across one or more zones (a drop beam at the same setback in adjacent zones is one continuous beam)."""
+    kind: str
+    size: str
+    species: str
+    plies: int
+    width: float
+    depth: float
+    y: float                     # plan y of the CL (from the reference wall; fronts are collinear in multi-zone plans)
+    x0: float
+    x1: float
+    zones: List[str]
+    posts_x: List[float]
+    post_zone: List[str]
+    post_loads: List[float]
+    post_len: float
+    pieces: List[Tuple[float, float]]     # (x0, x1) of each beam piece, spliced over posts
+    cap_mid: str
+    cap_end: str
+    label: str = ""
+
+    @property
+    def length(self) -> float:
+        return self.x1 - self.x0
+
+    @property
+    def n_posts(self) -> int:
+        return len(self.posts_x)
 
 
 @dataclass
@@ -200,10 +234,18 @@ class Layout:
     zones: List[ZoneLayout] = field(default_factory=list)
     edges: List[Edge] = field(default_factory=list)
     multi: bool = False
+    beam_lines: List[BeamLine] = field(default_factory=list)
+    divider_x: List[Tuple[float, float, str]] = field(default_factory=list)   # (x, length from the front, label) contrast divider boards
+    wall_lf: float = 0.0          # LF of house wall that gets membrane + flashing (ledgers + return walls; never a privacy wall)
 
     @property
-    def deck_sf(self) -> int:
-        return int(round(sum(z.decking.deck_w * z.decking.deck_d for z in self.zones) / 144.0)) if self.zones else self.decking.sf
+    def deck_sf(self) -> float:
+        """Sold square footage: over the fascia when there is one (Jason Ct 187), frame area when the rim is exposed (Eagle's Nest 617.2)."""
+        if not self.zones:
+            return self.decking.sf
+        if self.spec.decking.fascia:
+            return int(round(sum(z.decking.deck_w * z.decking.deck_d for z in self.zones) / 144.0))
+        return round(sum(z.W * z.D for z in self.zones) / 144.0, 1)
 
     @property
     def outer_edge_lf(self) -> float:
@@ -243,7 +285,7 @@ def decking_layout(spec: DeckSpec, W: float, D: float, n_bearing: int) -> Deckin
     bw, bt, gap = f["width"], f["thick"], spec.deck_gap
     fas = FASCIA[f["material"]]
     ft_ = fas["thick"] if dk.fascia else 0.0
-    nose = NOSE if dk.fascia else 0.0
+    nose = NOSE if dk.fascia else OVERHANG_NO_FASCIA
     deck_w = W + 2 * (ft_ + nose)
     deck_d = D + ft_ + nose
     pf = spec.geometry.picture_frame
@@ -373,20 +415,27 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         declared = [rear] + declared
     # resolve centrelines
     cls = []
+    engineered = spec.extras.engineered
     for b in declared:
+        if zone and b.zones and zone not in b.zones:
+            continue
         plies, nom, bwid, bdep = parse_beam(b.size)
-        if b.position_in is not None:
+        if b.position_in is not None and not zone:
             cl = float(b.position_in)
         elif b.kind == "flush":
-            cl = D - (b.setback_in or 0.0) - (bwid / 2 if (b.setback_in or 0) > 0 else front_t / 2)
+            cl = D - (b.setback_in or 0.0) - (0.0 if (b.setback_in or 0) > 0 else front_t / 2)   # flush: setback = CL back from the rim face
         else:
             cl = D - (b.setback_in if b.setback_in is not None else 24.0) - bwid / 2
-            # cantilever past a drop beam may not exceed 1/4 of the back-span: c <= (D - rear_t) / 5
+            # cantilever past a drop beam may not exceed 1/4 of the back-span: c <= (D - rear_t) / 5 — unless the job is engineered
             c_max = (D - rear_t) / 5.0
-            if D - cl > c_max + 0.01 and len(declared) == 1:
+            if D - cl > c_max + 0.01 and not engineered:
                 cl_new = D - math.floor(c_max * 2) / 2.0
                 notes.append(f"drop beam pulled out to {ftin(D - cl_new - bwid / 2)} back from the rim face (was {ftin(D - cl - bwid / 2)}) so the cantilever stays under L/4 of the back-span")
                 cl = cl_new
+            elif D - cl > c_max + 0.01:
+                notes.append(f"{ftin(D - cl)} cantilever past the drop beam exceeds L/4 of the {ftin(cl - rear_t)} back-span — engineered condition (owner-directed)")
+        if cl <= rear_t + 6 or cl > D - 1:
+            continue
         cls.append((cl, b))
     cls.sort(key=lambda t: t[0])
     # auto-add intermediate beams if any support-to-support span exceeds the joist allowable
@@ -443,7 +492,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         if back > 0:
             joist_checks.append(eng.check_timber_joist(jsize, jsp_key, spacing, back, total_psf) if timber
                                 else eng.check_joist(jsize, jsp, spacing, back, total_psf))
-        if cantilever > 0 and b.kind == "drop":
+        if cantilever > 0 and b.kind == "drop" and not engineered:
             if cantilever > eng.CANTILEVER_RATIO * back + 0.5:
                 notes.append(f"cantilever {ftin(cantilever)} exceeds L/4 of the {ftin(back)} back-span — pull the beam out or engineer it")
         # tributary depth the beam carries: half the back span + half the next span (or the cantilever)
@@ -480,12 +529,20 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
                             else eng.check_joist(jsize, jsp, spacing, joist_len, total_psf))
 
     # ---- blocking
-    rows = 1 if timber else spec.blocking_rows       # timber: one row of 4x blocks over each beam
+    rows = 1 if timber else spec.blocking_rows
     block_y = []
     for bl in beams:
         if bl.kind == "drop":
             block_y.append(bl.cl_y)
-    if rows >= 2 and beams:
+    if timber:
+        # a row wherever an unblocked run between supports (drop beam CL, flush beam face, wall/rim) would exceed 4'; none in the cantilever
+        sups = [rear_t] + sorted(b.cl_y for b in beams)
+        for a, bb in zip(sups, sups[1:]):
+            n = int(math.ceil((bb - a) / BLOCK_MAX_SPACING - 1e-9)) - 1
+            for k in range(1, n + 1):
+                block_y.append(round(a + (bb - a) * k / (n + 1), 2))
+        block_y = sorted(set(block_y))
+    elif rows >= 2 and beams:
         # PVC: a second row mid back-span of the deepest bay
         deepest = max(beams, key=lambda b: b.back_span)
         block_y.append(deepest.cl_y - deepest.back_span / 2)
@@ -500,8 +557,9 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     dk = decking_facts(spec.decking.collection)
     drop = any(b.kind == "drop" for b in beams)
     standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF}.get(fr.footing_type, CONC_STANDOFF)
-    post_len = g.height_in - dk["thick"] - jd - (beam_depth if drop else 0.0) - standoff
-    post_len = max(6.0, post_len)
+    for bl in beams:
+        bl.post_len = max(6.0, g.height_in - dk["thick"] - (jd if bl.kind == "drop" else 0.0) - bl.depth - standoff)
+    post_len = max([bl.post_len for bl in beams], default=max(6.0, g.height_in - dk["thick"] - jd - standoff))
     if timber:
         cap_post = eng.timber_post_capacity_lb(fr.post_size, "DF#1", post_len)
         ph_ok = (worst_load <= cap_post, cap_post)
@@ -618,7 +676,7 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
     return RailLayout(r.system, r.color, r.height_in, posts, sections, round(rail_lf / 12.0), round(perim / 12.0, 1), openings, notes)
 
 
-def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[RailOpening]) -> Optional[RailLayout]:
+def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[RailOpening], forced_x: Optional[List[float]] = None) -> Optional[RailLayout]:
     """Rail along named outline edges (multi-zone plans). Posts at the ends of every selected edge and evenly between at
     the system's max post spacing; a post shared by two selected edges is a CORNER."""
     r = spec.railing
@@ -678,19 +736,27 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
             p0, p1 = a + RP, b - RP
             if p1 - p0 < 12:
                 continue
-            n = max(1, int(math.ceil((p1 - p0) / max_ctc - 1e-9)))
-            ctc = (p1 - p0) / n
-            for i in range(n + 1):
-                t = p0 + i * ctc
-                kind = "END" if i in (0, n) else "LINE"
+            # fixed posts: segment ends + any divider line that falls on this run (posts on the divider lines)
+            fixed = [p0, p1]
+            if forced_x and abs(uy) < 1e-6:            # a run along the front: t is x
+                fixed += [fx - e.x0 for fx in forced_x if p0 + 12 < fx - e.x0 < p1 - 12]
+            fixed = sorted(set(round(v, 3) for v in fixed))
+            ts = []
+            for fa, fb in zip(fixed, fixed[1:]):
+                n = max(1, int(math.ceil((fb - fa) / max_ctc - 1e-9)))
+                ts += [fa + (fb - fa) * k / n for k in range(n)]
+            ts.append(fixed[-1])
+            for i, t in enumerate(ts):
+                kind = "END" if i in (0, len(ts) - 1) else "LINE"
                 add_post(e.x0 + ux * t + nx * RP, e.y0 + uy * t + ny * RP, kind, f"{e.name} {i + 1}")
-            cut = ctc - post_w - 2 * allow
-            stock = next((st for st, mx in sorted(panels.items()) if cut <= mx + 1e-6), max(panels))
-            for _ in range(n):
+            for fa, fb in zip(ts, ts[1:]):
+                ctc = fb - fa
+                cut = ctc - post_w - 2 * allow
+                stock = next((st for st, mx in sorted(panels.items()) if cut <= mx + 1e-6), max(panels))
                 sections.append(RailSection(e.name, round(ctc, 2), stock, round(cut, 2)))
             rail_lf += (b - a)
     perim = sum(e.length for e in exposed)
-    return RailLayout(r.system, r.color, r.height_in, posts, sections, round(rail_lf / 12.0), round(perim / 12.0, 1),
+    return RailLayout(r.system, r.color, r.height_in, posts, sections, round(rail_lf / 12.0, 1), round(perim / 12.0, 1),
                       list(r.openings) + stair_openings, notes)
 
 
@@ -749,6 +815,108 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
     return out
 
 
+# ================================================================== beam lines across zones
+def _place_posts_line(x0: float, x1: float, boundaries: List[float], allow_by_seg: List[float], end_in: float) -> List[float]:
+    """Posts end_in from each end, at every zone boundary, then evenly within each segment at or under that segment's allowable span."""
+    fixed = [x0 + end_in] + [b for b in boundaries if x0 + end_in + 12 < b < x1 - end_in - 12] + [x1 - end_in]
+    fixed = sorted(set(round(v, 3) for v in fixed))
+    out = []
+    for i, (a, b) in enumerate(zip(fixed, fixed[1:])):
+        allow = allow_by_seg[min(i, len(allow_by_seg) - 1)]
+        n = max(1, int(math.ceil((b - a) / allow - 1e-9)))
+        out += [a + (b - a) * k / n for k in range(n)]
+    out.append(fixed[-1])
+    return out
+
+
+def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
+    from .catalog import post_cap, TIMBER_CAP
+    timber = spec.is_timber
+    lines: List[BeamLine] = []
+    # group per-zone beams by (kind, size, species, offset from the front) and merge adjacent zones
+    used = set()
+    for zi, z in enumerate(zl):
+        front = z.wall_y + z.D
+        for bi, b in enumerate(z.frame.beams):
+            if (zi, bi) in used:
+                continue
+            key = (b.kind, b.size, b.species, round(z.D - b.cl_y, 1))          # offset of the CL back from the front edge (zone coords)
+            members = [(zi, bi, z, b)]
+            used.add((zi, bi))
+            zj = zi + 1
+            while zj < len(zl):
+                zz = zl[zj]
+                m = next(((zj, bj, zz, bb) for bj, bb in enumerate(zz.frame.beams)
+                          if (zj, bj) not in used and (bb.kind, bb.size, bb.species, round(zz.D - bb.cl_y, 1)) == key), None)
+                if not m:
+                    break
+                members.append(m); used.add((m[0], m[1])); zj += 1
+            first, last = members[0][2], members[-1][2]
+            hold = BEAM_HOLD_IN if b.kind == "drop" else first.frame.rim_plies * actual(first.frame.joist_size)[0]
+            x0 = first.x0 + hold
+            x1 = last.x0 + last.W - hold
+            boundaries = [m[2].x0 for m in members[1:]]
+            allow_by_seg = [m[3].check.allowable_in for m in members]
+            end_in = 18.0 if timber else POST_END_OVERHANG
+            posts = _place_posts_line(x0, x1, boundaries, allow_by_seg, end_in)
+            # zone of each post (boundary posts belong to the zone on the left) and its load
+            pz, loads = [], []
+            for i, px in enumerate(posts):
+                zone = next((m[2] for m in members if m[2].x0 <= px <= m[2].x0 + m[2].W + 0.01), members[-1][2])
+                bl = next(m[3] for m in members if m[2] is zone)
+                left = (px - posts[i - 1]) / 2 if i > 0 else (px - x0)
+                right = (posts[i + 1] - px) / 2 if i < len(posts) - 1 else (x1 - px)
+                pz.append(zone.name)
+                loads.append((left + right) / 12.0 * bl.trib_depth / 12.0 * zone.frame.total_psf)
+            # pieces: extend across posts while a piece stays within 16' (timber) / 20' (dimensional); splice over a post
+            max_piece = 192.0 if timber else 240.0
+            pieces, a = [], x0
+            for px in posts[1:]:
+                if px - a > max_piece:
+                    # splice at the previous post
+                    prev = max(q for q in posts if q < px and q - a <= max_piece)
+                    pieces.append((a, prev)); a = prev
+            pieces.append((a, x1))
+            if timber:
+                cap_mid, cap_end = TIMBER_CAP.get(spec.framing.post_size, ("CCQ68SDS2.5", "ECCQ68SDS2.5"))
+            else:
+                cap_mid = cap_end = post_cap(spec.framing.post_size, b.size)
+            plies, nom, bw, bd = parse_beam(b.size)
+            lines.append(BeamLine(b.kind, b.size, b.species, plies, bw, bd, front - key[3],
+                                  x0, x1, [m[2].name for m in members], posts, pz, loads, b.post_len, pieces, cap_mid, cap_end,
+                                  label=f"{'DROP' if b.kind == 'drop' else 'FLUSH'} {b.size} {b.species} " + "+".join(m[2].name for m in members)))
+    # write the line results back onto the zone frames (posts, worst load) so per-zone sums stay right
+    for z in zl:
+        z.frame.n_posts = 0
+        z.frame.footing_load_lb = 0.0
+    for ln in lines:
+        for zn, ld in zip(ln.post_zone, ln.post_loads):
+            z = next(q for q in zl if q.name == zn)
+            z.frame.n_posts += 1
+            z.frame.footing_load_lb = max(z.frame.footing_load_lb, ld)
+    for z in zl:
+        fr = z.frame
+        if fr.footing_type == "diamond_pier" and fr.footing_load_lb > fr.footing_capacity_lb and fr.footing_load_lb <= FOOTING_CAPACITY_LB["DP-75/63"]:
+            fr.footing_model = "DP-75/63"; fr.footing_capacity_lb = FOOTING_CAPACITY_LB["DP-75/63"]
+    return lines
+
+
+def build_dividers(spec: DeckSpec, zl: List[ZoneLayout], max_run_in: float = 192.0) -> List[Tuple[float, float, str]]:
+    """Divider boards: one on every zone boundary (to the shallower zone's wall) and mid-zone splits so no field run is
+    longer than a 16' board. Returns (x, length from the front edge, label)."""
+    out = []
+    if not spec.decking.dividers:
+        return out
+    for a, b in zip(zl, zl[1:]):
+        Ld = min(a.wall_y + a.D, b.wall_y + b.D) - max(a.wall_y, b.wall_y)
+        out.append((b.x0, Ld, f"D{a.name}/{b.name}"))
+    for z in zl:
+        k = int(math.ceil(z.W / max_run_in - 1e-9))
+        for i in range(1, k):
+            out.append((z.x0 + z.W * i / k, z.D, f"D{z.name}{i}"))
+    return sorted(out)
+
+
 # ================================================================== whole layout
 def _floor_to(x: float, step: float) -> float:
     return math.floor(x / step + 1e-9) * step
@@ -796,10 +964,16 @@ def build_layout(spec: DeckSpec) -> Layout:
         edges = outline_edges(zl, spec)
         deepest = max(zl, key=lambda q: q.D)
         st = stair_layouts(spec, deepest.W, deepest.D, deepest.decking)
-        rl = rail_layout_edges(spec, edges, [q.opening for q in st])
+        lines = build_beam_lines(spec, zl)
+        divs = build_dividers(spec, zl)
+        rl = rail_layout_edges(spec, edges, [q.opening for q in st], forced_x=[d[0] for d in divs])
         notes.append(f"{len(zl)} zones, {sum(q.W for q in zl) / 12:.1f}' along the house, outline "
                      + " · ".join(f"{e.name} {ftin(e.length)}" for e in edges if e.exposed))
-        L = Layout(spec, zl[0].frame, zl[0].decking, rl, st, x, deepest.D, notes, zl, edges, True)
+        for ln in lines:
+            notes.append(f"{ln.label}: {ftin(ln.length)} long, {ln.n_posts} posts at " + " / ".join(ftin(px) for px in ln.posts_x)
+                         + (f"; pieces " + " · ".join(ftin(b - a) for a, b in ln.pieces) if len(ln.pieces) > 1 else ""))
+        wall_lf = sum(q.W for q in zl) + sum(abs(a.wall_y - b.wall_y) for a, b in zip(zl, zl[1:]))
+        L = Layout(spec, zl[0].frame, zl[0].decking, rl, st, x, deepest.D, notes, zl, edges, True, lines, divs, wall_lf)
         return L
     W, D = float(g.width_in), float(g.depth_in)
     if g.size_mode == "nominal":
@@ -816,4 +990,6 @@ def build_layout(spec: DeckSpec) -> Layout:
     rl = rail_layout(spec, W, D, [q.opening for q in st])
     zl = [ZoneLayout("A", "", 0.0, 0.0, W, D, fr, dk, bool(spec.extras.hot_tub))]
     edges = outline_edges(zl, spec)
-    return Layout(spec, fr, dk, rl, st, W, D, notes, zl, edges, False)
+    lines = [BeamLine(b.kind, b.size, b.species, b.plies, b.width, b.depth, b.cl_y, b.x0, b.x0 + b.length, ["A"], list(b.posts_x), ["A"] * len(b.posts_x),
+                      [fr.footing_load_lb] * len(b.posts_x), b.post_len, [(b.x0, b.x0 + b.length)], b.cap, b.cap, b.label) for b in fr.beams]
+    return Layout(spec, fr, dk, rl, st, W, D, notes, zl, edges, False, lines, [], W if fr.ledger else 0.0)

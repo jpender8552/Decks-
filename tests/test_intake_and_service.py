@@ -65,4 +65,4 @@ def test_parse_eagles_nest_details():
     assert s.railing.system == "IRX" and s.railing.drink_rail and s.extras.stone_bases and s.extras.engineered and s.extras.hot_tub
     assert s.site.city == "Silverthorne" and s.site.ground_snow_psf == 80 and s.site.wui_fire_zone and not s.decking.fascia
     t, f, p = run(s)
-    assert t.layout.deck_sf == 617 and p.tax_rate == 0.08375
+    assert abs(t.layout.deck_sf - 617) < 1 and p.tax_rate == 0.04 and p.material_factor == 1.15

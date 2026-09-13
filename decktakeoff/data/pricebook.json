@@ -1,7 +1,7 @@
 {
   "_about": "Unit costs the pricing tool uses. Source column tells you where the number came from. Update from the latest Decks & Docks quote to GSEXT1 and the 'Pricing Sheet To Fit GS' before a bid. Prices are per unit as sold.",
   "account": "GSEXT1 (Decks & Docks, Henry Frederick)",
-  "as_of": "2026-08",
+  "as_of": "2026-09-08 (Eagle's Nest handoff v32; D&D quote 968400 where marked D&D; PS = GS Pricing Sheet)",
   "lumber": {
     "2x6": {
       "per_lf": 1.05,
@@ -48,32 +48,36 @@
       "source": "est."
     },
     "4x10_DF#1": {
-      "per_lf": 9.5,
-      "source": "est. \u2014 timber yard quote needed"
+      "per_lf": 5.75,
+      "source": "EST \u2014 Henry to quote (handoff v32)"
     },
     "4x12_DF#1": {
-      "per_lf": 12.0,
-      "source": "est."
-    },
-    "4x8_DF#1": {
       "per_lf": 7.5,
       "source": "est."
     },
+    "4x8_DF#1": {
+      "per_lf": 4.6,
+      "source": "est."
+    },
     "6x12_DF#1": {
-      "per_lf": 22.0,
-      "source": "est. \u2014 timber yard quote needed"
+      "per_lf": 16.0,
+      "source": "EST \u2014 request quote (handoff v32)"
     },
     "6x10_DF#1": {
-      "per_lf": 18.0,
+      "per_lf": 13.0,
       "source": "est."
     },
     "8x8_DF#1": {
-      "per_lf": 15.0,
-      "source": "est. \u2014 timber yard quote needed"
+      "per_lf": 12.5,
+      "source": "EST \u2014 8x8x8 $100 (handoff v32)"
     },
     "8x10_DF#1": {
-      "per_lf": 24.0,
+      "per_lf": 16.0,
       "source": "est."
+    },
+    "2x10_pt": {
+      "per_lf": 3.75,
+      "source": "EST \u2014 D&D 2x8 TFJ x 1.30 (handoff)"
     }
   },
   "footings": {
@@ -107,9 +111,10 @@
       "desc": "16\" form tube"
     },
     "sonotube_18": {
-      "per_lf": 7.5,
-      "source": "est.",
-      "desc": "18\" form tube"
+      "each": 97.18,
+      "source": "D&D quote",
+      "desc": "Sonotube 18\" x 12'",
+      "per_lf": 8.1
     },
     "sonotube_24": {
       "per_lf": 11.0,
@@ -147,9 +152,9 @@
       "desc": "Ready-mix concrete 4,000 psi, per cubic yard (short-load fee not included)"
     },
     "ABU88Z": {
-      "each": 48.0,
-      "source": "est.",
-      "desc": "Simpson ABU88Z standoff post base 8x8 (concrete)"
+      "each": 62.0,
+      "source": "EST",
+      "desc": "Simpson ABU88Z standoff post base 8x8"
     },
     "ABU88Z_black": {
       "each": 78.0,
@@ -162,9 +167,40 @@
       "desc": "Simpson Outdoor Accents ABU66 post base 6x6, black powder-coat"
     },
     "stone_base_kit": {
-      "each": 450.0,
-      "source": "est.",
-      "desc": "Stone column base: ledgestone veneer 24 SF (2'x2' x 3'), 24\" cap, lath, scratch, mortar"
+      "each": 380.0,
+      "source": "EST",
+      "desc": "Stone veneer column base 2'-0\" x 2'-0\" x 3'-0\" \u2014 cement board wrap, lath, scratch coat, ledgestone veneer (~24 SF) + 24\" x 24\" stone cap"
+    },
+    "sonotube_20": {
+      "each": 120.0,
+      "source": "EST",
+      "desc": "Sonotube 20\" x 12' (cut to length \u2014 3 caissons per tube)",
+      "per_lf": 10.0
+    },
+    "quikrete_80": {
+      "each": 7.0,
+      "source": "D&D",
+      "desc": "Quikrete 80# concrete mix"
+    },
+    "rebar4_20": {
+      "each": 12.0,
+      "source": "EST",
+      "desc": "#4 rebar x 20' (4 verticals per caisson)"
+    },
+    "rebar3_20": {
+      "each": 8.0,
+      "source": "EST",
+      "desc": "#3 rebar x 20' (ties)"
+    },
+    "anchor_5/8x8": {
+      "each": 5.5,
+      "source": "EST",
+      "desc": "5/8\" x 8\" HDG anchor bolt w/ nut + washer (cast-in)"
+    },
+    "APB88_black": {
+      "each": 83.7,
+      "source": "EST",
+      "desc": "Simpson 8x8 post base, BLACK powder-coat (Outdoor Accents APB88 or shop-coated ABU88Z)"
     }
   },
   "hardware": {
@@ -204,9 +240,9 @@
       "desc": "Simpson HUCQ212-2-SDS concealed-flange double 2x12 hanger"
     },
     "H2.5AZ": {
-      "each": 0.85,
-      "source": "est.",
-      "desc": "Simpson H2.5AZ hurricane tie"
+      "each": 1.05,
+      "source": "EST",
+      "desc": "Simpson H2.5AZ hurricane tie (joists to the drop beam, hidden)"
     },
     "BC46Z": {
       "each": 14.0,
@@ -309,14 +345,14 @@
       "desc": "Ledger end dam"
     },
     "gtape_2": {
-      "each": 18.45,
-      "source": "D&D Aug-26",
+      "each": 17.0,
+      "source": "D&D",
       "desc": "Nichigo G-Tape 3035 2\" x 65' black",
       "lf": 65
     },
     "gtape_4": {
-      "each": 43.17,
-      "source": "D&D Aug-26",
+      "each": 30.0,
+      "source": "EST",
       "desc": "Nichigo G-Tape 3035 4\" x 65' black",
       "lf": 65
     },
@@ -409,14 +445,14 @@
       "count": 250
     },
     "end_grain_sealer_gal": {
-      "each": 58.0,
-      "source": "est.",
-      "desc": "Anchorseal end-grain sealer, gallon (~400 cut ends)"
+      "each": 60.0,
+      "source": "EST",
+      "desc": "End-grain sealer (Anchorseal class) \u2014 every cut"
     },
     "timber_oil_gal": {
-      "each": 60.0,
-      "source": "est.",
-      "desc": "Dark walnut timber oil, gallon (~200 SF per coat)"
+      "each": 75.0,
+      "source": "EST",
+      "desc": "Penetrating oil, dark walnut (Penofin / Cabot Australian Timber Oil class), gallon"
     },
     "wall_flashing_10": {
       "each": 22.0,
@@ -427,6 +463,106 @@
       "each": 6.5,
       "source": "est.",
       "desc": "Drink rail bracket, black (24\" OC)"
+    },
+    "LUS410Z": {
+      "each": 5.5,
+      "source": "EST",
+      "desc": "Simpson LUS410Z 4x10 joist hanger"
+    },
+    "LUS410Z_black": {
+      "each": 5.5,
+      "source": "EST",
+      "desc": "Simpson LUS410Z 4x10 hanger (ledgers + both faces of the flush beam), black shop-coat where visible"
+    },
+    "HUC410": {
+      "each": 32.0,
+      "source": "EST",
+      "desc": "Simpson HUC410 concealed hanger (doubled joists under dividers, hung rims)"
+    },
+    "HUC410_black": {
+      "each": 32.0,
+      "source": "EST",
+      "desc": "Simpson HUC410 concealed hanger (doubled joists under dividers, hung rims), black shop-coat where visible"
+    },
+    "CCQ68SDS2.5_black": {
+      "each": 191.7,
+      "source": "EST",
+      "desc": "Simpson CCQ68SDS2.5 column cap 6x beam / 8x post, BLACK powder-coat (intermediate posts)"
+    },
+    "ECCQ68SDS2.5_black": {
+      "each": 159.3,
+      "source": "EST",
+      "desc": "Simpson ECCQ68SDS2.5 end column cap, BLACK powder-coat (beam-end posts)"
+    },
+    "CCQ68SDS2.5": {
+      "each": 142.0,
+      "source": "EST",
+      "desc": "Simpson CCQ68SDS2.5 column cap 6x beam / 8x post"
+    },
+    "ECCQ68SDS2.5": {
+      "each": 118.0,
+      "source": "EST",
+      "desc": "Simpson ECCQ68SDS2.5 end column cap"
+    },
+    "black_shopcoat_lot": {
+      "each": 150.0,
+      "source": "EST",
+      "desc": "Black shop-coat for the visible hangers + touch-up paint"
+    },
+    "LedgerLOK6_50": {
+      "each": 90.0,
+      "source": "EST",
+      "desc": "FastenMaster LedgerLOK 6\" (50 ct) \u2014 4x ledger to the house rim, 2 rows staggered 16\"",
+      "count": 50
+    },
+    "LedgerLOK5_50": {
+      "each": 75.0,
+      "source": "EST",
+      "desc": "FastenMaster LedgerLOK 5\" (50 ct)",
+      "count": 50
+    },
+    "HeadLOK6_50": {
+      "each": 52.0,
+      "source": "EST",
+      "desc": "FastenMaster HeadLOK 6\" (50 ct) \u2014 rail posts 4 ea",
+      "count": 50
+    },
+    "vycor_12x75": {
+      "each": 98.0,
+      "source": "EST",
+      "desc": "Grace Vycor Deck Protector 12\" x 75' (wall membrane behind ledger + side rims)",
+      "lf": 70
+    },
+    "lflash_10": {
+      "each": 14.0,
+      "source": "EST",
+      "desc": "Aluminum L-flashing 10' (over ledger + side rims)"
+    },
+    "wui_flash_10": {
+      "each": 18.0,
+      "source": "EST",
+      "desc": "26 ga galvanized wall flashing 12\" x 10' (CWRC 404.3.2: noncombustible flashing at the deck/wall intersection, behind cladding)"
+    },
+    "tub_bay_lot": {
+      "each": 320.0,
+      "source": "EST",
+      "desc": "Hot-tub bay: doubled joists + blocking under the tub footprint, per engineer"
+    },
+    "oil_sundries_lot": {
+      "each": 150.0,
+      "source": "EST",
+      "desc": "Sprayer tip / brushes / rags / masking (hardware + stone) / sealed rag can"
+    },
+    "nail_16d_ring_2000": {
+      "each": 85.0,
+      "source": "EST",
+      "desc": "16d HDG ring-shank framing nail (2000 ct)",
+      "count": 2000
+    },
+    "drink_rail_bracket_kit": {
+      "each": 42.0,
+      "source": "EST",
+      "desc": "TimberTech drink-rail brackets, black \u2014 per 8' section (Build SOP: always TimberTech drink-rail brackets)"
     }
   },
   "decking": {
@@ -500,8 +636,8 @@
       "source": "est. \u2014 get D&D quote"
     },
     "TimberTech|Vintage|per_lf": {
-      "each": 7.2,
-      "source": "est."
+      "each": 7.0,
+      "source": "PS"
     },
     "TimberTech|Landmark|per_lf": {
       "each": 7.2,
@@ -536,16 +672,16 @@
       "count": 224
     },
     "TimberTech|Vintage|12|square": {
-      "each": 86.4,
-      "source": "est. \u2014 get D&D quote"
+      "each": 84.0,
+      "source": "PS"
     },
     "TimberTech|Vintage|16|square": {
-      "each": 115.2,
-      "source": "est."
+      "each": 112.0,
+      "source": "PS ($7.00/LF)"
     },
     "TimberTech|Vintage|20|square": {
-      "each": 144.0,
-      "source": "est."
+      "each": 140.0,
+      "source": "PS"
     },
     "TimberTech|Vintage|12|grooved": {
       "each": 86.4,
@@ -572,16 +708,24 @@
       "source": "est.",
       "count": 224,
       "desc": "Cortex for TimberTech 2-1/2\" \u2014 100 LF (224 screws + plugs), color-matched"
+    },
+    "Cortex_TimberTech_350": {
+      "each": 98.0,
+      "source": "EST",
+      "count": 350,
+      "desc": "Cortex for TimberTech Advanced PVC, color-matched plugs (350 ct / 100 SF)"
     }
   },
   "rail": {
     "Fulton|panel|8|level": {
       "each": 150.0,
-      "source": "GS sheet"
+      "source": "GS sheet",
+      "desc": "TimberTech Fulton Rail 8' x 36\" level panel Black (pre-assembled steel balusters, cut to bay)"
     },
     "Fulton|panel|6|level": {
       "each": 120.0,
-      "source": "GS sheet"
+      "source": "GS sheet",
+      "desc": "TimberTech Fulton Rail 6' x 36\" level panel Black"
     },
     "Fulton|panel|8|stair": {
       "each": 175.0,
@@ -676,6 +820,30 @@
       "each": 6.5,
       "source": "est.",
       "desc": "Drink rail bracket, black (24\" OC)"
+    },
+    "IRX|kit|8": {
+      "each": 395.0,
+      "source": "EST \u2014 Henry to quote",
+      "desc": "TimberTech IRX Cable Rail kit 8' x 36\" black (top rail, cable, fittings; cut to bay)"
+    },
+    "IRX|kit|6": {
+      "each": 320.0,
+      "source": "est.",
+      "desc": "TimberTech IRX Cable Rail kit 6' x 36\" black"
+    },
+    "IRX|post_kit": {
+      "each": 92.0,
+      "source": "EST \u2014 Henry to quote",
+      "desc": "TimberTech IRX 36\" post kit (post + cap + skirt) black"
+    },
+    "IRX|stair_kit|8": {
+      "each": 440.0,
+      "source": "est."
+    },
+    "Fulton|post_kit": {
+      "each": 72.0,
+      "source": "GS sheet",
+      "desc": "TimberTech Fulton Rail 2\" post kit (post + brackets + cap + skirt), black"
     }
   },
   "labor": {
@@ -687,22 +855,30 @@
     "demo_per_sf": 2.0,
     "stairs_per_riser": 150.0,
     "source": "GSX_Subcontractor_Labor_Rates",
-    "timber_frame_per_sf": 18.0,
-    "caisson_each": 400.0,
-    "pvc_cortex_decking_per_sf": 9.0,
-    "cable_rail_per_lf": 45.0,
-    "drink_rail_per_lf": 8.0,
-    "stone_base_each": 600.0,
-    "oil_finish_per_sf_timber": 0.4,
-    "end_seal_each_timber": 3.0,
-    "hot_tub_bay_each": 900.0,
-    "wall_flashing_per_lf": 6.0
+    "timber_frame_per_sf": 10.0,
+    "caisson_each": 150.0,
+    "pvc_cortex_decking_per_sf": 8.0,
+    "cable_rail_per_lf": 60.0,
+    "drink_rail_per_lf": 5.0,
+    "stone_base_each": 615.62,
+    "oil_finish_per_sf_timber": 0.0,
+    "end_seal_each_timber": 0.0,
+    "hot_tub_bay_each": 350.0,
+    "wall_flashing_per_lf": 0.0,
+    "_card": "GSX Subcontractor Labor Rates rev 14 Jul 2026 \u2014 base rates + add-ons; NO steel / larger-timber / PVC / 12-in-OC up-charges (owner 7 Sep 2026)",
+    "cable_rail_addon_per_lf": 40.0,
+    "large_footing_addon_each": 150.0,
+    "extra_beam_set": 200.0,
+    "seal_cut_ends_lot": 150.0,
+    "steel_frame_addon_per_sf": 1.0,
+    "oil_pre_oil_per_lf": 0.2455,
+    "oil_in_place_lot": 333.27
   },
   "general_conditions": {
     "per_sf": 4.0,
-    "note": "never marked up"
+    "note": "never marked up. Jason Ct method: $4/SF + named site extras. Eagle's Nest method: itemized list at cost in extras.general_conditions."
   },
-  "gm_default": 0.45,
+  "gm_default": 0.425,
   "gm_floor": 0.4,
   "finance_rate": 0.0699,
   "finance_years": 10,
@@ -746,5 +922,68 @@
     "estes park": 0.087
   },
   "retail_mode": "uniform",
-  "_retail_mode_note": "uniform = Eagle's Nest standard: financed = check/ACH / 0.93 on the whole price. gc_at_cost = Jason Ct R5 method (GC excluded from the 7%)."
+  "_retail_mode_note": "uniform = Eagle's Nest standard: financed = check/ACH / 0.93 on the whole price. gc_at_cost = Jason Ct R5 method (GC excluded from the 7%).",
+  "material_factor": 1.15,
+  "tax_rate": 0.04,
+  "tax_mode": "flat",
+  "_tax_note": "standing rule (Eagle's Nest): sales tax 4% on factored materials. tax_mode 'destination' uses the city table instead.",
+  "dealer_fee_financed": 0.125,
+  "_dealer_fee_note": "GSX rule: 12.5% dealer fee is added manually to financed quotes; the 7% check/ACH spread does not cover it \u2014 owner to confirm whether the retail line absorbs it (open, 7 Sep 2026)",
+  "gc_template": [
+    {
+      "item": "Project management & supervision",
+      "amount": 1700.0,
+      "why": "20 hr \u2014 layout, holds, engineer + D&D coordination, QC gates"
+    },
+    {
+      "item": "Mobilization / demobilization \u2014 trailer, tools, lift",
+      "amount": 800.0,
+      "why": ""
+    },
+    {
+      "item": "811 utility locate + survey day",
+      "amount": 250.0,
+      "why": ""
+    },
+    {
+      "item": "Dumpster 20 yd \u2014 demo + construction",
+      "amount": 650.0,
+      "why": ""
+    },
+    {
+      "item": "Portable toilet",
+      "amount": 200.0,
+      "why": ""
+    },
+    {
+      "item": "Material delivery \u2014 2 drops",
+      "amount": 700.0,
+      "why": "boom truck for timbers"
+    },
+    {
+      "item": "Equipment \u2014 auger rig, lift day",
+      "amount": 600.0,
+      "why": ""
+    },
+    {
+      "item": "Site protection \u2014 Ram Board, plywood paths, tarps",
+      "amount": 250.0,
+      "why": ""
+    },
+    {
+      "item": "Travel / per diem",
+      "amount": 1500.0,
+      "why": "mountain jobs: 15 crew-days"
+    },
+    {
+      "item": "Final clean, magnet sweep x 2",
+      "amount": 150.0,
+      "why": ""
+    },
+    {
+      "item": "Contingency",
+      "amount": 400.0,
+      "why": ""
+    }
+  ]
 }
