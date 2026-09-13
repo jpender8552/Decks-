@@ -23,6 +23,8 @@ def main(argv=None):
     ap.add_argument("--gsx", action="store_true", help="also print the gsx-deck-docs job block")
     ap.add_argument("--json", action="store_true", help="print JSON instead of markdown")
     ap.add_argument("--quote", action="store_true", help="print the client quote (implies --price)")
+    ap.add_argument("--buildset", action="store_true", help="with --out: write the drawing sheets, 3D viewer, renders and build steps under OUT/buildset")
+    ap.add_argument("--no-render", action="store_true", help="skip the headless renders (sheets + viewer only)")
     a = ap.parse_args(argv)
     base = json.loads(Path(a.spec).read_text()) if a.spec else None
     if a.image:
@@ -45,6 +47,10 @@ def main(argv=None):
         (out / "gsx_job_block.py").write_text(gsx_job_block(t))
         if p is not None:
             (out / "quote.md").write_text(quote_markdown(t, p))
+        if a.buildset:
+            from .buildset import build_set
+            r = build_set(t, f, str(out / "buildset"), render=not a.no_render)
+            print(f"wrote {out}/buildset: {len(r['sheets'])} sheets, {len(r['stills'])} renders, viewer.html, buildset.html")
         print(f"wrote {out}/takeoff.md, takeoff.json, order.csv, spec.json, gsx_job_block.py" + (", quote.md" if p is not None else ""))
     if a.json:
         print(json.dumps(js, indent=2, default=str))

@@ -38,6 +38,9 @@ python -m decktakeoff --image drawing.png --details "Prime+ Coconut Husk, Fulton
 # the client quote (Eagle's Nest format)
 python -m decktakeoff examples/eagles_nest.json --quote
 
+# the build set: drawing sheets, 3D model, renders and build steps (add --no-render without Chromium)
+python -m decktakeoff examples/eagles_nest.json --price --out out/eagles_nest --buildset
+
 # HTTP service
 uvicorn decktakeoff.service:app --port 8000
 #   POST /takeoff    {"spec": {...}} or {"details": "..."}  (+ "price": true, "gsx": true)
@@ -49,6 +52,28 @@ Outputs (`--out DIR`): `takeoff.md` (design reads, order by category, fastener/c
 pricing), `takeoff.json` (everything, machine-readable), `order.csv` (the D&D order), `spec.json` (the resolved spec),
 `quote.md` (the client quote, with `--price`) and `gsx_job_block.py` — the geometry + BOM block that drops straight
 into the `gsx-deck-docs` build-set / proposal PDF pipeline.
+
+## Build set, permit set, 3D
+
+`--buildset` writes `OUT/buildset/`:
+
+- `sheets/*.svg` — the drawing set, one sheet per system, all generated from the same layout the takeoff counts
+  from: **G-001** general notes and design criteria (loads, snow, frost, wind, WUI, the flags), **S-100** foundation
+  plan (footing schedule, caisson / pier sizes, post loads), **S-101** framing plan (ledger, joists, beams, posts,
+  blocking, hangers called out), **A-101** decking plan (rows, borders, dividers, cuts), **A-201** railing plan and
+  elevation (post types, bays, cable / panel schedule), **A-301** section and front elevation, **D-501** details
+  (ledger, post-beam-cap, footing, rail post, deck edge, the job's special condition). Every sheet carries the job
+  line, the revision line and the "design intent / stamped set governs" footer, so the set is the permit submittal
+  for a prescriptive deck and the design-intent set that goes to the engineer on an engineered one.
+- `viewer.html` — a self-contained 3D model (three.js): orbit, zoom, preset views (yard, corner, on deck, iso, plan,
+  under), build phases one at a time and an exploded view. Works on a phone.
+- `renders/*.jpg` — stills from the same model (isometric, yard, corner, on-deck, underside, plan, exploded, one per
+  build step). They are 3D model renders that show design intent, materials and colors; they are not photographs.
+- `buildset.html` — the crew build set: steps **T-400 … T-406** (footings, posts, stone bases, beams, frame,
+  decking, rail), each with the render of that phase, what goes in (from the takeoff), how, and what to check.
+- `scene.json` — the model as boxes, for any other renderer.
+
+`decktakeoff.buildset.build_set(takeoff, flags, out_dir, render=True)` does the same from Python.
 
 ## What goes in
 
@@ -112,10 +137,16 @@ decktakeoff/
   pricing.py       GSX pricing model
   report.py        markdown / JSON / CSV / gsx-deck-docs job block
   intake.py        plain-English parser + Claude drawing reader (structured output)
+  scene.py         layout -> 3D scene (boxes, materials, phases, house context)
+  viewer.py        three.js viewer HTML (orbit, views, phases, exploded)
+  render.py        headless Chromium stills of the scene
+  drawings.py      SVG drawing sheets G-001 / S-100 / S-101 / A-101 / A-201 / A-301 / D-501
+  buildset.py      build steps T-400.. + buildset.html; build_set() writes the whole folder
+  data/three.min.js  three.js r128, so renders work offline
   cli.py, service.py
 docs/standards.md  the GSX rules the engine encodes
 docs/codes.md      the flag rules and their code references
-examples/          jason_ct.json (regression fixture), flush_beam_stairs.json, freestanding_concrete.json
+examples/          eagles_nest.json, jason_ct.json (regression fixtures), flush_beam_stairs.json, freestanding_concrete.json
 tests/
 ```
 

@@ -165,3 +165,43 @@ def tax_rate_for(city: str, override=None) -> float:
         return float(override)
     t = PRICEBOOK["tax_rates"]
     return float(t.get((city or "").strip().lower(), t["default"]))
+
+
+# render palettes (dark -> light) per board — from the timbertech-boards skill catalog (Jade-calibrated: Coastline pure gray,
+# Dark Hickory very dark gray not brown, Coconut Husk warm golden tan)
+BOARDS_PALETTE = {
+    ("Vintage", "Weathered Teak"): ["#7a6650", "#917b62", "#a58f74", "#b6a186", "#c5b196", "#d1bfa5", "#dccdb6"],
+    ("Vintage", "Cypress"): ["#5c3324", "#74432f", "#89523b", "#9b6147", "#ad7256", "#bd8567", "#cc9979"],
+    ("Vintage", "Coastline"): ["#6a6a68", "#7e7e7c", "#919190", "#a3a3a1", "#b3b3b1", "#c2c2c0", "#d0d0ce"],
+    ("Vintage", "Mahogany"): ["#4f3325", "#664434", "#7b5541", "#8e654e", "#a0775d", "#b18a6f", "#c19c81"],
+    ("Vintage", "English Walnut"): ["#2f2019", "#40302a", "#54413a", "#68524a", "#7c6357", "#8f7565", "#a08874"],
+    ("Vintage", "Dark Hickory"): ["#2c2a29", "#333234", "#3a3a3c", "#454546", "#525253", "#5e5e5f", "#6a6a6b"],
+    ("Landmark", "French White Oak"): ["#8f8168", "#a89a80", "#b8aa8f", "#c7b99f", "#d5c9b1", "#e2d8c3"],
+    ("Landmark", "American Walnut"): ["#211610", "#2e1f16", "#3b2a1e", "#493627", "#574232", "#66503e"],
+    ("Landmark", "Castle Gate"): ["#2a2927", "#373634", "#454341", "#524f4d", "#605c5a", "#6e6a67"],
+    ("Landmark", "Boardwalk"): ["#948878", "#a89c8b", "#b7ab9a", "#c4b9a8", "#d0c6b5", "#dbd2c2"],
+    ("Harvest+", "Toasted Wheat"): ["#a48a63", "#b59b74", "#c4ab86", "#d1ba97", "#dcc8a8"],
+    ("Harvest+", "Timber Gray"): ["#66625d", "#75716c", "#85817c", "#95918c", "#a5a19c"],
+    ("Harvest", "Slate Gray"): ["#727474", "#7b7d7d", "#838585"], ("Harvest", "Kona"): ["#4b3427", "#55402f", "#5e4836"], ("Harvest", "Brownstone"): ["#a27e58", "#ad8961", "#b7946b"],
+    ("Legacy", "Whitewash Cedar"): ["#9b8b72", "#b0a089", "#c0b19b", "#cfc2ad", "#dcd1be", "#e7dfcf"],
+    ("Legacy", "Ashwood"): ["#7d786f", "#918b82", "#a39d94", "#b3ada4", "#c2bdb4", "#cfcac2"],
+    ("Legacy", "Pecan"): ["#6a4826", "#835b33", "#9a6f41", "#b08552", "#c39a66", "#d2ad7c"],
+    ("Legacy", "Tigerwood"): ["#3e2412", "#5b3519", "#8a5a2e", "#b07a44", "#cc985a", "#dcae72"],
+    ("Legacy", "Mocha"): ["#3f2a1e", "#52392a", "#654a38", "#785b47", "#8a6c56", "#9c7e67"],
+    ("Legacy", "Espresso"): ["#1f1a18", "#2c2523", "#3a322f", "#48403c", "#564d48", "#635a54"],
+    ("Reserve", "Antique Leather"): ["#4f3520", "#6a4a30", "#845f41", "#9c7553", "#b08a66", "#c19c78"],
+    ("Reserve", "Dark Roast"): ["#26190f", "#3a2a1f", "#4c3a2d", "#5e4a3b", "#6e5a4a", "#7d6a5a"],
+    ("Reserve", "Driftwood"): ["#5c5954", "#77736c", "#979289", "#aea9a1", "#bdb8b0", "#cac6bf", "#d6d2cb"],
+    ("Reserve", "Reclaimed Chestnut"): ["#6e5238", "#88694c", "#a08260", "#b39674", "#c3a888", "#d0b99c"],
+    ("Terrain+", "Dark Oak"): ["#3f2f24", "#4e3b2e", "#5c4838", "#6a5543", "#775f4c"],
+    ("Terrain+", "Natural White Oak"): ["#a8946f", "#b9a683", "#c7b494", "#d3c2a4", "#dccdb2"],
+    ("Terrain+", "Weathered Oak"): ["#6f665b", "#7f776c", "#8f877b", "#9d968a", "#aaa398"],
+    ("Terrain", "Silver Maple"): ["#8a8a88", "#959593", "#a0a09e", "#aaaaa8"], ("Terrain", "Brown Oak"): ["#6b4d36", "#76573e", "#816147", "#8b6b50"],
+    ("Premier+", "Natural Oak"): ["#8f6f4c", "#a1825d", "#b09069", "#bd9e78", "#c9ac88"],
+    ("Prime+", "Coconut Husk"): ["#8f6a42", "#a07a4d", "#b58a58", "#c49a68", "#d2ad7b"],
+    ("Prime+", "Sea Salt Gray"): ["#777774", "#868683", "#959592", "#a3a3a0", "#b0b0ad"],
+    ("Prime+", "Dark Cocoa"): ["#3b2a20", "#4a3428", "#5b4234", "#6a5040", "#775c4a"],
+    ("Prime", "Dark Teak"): ["#4c3a2d", "#544133", "#5a4636"], ("Prime", "Maritime Gray"): ["#6b6f70", "#727677", "#787c7d"],
+    ("Premier", "Dark Teak"): ["#4c3a2d", "#544133", "#5a4636"], ("Premier", "Maritime Gray"): ["#6b6f70", "#727677", "#787c7d"],
+    ("Wood", "Cedar"): ["#9c6b3f", "#ad7a49", "#bd8a57", "#caa06c", "#d6b283"], ("Wood", "PT"): ["#9a8a5e", "#ab9a6a", "#b9a979", "#c6b78a", "#d1c49a"],
+}
