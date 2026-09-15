@@ -1,10 +1,17 @@
 {
-  "job": "Covered Porch Deck — 37 x 30",
+  "job": "Covered Porch Deck \u2014 37 x 30",
   "client": "",
-  "notes": "From the homeowner's top-down plan + photo. House along the top with a brick chimney projecting into the middle bay; an existing wall runs the full 30' along the left end (no rail there). Porch cover (26.5' x 10.5') sits over the chimney bay + right bay; its 6x6 cedar posts land on the deck. Plan says 8' high at the left, 6' at the right: frame set at 8', posts cut to grade. Plan dimensions do not close (10' + 10'5\" + 26.5' > 37'): zones set so the widths sum to 37' — field verify. The angled bay between the left wing and the chimney (10'5\" / 10'5\" diagonals) is framed here as a square inside corner: diagonal cuts are not counted until it is measured.",
+  "notes": "From the homeowner's top-down plan + photo. House along the top; brick chimney projects into the middle bay; porch cover (26.5' x 10.5') over the chimney bay + right bay with its 6x6 cedar posts on the deck. Left end is OPEN (rail) \u2014 the 30' on the plan is the overall depth, not a wall. The wing's inner edge jogs: two 10'5\" diagonals along the house side (a shallow angled bay) are framed here as a 2'-6\" x 20' rectangular house bump on the wing's inner edge \u2014 diagonal cuts and the two angled rail/rim joints are not counted until it is measured. Plan says 8' high at the left, 6' at the right: frame set at 8', posts cut to grade. Widths set so they sum to the plan's 37' overall (10'6\" wing + 10'6\" chimney bay + 16' porch); the '9'' between the notch and the chimney could instead be its own bay, which would make the deck 46' wide \u2014 verify on site.",
   "site": {
-    "address": "", "city": "", "state": "CO",
-    "ground_snow_psf": 30, "wind_speed_mph": 115, "frost_depth_in": 36, "soil_bearing_psf": 1500, "wui_fire_zone": false
+    "address": "1675 Summit Point Ct",
+    "city": "Colorado Springs",
+    "state": "CO",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 30,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false,
+    "notes": "Pikes Peak Regional Building Dept: 30 psf snow, 30\" frost, Vult 115 mph east of the foothills \u2014 confirm the lot is not in the 130-150 mph special wind region."
   },
   "geometry": {
     "height_in": 96,
@@ -12,18 +19,76 @@
     "board_direction": "parallel",
     "picture_frame": true,
     "zones": [
-      {"name": "A", "label": "Left wing", "width": 10.5, "depth": 30, "wall_offset": 23.5, "privacy_wall": true, "end_wall": "house"},
-      {"name": "B", "label": "Chimney bay", "width": 10.5, "depth": 6.5, "wall_offset": 0},
-      {"name": "C", "label": "Covered porch", "width": 16, "depth": 10.5, "wall_offset": 4}
+      {
+        "name": "W",
+        "label": "Left wing",
+        "width": 8,
+        "depth": 30,
+        "wall_offset": 23.5
+      },
+      {
+        "name": "N",
+        "label": "Wing beside the bay",
+        "width": 2.5,
+        "depth": 10,
+        "wall_offset": 3.5
+      },
+      {
+        "name": "B",
+        "label": "Chimney bay",
+        "width": 10.5,
+        "depth": 6.5,
+        "wall_offset": 0
+      },
+      {
+        "name": "C",
+        "label": "Covered porch",
+        "width": 16,
+        "depth": 10.5,
+        "wall_offset": 4
+      }
     ]
   },
   "framing": {
-    "joist_size": "2x8", "joist_species": "SYP", "rim_plies": 2, "ledger_fastener": "LedgerLOK",
-    "beams": [{"kind": "drop", "size": "(2)2x10", "species": "SYP", "setback_in": 24}],
-    "post_size": "6x6", "footing_type": "concrete"
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "(2)2x10",
+        "species": "SYP",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "concrete"
   },
-  "decking": {"brand": "TimberTech", "collection": "Prime+", "color": "Coconut Husk", "profile": "grooved", "fascia": true},
-  "railing": {"system": "Fulton", "color": "Black", "height_in": 36, "edges": ["front:A", "front:B", "front:C", "end:right"], "drink_rail": true},
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Prime+",
+    "color": "Coconut Husk",
+    "profile": "grooved",
+    "fascia": true
+  },
+  "railing": {
+    "system": "Fulton",
+    "color": "Black",
+    "height_in": 36,
+    "edges": [
+      "end:left",
+      "front:W",
+      "front:N",
+      "front:B",
+      "front:C",
+      "end:right"
+    ],
+    "drink_rail": true
+  },
   "stairs": [],
-  "extras": {"roof_over": true, "engineered": true}
+  "extras": {
+    "roof_over": true,
+    "engineered": true
+  }
 }
