@@ -1,0 +1,14 @@
+{
+  "job": "Deck 2 — 10 x 10",
+  "client": "",
+  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck.",
+  "site": {"address": "", "city": "", "state": "CO", "ground_snow_psf": 30, "wind_speed_mph": 115, "frost_depth_in": 36, "soil_bearing_psf": 1500},
+  "geometry": {"width": 10, "depth": 10, "size_mode": "nominal", "height_in": 96, "attachment": "ledger", "board_direction": "parallel", "picture_frame": true},
+  "framing": {"joist_size": "2x8", "joist_species": "SYP", "rim_plies": 2, "ledger_fastener": "LedgerLOK",
+    "beams": [{"kind": "drop", "size": "(2)2x10", "species": "SYP", "setback_in": 24}],
+    "post_size": "6x6", "footing_type": "concrete"},
+  "decking": {"brand": "TimberTech", "collection": "Prime+", "color": "Coconut Husk", "profile": "grooved", "fascia": true},
+  "railing": {"system": "Fulton", "color": "Black", "height_in": 36, "sides": ["left", "right", "front"], "drink_rail": true},
+  "stairs": [],
+  "extras": {}
+}

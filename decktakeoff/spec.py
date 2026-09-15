@@ -56,6 +56,7 @@ class Zone:
     wall_offset_in: float = 0.0
     label: str = ""                      # "Lounge", "Dining terrace", "Deep wing"
     privacy_wall: bool = False           # an existing wall along this zone's outer end (no rail there)
+    end_wall: str = "privacy"            # what that wall is: "privacy" (lot / screen wall, sold as an option) | "house" (the house's own return wall, full height)
 
 
 @dataclass

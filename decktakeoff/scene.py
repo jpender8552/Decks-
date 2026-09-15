@@ -146,9 +146,14 @@ def build_scene(L: Layout) -> Scene:
         zl = spec.zone_list[zi]
         if zl.privacy_wall:
             side_x = (z.x0 * IN) if zi == 0 else ((z.x0 + z.W) * IN)
-            xa, xb = (side_x - 0.4, side_x) if zi == 0 else (side_x, side_x + 0.4)
-            add("privacy", xa, xb, z.wall_y * IN, (z.wall_y + z.D) * IN, zt - 0.3, zt + 6.75, "privacy", 8, tag="privacy wall (option)")
-            add("trim", xa - 0.03, xb + 0.03, z.wall_y * IN, (z.wall_y + z.D) * IN, zt + 6.75, zt + 6.95, "steel", 8, tag="privacy wall cap")
+            if getattr(zl, "end_wall", "privacy") == "house":   # the house's own return wall runs the length of this end
+                xa, xb = (side_x - 0.6, side_x) if zi == 0 else (side_x, side_x + 0.6)
+                add("wall", xa, xb, z.wall_y * IN - 0.6, (z.wall_y + z.D) * IN + 0.6, 0.0, H_house, "house", tag="existing house wall")
+                add("roof", xa - 1.0, xb + 1.0, z.wall_y * IN - 1.0, (z.wall_y + z.D) * IN + 1.0, H_house, H_house + 0.55, "roof")
+            else:
+                xa, xb = (side_x - 0.4, side_x) if zi == 0 else (side_x, side_x + 0.4)
+                add("privacy", xa, xb, z.wall_y * IN, (z.wall_y + z.D) * IN, zt - 0.3, zt + 6.75, "privacy", 8, tag="privacy wall (option)")
+                add("trim", xa - 0.03, xb + 0.03, z.wall_y * IN, (z.wall_y + z.D) * IN, zt + 6.75, zt + 6.95, "steel", 8, tag="privacy wall cap")
 
     # ---------------- beams, posts, footings (from the beam lines)
     ft = spec.framing.footing_type
