@@ -64,7 +64,10 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
         border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
         drink=dict(color=dpal[len(dpal) // 2], palette=dpal, grain=True, rough=0.7),
-        fascia=dict(color=pal[max(0, len(pal) // 2 - 1)], palette=pal, grain=True, rough=0.7),
+        fascia=(dict(color="#4b3f34", pattern="lap", rough=0.8, label=f"HardieTrim {spec.extras.hardie_skirt}") if spec.extras.hardie_skirt
+                else dict(color=pal[max(0, len(pal) // 2 - 1)], palette=pal, grain=True, rough=0.7)),
+        hardie=dict(color="#4b3f34", pattern="lap", rough=0.8, label="James Hardie ColorPlus Timber Bark"),
+        soffit=dict(color="#4b3f34", pattern="batten", rough=0.85, label="HardieSoffit cedarmill Timber Bark"),
         steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
@@ -589,6 +592,15 @@ def draw_house_from_spec(add, spec, zt, H_house):
                     tag="cover rafter", rot=(theta if slope == "+y" else -theta), rot_axis="x")
             add("glass", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
                 tag="cover panels", rot=(theta if slope == "+y" else -theta), rot_axis="x")
+            if spec.extras.cover_soffit:      # ceiling under the rafters
+                add("soffit", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 - 0.04, (hi + lo) / 2, "soffit", 8,
+                    tag="HardieSoffit ceiling", rot=(theta if slope == "+y" else -theta), rot_axis="x")
+            if spec.extras.cover_fascia:      # fascia at the low edge + rakes on both ends
+                ye = (cy1 + 0.6) if slope == "+y" else (cy0 - 0.6)
+                add("hardie", cx0 - 0.4, cx1 + 0.4, ye - 0.08, ye + 0.08, lo + 0.45 - 0.6, lo + 0.52, "hardie", 8, tag="HardieTrim fascia")
+                for xe in (cx0 - 0.4, cx1 + 0.4):
+                    add("hardie", xe - 0.08, xe + 0.08, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 - 0.15, (hi + lo) / 2 + 0.5, "hardie", 8,
+                        tag="HardieTrim rake", rot=(theta if slope == "+y" else -theta), rot_axis="x")
 
 
 # ================================================================== polygon outlines (angled edges)

@@ -1086,6 +1086,41 @@
       "each": 9.5,
       "source": "est. \u2014 plan calls for cedar posts",
       "desc": "6x6 Western red cedar post, per LF"
+    },
+    "hardie_trim_4_4x12_12ft": {
+      "each": 62.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "HardieTrim 4/4 x 12 (11-1/4\") x 12' smooth ColorPlus Timber Bark"
+    },
+    "hardie_trim_4_4x7_25_rustic_12ft": {
+      "each": 44.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "HardieTrim 4/4 x 7-1/4 x 12' rustic grain ColorPlus Timber Bark"
+    },
+    "hardie_soffit_4x10_cedarmill": {
+      "each": 98.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "HardieSoffit 4' x 10' cedarmill ColorPlus Timber Bark (non-vented)"
+    },
+    "hardie_soffit_4x10_cedarmill_vented": {
+      "each": 108.0,
+      "source": "est.",
+      "desc": "HardieSoffit 4' x 10' cedarmill ColorPlus Timber Bark, vented"
+    },
+    "hardie_trim_screws_100": {
+      "each": 48.0,
+      "source": "est.",
+      "desc": "Color-matched trim screws for HardieTrim, 100 ct (Timber Bark)"
+    },
+    "hardie_touchup": {
+      "each": 22.0,
+      "source": "est.",
+      "desc": "ColorPlus touch-up kit, Timber Bark"
+    },
+    "hardie_soffit_nails_lb": {
+      "each": 9.0,
+      "source": "est.",
+      "desc": "Stainless ring-shank siding nails 2\", per lb"
     }
   }
 }

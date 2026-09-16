@@ -205,6 +205,9 @@ class Extras:
     engineering_fee_low: float = 1800.0
     engineering_fee_high: float = 3000.0
     options: List[Option] = field(default_factory=list)
+    hardie_skirt: Optional[str] = None   # deck skirt / rim wrap in HardieTrim instead of the decking fascia: "4/4 x 12 Timber Bark"
+    cover_soffit: Optional[str] = None   # porch cover ceiling: "HardieSoffit 4x10 cedarmill Timber Bark" (None -> 1x6 T&G pine)
+    cover_fascia: Optional[str] = None   # porch cover fascia + rakes: "HardieTrim 4/4 x 7.25 rustic Timber Bark" (None -> painted 2x8)
 
 
 @dataclass

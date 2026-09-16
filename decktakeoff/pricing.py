@@ -178,7 +178,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         parts.append((f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip(), round(comp(drink_m, labsum("Drink rail")))))
     if s.geometry.cover:
         cover_m = mats(lambda l: l.category == "Porch cover")
-        parts.append(("Porch cover — shed roof on 6x6 cedar posts, shingles, T&G ceiling", round(comp(cover_m, labsum("Porch cover")))))
+        finish = ("Hardie soffit, fascia and rakes" if (s.extras.cover_soffit or s.extras.cover_fascia) else "T&G ceiling")
+        parts.append((f"Porch cover — shed roof on 6x6 cedar posts, shingles, {finish}", round(comp(cover_m, labsum("Porch cover")))))
     main = rest - sum(v for _, v in parts)
     if s.is_timber:
         label = ("Timber-frame deck: caissons, Douglas fir frame (end grain sealed), " + f"{s.decking.color} decking, "

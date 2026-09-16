@@ -703,7 +703,16 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lf, src = _price("decking", "generic_fascia_per_lf"); uc = round(lf * 12, 2)
         fas = FASCIA[dkf["material"]]
         why = "+1  (" + " · ".join(f"{n} {ftin(Lf)}" for n, Lf in Qz.fascia_pieces) + ")"
-        lines.append(Line("Fascia", f"{brand} {coll} Fascia {spec.decking.fascia_color or color} {fas['thick']:g}x{fas['width']:g}x12", nf, nf + 1, "ea", why, uc, src))
+        if spec.extras.hardie_skirt:
+            hd = PRICEBOOK["cover"]["hardie_trim_4_4x12_12ft"]
+            lines.append(Line("Fascia", f"Deck skirt — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {spec.extras.hardie_skirt.split()[-2] + ' ' + spec.extras.hardie_skirt.split()[-1] if len(spec.extras.hardie_skirt.split()) > 1 else spec.extras.hardie_skirt} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
+            scr = int(-(-nf * 12 * 2 // 12)) * 2 + 20     # 2 screws per bearing point @ 12" plus corners
+            sc_ = PRICEBOOK["cover"]["hardie_trim_screws_100"]
+            lines.append(Line("Fascia", sc_["desc"], -(-scr // 100), -(-scr // 100), "box", f"{scr} color-matched screws, pre-drilled, 2 per joist line", sc_["each"], sc_["source"]))
+            tu = PRICEBOOK["cover"]["hardie_touchup"]
+            lines.append(Line("Fascia", tu["desc"], 1, 1, "kit", "cut ends", tu["each"], tu["source"]))
+        else:
+            lines.append(Line("Fascia", f"{brand} {coll} Fascia {spec.decking.fascia_color or color} {fas['thick']:g}x{fas['width']:g}x12", nf, nf + 1, "ea", why, uc, src))
         for name, Lf in Qz.fascia_pieces:
             cuts.append(CutPiece(name.capitalize(), "fascia", Lf, 1, "flush under the board nose; full board at the front corners, short piece at the house"))
     elif not spec.decking.fascia:
@@ -922,7 +931,16 @@ def cover_lines(spec) -> List[Line]:
     de = int(_m.ceil(fascia_lf / 10))
     L_(None, de, de, "ea", f"{fascia_lf:.0f} LF", key="drip_edge_10ft")
     L_(None, round(along), round(along), "LF", "flashing at the ledger", key="ridge_flash_lf")
-    L_(None, round(area), round(area * 1.08), "SF", "+8% waste", key="tg_ceiling_sf")
+    if spec.extras.cover_soffit:
+        panels = int(_m.ceil(area / 40 * 1.1))
+        L_(f"Porch ceiling — HardieSoffit 4' x 10' cedarmill ColorPlus {spec.extras.cover_soffit.split()[-2]} {spec.extras.cover_soffit.split()[-1]} (non-vented; 1 in 3 vented if the roof is closed)", panels, panels, "panel", f"{area:.0f} SF + 10% cuts", key="hardie_soffit_4x10_cedarmill")
+        L_(None, int(_m.ceil(area / 60)), int(_m.ceil(area / 60)), "lb", "stainless ring-shank, 6\" OC at every rafter", key="hardie_soffit_nails_lb")
+    else:
+        L_(None, round(area), round(area * 1.08), "SF", "+8% waste", key="tg_ceiling_sf")
+    if spec.extras.cover_fascia:
+        nfb = int(_m.ceil(fascia_lf / 12 * 1.05))
+        L_(f"Cover fascia + rakes — HardieTrim 4/4 x 7-1/4 x 12' rustic ColorPlus {spec.extras.cover_fascia.split()[-2]} {spec.extras.cover_fascia.split()[-1]} over the 2x8 sub-fascia", nfb, nfb + 1, "ea", f"+1  ({fascia_lf:.0f} LF: front {along:.0f}' + two rakes {out + 1.5:.1f}')", key="hardie_trim_4_4x7_25_rustic_12ft")
+        L_(None, 1, 1, "box", "color-matched trim screws", key="hardie_trim_screws_100")
     L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
     L_(None, n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
     L_(None, n_r, n_r, "ea", "one per rafter at the beam", key="rafter_tie")
