@@ -158,3 +158,18 @@ tests/
   stamped design — it never invents a span.
 - Prices marked `est.` in the pricebook are placeholders; pull the latest D&D quote before the number goes on a bid.
 - Setback / frost / snow / wind values are inputs — the engine checks them, it does not look them up.
+
+
+## The job page — one template, every job
+
+`decktakeoff/page.py` builds the document for a job. It is the only page builder; every job runs through it so they look the same.
+
+```
+python -m decktakeoff jobs/parkview_deck.json --out out/parkview --page customer --pdf --key pv --lede "One paragraph under the cover image."
+python -m decktakeoff examples/eagles_nest.json --out out/eagles --page internal --key eagles
+```
+
+- `internal`: the takeoff + build set page (Eagle's Nest layout): design reads, flags, the order (NET / ORDER / why, or the quoted lines with a model cross-check), fastener schedule, cut list, the stack, the quote, renders, isometrics, explosions, drawings, build set, live 3D.
+- `customer`: the proposal: black cover (title, prepared for, price bar, hero render, one paragraph), then at a glance, what it is, renders, isometrics, exploded views, structure, drawings without the internal block, materials without prices, fastening, build steps, investment, live 3D. Nothing internal, no names.
+- `--pdf` prints a Letter PDF: cover locked to one page, sheets expanded, the 3D swapped for a still.
+- The page references its renders as `r/<key>-<still>.jpg`; `files.json` maps each to the file on disk (publish them alongside the page).

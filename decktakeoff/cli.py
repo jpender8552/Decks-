@@ -25,6 +25,10 @@ def main(argv=None):
     ap.add_argument("--quote", action="store_true", help="print the client quote (implies --price)")
     ap.add_argument("--buildset", action="store_true", help="with --out: write the drawing sheets, 3D viewer, renders and build steps under OUT/buildset")
     ap.add_argument("--no-render", action="store_true", help="skip the headless renders (sheets + viewer only)")
+    ap.add_argument("--page", choices=["internal", "customer"], help="with --out: write the job page (OUT/page.html + files.json) — the takeoff + build set page, or the customer proposal")
+    ap.add_argument("--pdf", action="store_true", help="with --page: also print OUT/page.pdf")
+    ap.add_argument("--key", default="job", help="short key for the page's render file names (r/<key>-<still>.jpg)")
+    ap.add_argument("--lede", default="", help="customer page: the one paragraph under the cover image")
     a = ap.parse_args(argv)
     base = json.loads(Path(a.spec).read_text()) if a.spec else None
     if a.image:
@@ -51,6 +55,10 @@ def main(argv=None):
             from .buildset import build_set
             r = build_set(t, f, str(out / "buildset"), render=not a.no_render)
             print(f"wrote {out}/buildset: {len(r['sheets'])} sheets, {len(r['stills'])} renders, viewer.html, buildset.html")
+        if a.page:
+            from .page import render_page
+            rp = render_page(spec, str(out), mode=a.page, key=a.key, lede=a.lede, render=not a.no_render, pdf=a.pdf)
+            print(f"wrote {rp['html']}" + (f" and {rp['pdf']}" if a.pdf else "") + f" — {len(rp['files'])} render files")
         print(f"wrote {out}/takeoff.md, takeoff.json, order.csv, spec.json, gsx_job_block.py" + (", quote.md" if p is not None else ""))
     if a.json:
         print(json.dumps(js, indent=2, default=str))
