@@ -123,7 +123,7 @@ for (const b of D.boxes) {
   else geo = new THREE.BoxGeometry(w, h, d);
   const mesh = new THREE.Mesh(geo, material(b));
   mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
-  if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else mesh.rotation.z = b.rot; }
+  if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
   mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }

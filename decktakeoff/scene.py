@@ -112,32 +112,35 @@ def build_scene(L) -> Scene:
     depth_back = 26.0
     H_house = zt + 9.5                      # one storey above the deck floor
     door_h = 6.75
-    for zi, z in enumerate(L.zones):
-        yw = z.wall_y * IN
-        x0h = z.x0 * IN - (3.0 if zi == 0 else 0.0)
-        x1h = (z.x0 + z.W) * IN + (3.0 if zi == len(L.zones) - 1 else 0.0)
-        add("house", x0h, x1h, yw - depth_back, yw, 0.0, H_house, "house", tag=f"house behind {z.name}")
-        add("roof", x0h - 1.0, x1h + 1.0, yw - depth_back - 1.0, yw + 1.0, H_house, H_house + 0.55, "roof")
-        add("trim", x0h - 1.0, x1h + 1.0, yw + 0.98, yw + 1.02, H_house - 0.02, H_house + 0.55, "trim", tag="fascia board")
-        # a sliding door at deck level in the middle of every zone; windows either side of it on the wide zones
-        cx = (z.x0 + z.W / 2) * IN
-        dw = 6.0 if z.W > 120 else 3.0
-        add("trim", cx - dw / 2 - 0.25, cx + dw / 2 + 0.25, yw - 0.05, yw + 0.06, zt + 0.02, zt + door_h + 0.25, "trim")
-        add("glass", cx - dw / 2, cx + dw / 2, yw - 0.02, yw + 0.07, zt + 0.1, zt + door_h, "glass")
-        if dw > 4:
-            add("trim", cx - 0.06, cx + 0.06, yw - 0.02, yw + 0.08, zt + 0.1, zt + door_h, "trim")
-        if z.W > 200:
-            for sx in (-1, 1):
-                wx = cx + sx * (z.W * IN / 4 + 1.0)
-                add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, zt + 2.9, zt + 7.1, "trim")
-                add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, zt + 3.0, zt + 7.0, "glass")
-        if zt >= 7.0:   # walkout level below the deck
-            for sx in (-1, 1) if z.W > 200 else (0,):
-                wx = cx + sx * (z.W * IN / 4 + 1.0)
-                add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, 3.4, 5.6, "trim")
-                add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, 3.5, 5.5, "glass")
+    if spec.geometry.house_blocks:
+        draw_house_from_spec(add, spec, zt, H_house)
+    else:
+        for zi, z in enumerate(L.zones):
+            yw = z.wall_y * IN
+            x0h = z.x0 * IN - (3.0 if zi == 0 else 0.0)
+            x1h = (z.x0 + z.W) * IN + (3.0 if zi == len(L.zones) - 1 else 0.0)
+            add("house", x0h, x1h, yw - depth_back, yw, 0.0, H_house, "house", tag=f"house behind {z.name}")
+            add("roof", x0h - 1.0, x1h + 1.0, yw - depth_back - 1.0, yw + 1.0, H_house, H_house + 0.55, "roof")
+            add("trim", x0h - 1.0, x1h + 1.0, yw + 0.98, yw + 1.02, H_house - 0.02, H_house + 0.55, "trim", tag="fascia board")
+            # a sliding door at deck level in the middle of every zone; windows either side of it on the wide zones
+            cx = (z.x0 + z.W / 2) * IN
+            dw = 6.0 if z.W > 120 else 3.0
+            add("trim", cx - dw / 2 - 0.25, cx + dw / 2 + 0.25, yw - 0.05, yw + 0.06, zt + 0.02, zt + door_h + 0.25, "trim")
+            add("glass", cx - dw / 2, cx + dw / 2, yw - 0.02, yw + 0.07, zt + 0.1, zt + door_h, "glass")
+            if dw > 4:
+                add("trim", cx - 0.06, cx + 0.06, yw - 0.02, yw + 0.08, zt + 0.1, zt + door_h, "trim")
+            if z.W > 200:
+                for sx in (-1, 1):
+                    wx = cx + sx * (z.W * IN / 4 + 1.0)
+                    add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, zt + 2.9, zt + 7.1, "trim")
+                    add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, zt + 3.0, zt + 7.0, "glass")
+            if zt >= 7.0:   # walkout level below the deck
+                for sx in (-1, 1) if z.W > 200 else (0,):
+                    wx = cx + sx * (z.W * IN / 4 + 1.0)
+                    add("trim", wx - 1.75, wx + 1.75, yw - 0.05, yw + 0.06, 3.4, 5.6, "trim")
+                    add("glass", wx - 1.5, wx + 1.5, yw - 0.02, yw + 0.07, 3.5, 5.5, "glass")
     # the return walls of a recess are the sides of the neighbouring block, drawn so they shade the wing
-    for a, b in zip(L.zones, L.zones[1:]):
+    for a, b in ([] if spec.geometry.house_blocks else zip(L.zones, L.zones[1:])):
         ya, yb = a.wall_y * IN, b.wall_y * IN
         if abs(ya - yb) > 0.01:
             xb = b.x0 * IN
@@ -403,9 +406,15 @@ def build_scene(L) -> Scene:
         add("tubrim", x0 - 0.05, x0 + bay + 0.05, y0 - 0.05, y0 + bay + 0.05, zt + 2.7, zt + 3.0, "tubrim", 8)
         add("water", x0 + 0.5, x0 + bay - 0.5, y0 + 0.5, y0 + bay - 0.5, zt + 2.75, zt + 2.82, "water", 8)
 
+    if spec.geometry.outline:
+        fixed = apply_outline(fixed, spec, zt, jbot, jtop, jb, bt, fas_t if fascia else 0.0)
+    if spec.geometry.house_walls:
+        for wseg in spec.geometry.house_walls:
+            fixed.append(angled_wall(*wseg, z0=0.0, z1=H_house))
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
                 zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN) for z in L.zones],
                 edge=edge, timber=timber, oiled=spec.framing.finish == "oil",
+                outline=[list(p) for p in spec.geometry.outline] if spec.geometry.outline else None,
                 step_text=step_captions(L))
     return Scene(fixed, zt, W, y_min, y_front, materials_for(spec), meta)
 
@@ -495,6 +504,23 @@ def build_composite_scene(L) -> Scene:
         for z in p.layout.zones:
             gx0, gx1, gy0, gy1 = p.placement.box(z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5)
             add("gravel", gx0, gx1, gy0, gy1, 0.0, 0.04, "gravel")
+    draw_house_from_spec(add, spec, zt, H_house)
+    W = x1 - x0
+    # the viewer's camera framing wants the deck's extent: shift nothing, report the bbox
+    meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
+                zones=[dict(name=f"{p.name} {z.name}", label=z.label, x0=p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0],
+                            W=abs((p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[1]) - (p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0])),
+                            wall_y=0, D=0, front=0) for p in L.parts for z in p.layout.zones],
+                edge=0.0, timber=spec.is_timber, oiled=spec.framing.finish == "oil", step_text=step_captions(L), composite=True, bbox=list(L.bbox))
+    S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
+    S.x_min = x0
+    return S
+
+
+
+
+def draw_house_from_spec(add, spec, zt, H_house):
+    """The house from its measured footprint (blocks, brick chimneys), the doors and windows on the walls facing the deck, and the porch cover."""
     # the house
     for h in spec.geometry.house_blocks:
         bx0, bx1, by0, by1 = h[:4]
@@ -563,13 +589,101 @@ def build_composite_scene(L) -> Scene:
                     tag="cover rafter", rot=(theta if slope == "+y" else -theta), rot_axis="x")
             add("glass", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
                 tag="cover panels", rot=(theta if slope == "+y" else -theta), rot_axis="x")
-    W = x1 - x0
-    # the viewer's camera framing wants the deck's extent: shift nothing, report the bbox
-    meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
-                zones=[dict(name=f"{p.name} {z.name}", label=z.label, x0=p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0],
-                            W=abs((p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[1]) - (p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0])),
-                            wall_y=0, D=0, front=0) for p in L.parts for z in p.layout.zones],
-                edge=0.0, timber=spec.is_timber, oiled=spec.framing.finish == "oil", step_text=step_captions(L), composite=True, bbox=list(L.bbox))
-    S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
-    S.x_min = x0
-    return S
+
+
+# ================================================================== polygon outlines (angled edges)
+DECK_KINDS = {"board", "border", "joist", "rim", "block", "fascia", "ledger", "beam"}
+
+
+def _inside(poly, x, y) -> bool:
+    n = len(poly); inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]; xj, yj = poly[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-9) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _clip_x(poly, y, x0, x1):
+    """The part of the horizontal span [x0, x1] at height y that lies inside the polygon (largest run)."""
+    xs = []
+    n = len(poly)
+    for i in range(n):
+        (xa, ya), (xb, yb) = poly[i], poly[(i + 1) % n]
+        if (ya > y) != (yb > y):
+            xs.append(xa + (y - ya) * (xb - xa) / (yb - ya))
+    xs.sort()
+    best = None
+    for a, b in zip(xs[0::2], xs[1::2]):
+        lo, hi = max(a, x0), min(b, x1)
+        if hi - lo > 0.05 and (best is None or hi - lo > best[1] - best[0]):
+            best = (lo, hi)
+    return best
+
+
+def _clip_y(poly, x, y0, y1):
+    ys = []
+    n = len(poly)
+    for i in range(n):
+        (xa, ya), (xb, yb) = poly[i], poly[(i + 1) % n]
+        if (xa > x) != (xb > x):
+            ys.append(ya + (x - xa) * (yb - ya) / (xb - xa))
+    ys.sort()
+    best = None
+    for a, b in zip(ys[0::2], ys[1::2]):
+        lo, hi = max(a, y0), min(b, y1)
+        if hi - lo > 0.05 and (best is None or hi - lo > best[1] - best[0]):
+            best = (lo, hi)
+    return best
+
+
+def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List[Box]:
+    """Clip the deck's pieces to the true outline and add mitred rim / fascia along every angled edge."""
+    poly = [(float(x), float(y)) for x, y in spec.geometry.outline]
+    out: List[Box] = []
+    for b in boxes:
+        if b.kind not in DECK_KINDS or b.rot:
+            out.append(b); continue
+        cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+        along_x = (b.x1 - b.x0) >= (b.y1 - b.y0)
+        if along_x:
+            span = _clip_x(poly, cy, b.x0, b.x1)
+            if span is None:
+                continue
+            if abs(span[0] - b.x0) > 0.02 or abs(span[1] - b.x1) > 0.02:
+                b = Box(b.kind, span[0], span[1], b.y0, b.y1, b.z0, b.z1, b.mat, b.phase, b.tag + " (angled cut)", b.shape, b.tone)
+        else:
+            span = _clip_y(poly, cx, b.y0, b.y1)
+            if span is None:
+                continue
+            if abs(span[0] - b.y0) > 0.02 or abs(span[1] - b.y1) > 0.02:
+                b = Box(b.kind, b.x0, b.x1, span[0], span[1], b.z0, b.z1, b.mat, b.phase, b.tag + " (angled cut)", b.shape, b.tone)
+        out.append(b)
+    # mitred rim (and fascia) pieces along the angled edges
+    n = len(poly)
+    for i in range(n):
+        (xa, ya), (xb, yb) = poly[i], poly[(i + 1) % n]
+        if abs(xa - xb) < 0.01 or abs(ya - yb) < 0.01:
+            continue
+        L_e = math.hypot(xb - xa, yb - ya); phi = math.atan2(yb - ya, xb - xa)
+        cx, cy = (xa + xb) / 2, (ya + yb) / 2
+        # the rim sits just inside the edge: offset toward the polygon interior
+        nx, ny = -math.sin(phi), math.cos(phi)
+        if not _inside(poly, cx + nx * 0.5, cy + ny * 0.5):
+            nx, ny = -nx, -ny
+        for k in range(spec.framing.rim_plies):
+            off = (k + 0.5) * jb
+            out.append(Box("rim", cx + nx * off - L_e / 2, cx + nx * off + L_e / 2, cy + ny * off - jb / 2, cy + ny * off + jb / 2, jbot, jtop, "timber", 5,
+                           tag=f"angled rim {L_e:.1f}' mitred", rot=phi, rot_axis="z"))
+        if fas_t:
+            out.append(Box("fascia", cx - nx * fas_t / 2 - L_e / 2, cx - nx * fas_t / 2 + L_e / 2, cy - ny * fas_t / 2 - fas_t / 2, cy - ny * fas_t / 2 + fas_t / 2, jbot - 0.15, zt - 0.02, "fascia", 6,
+                           tag=f"angled fascia {L_e:.1f}' mitred", rot=phi, rot_axis="z"))
+    return out
+
+
+def angled_wall(x0, y0, x1, y1, z0=0.0, z1=18.0, thick=0.5) -> Box:
+    L_w = math.hypot(x1 - x0, y1 - y0); phi = math.atan2(y1 - y0, x1 - x0)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    return Box("wall", cx - L_w / 2, cx + L_w / 2, cy - thick / 2, cy + thick / 2, z0, z1, "house", tag="angled house wall", rot=phi, rot_axis="z")

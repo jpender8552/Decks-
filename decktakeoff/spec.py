@@ -90,7 +90,10 @@ class Geometry:
     parts: Optional[List[dict]] = None
     house_blocks: List[List[float]] = field(default_factory=list)     # global frame, feet: [x0, x1, y0, y1] blocks of the house footprint (drawn, not counted)
     house_openings: List[List[float]] = field(default_factory=list)   # [x0, x1, y_face, z0, z1] doors / windows on a wall facing the deck
-    cover: Optional[List[float]] = None                                 # existing porch cover to reset: [x0, x1, y0, y1] (global, feet), drawn in the finished view
+    cover: Optional[List[float]] = None                                 # porch cover: [x0, x1, y0, y1, slope] (feet), drawn as a shed roof on posts
+    outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
+                                                                        # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
+    house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
 
 
 @dataclass

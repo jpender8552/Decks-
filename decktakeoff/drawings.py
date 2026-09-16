@@ -79,6 +79,9 @@ def draw_plan_boxes(o, X, Y, sc, boxes: List[Box], kinds, stroke=INK, sw=0.4, da
         f = fill_for(b)
         if b.shape == "cyl":
             o.append(C(X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2), (b.x1 - b.x0) / 2 * sc, f, stroke, sw, dash))
+        elif b.rot and b.rot_axis == "z":     # a mitred piece along an angled edge: rotate about its centre in plan
+            cx, cy = X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2)
+            o.append(f'<g transform="rotate({math.degrees(b.rot):.2f} {cx:.1f} {cy:.1f})">' + R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, f, stroke, sw, f'stroke-dasharray="{dash}"' if dash else "") + "</g>")
         else:
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, f, stroke, sw, f'stroke-dasharray="{dash}"' if dash else ""))
 
@@ -105,7 +108,11 @@ def house_outline(o, X, Y, sc, S: Scene):
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["house"], INK, 1.4))
     for b in S.boxes:
         if b.kind == "wall":
-            o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["house"], INK, 1.2))
+            if b.rot and b.rot_axis == "z":
+                cx, cy = X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2)
+                o.append(f'<g transform="rotate({math.degrees(b.rot):.2f} {cx:.1f} {cy:.1f})">' + R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["house"], INK, 1.2) + "</g>")
+            else:
+                o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["house"], INK, 1.2))
         if b.kind == "privacy":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["privacy"], "#7a7267", 0.8))
             o.append(T(X((b.x0 + b.x1) / 2) - 8, Y((b.y0 + b.y1) / 2), "PRIVACY / LOT WALL — nothing fastens, no rail", 7, 700, "middle", MUTE, rot=-90))
@@ -114,6 +121,8 @@ def house_outline(o, X, Y, sc, S: Scene):
 
 
 def deck_outline(S: Scene) -> List[Tuple[float, float]]:
+    if S.meta.get("outline"):
+        return [tuple(p) for p in S.meta["outline"]]
     zs = S.meta["zones"]
     pts = [(zs[0]["x0"], zs[0]["wall_y"])]
     for z in zs:

@@ -1,7 +1,7 @@
 {
-  "job": "1675 Summit Point Ct \u2014 Wraparound Deck",
+  "job": "1675 Summit Point Ct \u2014 Deck with Porch Cover",
   "client": "William Wright",
-  "notes": "Rebuilt from the HOVER measurement report (4 Apr 2025) and the site photos; the homeowner's sketch is not used. Global frame: x along the back wall, x=0 at the SGD-2 bump, house corner at 26'11\"; y toward the yard. BACK RUN: 26'11\" x 10'6\" on the back wall under the 18'9\" gable window wall (walkout with a covered patio below, 8' high); rail on the yard edge and on the left end, returning to the 2'4\" SGD-2 bump. WING: 10' wide, turns the corner and runs 27'1\" along the LEFT side wall toward the front: SGD-3 sliding door right at the corner, the 9'10\" chimney 8'4\" from the corner projecting 2'10\" into the wing (square at deck level; its 2'11\" shoulders start 2'8\" above the deck), then the 8'11\" wall with the three tall windows under the existing cover, ending where the house steps out 5'6\" into the gable section. The wing's far end is OPEN: 6' of rail and the 4' stair on the outer side, which runs on down along the gable wall (9 risers, 66\" to a concrete pad beside the W-111 walkout window; house on one side, one rail). The corner square hangs on the back run's double rim (counted as a ledger \u2014 swap LedgerLOKs for hangers). The rail meets at the seam of the two parts (one extra post). Heights: ~8' at the back run, ~6' at the wing's end; frame at 8', posts cut to grade. COVER: the existing translucent-panel shed roof over the last 9' of the wing (ledger on the house, 6x6 posts at the rail line) comes down and goes back on the new frame \u2014 RFI, not priced. Existing deck (all of it) is demo'd: stained wood, black aluminum balusters, flat drink-rail cap. Plan says joists AND boards run perpendicular to the house \u2014 GSX frame kept (boards parallel to each part's wall). PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
+  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -17,262 +17,222 @@
     "attachment": "ledger",
     "board_direction": "parallel",
     "picture_frame": true,
-    "parts": [
+    "zones": [
       {
-        "name": "Back run",
-        "geometry": {
-          "width": 26.92,
-          "depth": 10.5,
-          "size_mode": "frame",
-          "height_in": 96
-        },
-        "railing": {
-          "sides": [
-            "left",
-            "front"
-          ],
-          "openings": [
-            {
-              "side": "left",
-              "start_in": 0,
-              "length_in": 28,
-              "reason": "SGD-2 bump wall \u2014 rail returns to it"
-            }
-          ]
-        },
-        "stairs": [],
-        "placement": {
-          "origin": [
-            0,
-            0
-          ],
-          "xx": 1,
-          "xy": 0,
-          "yx": 0,
-          "yy": 1
-        }
+        "name": "W",
+        "label": "Wing \u2014 6' at the top wall, 30' deep, angled bay cuts its inner edge",
+        "width": 6,
+        "depth": 30,
+        "wall_offset": 22.5
       },
       {
-        "name": "Wing",
-        "geometry": {
-          "height_in": 96,
-          "zones": [
-            {
-              "name": "C",
-              "label": "Past the chimney: the 8'11\" wall with the three windows, under the cover",
-              "width": 8.92,
-              "depth": 10,
-              "wall_offset": 2.83
-            },
-            {
-              "name": "B",
-              "label": "Beside the chimney (9'10\" wide, projects 2'10\")",
-              "width": 9.83,
-              "depth": 7.17,
-              "wall_offset": 0
-            },
-            {
-              "name": "A",
-              "label": "At the corner: the 8'4\" wall with the SGD-3 door",
-              "width": 8.33,
-              "depth": 10,
-              "wall_offset": 2.83
-            },
-            {
-              "name": "D",
-              "label": "Corner square (hangs on the back run's rim)",
-              "width": 10.5,
-              "depth": 10,
-              "wall_offset": 2.83
-            }
-          ]
-        },
-        "railing": {
-          "edges": [
-            "end:left",
-            "front:C",
-            "front:B",
-            "front:A",
-            "front:D",
-            "end:right"
-          ]
-        },
-        "stairs": [
-          {
-            "side": "end:left",
-            "width_in": 48,
-            "position_in": 72,
-            "total_rise_in": 66,
-            "landing": "concrete pad",
-            "rails": 1,
-            "stringer_size": "2x12",
-            "closed_risers": true
-          }
-        ],
-        "placement": {
-          "origin": [
-            29.75,
-            -27.08
-          ],
-          "xx": 0,
-          "xy": 1,
-          "yx": 1,
-          "yy": 0
-        }
+        "name": "N",
+        "label": "Under the short wall beside the chimney",
+        "width": 4.5,
+        "depth": 7.5,
+        "wall_offset": 0
+      },
+      {
+        "name": "B",
+        "label": "Chimney bay \u2014 10'6\" brick chimney 3' proud",
+        "width": 10.5,
+        "depth": 7.5,
+        "wall_offset": 0
+      },
+      {
+        "name": "P",
+        "label": "Porch bay under the cover",
+        "width": 16,
+        "depth": 10.5,
+        "wall_offset": 3
       }
     ],
-    "house_blocks": [
+    "outline": [
       [
-        -36.92,
-        26.92,
-        -29.17,
+        0,
+        -22.5
+      ],
+      [
+        6,
+        -22.5
+      ],
+      [
+        3.4,
+        -11.25
+      ],
+      [
+        6,
         0.0
       ],
       [
-        -12.0,
-        26.92,
-        -45.0,
-        -29.17
+        21,
+        0.0
       ],
       [
-        -6.17,
-        0.0,
-        0.0,
-        2.33
+        21,
+        -3.0
       ],
       [
-        26.92,
-        29.75,
-        -18.17,
-        -8.33,
+        37,
+        -3.0
+      ],
+      [
+        37,
+        7.5
+      ],
+      [
+        0,
+        7.5
+      ]
+    ],
+    "house_blocks": [
+      [
+        0,
+        6,
+        -52.5,
+        -22.5
+      ],
+      [
+        6,
+        10.5,
+        -52.5,
+        0.0
+      ],
+      [
+        10.5,
+        21,
+        -3.0,
+        0.0,
         "brick",
         0.0,
         10.7
       ],
       [
-        26.92,
-        29.75,
-        -16.25,
-        -10.25,
+        12.5,
+        19,
+        -3.0,
+        0.0,
         "brick",
         10.7,
         30.0
       ],
       [
-        26.92,
-        32.42,
-        -41.25,
-        -27.08
+        10.5,
+        45,
+        -52.5,
+        -3.0
       ],
       [
-        26.92,
-        27.33,
-        -61.6,
-        -41.25
+        5.84,
+        6.0,
+        -22.5,
+        -20.25
       ],
       [
-        26.92,
-        36.08,
-        -73.5,
-        -61.6
+        5.319999999999999,
+        6.0,
+        -20.25,
+        -18.0
+      ],
+      [
+        4.8,
+        6.0,
+        -18.0,
+        -15.75
+      ],
+      [
+        4.279999999999999,
+        6.0,
+        -15.75,
+        -13.5
+      ],
+      [
+        3.76,
+        6.0,
+        -13.5,
+        -11.25
+      ],
+      [
+        3.76,
+        6.0,
+        -11.25,
+        -9.0
+      ],
+      [
+        4.279999999999999,
+        6.0,
+        -9.0,
+        -6.75
+      ],
+      [
+        4.8,
+        6.0,
+        -6.75,
+        -4.5
+      ],
+      [
+        5.319999999999999,
+        6.0,
+        -4.5,
+        -2.25
+      ],
+      [
+        5.84,
+        6.0,
+        -2.25,
+        0.0
+      ]
+    ],
+    "house_walls": [
+      [
+        6,
+        -22.5,
+        3.4,
+        -11.25
+      ],
+      [
+        3.4,
+        -11.25,
+        6,
+        0.0
       ]
     ],
     "house_openings": [
       [
-        -31.7,
-        -24.8,
-        0.0,
-        8.1,
+        1.3,
+        4.2,
+        -22.5,
+        8.05,
         14.8
       ],
       [
-        -21.3,
-        -13.0,
-        0.0,
-        13.6,
-        18.2
-      ],
-      [
-        -9.0,
-        -5.1,
-        0.0,
-        13.6,
-        18.2
-      ],
-      [
-        -6.0,
-        -0.4,
-        2.33,
-        8.1,
+        23.0,
+        26.0,
+        -3.0,
+        8.05,
         14.8
       ],
       [
-        -29.7,
-        -24.5,
-        0.0,
-        3.5,
-        5.5
+        28.5,
+        34.5,
+        -3.0,
+        10.5,
+        14.5
       ],
       [
-        8.5,
-        26.7,
+        7.0,
+        9.5,
         0.0,
         10.5,
-        20.0
-      ],
-      [
-        9.0,
-        14.2,
-        0.0,
-        3.5,
-        5.5
-      ],
-      [
-        19.4,
-        24.6,
-        0.0,
-        3.5,
-        5.5
-      ],
-      [
-        -7.7,
-        -1.6,
-        26.92,
-        8.1,
-        14.8,
-        "x"
-      ],
-      [
-        -27.0,
-        -21.0,
-        26.92,
-        10.5,
-        14.5,
-        "x"
-      ],
-      [
-        -40.5,
-        -28.0,
-        32.42,
-        10.5,
-        14.5,
-        "x"
-      ],
-      [
-        -38.5,
-        -33.7,
-        32.42,
-        1.0,
-        3.9,
-        "x"
+        14.5
       ]
     ],
     "cover": [
-      27.0,
-      36.5,
-      -27.0,
-      -18.2,
-      "+x"
+      10.5,
+      37,
+      -3.0,
+      7.5,
+      "+y"
     ]
   },
   "framing": {
@@ -302,9 +262,28 @@
     "system": "Cinch",
     "color": "Satin Black",
     "height_in": 36,
+    "edges": [
+      "end:left",
+      "front:W",
+      "front:N",
+      "front:B",
+      "front:P",
+      "end:right"
+    ],
     "drink_rail": true
   },
-  "stairs": [],
+  "stairs": [
+    {
+      "side": "end:right",
+      "width_in": 48,
+      "position_in": 12,
+      "total_rise_in": 66,
+      "landing": "concrete pad",
+      "rails": 1,
+      "stringer_size": "2x12",
+      "closed_risers": true
+    }
+  ],
   "extras": {
     "roof_over": true,
     "engineered": true,
