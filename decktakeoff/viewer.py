@@ -111,7 +111,7 @@ function material(b) {
   if (b.mat === 'glass') { opts.envMapIntensity = 1; }
   const mm = new THREE.MeshStandardMaterial(opts); MATC[key] = mm; return mm;
 }
-const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy']);
+const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser']);
 const edgeMat = new THREE.LineBasicMaterial({color: 0x1a1612, transparent: true, opacity: 0.22});
 // meshes
 const phased = [], ctx = [];
@@ -122,6 +122,7 @@ for (const b of D.boxes) {
   else geo = new THREE.BoxGeometry(w, h, d);
   const mesh = new THREE.Mesh(geo, material(b));
   mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
+  if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
   mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }

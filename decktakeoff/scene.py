@@ -27,6 +27,8 @@ class Box:
     tag: str = ""
     shape: str = "box"  # box | cyl
     tone: float = 0.0   # per-board tone jitter (-1..1)
+    rot: float = 0.0    # radians about the box centre: stair stringers / stair rails (axis below); 0 = axis-aligned
+    rot_axis: str = "y" # "y": run along x (viewer rotation.z) | "x": run along y (viewer rotation.x)
 
 
 @dataclass
@@ -327,6 +329,66 @@ def build_scene(L: Layout) -> Scene:
                     add("drink", x0_ - pw / 2, x1_ + pw / 2, ya - bw / 2, ya + bw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())
                 else:
                     add("drink", xa - bw / 2, xa + bw / 2, y0_ - pw / 2, y1_ + pw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())
+
+    # ---------------- stairs: stringers (rotated boxes), treads, closed risers, stair rail, landing pad
+    for st in L.stairs:
+        g = st.geo
+        rise, run, width = g.riser_in * IN, g.tread_in * IN, st.width * IN
+        n_r, n_t = g.risers, g.treads
+        total_run = g.total_run_in * IN
+        side = st.side
+        if side in ("right", "end:right"):
+            zz = L.zones[-1]; direction = "+x"; u0 = (zz.x0 + zz.W) * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
+        elif side in ("left", "end:left"):
+            zz = L.zones[0]; direction = "-x"; u0 = zz.x0 * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
+        else:
+            zn = side.split(":")[1] if ":" in side else None
+            zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "+y"
+            u0 = (zz.wall_y + zz.D) * IN + edge; v_a = zz.x0 * IN + st.opening.start_in * IN
+        v_b = v_a + width
+        theta = math.atan2(zt, total_run)
+        def sb(kind, ua, ub, va, vb, za, zb, mat, phase, tag="", rot=0.0, tone_=0.0):
+            if direction == "+x":
+                add(kind, u0 + ua, u0 + ub, va, vb, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="y", tone=tone_)
+            elif direction == "-x":
+                add(kind, u0 - ub, u0 - ua, va, vb, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="y", tone=tone_)
+            else:
+                add(kind, va, vb, u0 + ua, u0 + ub, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="x", tone=tone_)
+        # stringers: a 2x12 along the slope, centred under the nosing line
+        depth = 11.25 * IN
+        slope_len = math.hypot(total_run, zt)
+        nst = max(2, st.stringers)
+        for i in range(nst):
+            v = v_a + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
+            zc = zt / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
+            sb("stringer", total_run / 2 - slope_len / 2, total_run / 2 + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {st.side}", rot=theta)
+        for k in range(1, n_r + 1):
+            ztop = zt - k * rise
+            # riser board k at the back of tread k (the last riser sits at the pad)
+            sb("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, v_a, v_b, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
+            if k <= n_t:
+                sb("tread", (k - 1) * run, k * run + NOSE * IN, v_a - 0.02, v_b + 0.02, ztop - bt, ztop, "deck", 6, tag=f"tread {k}", tone_=tone())
+        # stair rail on the open side(s): posts top and bottom, a sloped top rail, a baluster per tread
+        if st.stair_rail_sides and L.rail:
+            sysd = RAIL_SYSTEMS.get(L.rail.system, RAIL_SYSTEMS["Fulton"])
+            pw = sysd["post_w"] * IN
+            hr = L.rail.height * IN
+            sides = [v_b - pw / 2 - 0.02] if st.stair_rail_sides == 1 else [v_a + pw / 2 + 0.02, v_b - pw / 2 - 0.02]
+            for vc in sides:
+                for u_, zb_ in ((0.25, zt - rise), (total_run - 0.25, 0.0)):
+                    sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "steel", 7, tag="stair post")
+                rail_len = math.hypot(total_run - 0.5, zt - rise)
+                zc = (zt - rise) / 2 + hr + 0.1
+                sb("toprail", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
+                if spec.railing.drink_rail:
+                    sb("drink", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
+                for k in range(1, n_t + 1):
+                    for frac in (0.3, 0.7):
+                        u_ = (k - 1) * run + frac * run
+                        ztop = zt - k * rise
+                        sb("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02 + (theta and (frac * run) * math.tan(theta) * 0), "steel", 7)
+        # landing pad
+        sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, -0.3, 0.02, "concrete", 1, tag=f"landing pad {st.side}")
 
     # ---------------- furnishings: hot tub in its zone against the wall
     if spec.extras.hot_tub:
