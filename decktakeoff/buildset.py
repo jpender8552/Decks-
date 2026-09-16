@@ -113,7 +113,7 @@ def buildset_html(t: Takeoff, sheets: List[Tuple[str, str, str]], steps: List[di
     return "\n".join(out)
 
 
-def build_set(t: Takeoff, flags, out_dir: str, render: bool = True) -> dict:
+def build_set(t: Takeoff, flags, out_dir: str, render: bool = True, customer: bool = False) -> dict:
     """Write drawings (SVG + HTML), viewer.html, renders/, buildset.html. Returns paths + in-memory pieces."""
     L = t.layout
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
@@ -122,12 +122,12 @@ def build_set(t: Takeoff, flags, out_dir: str, render: bool = True) -> dict:
         sheets = []
         for i, p in enumerate(L.parts):
             tag = chr(65 + i)
-            for num, ttl, svg in all_sheets(p.layout, p.takeoff, p.flags, build_scene(p.layout)):
+            for num, ttl, svg in all_sheets(p.layout, p.takeoff, p.flags, build_scene(p.layout), customer=customer):
                 if num == "G-001" and i > 0:
                     continue
                 sheets.append((num if num == "G-001" else f"{num}-{tag}", f"{ttl} — {p.name}", svg))
     else:
-        sheets = all_sheets(L, t, flags, S)
+        sheets = all_sheets(L, t, flags, S, customer=customer)
     (out / "sheets").mkdir(exist_ok=True)
     for num, ttl, svg in sheets:
         (out / "sheets" / f"{num}.svg").write_text(svg)

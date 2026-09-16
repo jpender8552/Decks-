@@ -13,7 +13,7 @@
     "wui_fire_zone": false,
     "seismic_design_category": "B",
     "tax_rate": 0.045,
-    "notes": "Unincorporated Jefferson County (Columbine) \u2014 combined sales tax 4.5% (CO 2.9 + Jeffco 0.5 + RTD 1.0 + CD 0.1), matches the D&D quote. Existing 8'-high wood deck, pergola and stair come out. Setbacks and lot lines not on file."
+    "notes": "Unincorporated Jefferson County (Columbine). Existing deck, pergola and stair come out."
   },
   "geometry": {
     "height_in": 96,
@@ -153,12 +153,15 @@
   "extras": {
     "demo_existing": true,
     "demo_sf": 300,
-    "site_extras": [
-      {
-        "item": "Dumpster + portable toilet",
-        "cost": 800
-      }
-    ]
+    "site_extras": [],
+    "material_factor": 1.0,
+    "no_general_conditions": true,
+    "labor_rates": {
+      "rail_per_lf": 50,
+      "cable_rail_addon_per_lf": 0
+    },
+    "extra_beam_sets": 1,
+    "engineering_note": "If the county asks for a stamped set, GSX provides the engineer and the engineering is billed at cost, separate from this price."
   },
   "quoted_order": [
     {
@@ -570,5 +573,6 @@
       "source": "D&D quote 979610"
     }
   ],
-  "quoted_ref": "Decks & Docks quote 979610 \u00b7 09/11/2026 \u00b7 Henry Frederick \u00b7 ship to 9083 W. Parkview Dr"
+  "quoted_ref": "Decks & Docks quote 979610 \u00b7 09/11/2026 \u00b7 Henry Frederick \u00b7 ship to 9083 W. Parkview Dr",
+  "quoted_tax": 1156.12
 }

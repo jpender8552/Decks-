@@ -218,6 +218,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"| **Total, check or ACH** | **${p.sell:,.0f}** |")
     w(f"| **Total, financed** | **${p.retail:,.0f}** |")
     w("")
+    if s.extras.engineering_note and not p.engineering:
+        w(f"**Engineering.** {s.extras.engineering_note}")
+        w("")
     if p.engineering:
         lo, hi = p.engineering
         w(f"**Engineering — ${lo:,.0f} to ${hi:,.0f}.** Stamped drawings by a Colorado engineer ({s.site.ground_snow_psf:g} psf snow"
@@ -244,7 +247,8 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Frame | {sm['joists']}; {sm['rims']}; {'; '.join(sm['beams'])}. |")
     if s.extras.stone_bases:
         w(f"| Column bases | Stone veneer 2'x2' x 3' with a 24\" stone cap at all {n_posts} posts. |")
-    w(f"| Foundation | {sm['posts'].split(' on ')[-1].capitalize()}" + (f" (frost depth {ftin(s.site.frost_depth_in)})" if s.framing.footing_type in ('caisson', 'concrete') else "") + ". |")
+    _fd = sm['posts'].split(' on ')[-1]
+    w(f"| Foundation | {(_fd[0].upper() + _fd[1:]) if _fd else ''}" + (f" (frost depth {ftin(s.site.frost_depth_in)})" if s.framing.footing_type in ('caisson', 'concrete') else "") + ". |")
     w(f"| Design load | {s.site.ground_snow_psf:g} psf snow" + (", stamped by a Colorado engineer" if s.extras.engineered else "")
       + (". Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall" if s.site.wui_fire_zone else "") + ". |")
     w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"

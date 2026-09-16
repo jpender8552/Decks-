@@ -156,6 +156,9 @@ const VIEWS = {
   iso:    {pos: [cx + span * 0.95, zt + span * 0.7, D.y_front + span * 0.8], at: [cx, zt - 2, cy]},
   plan:   {pos: [cx, zt + 120, cy - 4 + 0.001], at: [cx, 0, cy - 4], up: [0, 0, -1], ortho: true},
   under:  {pos: [cx + span * 0.22, Math.min(zt * 0.45 + 0.4, 3.2), D.y_front + Math.max(7, span * 0.42)], at: [cx, zt - 1.3, cy - 2]},
+  iso2:   {pos: [cx - span * 0.95, zt + span * 0.7, D.y_front + span * 0.8], at: [cx, zt - 2, cy]},
+  isolow: {pos: [cx + span * 0.85, zt + 2.2, D.y_front + span * 0.95], at: [cx, zt - 1.2, cy]},
+  underiso: {pos: [cx - span * 0.55, Math.max(1.2, zt * 0.25), D.y_front + span * 0.7], at: [cx, zt - 2.2, cy - 2]},
 };
 function planMode(on) {
   if (renderer.shadowMap.enabled === on) { renderer.shadowMap.enabled = !on; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }   // a plan has no cast shadows
@@ -204,7 +207,7 @@ def viewer_html(scene: Scene, three_src: Optional[str] = None, title: str = "3D 
     steps = "".join(f'<button type="button" data-step="{n}">{n}</button>' for n in range(1, 9))
     ui = f'''<div class="v3d-ui v3d-top"><span class="v3d-title">{title}</span><span class="v3d-cap"></span></div>
 <div class="v3d-ui v3d-bar">
-  <span class="grp"><button type="button" data-view="yard" class="on">Yard</button><button type="button" data-view="corner">Corner</button><button type="button" data-view="ondeck">On deck</button><button type="button" data-view="iso">Iso</button><button type="button" data-view="plan">Plan</button><button type="button" data-view="under">Under</button></span>
+  <span class="grp"><button type="button" data-view="yard" class="on">Yard</button><button type="button" data-view="corner">Corner</button><button type="button" data-view="ondeck">On deck</button><button type="button" data-view="iso">Iso</button><button type="button" data-view="plan">Plan</button><button type="button" data-view="under">Under</button><button type="button" data-view="iso2">Iso 2</button><button type="button" data-view="isolow">Low</button><button type="button" data-view="underiso">Under iso</button></span>
   <span class="grp"><span class="lbl">Step</span>{steps}<button type="button" class="v3d-explode">Exploded</button></span>
 </div>'''
     css = '''<style>

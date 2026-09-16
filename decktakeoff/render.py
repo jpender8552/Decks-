@@ -11,7 +11,11 @@ from .scene import Scene
 from .viewer import viewer_html
 
 STILLS = [("yard", dict(view="yard")), ("corner", dict(view="corner")), ("ondeck", dict(view="ondeck")), ("iso", dict(view="iso")),
-          ("plan", dict(view="plan")), ("under", dict(view="under")), ("exploded", dict(view="iso", explode="1"))] + \
+          ("plan", dict(view="plan")), ("under", dict(view="under")), ("exploded", dict(view="iso", explode="1")),
+          # the second set: the opposite front corner, a low isometric, an isometric from under the frame, and the explosions from three angles
+          ("iso2", dict(view="iso2")), ("isolow", dict(view="isolow")), ("underiso", dict(view="underiso")),
+          ("exploded2", dict(view="iso2", explode="1")), ("exploded-corner", dict(view="corner", explode="1")), ("exploded-low", dict(view="isolow", explode="1")),
+          ("frame-iso2", dict(view="iso2", phase="5")), ("rail-iso2", dict(view="iso2", phase="7")), ("structure-underiso", dict(view="underiso", phase="4"))] + \
          [(f"step{n}", dict(view="iso", phase=str(n))) for n in range(1, 9)]
 
 

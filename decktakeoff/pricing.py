@@ -60,7 +60,7 @@ class Pricing:
 def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     """(line, qty, unit, rate, note) per the rate card."""
     s, L = t.spec, t.layout
-    lr = PRICEBOOK["labor"]
+    lr = dict(PRICEBOOK["labor"]); lr.update(s.extras.labor_rates or {})
     sf = L.deck_sf
     timber = s.is_timber
     n_posts = L.n_footings
@@ -90,8 +90,10 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         if s.railing.drink_rail:
             lab.append(("Drink rail add-on", L.rail.rail_lf, "LF", lr["drink_rail_per_lf"], "rate card add-on"))
     n_beam_lines = len(L.beam_lines)
-    if n_beam_lines > 1:
-        lab.append(("Extra beam set", n_beam_lines - 1, "set", lr["extra_beam_set"], "rate card add-on"))
+    n_extra = s.extras.extra_beam_sets if s.extras.extra_beam_sets is not None else max(0, n_beam_lines - 1)
+    if n_extra > 0:
+        lab.append(("Extra beam set", n_extra, "set", lr["extra_beam_set"], "rate card add-on" + (" · job-set count" if s.extras.extra_beam_sets is not None else "")))
+    lab = [x for x in lab if x[3] and x[1]]      # a zero rate (job override) or a zero count drops the line
     if s.extras.hot_tub:
         lab.append(("Hot-tub bay framing + coordination with the tub set / electrician", 1, "ea", lr["hot_tub_bay_each"], "EST"))
     if s.extras.stone_bases:
@@ -117,6 +119,8 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
 
 def gc_lines_for(t: Takeoff) -> Tuple[List[Tuple[str, float, str]], float, List[Tuple[str, float]]]:
     s, L = t.spec, t.layout
+    if s.extras.no_general_conditions:
+        return [], 0.0, []
     if s.extras.general_conditions:
         return [(g.get("item", "GC"), float(g.get("amount", 0)), g.get("why", "")) for g in s.extras.general_conditions], 0.0, []
     base = PRICEBOOK["general_conditions"]["per_sf"] * L.deck_sf
@@ -146,7 +150,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         cats[ln.category] = cats.get(ln.category, 0.0) + ln.ext
         mat += ln.ext
     mat_f = mat * factor
-    tax = mat_f * rate
+    tax = float(s.quoted_tax) if (s.quoted_order and s.quoted_tax is not None) else mat_f * rate
     lab = labor_lines_for(t)
     labor_lines = [(i, q, u, r, round(q * r, 2)) for i, q, u, r, n in lab]
     labor = sum(x[4] for x in labor_lines)
@@ -208,7 +212,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         if L.stairs:
             alloc.append(("Stairs", round(comp(stair_m, labsum("Stairs")))))
         alloc += parts
-    alloc.append(("Site & project services", round(gc)))
+    if gc:
+        alloc.append(("Site & project services", round(gc)))
     diff = sell - sum(a[1] for a in alloc)
     i = 1 if (s.extras.demo_existing and not s.is_timber) else 0
     alloc[i] = (alloc[i][0], alloc[i][1] + diff)

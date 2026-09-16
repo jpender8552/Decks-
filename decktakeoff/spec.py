@@ -206,6 +206,10 @@ class Extras:
     engineered: bool = False             # a stamped design is part of the job (quote shows engineering at cost)
     engineering_fee_low: float = 1800.0
     engineering_fee_high: float = 3000.0
+    engineering_note: str = ""           # customer-facing line when engineering is outside the price ("billed at cost if the county asks for a stamped set")
+    no_general_conditions: bool = False  # drop the $/SF general conditions and site extras entirely
+    labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}
+    extra_beam_sets: Optional[int] = None             # override the "extra beam set" labor count (None -> beam lines minus one)
     options: List[Option] = field(default_factory=list)
     hardie_skirt: Optional[str] = None   # deck skirt / rim wrap in HardieTrim instead of the decking fascia: "4/4 x 12 Timber Bark"
     cover_soffit: Optional[str] = None   # porch cover ceiling: "HardieSoffit 4x10 cedarmill Timber Bark" (None -> 1x6 T&G pine)
@@ -225,6 +229,7 @@ class DeckSpec:
     # When present the takeoff's lines ARE these, priced as quoted; the engine's own counts are kept as model_lines for a cross-check.
     quoted_order: List[dict] = field(default_factory=list)
     quoted_ref: str = ""                 # "Decks & Docks quote 979610 · 09/11/2026 · Henry Frederick"
+    quoted_tax: Optional[float] = None   # the sales tax on that quote; when set, it IS the tax (no rate applied to the materials)
     geometry: Geometry = field(default_factory=Geometry)
     framing: Framing = field(default_factory=Framing)
     decking: Decking = field(default_factory=Decking)

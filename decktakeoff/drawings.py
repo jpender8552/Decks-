@@ -191,9 +191,10 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
         site = ["Setbacks not on file — verify the plat / ILC before layout"]
     for ln in site:
         o.append(T(x2, yy, textwrap.shorten(ln, 74, placeholder="…"), 8, 400)); yy += 12
-    o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
-    for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
-        o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
+    if flags is not None:
+        o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
+        for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
+            o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
     return sheet("G-001", "General notes · design criteria", "Loads, codes, structure summary, sheet index, site — the permit-set cover", o, "No scale", meta)
 
 
@@ -522,8 +523,11 @@ def sheet_meta(L: Layout) -> dict:
                         else "Design intent per 2021 IRC R507 prescriptive. Field verify. Do not scale.") + (" Oil finish is an option; base timbers unfinished, end grain sealed." if s.is_timber and s.framing.finish != "oil" else ""))
 
 
-def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None) -> List[Tuple[str, str, str]]:
-    """[(num, title, svg)] — everything except A-001 (renders) and T-400 (build steps), which the build set adds."""
+def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: bool = False) -> List[Tuple[str, str, str]]:
+    """[(num, title, svg)] — everything except A-001 (renders) and T-400 (build steps), which the build set adds.
+    customer=True leaves the internal flags block off G-001."""
+    if customer:
+        flags = None
     S = scene or build_scene(L)
     _MAT_COLORS.clear()
     for k in ("deck", "border", "drink", "fascia"):
