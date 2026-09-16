@@ -99,6 +99,11 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
     for st in L.stairs:
         lab.append((f"Stairs ({st.side})", st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
+    if s.geometry.cover:
+        from .takeoff import cover_size
+        along, out, area = cover_size(s)
+        lab.append(("Porch cover — frame, sheath, roof, ceiling", round(area), "SF", lr["cover_per_sf"], "ESTIMATE — no cover rate on the card; confirm"))
+        lab.append(("Porch cover — post blocking in the deck frame", 1, "lot", lr["cover_post_blocking_lot"], "est."))
     return lab
 
 
@@ -171,6 +176,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
         parts.append((f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip(), round(comp(drink_m, labsum("Drink rail")))))
+    if s.geometry.cover:
+        cover_m = mats(lambda l: l.category == "Porch cover")
+        parts.append(("Porch cover — shed roof on 6x6 cedar posts, shingles, T&G ceiling", round(comp(cover_m, labsum("Porch cover")))))
     main = rest - sum(v for _, v in parts)
     if s.is_timber:
         label = ("Timber-frame deck: caissons, Douglas fir frame (end grain sealed), " + f"{s.decking.color} decking, "

@@ -19,7 +19,7 @@ from .layout import Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PL
 from .spec import DeckSpec
 from .units import ftin
 
-CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Finish", "Site"]
+CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Porch cover", "Finish", "Site"]
 BOARD_STOCK_IN = {12: 144.0, 16: 192.0, 20: 240.0}
 
 
@@ -820,6 +820,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             if st.geo.handrail_required and st.stair_rail_sides:
                 uc, src = _price("rail", f"{sysn}|handrail_kit")
                 lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
+        if spec.geometry.cover:
+            lines += cover_lines(spec)
         if not timber:
             uc, src = _price("rail", "touchup_paint")
             lines.append(Line("Rail", "Rust-Oleum flat black touch-up (cut ends)", 1, 1, "ea", "exact", uc, src))
@@ -873,3 +875,57 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         material_cost=round(sum(l.ext for l in lines), 2),
     )
     return Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
+
+
+
+def cover_size(spec) -> Tuple[float, float, float]:
+    """(along the house ft, out from the house ft, roof area SF) of the porch cover rectangle [x0, x1, y0, y1, slope]."""
+    c = spec.geometry.cover
+    x0, x1, y0, y1 = c[:4]
+    slope = c[4] if len(c) > 4 else "+y"
+    along = (y1 - y0) if slope in ("+x", "-x") else (x1 - x0)
+    out = (x1 - x0) if slope in ("+x", "-x") else (y1 - y0)
+    return along, out, along * (out + 1.5)
+
+
+def cover_lines(spec) -> List[Line]:
+    """Porch cover over the deck: shed roof, ledger on the house, 2x8 rafters @ 16", (2)2x10 beam on 6x6 cedar posts at the rail line,
+    OSB, underlayment, architectural shingles, drip edge, T&G ceiling. Every price is an estimate until D&D quotes it."""
+    import math as _m
+    along, out, area = cover_size(spec)
+    out_lines: List[Line] = []
+    def L_(item, net, order, unit, why, key=None, section="cover", per=None):
+        if key:
+            d_ = PRICEBOOK[section][key]; uc, src = d_["each"], d_.get("source", "est.")
+            item = item or d_.get("desc", key)
+        else:
+            uc, src = per, "est."
+        out_lines.append(Line("Porch cover", item, net, order, unit, why, uc, src))
+    n_posts = max(2, int(_m.ceil(along / 8.5)) + 1)
+    post_len = 10
+    L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea", f"exact  ({n_posts} posts at the rail line, ≤ 8'-6\" OC)", per=PRICEBOOK["cover"]["cedar_6x6_lf"]["each"] * post_len)
+    beam_pcs = int(_m.ceil(along / 16)) * 2
+    L_(f"2x10x16 #1 SYP — cover beam (2 ply)", beam_pcs, beam_pcs, "ea", f"+0  ((2)2x10 x {along:.1f}' at the posts)", per=PRICEBOOK["lumber"]["2x10"]["per_lf"] * 16)
+    ledger_pcs = int(_m.ceil(along / 16))
+    L_(f"2x10x16 #1 SYP — cover ledger on the house", ledger_pcs, ledger_pcs, "ea", "exact", per=PRICEBOOK["lumber"]["2x10"]["per_lf"] * 16)
+    n_r = int(along / (16 / 12)) + 1
+    r_len = 12 if out + 1.5 <= 12 else 14
+    L_(f"2x8x{r_len} #1 SYP — cover rafters @ 16\" OC", n_r, n_r + 1, "ea", f"+1 cull  ({n_r} rafters, {out + 1.5:.1f}' with the overhang)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * r_len)
+    fascia_lf = along + 2 * (out + 1.5)
+    fpcs = int(_m.ceil(fascia_lf / 16))
+    L_(f"2x8x16 #1 SYP — cover fascia / sub-fascia", fpcs, fpcs + 1, "ea", f"+1  ({fascia_lf:.0f} LF)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * 16)
+    sheets = int(_m.ceil(area / 32 * 1.1))
+    L_(None, sheets, sheets, "sheet", f"{area:.0f} SF + 10% cuts", key="osb_7_16_sheet")
+    L_(None, 1, 1, "roll", f"{area:.0f} SF", key="underlayment_roll")
+    bundles = int(_m.ceil(area / 100 * 3 * 1.12))
+    L_(None, bundles, bundles, "bundle", f"{area / 100:.1f} sq + 12% waste (starter, ridge cap)", key="shingle_bundle")
+    de = int(_m.ceil(fascia_lf / 10))
+    L_(None, de, de, "ea", f"{fascia_lf:.0f} LF", key="drip_edge_10ft")
+    L_(None, round(along), round(along), "LF", "flashing at the ledger", key="ridge_flash_lf")
+    L_(None, round(area), round(area * 1.08), "SF", "+8% waste", key="tg_ceiling_sf")
+    L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
+    L_(None, n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
+    L_(None, n_r, n_r, "ea", "one per rafter at the beam", key="rafter_tie")
+    lok = int(_m.ceil(along / 16 * 2)) * 16 // 16 * 2
+    L_("FastenMaster LedgerLOK 6\" — cover ledger, 2 rows staggered 16\" OC", int(_m.ceil(along / 16 * 12 * 2)), int(_m.ceil(along / 16 * 12 * 2)), "ea", f"{along:.0f} LF x 2 rows @ 16\"", per=PRICEBOOK["hardware"]["LedgerLOK6_50"]["each"] / 50 if "each" in PRICEBOOK["hardware"]["LedgerLOK6_50"] else 1.2)
+    return out_lines

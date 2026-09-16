@@ -725,8 +725,14 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
         nx, ny = uy, -ux          # inward normal: the outline runs clockwise (left end down, fronts left->right, right end up)
         ops = sorted([o for o in list(r.openings) + stair_openings if o.side == e.name or o.side in e.name.replace("+", ",front:").split(",")], key=lambda o: o.start_in)
         segs, cur = [], 0.0
+        house_based_flip = abs(e.x1 - e.x0) < 0.01 and e.y1 < e.y0     # an end edge that runs front -> wall: openings are given from the house face
+        if house_based_flip:
+            ops = sorted(ops, key=lambda o: L - (o.start_in + o.length_in))
         for o in ops:
-            a, b = max(0.0, o.start_in), min(L, o.start_in + o.length_in)
+            if house_based_flip:
+                a, b = max(0.0, L - (o.start_in + o.length_in)), min(L, L - o.start_in)
+            else:
+                a, b = max(0.0, o.start_in), min(L, o.start_in + o.length_in)
             if a > cur + 1:
                 segs.append((cur, a))
             cur = max(cur, b)

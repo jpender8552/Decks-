@@ -920,7 +920,9 @@
     "seal_cut_ends_lot": 150.0,
     "steel_frame_addon_per_sf": 1.0,
     "oil_pre_oil_per_lf": 0.2455,
-    "oil_in_place_lot": 333.27
+    "oil_in_place_lot": 333.27,
+    "cover_per_sf": 28.0,
+    "cover_post_blocking_lot": 300.0
   },
   "general_conditions": {
     "per_sf": 4.0,
@@ -1033,5 +1035,57 @@
       "amount": 400.0,
       "why": ""
     }
-  ]
+  ],
+  "cover": {
+    "osb_7_16_sheet": {
+      "each": 24.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "7/16\" OSB roof sheathing 4x8"
+    },
+    "underlayment_roll": {
+      "each": 95.0,
+      "source": "est.",
+      "desc": "Synthetic roof underlayment, 10 sq roll"
+    },
+    "shingle_bundle": {
+      "each": 42.0,
+      "source": "est.",
+      "desc": "Architectural shingles, bundle (3 per square)"
+    },
+    "drip_edge_10ft": {
+      "each": 9.0,
+      "source": "est.",
+      "desc": "Aluminum drip edge 10'"
+    },
+    "ridge_flash_lf": {
+      "each": 3.0,
+      "source": "est.",
+      "desc": "Step / wall flashing at the ledger, per LF"
+    },
+    "tg_ceiling_sf": {
+      "each": 3.25,
+      "source": "est.",
+      "desc": "1x6 T&G pine ceiling, per SF"
+    },
+    "post_base_6x6": {
+      "each": 26.0,
+      "source": "est.",
+      "desc": "Simpson ABU66Z standoff base, 6x6"
+    },
+    "post_cap_6x6": {
+      "each": 19.0,
+      "source": "est.",
+      "desc": "Simpson AC6Z post cap, 6x6 to (2)2x10 beam"
+    },
+    "rafter_tie": {
+      "each": 0.95,
+      "source": "est.",
+      "desc": "Simpson H2.5AZ rafter tie"
+    },
+    "cedar_6x6_lf": {
+      "each": 9.5,
+      "source": "est. \u2014 plan calls for cedar posts",
+      "desc": "6x6 Western red cedar post, per LF"
+    }
+  }
 }
