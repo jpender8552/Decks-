@@ -115,7 +115,7 @@
     "color": "Weathered Teak",
     "profile": "square",
     "fascia": true,
-    "fastener_system": "TOPLoc"
+    "fastener_system": "Cortex"
   },
   "railing": {
     "system": "IRX",
@@ -199,24 +199,24 @@
       "source": "D&D quote 979610"
     },
     {
-      "sku": "TTTOPLOC100LT",
-      "item": "TOPLoc for PVC - 100 SF (350 - 2 1/2\" screws, 2 bits) - Light Tan",
+      "sku": "CORTEX-100-WT",
+      "item": "Cortex for TimberTech Vintage \u2014 100 SF (screws + Weathered Teak plugs, setting tool)",
       "qty": 3,
       "unit": "ea",
       "unit_cost": 157.29,
       "source": "D&D quote 979610"
     },
     {
-      "sku": "TTTOPLOC300LT",
-      "item": "TOPLoc for PVC - 300 SF (1,050 - 2 1/2\" screws, 3 bits) - Light Tan",
+      "sku": "CORTEX-300-WT",
+      "item": "Cortex for TimberTech Vintage \u2014 300 SF (screws + Weathered Teak plugs, setting tool)",
       "qty": 1,
       "unit": "ea",
       "unit_cost": 448.21,
       "source": "D&D quote 979610"
     },
     {
-      "sku": "ATLOCFAS30LT",
-      "item": "TOPLoc PVC Fascia - 30 LF (100 - 1 5/8\" screws, 1 bit) - Light Tan",
+      "sku": "CORTEX-FAS-WT",
+      "item": "Cortex for TimberTech fascia \u2014 30 LF (screws + Weathered Teak plugs)",
       "qty": 2,
       "unit": "ea",
       "unit_cost": 59.9,
