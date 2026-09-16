@@ -14,7 +14,11 @@ __version__ = "0.1.0"
 
 def run(spec: DeckSpec, with_pricing: bool = True):
     """One call: takeoff + flags (+ pricing). Returns (takeoff, flags, pricing|None)."""
-    t = build_takeoff(spec)
-    f = run_flags(t.layout)
+    if spec.geometry.parts:
+        from .composite import build_composite
+        t, f = build_composite(spec)
+    else:
+        t = build_takeoff(spec)
+        f = run_flags(t.layout)
     p = price(t) if with_pricing else None
     return t, f, p

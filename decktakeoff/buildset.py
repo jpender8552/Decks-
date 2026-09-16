@@ -104,7 +104,16 @@ def build_set(t: Takeoff, flags, out_dir: str, render: bool = True) -> dict:
     L = t.layout
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     S = build_scene(L)
-    sheets = all_sheets(L, t, flags, S)
+    if hasattr(L, "parts"):     # composite: the drawing sheets are per part (each in its own frame); the 3D and the steps are the whole deck
+        sheets = []
+        for i, p in enumerate(L.parts):
+            tag = chr(65 + i)
+            for num, ttl, svg in all_sheets(p.layout, p.takeoff, p.flags, build_scene(p.layout)):
+                if num == "G-001" and i > 0:
+                    continue
+                sheets.append((num if num == "G-001" else f"{num}-{tag}", f"{ttl} — {p.name}", svg))
+    else:
+        sheets = all_sheets(L, t, flags, S)
     (out / "sheets").mkdir(exist_ok=True)
     for num, ttl, svg in sheets:
         (out / "sheets" / f"{num}.svg").write_text(svg)

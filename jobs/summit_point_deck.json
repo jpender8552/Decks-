@@ -1,0 +1,238 @@
+{
+  "job": "1675 Summit Point Ct \u2014 Wraparound Deck",
+  "client": "William Wright",
+  "notes": "Geometry from the HOVER measurement report (4 Apr 2025), the site photos and satellite imagery \u2014 the homeowner's plan is not used for dimensions. Global frame: x along the back wall from the SGD-2 bump (x=0) to the house corner at 26'11\"; y from the back wall toward the yard. PART 1 'Back run': 26'11\" x 10'6\" ledgered to the back wall under the tall gable windows (walkout and covered patio below); rail on the yard edge and the left end (returns to the 2'4\" bump). PART 2 'Wing': 10' wide, turns the corner and runs 27'1\" along the brick side wall toward the front of the house: 8'4\" of wall, the 9'10\" chimney projecting 2'10\" into it, 8'11\" of wall, then the 5'6\" house step with door D-4; the last 4'6\" of the far end is open and the 4' stair leaves there and runs on down along the side wall (9 risers, 66\" to a concrete pad, one rail, house on the other side). The corner square hangs on the back run's double rim (counted as a ledger \u2014 swap LedgerLOKs for hangers). Rail meets at the seam of the two parts (one extra post counted there). Heights: ~8' at the back run (walkout), ~6' at the wing's far end; frame at 8', posts cut to grade. Existing translucent-panel cover on 6x6 posts stands on the wing by the door: take down and reset on the new frame (RFI, not priced). Existing deck (all of it) is demo'd: stained wood, black aluminum balusters, flat drink-rail cap, 6x6 posts. Plan says joists AND boards run perpendicular to the house \u2014 GSX frame kept (boards parallel to each part's wall). PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
+  "site": {
+    "address": "1675 Summit Point Ct",
+    "city": "Colorado Springs",
+    "state": "CO",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 30,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false
+  },
+  "geometry": {
+    "height_in": 96,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true,
+    "parts": [
+      {
+        "name": "Back run",
+        "geometry": {
+          "width": 26.92,
+          "depth": 10.5,
+          "size_mode": "frame",
+          "height_in": 96
+        },
+        "railing": {
+          "sides": [
+            "left",
+            "front"
+          ],
+          "openings": [
+            {
+              "side": "left",
+              "start_in": 0,
+              "length_in": 28,
+              "reason": "SGD-2 bump wall \u2014 rail returns to it"
+            }
+          ]
+        },
+        "stairs": [],
+        "placement": {
+          "origin": [
+            0,
+            0
+          ],
+          "xx": 1,
+          "xy": 0,
+          "yx": 0,
+          "yy": 1
+        }
+      },
+      {
+        "name": "Wing",
+        "geometry": {
+          "height_in": 96,
+          "zones": [
+            {
+              "name": "C",
+              "label": "Wing end past the chimney (8'11\" wall, house step at the end)",
+              "width": 8.92,
+              "depth": 10,
+              "wall_offset": 2.83
+            },
+            {
+              "name": "B",
+              "label": "Beside the chimney (9'10\" wide, projects 2'10\")",
+              "width": 9.83,
+              "depth": 7.17,
+              "wall_offset": 0
+            },
+            {
+              "name": "A",
+              "label": "Wing at the corner (8'4\" wall)",
+              "width": 8.33,
+              "depth": 10,
+              "wall_offset": 2.83
+            },
+            {
+              "name": "D",
+              "label": "Corner square (hangs on the back run's rim)",
+              "width": 10.5,
+              "depth": 10,
+              "wall_offset": 2.83
+            }
+          ]
+        },
+        "railing": {
+          "edges": [
+            "end:left",
+            "front:C",
+            "front:B",
+            "front:A",
+            "front:D",
+            "end:right"
+          ],
+          "openings": [
+            {
+              "side": "end:left",
+              "start_in": 0,
+              "length_in": 66,
+              "reason": "house step wall with door D-4 \u2014 no rail"
+            }
+          ]
+        },
+        "stairs": [
+          {
+            "side": "end:left",
+            "width_in": 48,
+            "position_in": 66,
+            "total_rise_in": 66,
+            "landing": "concrete pad",
+            "rails": 1,
+            "stringer_size": "2x12",
+            "closed_risers": true
+          }
+        ],
+        "placement": {
+          "origin": [
+            29.75,
+            -27.08
+          ],
+          "xx": 0,
+          "xy": 1,
+          "yx": 1,
+          "yy": 0
+        }
+      }
+    ],
+    "house_blocks": [
+      [
+        -32,
+        26.92,
+        -45,
+        0
+      ],
+      [
+        -6.2,
+        0,
+        0,
+        2.33
+      ],
+      [
+        26.92,
+        29.75,
+        -18.17,
+        -8.33,
+        "brick"
+      ],
+      [
+        26.92,
+        32.42,
+        -45,
+        -27.08
+      ]
+    ],
+    "house_openings": [
+      [
+        -6.0,
+        -0.4,
+        2.33,
+        8.1,
+        14.8
+      ],
+      [
+        8.0,
+        26.7,
+        0,
+        8.1,
+        16.5
+      ],
+      [
+        10,
+        15.5,
+        0,
+        3.5,
+        5.5
+      ],
+      [
+        19,
+        24.5,
+        0,
+        3.5,
+        5.5
+      ],
+      [
+        27.6,
+        30.3,
+        -27.08,
+        8.05,
+        14.8
+      ]
+    ],
+    "cover": [
+      27.0,
+      36.5,
+      -27.0,
+      -17.0
+    ]
+  },
+  "framing": {
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "(2)2x10",
+        "species": "SYP",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "concrete"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Prime+",
+    "color": "Coconut Husk",
+    "profile": "grooved",
+    "fascia": true
+  },
+  "railing": {
+    "system": "Cinch",
+    "color": "Satin Black",
+    "height_in": 36,
+    "drink_rail": true
+  },
+  "stairs": [],
+  "extras": {
+    "roof_over": true,
+    "engineered": true,
+    "demo_existing": true
+  }
+}

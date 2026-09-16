@@ -38,12 +38,13 @@ scene.fog = new THREE.Fog(0xdbe7f1, 180, 520);
 // lights
 scene.add(new THREE.HemisphereLight(0xd6e6f5, 0x66604f, 0.6));
 const sun = new THREE.DirectionalLight(0xfff1dc, 1.35);
+const X0 = D.x_min || 0;
 const ext = Math.max(D.W, D.y_front - D.y_min, 30);
-sun.position.set(D.W * 0.5 - ext * 0.9, ext * 1.15, D.y_front + ext * 1.0);
+sun.position.set(X0 + D.W * 0.5 - ext * 0.9, ext * 1.15, D.y_front + ext * 1.0);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -ext * 1.4; sun.shadow.camera.right = ext * 1.4; sun.shadow.camera.top = ext * 1.4; sun.shadow.camera.bottom = -ext * 1.4;
 sun.shadow.camera.near = 1; sun.shadow.camera.far = ext * 6; sun.shadow.bias = -0.0008;
-sun.target.position.set(D.W / 2, D.deck_top, (D.y_min + D.y_front) / 2); scene.add(sun); scene.add(sun.target);
+sun.target.position.set(X0 + D.W / 2, D.deck_top, (D.y_min + D.y_front) / 2); scene.add(sun); scene.add(sun.target);
 
 // textures
 function grainTex(hexes, vertical, count, alpha, seed) {
@@ -134,15 +135,15 @@ function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <=
 function explode(on) { for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) : 0); }
 // camera + orbit
 const persp = new THREE.PerspectiveCamera(40, W / H, 0.5, 2000);
-const cx = D.W / 2, cy = (D.y_min + D.y_front) / 2, zt = D.deck_top, span = Math.max(D.W, D.y_front - D.y_min, 24);
+const cx = X0 + D.W / 2, cy = (D.y_min + D.y_front) / 2, zt = D.deck_top, span = Math.max(D.W, D.y_front - D.y_min, 24);
 const planW = D.W + 16, planD = (D.y_front - D.y_min) + 22;
 const planHalf = Math.max(planW / 2, planD / 2 * (W / H));
 const ortho = new THREE.OrthographicCamera(-planHalf, planHalf, planHalf * H / W, -planHalf * H / W, 0.5, 2000);
 let cam = persp;
 const VIEWS = {
   yard:   {pos: [cx + span * 0.1, zt + 6.0, D.y_front + span * 1.0], at: [cx, zt - 0.6, cy]},
-  corner: {pos: [D.W + span * 0.5, zt + 6.5, D.y_front + span * 0.5], at: [cx, zt - 1.0, cy]},
-  ondeck: {pos: [Math.min(D.W - 2, 2.5), zt + 5.6, D.y_front - 2.2], at: [D.W * 0.92, zt + 0.4, D.y_front - Math.min(6, span * 0.3)]},
+  corner: {pos: [X0 + D.W + span * 0.5, zt + 6.5, D.y_front + span * 0.5], at: [cx, zt - 1.0, cy]},
+  ondeck: {pos: [X0 + Math.min(D.W - 2, 2.5), zt + 5.6, D.y_front - 2.2], at: [X0 + D.W * 0.92, zt + 0.4, D.y_front - Math.min(6, span * 0.3)]},
   iso:    {pos: [cx + span * 0.95, zt + span * 0.7, D.y_front + span * 0.8], at: [cx, zt - 2, cy]},
   plan:   {pos: [cx, zt + 120, cy - 4 + 0.001], at: [cx, 0, cy - 4], up: [0, 0, -1], ortho: true},
   under:  {pos: [cx + span * 0.22, Math.min(zt * 0.45 + 0.4, 3.2), D.y_front + Math.max(7, span * 0.42)], at: [cx, zt - 1.3, cy - 2]},

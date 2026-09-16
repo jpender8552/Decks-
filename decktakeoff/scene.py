@@ -42,7 +42,7 @@ class Scene:
     meta: dict
 
     def to_dict(self) -> dict:
-        return dict(boxes=[asdict(b) for b in self.boxes], deck_top=self.deck_top, W=self.W, y_min=self.y_min, y_front=self.y_front,
+        return dict(boxes=[asdict(b) for b in self.boxes], deck_top=self.deck_top, W=self.W, x_min=getattr(self, 'x_min', 0.0), y_min=self.y_min, y_front=self.y_front,
                     materials=self.materials, meta=self.meta, phases=PHASES)
 
 
@@ -84,7 +84,9 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
     )
 
 
-def build_scene(L: Layout) -> Scene:
+def build_scene(L) -> Scene:
+    if hasattr(L, "parts"):
+        return build_composite_scene(L)
     spec = L.spec
     zt = spec.geometry.height_in * IN
     f = decking_facts(spec.decking.collection)
@@ -458,3 +460,77 @@ def step_captions(L: Layout) -> Dict[int, str]:
            7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else "Step 7 · (no rail)",
            8: "Step 8 · Your room" + (" — hot tub" if s.extras.hot_tub else "")}
     return out
+
+
+# ================================================================== composite decks
+SITE_KINDS = {"house", "wall", "roof", "trim", "glass", "ground", "gravel", "privacy"}
+
+
+def build_composite_scene(L) -> Scene:
+    """Each part's scene in its own frame, moved into the global frame; the house from its measured footprint."""
+    spec = L.spec
+    zt = spec.geometry.height_in * IN
+    B: List[Box] = []
+    add = lambda *a, **k: B.append(Box(*a, **k))
+    deck_boxes = []
+    for p in L.parts:
+        S = build_scene(p.layout)
+        pl = p.placement
+        for b in S.boxes:
+            if b.kind in SITE_KINDS:
+                continue
+            x0, x1, y0, y1 = pl.box(b.x0, b.x1, b.y0, b.y1)
+            rot, axis = b.rot, b.rot_axis
+            if b.rot and pl.swaps:
+                axis = "x" if axis == "y" else "y"; rot = -rot
+            nb = Box(b.kind, x0, x1, y0, y1, b.z0, b.z1, b.mat, b.phase, f"{p.name}: {b.tag}" if b.tag else "", b.shape, b.tone, rot, axis)
+            B.append(nb); deck_boxes.append(nb)
+    x0, x1, y0, y1 = L.bbox
+    H_house = zt + 9.5
+    # site
+    hx0 = min([x0] + [h[0] for h in spec.geometry.house_blocks]); hx1 = max([x1] + [h[1] for h in spec.geometry.house_blocks])
+    hy0 = min([y0] + [h[2] for h in spec.geometry.house_blocks]); hy1 = max([y1] + [h[3] for h in spec.geometry.house_blocks])
+    add("ground", hx0 - 60, hx1 + 60, hy0 - 40, hy1 + 70, -0.6, 0.0, "ground")
+    for p in L.parts:
+        for z in p.layout.zones:
+            gx0, gx1, gy0, gy1 = p.placement.box(z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5)
+            add("gravel", gx0, gx1, gy0, gy1, 0.0, 0.04, "gravel")
+    # the house
+    for h in spec.geometry.house_blocks:
+        bx0, bx1, by0, by1 = h[:4]
+        brick = len(h) > 4 and str(h[4]).lower() == "brick"
+        if brick:   # a chimney: brick, taller than the eave, no roof slab
+            add("house", bx0, bx1, by0, by1, 0.0, H_house + 4.0, "stone", tag="chimney (brick)")
+        else:
+            add("house", bx0, bx1, by0, by1, 0.0, H_house, "house", tag="house")
+            add("roof", bx0 - 1.0, bx1 + 1.0, by0 - 1.0, by1 + 1.0, H_house, H_house + 0.55, "roof")
+    for o in spec.geometry.house_openings:
+        ox0, ox1, yf, z0, z1 = o
+        add("trim", ox0 - 0.25, ox1 + 0.25, yf - 0.05, yf + 0.06, z0 - 0.05, z1 + 0.25, "trim")
+        add("glass", ox0, ox1, yf - 0.02, yf + 0.07, z0, z1, "glass")
+        if ox1 - ox0 > 4.5:
+            for k in range(1, int((ox1 - ox0) // 3) + 1):
+                mx = ox0 + k * (ox1 - ox0) / (int((ox1 - ox0) // 3) + 1)
+                add("trim", mx - 0.06, mx + 0.06, yf - 0.02, yf + 0.08, z0, z1, "trim")
+    # existing cover, reset on the new deck (shown in the finished view)
+    if spec.geometry.cover:
+        cx0, cx1, cy0, cy1 = spec.geometry.cover
+        for (px, py) in ((cx0 + 0.5, cy0 + 0.5), (cx1 - 0.5, cy0 + 0.5), (cx0 + 0.5, cy1 - 0.5), (cx1 - 0.5, cy1 - 0.5)):
+            add("post", px - 0.23, px + 0.23, py - 0.23, py + 0.23, zt, zt + 8.0, "timber", 8, tag="cover post (existing, reset)")
+        add("beam", cx0, cx1, cy0 + 0.3, cy0 + 0.75, zt + 8.0, zt + 8.6, "timber", 8, tag="cover beam")
+        add("beam", cx0, cx1, cy1 - 0.75, cy1 - 0.3, zt + 8.0, zt + 8.6, "timber", 8, tag="cover beam")
+        n = max(2, int((cx1 - cx0) / 2))
+        for k in range(n + 1):
+            rx = cx0 + k * (cx1 - cx0) / n
+            add("joist", rx - 0.08, rx + 0.08, cy0 - 0.5, cy1 + 0.5, zt + 8.6, zt + 9.05, "timber", 8, tag="cover rafter")
+        add("glass", cx0 - 0.3, cx1 + 0.3, cy0 - 0.6, cy1 + 0.6, zt + 9.05, zt + 9.12, "glass", 8, tag="cover panels")
+    W = x1 - x0
+    # the viewer's camera framing wants the deck's extent: shift nothing, report the bbox
+    meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
+                zones=[dict(name=f"{p.name} {z.name}", label=z.label, x0=p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0],
+                            W=abs((p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[1]) - (p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0])),
+                            wall_y=0, D=0, front=0) for p in L.parts for z in p.layout.zones],
+                edge=0.0, timber=spec.is_timber, oiled=spec.framing.finish == "oil", step_text=step_captions(L), composite=True, bbox=list(L.bbox))
+    S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
+    S.x_min = x0
+    return S

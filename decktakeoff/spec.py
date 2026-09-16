@@ -84,6 +84,13 @@ class Geometry:
     notches: List[dict] = field(default_factory=list)   # [{"corner":"front-left","w_in":..,"d_in":..}] informational
     levels: int = 1
     zones: List[Zone] = field(default_factory=list)      # jogged / multi-zone plans (Eagle's Nest). Empty = one rectangle.
+    # composite decks (a deck that wraps a corner of the house): a list of PARTS, each its own rectangle / zone set on its own
+    # wall, placed in one global frame by an axis-aligned transform. Each part dict: {"name", "geometry": {...}, "railing": {...},
+    # "stairs": [...], "placement": {"origin": [x_ft, y_ft], "xx": 1, "xy": 0, "yx": 0, "yy": 1}} — global = origin + M·local.
+    parts: Optional[List[dict]] = None
+    house_blocks: List[List[float]] = field(default_factory=list)     # global frame, feet: [x0, x1, y0, y1] blocks of the house footprint (drawn, not counted)
+    house_openings: List[List[float]] = field(default_factory=list)   # [x0, x1, y_face, z0, z1] doors / windows on a wall facing the deck
+    cover: Optional[List[float]] = None                                 # existing porch cover to reset: [x0, x1, y0, y1] (global, feet), drawn in the finished view
 
 
 @dataclass
