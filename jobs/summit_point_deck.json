@@ -1,7 +1,7 @@
 {
   "job": "1675 Summit Point Ct \u2014 Wraparound Deck",
   "client": "William Wright",
-  "notes": "Geometry from the HOVER measurement report (4 Apr 2025), the site photos and satellite imagery \u2014 the homeowner's plan is not used for dimensions. Global frame: x along the back wall from the SGD-2 bump (x=0) to the house corner at 26'11\"; y from the back wall toward the yard. PART 1 'Back run': 26'11\" x 10'6\" ledgered to the back wall under the tall gable windows (walkout and covered patio below); rail on the yard edge and the left end (returns to the 2'4\" bump). PART 2 'Wing': 10' wide, turns the corner and runs 27'1\" along the brick side wall toward the front of the house: 8'4\" of wall, the 9'10\" chimney projecting 2'10\" into it, 8'11\" of wall, then the 5'6\" house step with door D-4; the last 4'6\" of the far end is open and the 4' stair leaves there and runs on down along the side wall (9 risers, 66\" to a concrete pad, one rail, house on the other side). The corner square hangs on the back run's double rim (counted as a ledger \u2014 swap LedgerLOKs for hangers). Rail meets at the seam of the two parts (one extra post counted there). Heights: ~8' at the back run (walkout), ~6' at the wing's far end; frame at 8', posts cut to grade. Existing translucent-panel cover on 6x6 posts stands on the wing by the door: take down and reset on the new frame (RFI, not priced). Existing deck (all of it) is demo'd: stained wood, black aluminum balusters, flat drink-rail cap, 6x6 posts. Plan says joists AND boards run perpendicular to the house \u2014 GSX frame kept (boards parallel to each part's wall). PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
+  "notes": "Rebuilt from the HOVER measurement report (4 Apr 2025) and the site photos; the homeowner's sketch is not used. Global frame: x along the back wall, x=0 at the SGD-2 bump, house corner at 26'11\"; y toward the yard. BACK RUN: 26'11\" x 10'6\" on the back wall under the 18'9\" gable window wall (walkout with a covered patio below, 8' high); rail on the yard edge and on the left end, returning to the 2'4\" SGD-2 bump. WING: 10' wide, turns the corner and runs 27'1\" along the LEFT side wall toward the front: SGD-3 sliding door right at the corner, the 9'10\" chimney 8'4\" from the corner projecting 2'10\" into the wing (square at deck level; its 2'11\" shoulders start 2'8\" above the deck), then the 8'11\" wall with the three tall windows under the existing cover, ending where the house steps out 5'6\" into the gable section. The wing's far end is OPEN: 6' of rail and the 4' stair on the outer side, which runs on down along the gable wall (9 risers, 66\" to a concrete pad beside the W-111 walkout window; house on one side, one rail). The corner square hangs on the back run's double rim (counted as a ledger \u2014 swap LedgerLOKs for hangers). The rail meets at the seam of the two parts (one extra post). Heights: ~8' at the back run, ~6' at the wing's end; frame at 8', posts cut to grade. COVER: the existing translucent-panel shed roof over the last 9' of the wing (ledger on the house, 6x6 posts at the rail line) comes down and goes back on the new frame \u2014 RFI, not priced. Existing deck (all of it) is demo'd: stained wood, black aluminum balusters, flat drink-rail cap. Plan says joists AND boards run perpendicular to the house \u2014 GSX frame kept (boards parallel to each part's wall). PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -59,7 +59,7 @@
           "zones": [
             {
               "name": "C",
-              "label": "Wing end past the chimney (8'11\" wall, house step at the end)",
+              "label": "Past the chimney: the 8'11\" wall with the three windows, under the cover",
               "width": 8.92,
               "depth": 10,
               "wall_offset": 2.83
@@ -73,7 +73,7 @@
             },
             {
               "name": "A",
-              "label": "Wing at the corner (8'4\" wall)",
+              "label": "At the corner: the 8'4\" wall with the SGD-3 door",
               "width": 8.33,
               "depth": 10,
               "wall_offset": 2.83
@@ -95,21 +95,13 @@
             "front:A",
             "front:D",
             "end:right"
-          ],
-          "openings": [
-            {
-              "side": "end:left",
-              "start_in": 0,
-              "length_in": 66,
-              "reason": "house step wall with door D-4 \u2014 no rail"
-            }
           ]
         },
         "stairs": [
           {
             "side": "end:left",
             "width_in": 48,
-            "position_in": 66,
+            "position_in": 72,
             "total_rise_in": 66,
             "landing": "concrete pad",
             "rails": 1,
@@ -131,15 +123,21 @@
     ],
     "house_blocks": [
       [
-        -32,
+        -36.92,
         26.92,
-        -45,
-        0
+        -29.17,
+        0.0
       ],
       [
-        -6.2,
-        0,
-        0,
+        -12.0,
+        26.92,
+        -45.0,
+        -29.17
+      ],
+      [
+        -6.17,
+        0.0,
+        0.0,
         2.33
       ],
       [
@@ -147,16 +145,60 @@
         29.75,
         -18.17,
         -8.33,
-        "brick"
+        "brick",
+        0.0,
+        10.7
+      ],
+      [
+        26.92,
+        29.75,
+        -16.25,
+        -10.25,
+        "brick",
+        10.7,
+        30.0
       ],
       [
         26.92,
         32.42,
-        -45,
+        -41.25,
         -27.08
+      ],
+      [
+        26.92,
+        27.33,
+        -61.6,
+        -41.25
+      ],
+      [
+        26.92,
+        36.08,
+        -73.5,
+        -61.6
       ]
     ],
     "house_openings": [
+      [
+        -31.7,
+        -24.8,
+        0.0,
+        8.1,
+        14.8
+      ],
+      [
+        -21.3,
+        -13.0,
+        0.0,
+        13.6,
+        18.2
+      ],
+      [
+        -9.0,
+        -5.1,
+        0.0,
+        13.6,
+        18.2
+      ],
       [
         -6.0,
         -0.4,
@@ -165,39 +207,72 @@
         14.8
       ],
       [
-        8.0,
+        -29.7,
+        -24.5,
+        0.0,
+        3.5,
+        5.5
+      ],
+      [
+        8.5,
         26.7,
-        0,
+        0.0,
+        10.5,
+        20.0
+      ],
+      [
+        9.0,
+        14.2,
+        0.0,
+        3.5,
+        5.5
+      ],
+      [
+        19.4,
+        24.6,
+        0.0,
+        3.5,
+        5.5
+      ],
+      [
+        -7.7,
+        -1.6,
+        26.92,
         8.1,
-        16.5
+        14.8,
+        "x"
       ],
       [
-        10,
-        15.5,
-        0,
-        3.5,
-        5.5
+        -27.0,
+        -21.0,
+        26.92,
+        10.5,
+        14.5,
+        "x"
       ],
       [
-        19,
-        24.5,
-        0,
-        3.5,
-        5.5
+        -40.5,
+        -28.0,
+        32.42,
+        10.5,
+        14.5,
+        "x"
       ],
       [
-        27.6,
-        30.3,
-        -27.08,
-        8.05,
-        14.8
+        -38.5,
+        -33.7,
+        32.42,
+        1.0,
+        3.9,
+        "x"
       ]
     ],
     "cover": [
       27.0,
       36.5,
       -27.0,
-      -17.0
+      -18.2,
+      "+x"
     ]
   },
   "framing": {

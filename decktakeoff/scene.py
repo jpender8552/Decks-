@@ -499,31 +499,70 @@ def build_composite_scene(L) -> Scene:
     for h in spec.geometry.house_blocks:
         bx0, bx1, by0, by1 = h[:4]
         brick = len(h) > 4 and str(h[4]).lower() == "brick"
-        if brick:   # a chimney: brick, taller than the eave, no roof slab
-            add("house", bx0, bx1, by0, by1, 0.0, H_house + 4.0, "stone", tag="chimney (brick)")
+        if brick:   # a chimney: brick, taller than the eave, no roof slab; optional [.., "brick", z0, z1]
+            z0c = float(h[5]) if len(h) > 5 else 0.0
+            z1c = float(h[6]) if len(h) > 6 else H_house + 4.0
+            add("house", bx0, bx1, by0, by1, z0c, z1c, "stone", tag="chimney (brick)")
         else:
             add("house", bx0, bx1, by0, by1, 0.0, H_house, "house", tag="house")
             add("roof", bx0 - 1.0, bx1 + 1.0, by0 - 1.0, by1 + 1.0, H_house, H_house + 0.55, "roof")
     for o in spec.geometry.house_openings:
-        ox0, ox1, yf, z0, z1 = o
+        if len(o) > 5 and str(o[5]).lower() == "x":      # [y0, y1, x_face, z0, z1, "x"]: an opening on a wall that faces +x / -x
+            oy0, oy1, xf, z0, z1 = o[:5]
+            add("trim", xf - 0.05, xf + 0.06, oy0 - 0.25, oy1 + 0.25, z0 - 0.05, z1 + 0.25, "trim")
+            add("glass", xf - 0.02, xf + 0.07, oy0, oy1, z0, z1, "glass")
+            n = int((oy1 - oy0) // 3)
+            for k in range(1, n + 1):
+                my = oy0 + k * (oy1 - oy0) / (n + 1)
+                add("trim", xf - 0.02, xf + 0.08, my - 0.06, my + 0.06, z0, z1, "trim")
+            continue
+        ox0, ox1, yf, z0, z1 = o[:5]
         add("trim", ox0 - 0.25, ox1 + 0.25, yf - 0.05, yf + 0.06, z0 - 0.05, z1 + 0.25, "trim")
         add("glass", ox0, ox1, yf - 0.02, yf + 0.07, z0, z1, "glass")
         if ox1 - ox0 > 4.5:
-            for k in range(1, int((ox1 - ox0) // 3) + 1):
-                mx = ox0 + k * (ox1 - ox0) / (int((ox1 - ox0) // 3) + 1)
+            n = int((ox1 - ox0) // 3)
+            for k in range(1, n + 1):
+                mx = ox0 + k * (ox1 - ox0) / (n + 1)
                 add("trim", mx - 0.06, mx + 0.06, yf - 0.02, yf + 0.08, z0, z1, "trim")
-    # existing cover, reset on the new deck (shown in the finished view)
+    # existing cover, reset on the new deck: a shed roof of translucent panels — ledger on the house, rafters sloping down to a
+    # beam on two 6x6 posts at the rail line. [x0, x1, y0, y1, "slope"]: slope "+x" = down toward +x (house at x0), "-x", "+y", "-y"
     if spec.geometry.cover:
-        cx0, cx1, cy0, cy1 = spec.geometry.cover
-        for (px, py) in ((cx0 + 0.5, cy0 + 0.5), (cx1 - 0.5, cy0 + 0.5), (cx0 + 0.5, cy1 - 0.5), (cx1 - 0.5, cy1 - 0.5)):
-            add("post", px - 0.23, px + 0.23, py - 0.23, py + 0.23, zt, zt + 8.0, "timber", 8, tag="cover post (existing, reset)")
-        add("beam", cx0, cx1, cy0 + 0.3, cy0 + 0.75, zt + 8.0, zt + 8.6, "timber", 8, tag="cover beam")
-        add("beam", cx0, cx1, cy1 - 0.75, cy1 - 0.3, zt + 8.0, zt + 8.6, "timber", 8, tag="cover beam")
-        n = max(2, int((cx1 - cx0) / 2))
-        for k in range(n + 1):
-            rx = cx0 + k * (cx1 - cx0) / n
-            add("joist", rx - 0.08, rx + 0.08, cy0 - 0.5, cy1 + 0.5, zt + 8.6, zt + 9.05, "timber", 8, tag="cover rafter")
-        add("glass", cx0 - 0.3, cx1 + 0.3, cy0 - 0.6, cy1 + 0.6, zt + 9.05, zt + 9.12, "glass", 8, tag="cover panels")
+        c = spec.geometry.cover
+        cx0, cx1, cy0, cy1 = c[:4]
+        slope = c[4] if len(c) > 4 else "+y"
+        hi, lo = zt + 8.4, zt + 7.3
+        along_x = slope in ("+x", "-x")
+        run = (cx1 - cx0) if along_x else (cy1 - cy0)
+        theta = math.atan2(hi - lo, run)
+        # posts + beam at the low edge, ledger at the high edge
+        if along_x:
+            xl, xh = (cx1 - 0.5, cx0 + 0.15) if slope == "+x" else (cx0 + 0.5, cx1 - 0.15)
+            for py in (cy0 + 0.5, cy1 - 0.5):
+                add("post", xl - 0.23, xl + 0.23, py - 0.23, py + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post (existing, reset)")
+            add("beam", xl - 0.25, xl + 0.25, cy0, cy1, lo - 0.5, lo, "timber", 8, tag="cover beam")
+            add("ledger", xh - 0.08, xh + 0.08, cy0, cy1, hi - 0.6, hi, "timber", 8, tag="cover ledger")
+            n = max(2, int((cy1 - cy0) / 2))
+            L_r = math.hypot(run, hi - lo)
+            for k in range(n + 1):
+                ry = cy0 + k * (cy1 - cy0) / n
+                add("joist", (cx0 + cx1) / 2 - L_r / 2, (cx0 + cx1) / 2 + L_r / 2, ry - 0.08, ry + 0.08, (hi + lo) / 2, (hi + lo) / 2 + 0.45, "timber", 8,
+                    tag="cover rafter", rot=(-theta if slope == "+x" else theta), rot_axis="y")
+            add("glass", (cx0 + cx1) / 2 - L_r / 2 - 0.3, (cx0 + cx1) / 2 + L_r / 2 + 0.3, cy0 - 0.4, cy1 + 0.4, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
+                tag="cover panels", rot=(-theta if slope == "+x" else theta), rot_axis="y")
+        else:
+            yl, yh = (cy1 - 0.5, cy0 + 0.15) if slope == "+y" else (cy0 + 0.5, cy1 - 0.15)
+            for px in (cx0 + 0.5, cx1 - 0.5):
+                add("post", px - 0.23, px + 0.23, yl - 0.23, yl + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post (existing, reset)")
+            add("beam", cx0, cx1, yl - 0.25, yl + 0.25, lo - 0.5, lo, "timber", 8, tag="cover beam")
+            add("ledger", cx0, cx1, yh - 0.08, yh + 0.08, hi - 0.6, hi, "timber", 8, tag="cover ledger")
+            n = max(2, int((cx1 - cx0) / 2))
+            L_r = math.hypot(run, hi - lo)
+            for k in range(n + 1):
+                rx = cx0 + k * (cx1 - cx0) / n
+                add("joist", rx - 0.08, rx + 0.08, (cy0 + cy1) / 2 - L_r / 2, (cy0 + cy1) / 2 + L_r / 2, (hi + lo) / 2, (hi + lo) / 2 + 0.45, "timber", 8,
+                    tag="cover rafter", rot=(theta if slope == "+y" else -theta), rot_axis="x")
+            add("glass", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
+                tag="cover panels", rot=(theta if slope == "+y" else -theta), rot_axis="x")
     W = x1 - x0
     # the viewer's camera framing wants the deck's extent: shift nothing, report the bbox
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
