@@ -61,6 +61,8 @@ class Takeoff:
     notes: List[str] = field(default_factory=list)
     joist_lf: float = 0.0             # LF of joist-size lumber (joists, rims, ledgers, blocking, doublers)
     timber_sf: float = 0.0            # timber surface for the oil option (every face that shows)
+    model_lines: List[Line] = field(default_factory=list)   # the engine's own counts when the order came from the owner's quote
+    order_ref: str = ""                                     # "Decks & Docks quote 979610"
 
     def by_category(self) -> Dict[str, List[Line]]:
         out = defaultdict(list)
@@ -371,7 +373,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     brand, coll, color = spec.decking.brand, spec.decking.collection, spec.decking.color
     bcoll, bcolor = spec.decking.border_collection or coll, spec.decking.border_color or color
     fr0, dk0 = L.frame, L.decking
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     worst_load = max(z.frame.footing_load_lb for z in L.zones)
 
     Qz = Q(n_zones=len(L.zones))
@@ -438,6 +440,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         uc, src = _lumber_price(nom, st, timber)
         desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if timber else SPECIES_NAMES.get(sp, sp)}"
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  ({_summarize_labels(labels)}: " + " · ".join(bl.label for bl in L.beam_lines) + ")", uc, src))
+    for st_ in L.stairs:
+        if st_.mid_support:
+            post_pieces += [(spec.framing.post_size, zt_post := (st_.geo.total_rise_in / 2.0 + 6.0), "stair carrier post")] * 2
+            cuts.append(CutPiece(f"Stair carrier posts ({st_.side})", spec.framing.post_size, st_.geo.total_rise_in / 2.0, 2, "under the stringers at mid-run — field-measure"))
+            car = "2x6" if not timber else "4x6"
+            uc, src = _lumber_price(car, 12, timber)
+            lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at mid-run ({st_.side})", 3, 3, "ea",
+                              f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks; 1 spare)", uc, src))
+            cuts.append(CutPiece(f"Stair carrier ({st_.side})", car, st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         uc, src = _lumber_price(nom, st, timber)
         desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if timber else '#2 GC'}"
@@ -980,3 +991,41 @@ def cover_lines(spec) -> List[Line]:
     lok = int(_m.ceil(along / 16 * 2)) * 16 // 16 * 2
     L_("FastenMaster LedgerLOK 6\" — cover ledger, 2 rows staggered 16\" OC", int(_m.ceil(along / 16 * 12 * 2)), int(_m.ceil(along / 16 * 12 * 2)), "ea", f"{along:.0f} LF x 2 rows @ 16\"", per=PRICEBOOK["hardware"]["LedgerLOK6_50"]["each"] / 50 if "each" in PRICEBOOK["hardware"]["LedgerLOK6_50"] else 1.2)
     return out_lines
+
+
+QUOTE_CATEGORY_RULES = [
+    ("Stairs", ("riser", "stair", "stringer")),
+    ("Footings", ("diamond pier", "post base", "abu66", "aba66", "concrete mix", "quikrete", "titen")),
+    ("Flashing & waterproofing", ("g-tape", "flash", "membrane", "vycor")),
+    ("Hardware", ("simpson", "ledgerlok", "hanger", "tension tie", "hurricane", "post cap", "anchor")),
+    ("Fasteners", ("toploc", "cortex", "camo", "screw", "nail", "clip")),
+    ("Fascia", ("fascia",)),
+    ("Decking", ("1x6x", "deck board", "vintage", "harvest", "landmark", "prime", "legacy", "reserve")),
+    ("Rail", ("rail", "post kit", "cable", "impression", "fulton", "cinch", "touch-up")),
+    ("Lumber", ("true frame joist", "kdat", "6x6", "4x4", "#2 - gc", "2x")),
+]
+
+
+def quoted_category(item: str, sku: str = "") -> str:
+    t = (item + " " + sku).lower()
+    for cat, keys in QUOTE_CATEGORY_RULES:
+        if any(k in t for k in keys):
+            return cat
+    return "Hardware"
+
+
+def apply_quoted_order(t: Takeoff) -> Takeoff:
+    """Replace the engine's lines with the owner's quoted order (NET = ORDER = the quoted qty); keep the engine's counts as model_lines."""
+    q = t.spec.quoted_order
+    if not q:
+        return t
+    t.model_lines = list(t.lines)
+    t.order_ref = t.spec.quoted_ref
+    lines: List[Line] = []
+    for d in q:
+        cat = d.get("category") or quoted_category(d.get("item", ""), d.get("sku", ""))
+        qty = float(d.get("qty", 0))
+        lines.append(Line(cat, d.get("item", ""), qty, qty, d.get("unit", "ea"), d.get("why", "as quoted"), float(d.get("unit_cost", 0.0)),
+                          d.get("source") or (t.spec.quoted_ref or "quoted"), d.get("sku", ""), d.get("note", "")))
+    t.lines = lines
+    return t

@@ -154,7 +154,7 @@ def run_flags(L: Layout) -> List[Flag]:
             if missing:
                 add("CHECK", "guard", f"no rail on {', '.join(sorted(missing))} — required unless grade is within 30\" there", "IRC R312.1.1")
             for o in rl.openings:
-                if "stair" not in o.reason:
+                if "stair" not in o.reason and "house" not in o.reason.lower() and "wall" not in o.reason.lower():
                     add("CHECK", "guard", f"rail opening on the {o.side} ({ftin(o.length_in)}, {o.reason}) — allowed only if the drop there is 30\" or less", "IRC R312.1.1")
     elif hi > 24 and (rl is None or not rl.sections):
         add("INFO", "guard", f"deck {ftin(hi)} above grade — under 30\", guard not required by IRC (client choice)")

@@ -1,0 +1,574 @@
+{
+  "job": "Parkview Dr \u2014 12 x 20 deck with landing and stair",
+  "client": "",
+  "site": {
+    "address": "9083 W. Parkview Dr",
+    "city": "Littleton",
+    "state": "CO",
+    "zip": "80123",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false,
+    "seismic_design_category": "B",
+    "tax_rate": 0.045,
+    "notes": "Unincorporated Jefferson County (Columbine) \u2014 combined sales tax 4.5% (CO 2.9 + Jeffco 0.5 + RTD 1.0 + CD 0.1), matches the D&D quote. Existing 8'-high wood deck, pergola and stair come out. Setbacks and lot lines not on file."
+  },
+  "geometry": {
+    "height_in": 96,
+    "attachment": "ledger",
+    "picture_frame": false,
+    "board_direction": "parallel",
+    "zones": [
+      {
+        "name": "N",
+        "width_in": 96,
+        "depth_in": 144,
+        "wall_offset_in": 0,
+        "label": "North bay \u2014 open end, no house behind it",
+        "freestanding": true
+      },
+      {
+        "name": "S",
+        "width_in": 96,
+        "depth_in": 144,
+        "wall_offset_in": 0,
+        "label": "South bay \u2014 ledgered to the Hardie wall"
+      },
+      {
+        "name": "L",
+        "width_in": 48,
+        "depth_in": 192,
+        "wall_offset_in": 0,
+        "label": "Stair landing \u2014 4' bump-out at the brick corner"
+      }
+    ],
+    "house_blocks": [
+      [
+        8,
+        20,
+        -14,
+        0
+      ],
+      [
+        20,
+        27,
+        -14,
+        12,
+        "brickhouse"
+      ]
+    ],
+    "house_openings": [
+      [
+        10.5,
+        13.5,
+        0,
+        8.0,
+        14.8
+      ],
+      [
+        15.5,
+        18.5,
+        0,
+        10.5,
+        14.5
+      ],
+      [
+        3,
+        6,
+        20,
+        8.0,
+        14.8,
+        "x"
+      ],
+      [
+        8,
+        10.5,
+        20,
+        10.5,
+        14.5,
+        "x"
+      ]
+    ]
+  },
+  "framing": {
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "joist_spacing_in": 12,
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "(2)2x10",
+        "species": "SYP",
+        "setback_in": 24
+      }
+    ]
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Vintage",
+    "color": "Weathered Teak",
+    "profile": "square",
+    "fascia": true,
+    "fastener_system": "TOPLoc"
+  },
+  "railing": {
+    "system": "IRX",
+    "color": "Black",
+    "height_in": 36,
+    "edges": [
+      "end:left",
+      "front:N",
+      "front:S",
+      "step:S-L",
+      "front:L",
+      "end:right",
+      "wall:N"
+    ],
+    "openings": [
+      {
+        "side": "end:right",
+        "start_in": 0,
+        "length_in": 144,
+        "why": "brick house wall"
+      }
+    ]
+  },
+  "stairs": [
+    {
+      "side": "step:S-L",
+      "width_in": 48,
+      "position_in": 0,
+      "total_rise_in": 96,
+      "landing": "concrete pad",
+      "rails": 2,
+      "closed_risers": true
+    }
+  ],
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 300,
+    "site_extras": [
+      {
+        "item": "Dumpster + portable toilet",
+        "cost": 800
+      }
+    ]
+  },
+  "quoted_order": [
+    {
+      "sku": "AZV1616WT",
+      "item": "Azek Vintage 1x6x16 - Weathered Teak - Square",
+      "qty": 10,
+      "unit": "ea",
+      "unit_cost": 123.04,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZV1620WT",
+      "item": "Azek Vintage 1x6x20 - Weathered Teak - Square",
+      "qty": 27,
+      "unit": "ea",
+      "unit_cost": 153.8,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZVFASCIA12WT",
+      "item": "Azek Vintage (1/2x12x12') Fascia - Weathered Teak",
+      "qty": 5,
+      "unit": "ea",
+      "unit_cost": 171.38,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZVRISER12WT",
+      "item": "Azek Vintage (3/4x8x12') Riser - Weathered Teak",
+      "qty": 6,
+      "unit": "ea",
+      "unit_cost": 121.69,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "TTTOPLOC100LT",
+      "item": "TOPLoc for PVC - 100 SF (350 - 2 1/2\" screws, 2 bits) - Light Tan",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 157.29,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "TTTOPLOC300LT",
+      "item": "TOPLoc for PVC - 300 SF (1,050 - 2 1/2\" screws, 3 bits) - Light Tan",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 448.21,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "ATLOCFAS30LT",
+      "item": "TOPLoc PVC Fascia - 30 LF (100 - 1 5/8\" screws, 1 bit) - Light Tan",
+      "qty": 2,
+      "unit": "ea",
+      "unit_cost": 59.9,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "GT265DFT",
+      "item": "Nichigo G-Tape 3035 2\"x65' Deck Flash Tape - Black w/ NO Liner",
+      "qty": 6,
+      "unit": "ea",
+      "unit_cost": 18.6,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "GT465DFT",
+      "item": "Nichigo G-Tape 3035 4\"x65' Deck Flash Tape - Black w/ NO Liner",
+      "qty": 2,
+      "unit": "ea",
+      "unit_cost": 36.6,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "210N12TFJ",
+      "item": "2x10x12 #1 True Frame Joist - GC",
+      "qty": 27,
+      "unit": "ea",
+      "unit_cost": 43.93,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "212N16TFJ",
+      "item": "2x12x16 #1 True Frame Joist - GC",
+      "qty": 7,
+      "unit": "ea",
+      "unit_cost": 77.06,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "210N16TFJ",
+      "item": "2x10x16 #1 True Frame Joist - GC",
+      "qty": 10,
+      "unit": "ea",
+      "unit_cost": 62.03,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "26N12K",
+      "item": "2x6x12 #1 KDAT - GC",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 21.9,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "24N12K",
+      "item": "2x4x12 #1 KDAT - GC",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 13.68,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "24N16K",
+      "item": "2x4x16 #1 KDAT - GC",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 18.76,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "66NN8",
+      "item": "6x6x8 #2 - GC",
+      "qty": 9,
+      "unit": "ea",
+      "unit_cost": 45.6,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "210N16TFJ",
+      "item": "2x10x16 #1 True Frame Joist - GC (line 17)",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 62.03,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "210N20TFJ",
+      "item": "2x10x20 #1 True Frame Joist - GC",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 81.55,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "LUS210Z",
+      "item": "Simpson 2x10 Shear Face Mount Hanger Zmax",
+      "qty": 40,
+      "unit": "ea",
+      "unit_cost": 2.43,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "HUC2102-2Z",
+      "item": "Simpson 2x10 Double Concealed Face Mount Hanger Zmax",
+      "qty": 6,
+      "unit": "ea",
+      "unit_cost": 37.96,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "H2.5AZ",
+      "item": "Simpson Hurricane Ties Z-Max H2.5AZ",
+      "qty": 58,
+      "unit": "ea",
+      "unit_cost": 0.83,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AC6Z",
+      "item": "Simpson Adjustable Post Cap 6x6 - Zmax",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 12.05,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "LPC6Z",
+      "item": "Simpson 6x Post Cap Adjustable Zmax",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 6.64,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "ACH6Z",
+      "item": "Simpson 6x Heavy Adjustable Post Cap - Zmax",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 32.28,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "LSCZ",
+      "item": "Simpson Adjustable Stair Stringer Z-Max",
+      "qty": 6,
+      "unit": "ea",
+      "unit_cost": 2.93,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "DTT2Z",
+      "item": "Simpson Deck Tension Tie Zmax with 1.5\" screws",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 13.81,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "FMLLF005-50",
+      "item": "FastenMaster LedgerLok Flat Head 5\" (50 ct)",
+      "qty": 1,
+      "unit": "box",
+      "unit_cost": 77.25,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "THD37300H6SS",
+      "item": "Simpson Titen HD 316SS 3/8x3 Screw Anchor",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 4.86,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "0096175",
+      "item": "Camo 3\" PRO-FIT Joist Hanger nail HDG (5 lb box)",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 20.29,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "0606491",
+      "item": "Camo Pro-Fit 1-1/2\"x.148 Hanger nail PT SM 1M Positive Placement 100/PL",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 51.95,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "0356174",
+      "item": "Camo 3\" x #9 Premium Deck Screw ProTech 2-Tan (350 ct)",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 32.07,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "GT965DFT",
+      "item": "Nichigo G-Tape 3040 9\"x65' Deck Flash Tape - Black w/ Liner",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 84.17,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "DP1000",
+      "item": "Diamond Pier Deck Footing DP50",
+      "qty": 9,
+      "unit": "ea",
+      "unit_cost": 165.61,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "ABU66Z",
+      "item": "Simpson Adjustable Post Base 6x6 - Zmax",
+      "qty": 9,
+      "unit": "ea",
+      "unit_cost": 68.38,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "QT110180",
+      "item": "Quikrete 80# Concrete Mix",
+      "qty": 11,
+      "unit": "ea",
+      "unit_cost": 7.0,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHC90PK38B",
+      "item": "Azek Impression Express 3x3x38\" Horizontal Cable Post Kit, Corner - Black",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 183.28,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCEPK38B",
+      "item": "Azek Impression Express 3x3x38\" Horizontal Cable Post Kit, Level End - Black",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 208.55,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCIPK38B",
+      "item": "Azek Impression Express 3x3x38\" Horizontal Cable Post Kit, Level Inline - Black",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 156.72,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCESPK43B",
+      "item": "Azek Impression Express 3x3x43\" Horizontal Cable Post Kit, Stair Bottom End - Black",
+      "qty": 2,
+      "unit": "ea",
+      "unit_cost": 318.48,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCISPK43B",
+      "item": "Azek Impression Express 3x3x43\" Horizontal Cable Post Kit, Stair Inline - Black",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 166.67,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCLP6B",
+      "item": "Azek Impression Express 6' x 36\"/42\" Level Horizontal Cable Railing Section Kit - Black",
+      "qty": 4,
+      "unit": "ea",
+      "unit_cost": 175.98,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCLP8B",
+      "item": "Azek Impression Express 8' x 36\"/42\" Level Horizontal Cable Railing Section Kit - Black",
+      "qty": 3,
+      "unit": "ea",
+      "unit_cost": 205.02,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCSP6B",
+      "item": "Azek Impression Express 6' x 36\"/42\" Stair Horizontal Cable Railing Section Kit - Black",
+      "qty": 6,
+      "unit": "ea",
+      "unit_cost": 187.85,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHC20CABLE",
+      "item": "Azek Impression Express 316ss Cable (20' x 1/8\") & Hardware",
+      "qty": 10,
+      "unit": "ea",
+      "unit_cost": 120.32,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHC40CABLE",
+      "item": "Azek Impression Express 316ss Cable (40' x 1/8\") & Hardware",
+      "qty": 20,
+      "unit": "ea",
+      "unit_cost": 144.82,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXHCACCKIT",
+      "item": "Azek Impression Express Horizontal Cable Accessory Kit",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 52.19,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXCSTR6B",
+      "item": "Azek Impression Rail Express Classic Top Rail 6' - Black",
+      "qty": 10,
+      "unit": "ea",
+      "unit_cost": 76.94,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXCSTR8B",
+      "item": "Azek Impression Rail Express Classic Top Rail 8' - Black",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 91.7,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXADAPR90DRKB",
+      "item": "Azek Impression Aluminum ADA Rail Pipe Rail and 90\u00b0 Return Kit - Black",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 180.63,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXADAPREKB",
+      "item": "Azek Impression Aluminum ADA Rail ADA Pipe Rail Extension Kit - Black",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 193.48,
+      "source": "D&D quote 979610"
+    },
+    {
+      "sku": "AZTIXACCKITB",
+      "item": "Azek Impression Express Touch-Up Paint / Install Tool Kit - Black",
+      "qty": 1,
+      "unit": "ea",
+      "unit_cost": 38.09,
+      "source": "D&D quote 979610"
+    }
+  ],
+  "quoted_ref": "Decks & Docks quote 979610 \u00b7 09/11/2026 \u00b7 Henry Frederick \u00b7 ship to 9083 W. Parkview Dr"
+}

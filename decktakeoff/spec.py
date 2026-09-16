@@ -57,6 +57,7 @@ class Zone:
     label: str = ""                      # "Lounge", "Dining terrace", "Deep wing"
     privacy_wall: bool = False           # an existing wall along this zone's outer end (no rail there)
     end_wall: str = "privacy"            # what that wall is: "privacy" (lot / screen wall, sold as an option) | "house" (the house's own return wall, full height)
+    freestanding: bool = False           # no house behind this zone: a rear beam on posts instead of a ledger, rail along the wall line ("wall:<name>" edge)
 
 
 @dataclass
@@ -182,6 +183,7 @@ class Stair:
     rails: int = 2                       # stair guards/handrails: 0, 1 or 2 sides
     stringer_size: str = "2x12"
     closed_risers: bool = True
+    mid_support: Optional[bool] = None   # a carrier beam on two posts / footings at mid-run under the stringers (None -> yes when the run is over 6')
 
 
 @dataclass
@@ -219,6 +221,10 @@ class DeckSpec:
     job: str = "Deck"
     client: str = ""
     site: Site = field(default_factory=Site)
+    # an order the owner already took off and priced (a Decks & Docks quote): [{"sku","item","qty","unit","unit_cost","category"?}].
+    # When present the takeoff's lines ARE these, priced as quoted; the engine's own counts are kept as model_lines for a cross-check.
+    quoted_order: List[dict] = field(default_factory=list)
+    quoted_ref: str = ""                 # "Decks & Docks quote 979610 · 09/11/2026 · Henry Frederick"
     geometry: Geometry = field(default_factory=Geometry)
     framing: Framing = field(default_factory=Framing)
     decking: Decking = field(default_factory=Decking)

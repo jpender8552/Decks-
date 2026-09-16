@@ -63,13 +63,17 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     lr = PRICEBOOK["labor"]
     sf = L.deck_sf
     timber = s.is_timber
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     lab = []
     if s.extras.demo_existing:
         lab.append(("Demolition — existing deck", s.extras.demo_sf or sf, "SF", lr["demo_per_sf"], "base rate; field verify the existing deck"))
     ft = s.framing.footing_type
     if ft == "diamond_pier":
-        lab.append(("Diamond Pier install (replaces caisson)", n_posts, "pier", lr["diamond_pier_each"], "rate card"))
+        n_piers = n_posts
+        if t.order_ref:   # the owner's quoted order governs: every pier on it gets set
+            q = sum(l.order for l in t.lines if "diamond pier" in l.item.lower())
+            n_piers = int(q) if q else n_posts
+        lab.append(("Diamond Pier install (replaces caisson)", n_piers, "pier", lr["diamond_pier_each"], "rate card" + (" · count from the quoted order" if n_piers != n_posts else "")))
     elif ft == "caisson":
         lab.append((f"Caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' (frost {s.site.frost_depth_in:g}\")", n_posts, "hole", lr["caisson_each"], "base rate"))
         if L.frame.footing_dia_in >= 20:

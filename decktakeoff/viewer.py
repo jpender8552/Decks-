@@ -75,6 +75,12 @@ function patternTex(kind, hex, seed) {
   } else if (kind === 'batten') {  // board & batten, 12" battens
     for (let x = 0; x < 512; x += 64) { g.fillStyle = shade(hex, -0.25); g.fillRect(x, 0, 6, 512); g.fillStyle = shade(hex, 0.08); g.fillRect(x + 6, 0, 2, 512); }
     g.globalAlpha = 0.18; for (let i = 0; i < 120; i++) { g.fillStyle = rnd() > 0.5 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 40 + rnd() * 120); } g.globalAlpha = 1;
+  } else if (kind === 'brick') {   // running bond: 8" x 2-2/3" modular brick, 512px = 8'
+    const bh = 512 / 36, bw = 512 / 12;
+    for (let r = 0; r < 36; r++) { const off = (r % 2) * bw / 2; for (let c = -1; c < 13; c++) {
+      g.fillStyle = [shade(hex, -0.12), hex, shade(hex, 0.1), shade(hex, -0.05), shade(hex, 0.18)][Math.floor(rnd() * 5)];
+      g.fillRect(c * bw + off + 1.5, r * bh + 1.5, bw - 3, bh - 3); } }
+    g.globalAlpha = 0.5; g.fillStyle = '#b9b0a4'; for (let r = 0; r <= 36; r++) g.fillRect(0, r * bh - 0.5, 512, 1.5); g.globalAlpha = 1;
   } else if (kind === 'seam') {    // standing seam: 1-1/2" ribs at 16" OC (512px = 8'), a highlight and a shadow on each rib
     for (let x = 0; x < 512; x += 85.33) { g.fillStyle = shade(hex, 0.35); g.fillRect(x, 0, 5, 512); g.fillStyle = shade(hex, -0.45); g.fillRect(x + 5, 0, 4, 512); }
     g.globalAlpha = 0.08; for (let i = 0; i < 300; i++) { g.fillStyle = i % 2 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 20 + rnd() * 80); } g.globalAlpha = 1;

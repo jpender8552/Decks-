@@ -190,7 +190,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     fr_txt = (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
               f"{s.framing.joist_size} joists at {fr.spacing:g}\"" if s.is_timber else
               f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", {s.framing.beams[0].size if s.framing.beams else ''} beam, {s.framing.post_size} posts")
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     foot = {"caisson": f"{n_posts} caissons", "diamond_pier": f"{n_posts} Diamond Pier footings", "concrete": f"{n_posts} concrete piers"}[s.framing.footing_type]
     w(f"{fr_txt} — on {foot}{' with stone column bases' if s.extras.stone_bases else ''}. "
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
@@ -201,7 +201,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"**{L.deck_sf} SF** · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''} · **{ftin(s.geometry.height_in)}** above grade"
       + (", engineered" if s.extras.engineered else "") + f" · **{s.site.ground_snow_psf:g} psf** snow design")
     if s.client or s.site.address:
-        w(f"Prepared for {s.client}" + (f" · {s.site.address}, {s.site.city}" if s.site.address else ""))
+        w(("Prepared for " + s.client + (f" · {s.site.address}, {s.site.city}" if s.site.address else "")) if s.client else (f"Prepared for the owner of {s.site.address}, {s.site.city}" if s.site.address else "Prepared for the owner"))
     w("")
     w("## PRICE")
     w(f"**Total investment ${p.retail:,.0f}** — financed, no money down")
@@ -293,7 +293,7 @@ def _schedule(t: Takeoff) -> List[str]:
         days.append("Engineering & ordering (2–3 weeks). Stamped drawings, materials ordered, samples approved.")
     d = 1
     days.append(f"Day {d} — protection, utilities located (811)" + (", old deck out" if s.extras.demo_existing else "") + ".")
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     if s.framing.footing_type == "caisson":
         days.append(f"Days {d+1}–{d+2} — layout, {n_posts} caissons augered and poured."); d += 2
         days.append(f"Days {d+1}–{d+2} — concrete cure."); d += 2

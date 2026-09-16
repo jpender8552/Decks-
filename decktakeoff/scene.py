@@ -72,6 +72,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
         stone=dict(color="#8c8478", pattern="stone", rough=0.95, label="ledgestone veneer"),
+        brick=dict(color="#8e4a3a", pattern="brick", rough=0.95, label="brick"),
         stonecap=dict(color="#a8a297", rough=0.9),
         house=dict(color="#5b544d" if timber else "#cfc6b4", pattern="lap", rough=0.9),
         trim=dict(color="#24221f" if timber else "#f2efe8", rough=0.8),
@@ -351,6 +352,15 @@ def build_scene(L) -> Scene:
             zz = L.zones[-1]; direction = "+x"; u0 = (zz.x0 + zz.W) * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
         elif side in ("left", "end:left"):
             zz = L.zones[0]; direction = "-x"; u0 = zz.x0 * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
+        elif side.startswith("step:"):
+            # the step between two zone fronts: the stair leaves the deeper zone's side edge and runs alongside the shallower zone
+            na, nb = side.split(":")[1].split("-")
+            za = next(q for q in L.zones if q.name == na); zb = next(q for q in L.zones if q.name == nb)
+            u0 = (za.x0 + za.W) * IN
+            if zb.D > za.D:
+                direction = "-x"; v_a = (za.wall_y + za.D) * IN + edge + st.opening.start_in * IN
+            else:
+                direction = "+x"; v_a = (zb.wall_y + zb.D) * IN + edge + st.opening.start_in * IN
         else:
             zn = side.split(":")[1] if ":" in side else None
             zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "+y"
@@ -392,11 +402,31 @@ def build_scene(L) -> Scene:
                 sb("toprail", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
                 if spec.railing.drink_rail:
                     sb("drink", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
-                for k in range(1, n_t + 1):
-                    for frac in (0.3, 0.7):
-                        u_ = (k - 1) * run + frac * run
-                        ztop = zt - k * rise
-                        sb("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02 + (theta and (frac * run) * math.tan(theta) * 0), "steel", 7)
+                if RAIL_SYSTEMS.get(L.rail.system, {}).get("cable"):
+                    # horizontal cable infill runs parallel to the slope, 3-1/8" apart, plus a mid post on a run over 6'
+                    n_c = int((hr - 0.25) / (3.125 * IN))
+                    for i in range(1, n_c + 1):
+                        zc_ = (zt - rise) / 2 + i * 3.125 * IN + 0.1
+                        sb("cable", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.01, vc + 0.01, zc_ - 0.01, zc_ + 0.01, "cable", 7, rot=theta)
+                    if rail_len > 6.5:
+                        u_ = total_run / 2
+                        sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, (zt - rise) / 2, (zt - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
+                else:
+                    for k in range(1, n_t + 1):
+                        for frac in (0.3, 0.7):
+                            u_ = (k - 1) * run + frac * run
+                            ztop = zt - k * rise
+                            sb("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "steel", 7)
+        # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
+        if st.mid_support:
+            um = st.mid_run_in * IN
+            z_under = zt - (um / total_run) * zt - 1.5 * IN - depth / math.cos(theta) + 0.3   # underside of the stringers at mid-run
+            zc_top = z_under - 0.02
+            sb("beam", um - 1.5 * IN, um + 1.5 * IN, v_a - 0.25, v_b + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
+            for vp in (v_a + 0.25, v_b - 0.25):
+                sb("post", um - pb_ / 2, um + pb_ / 2, vp - pb_ / 2, vp + pb_ / 2, 0.55, zc_top - 5.5 * IN, "timber", 2, tag="stair carrier post")
+                sb("base", um - pb_ / 2 - 0.02, um + pb_ / 2 + 0.02, vp - pb_ / 2 - 0.02, vp + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
+                sb("footing", um - 0.55, um + 0.55, vp - 0.55, vp + 0.55, -0.1, 0.45, "concrete", 1, tag="stair footing")
         # landing pad
         sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, -0.3, 0.02, "concrete", 1, tag=f"landing pad {st.side}")
 
@@ -417,7 +447,7 @@ def build_scene(L) -> Scene:
         for wseg in spec.geometry.house_walls:
             fixed.append(angled_wall(*wseg, z0=0.0, z1=H_house))
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
-                zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN) for z in L.zones],
+                zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN, ledger=bool(z.frame.ledger)) for z in L.zones],
                 edge=edge, timber=timber, oiled=spec.framing.finish == "oil",
                 outline=[list(p) for p in spec.geometry.outline] if spec.geometry.outline else None,
                 step_text=step_captions(L))
@@ -460,7 +490,7 @@ def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
 
 def step_captions(L: Layout) -> Dict[int, str]:
     s = L.spec
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     ft = {"caisson": f"{n_posts} caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' below frost",
           "diamond_pier": f"{n_posts} Diamond Pier {L.frame.footing_model} driven-pin footings",
           "concrete": f"{n_posts} concrete piers {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}'"}[s.framing.footing_type]
@@ -529,7 +559,12 @@ def draw_house_from_spec(add, spec, zt, H_house):
     # the house
     for h in spec.geometry.house_blocks:
         bx0, bx1, by0, by1 = h[:4]
-        brick = len(h) > 4 and str(h[4]).lower() == "brick"
+        kind_ = str(h[4]).lower() if len(h) > 4 else ""
+        brick = kind_ == "brick"
+        if kind_ == "brickhouse":   # a brick-clad house block: running-bond brick, eave and roof slab like the sided blocks
+            add("house", bx0, bx1, by0, by1, 0.0, H_house, "brick", tag="house (brick)")
+            add("roof", bx0 - 1.0, bx1 + 1.0, by0 - 1.0, by1 + 1.0, H_house, H_house + 0.55, "roof")
+            continue
         if brick:   # a chimney: brick, taller than the eave, no roof slab; optional [.., "brick", z0, z1]
             z0c = float(h[5]) if len(h) > 5 else 0.0
             z1c = float(h[6]) if len(h) > 6 else H_house + 4.0

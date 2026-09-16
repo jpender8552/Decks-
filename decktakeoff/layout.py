@@ -191,6 +191,8 @@ class StairLayout:
     landing: str
     opening: RailOpening
     notes: List[str] = field(default_factory=list)
+    mid_support: bool = False            # carrier beam on 2 posts + 2 footings at mid-run under the stringers (stringer run over 6')
+    mid_run_in: float = 0.0              # horizontal distance from the top riser to the carrier CL
 
 
 @dataclass
@@ -250,6 +252,15 @@ class Layout:
     @property
     def outer_edge_lf(self) -> float:
         return round(sum(e.length for e in self.edges if e.exposed) / 12.0, 1)
+
+    @property
+    def stair_support_posts(self) -> int:
+        return sum(2 for st in self.stairs if st.mid_support)
+
+    @property
+    def n_footings(self) -> int:
+        """Every post that needs a footing: beam-line posts plus the mid-stair carrier posts."""
+        return sum(z.frame.n_posts for z in self.zones) + self.stair_support_posts
 
 
 # ================================================================== decking first (it sizes the frame)
@@ -383,7 +394,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     jb, jd = actual(jsize)
     tub = spec.extras.hot_tub if hot_tub is None else hot_tub
     total_psf, load_note = eng.design_load_psf(spec.site.ground_snow_psf, tub)
-    ledger = g.attachment == "ledger"
+    ledger = g.attachment == "ledger" and not (zone and next((zz.freestanding for zz in spec.zone_list if zz.name == zone), False))
     rim_plies = spec.rim_plies
     rim_t = rim_plies * jb              # timber: one 4x rim; dimensional: 2 x 1-1/2"
     ledger_t = jb
@@ -413,6 +424,9 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         rear = _B(kind="drop", size=declared[0].size if declared else ("6x12" if timber else "4x10"), species=declared[0].species if declared else "DF", setback_in=12.0)
         rear.position_in = 12.0 + parse_beam(rear.size)[2] / 2
         declared = [rear] + declared
+        rear_auto = rear
+    else:
+        rear_auto = None
     # resolve centrelines
     cls = []
     engineered = spec.extras.engineered
@@ -420,7 +434,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         if zone and b.zones and zone not in b.zones:
             continue
         plies, nom, bwid, bdep = parse_beam(b.size)
-        if b.position_in is not None and not zone:
+        if b.position_in is not None and (not zone or b is rear_auto):
             cl = float(b.position_in)
         elif b.kind == "flush":
             cl = D - (b.setback_in or 0.0) - (0.0 if (b.setback_in or 0) > 0 else front_t / 2)   # flush: setback = CL back from the rim face
@@ -785,6 +799,10 @@ def outline_edges(zones: List[ZoneLayout], spec: DeckSpec) -> List[Edge]:
     zn = zones[-1]
     fn = zn.wall_y + zn.D
     edges.append(Edge("end:right", zn.x0 + zn.W, fn, zn.x0 + zn.W, zn.wall_y, exposed=not zl[-1].privacy_wall))
+    # freestanding zones: the wall line is an open edge too (right to left, closing the clockwise outline)
+    for z, zz in zip(reversed(zones), reversed(zl)):
+        if zz.freestanding:
+            edges.append(Edge(f"wall:{z.name}", z.x0 + z.W, z.wall_y, z.x0, z.wall_y, exposed=True))
     return edges
 
 
@@ -811,13 +829,16 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
                 stock = next((st for st, mx in sorted(sysd["panels"].items()) if cut <= mx + 1e-6), max(sysd["panels"]))
                 secs.append(RailSection("stair " + s.side, round(slope_len / n, 2), stock, round(cut, 2), kind="stair"))
         stair_posts = s.rails * (n + 1) if s.rails else 0
-        pos = s.position_in if s.position_in is not None else ((W - s.width_in) / 2 if s.side == "front" else (D - s.width_in - 12))
+        pos = s.position_in if s.position_in is not None else ((W - s.width_in) / 2 if s.side == "front" else (0.0 if s.side.startswith("step:") else (D - s.width_in - 12)))
         opening = RailOpening(s.side, pos, s.width_in, f"stair {s.width_in:.0f}\" wide")
         notes = list(geo.notes)
         if geo.handrail_required:
             notes.append(f"{geo.risers} risers — graspable handrail 34–38\" on at least one side (IRC R311.7.8)")
+        mid = s.mid_support if s.mid_support is not None else geo.total_run_in > 72.0
+        if mid:
+            notes.append(f"stringer run {geo.total_run_in / 12:.1f}' — carrier beam on two {spec.framing.post_size} posts and footings at mid-run under the stringers")
         out.append(StairLayout(s.side, s.width_in, geo, 2, tread_pieces, riser_pieces, geo.stringers, geo.stringer_stock_ft, s.rails, secs, stair_posts,
-                               s.landing, opening, notes))
+                               s.landing, opening, notes, mid, round(geo.total_run_in / 2.0, 1) if mid else 0.0))
     return out
 
 
@@ -846,14 +867,14 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
         for bi, b in enumerate(z.frame.beams):
             if (zi, bi) in used:
                 continue
-            key = (b.kind, b.size, b.species, round(z.D - b.cl_y, 1))          # offset of the CL back from the front edge (zone coords)
+            key = (b.kind, b.size, b.species, round(z.wall_y + b.cl_y, 1))     # absolute CL y: only collinear beams merge into one line
             members = [(zi, bi, z, b)]
             used.add((zi, bi))
             zj = zi + 1
             while zj < len(zl):
                 zz = zl[zj]
                 m = next(((zj, bj, zz, bb) for bj, bb in enumerate(zz.frame.beams)
-                          if (zj, bj) not in used and (bb.kind, bb.size, bb.species, round(zz.D - bb.cl_y, 1)) == key), None)
+                          if (zj, bj) not in used and (bb.kind, bb.size, bb.species, round(zz.wall_y + bb.cl_y, 1)) == key), None)
                 if not m:
                     break
                 members.append(m); used.add((m[0], m[1])); zj += 1
@@ -888,7 +909,7 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             else:
                 cap_mid = cap_end = post_cap(spec.framing.post_size, b.size)
             plies, nom, bw, bd = parse_beam(b.size)
-            lines.append(BeamLine(b.kind, b.size, b.species, plies, bw, bd, front - key[3],
+            lines.append(BeamLine(b.kind, b.size, b.species, plies, bw, bd, key[3],
                                   x0, x1, [m[2].name for m in members], posts, pz, loads, b.post_len, pieces, cap_mid, cap_end,
                                   label=f"{'DROP' if b.kind == 'drop' else 'FLUSH'} {b.size} {b.species} " + "+".join(m[2].name for m in members)))
     # write the line results back onto the zone frames (posts, worst load) so per-zone sums stay right
@@ -978,7 +999,7 @@ def build_layout(spec: DeckSpec) -> Layout:
         for ln in lines:
             notes.append(f"{ln.label}: {ftin(ln.length)} long, {ln.n_posts} posts at " + " / ".join(ftin(px) for px in ln.posts_x)
                          + (f"; pieces " + " · ".join(ftin(b - a) for a, b in ln.pieces) if len(ln.pieces) > 1 else ""))
-        wall_lf = sum(q.W for q in zl) + sum(abs(a.wall_y - b.wall_y) for a, b in zip(zl, zl[1:]))
+        wall_lf = sum(q.W for q in zl if q.frame.ledger) + sum(abs(a.wall_y - b.wall_y) for a, b in zip(zl, zl[1:]) if a.frame.ledger and b.frame.ledger)
         L = Layout(spec, zl[0].frame, zl[0].decking, rl, st, x, deepest.D, notes, zl, edges, True, lines, divs, wall_lf)
         return L
     W, D = float(g.width_in), float(g.depth_in)

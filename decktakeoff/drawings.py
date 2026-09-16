@@ -117,7 +117,7 @@ def house_outline(o, X, Y, sc, S: Scene):
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["privacy"], "#7a7267", 0.8))
             o.append(T(X((b.x0 + b.x1) / 2) - 8, Y((b.y0 + b.y1) / 2), "PRIVACY / LOT WALL — nothing fastens, no rail", 7, 700, "middle", MUTE, rot=-90))
     for z in S.meta["zones"]:
-        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["wall_y"]) - 6, f"HOUSE — {z['name']}", 8, 800, "middle", "#a89b84"))
+        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["wall_y"]) - 6, (f"HOUSE — {z['name']}" if z.get("ledger", True) else f"OPEN — {z['name']} (rear beam, no ledger)"), 8, 800, "middle", "#a89b84"))
 
 
 def deck_outline(S: Scene) -> List[Tuple[float, float]]:
@@ -215,6 +215,13 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
             x, y = px * IN, bl.y * IN
             o.append(T(X(x), Y(y) - 12 * (1 if bl.kind == "drop" else -1) - (0 if bl.kind == "drop" else 4), f"P{n}", 8, 800, "middle"))
             rows.append((f"P{n}", ftin(px), ftin(bl.y), zn, f"{ld:,.0f} lb"))
+    for st in L.stairs:
+        if st.mid_support:
+            for b in [q for q in S.boxes if q.tag == "stair footing"]:
+                n += 1
+                cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+                o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
+                rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "carrier"))
     for bl in L.beam_lines:
         o.append(T(X(bl.x0) + 4, Y(bl.y * IN) - 6, bl.label, 7.5, 800, fill=MUTE))
     # dims: beam lines from the front, zone widths

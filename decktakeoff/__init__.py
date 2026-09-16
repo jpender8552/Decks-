@@ -20,5 +20,8 @@ def run(spec: DeckSpec, with_pricing: bool = True):
     else:
         t = build_takeoff(spec)
         f = run_flags(t.layout)
+    if spec.quoted_order:
+        from .takeoff import apply_quoted_order
+        t = apply_quoted_order(t)
     p = price(t) if with_pricing else None
     return t, f, p

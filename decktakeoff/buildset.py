@@ -27,7 +27,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     def items(pred, n=7):
         return [f"({l.net:g}) {l.item}" for l in lines if pred(l)][:n]
     fr = L.frame
-    n_posts = sum(z.frame.n_posts for z in L.zones)
+    n_posts = L.n_footings
     ft = s.framing.footing_type
     steps = []
     # 1 footings
