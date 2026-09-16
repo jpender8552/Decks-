@@ -208,7 +208,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w("- 12 months no payments, no down payment")
     w("- 18 months no payments, no down payment")
     w(f"- 6.99% for 10 years — about ${p.monthly:,.0f}/month")
-    w(f"**Check or ACH: ${p.sell:,.0f}** (7% savings)")
+    w(f"**Check or ACH: ${p.sell:,.0f}** ({(1 - p.sell / p.retail) * 100:.0f}% savings)")
     w("")
     w("## WHAT THE PRICE INCLUDES")
     w("| Item | Value |")

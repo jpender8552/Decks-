@@ -160,7 +160,10 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     cost = work + gc
     sell = round(work / (1 - gm) + gc)
     sell_floor = round(work / (1 - pb["gm_floor"]) + gc)
-    retail = round(sell / pb["retail_factor"])
+    if s.extras.sell_override:
+        sell = round(float(s.extras.sell_override))
+        gm = 1 - work / max(sell - gc, 1)          # the margin the override actually carries
+    retail = round(sell * (1 + s.extras.retail_markup)) if s.extras.retail_markup is not None else round(sell / pb["retail_factor"])
     r = pb["finance_rate"] / 12
     n = pb["finance_years"] * 12
     monthly = retail * r / (1 - (1 + r) ** -n)
@@ -214,6 +217,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         alloc += parts
     if gc:
         alloc.append(("Site & project services", round(gc)))
+    if s.extras.sell_override:        # scale every component to the set price, then true up the rounding
+        tot = sum(a[1] for a in alloc) or 1
+        alloc = [(k, round(v * sell / tot)) for k, v in alloc]
     diff = sell - sum(a[1] for a in alloc)
     i = 1 if (s.extras.demo_existing and not s.is_timber) else 0
     alloc[i] = (alloc[i][0], alloc[i][1] + diff)

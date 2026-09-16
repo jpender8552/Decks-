@@ -1,6 +1,6 @@
 {
   "job": "Parkview Dr \u2014 12 x 20 deck with landing and stair",
-  "client": "",
+  "client": "Alan",
   "site": {
     "address": "9083 W. Parkview Dr",
     "city": "Littleton",
@@ -161,7 +161,9 @@
       "cable_rail_addon_per_lf": 0
     },
     "extra_beam_sets": 1,
-    "engineering_note": "If the county asks for a stamped set, GSX provides the engineer and the engineering is billed at cost, separate from this price."
+    "engineering_note": "If the county asks for a stamped set, GSX provides the engineer and the engineering is billed at cost, separate from this price.",
+    "sell_override": 59790,
+    "retail_markup": 0.07
   },
   "quoted_order": [
     {

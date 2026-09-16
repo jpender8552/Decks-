@@ -210,6 +210,8 @@ class Extras:
     no_general_conditions: bool = False  # drop the $/SF general conditions and site extras entirely
     labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}
     extra_beam_sets: Optional[int] = None             # override the "extra beam set" labor count (None -> beam lines minus one)
+    sell_override: Optional[float] = None             # owner-set check/ACH price; the allocation scales to it
+    retail_markup: Optional[float] = None             # financed = sell x (1 + markup) instead of sell / 0.93
     options: List[Option] = field(default_factory=list)
     hardie_skirt: Optional[str] = None   # deck skirt / rim wrap in HardieTrim instead of the decking fascia: "4/4 x 12 Timber Bark"
     cover_soffit: Optional[str] = None   # porch cover ceiling: "HardieSoffit 4x10 cedarmill Timber Bark" (None -> 1x6 T&G pine)

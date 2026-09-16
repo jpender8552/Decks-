@@ -515,10 +515,10 @@ SHEET_INDEX = [("G-001", "General notes · design criteria"), ("A-001", "Isometr
                ("T-400", "Build steps (build set)"), ("T-700", "Order + schedules (takeoff)")]
 
 
-def sheet_meta(L: Layout) -> dict:
+def sheet_meta(L: Layout, customer: bool = False) -> dict:
     s = L.spec
     return dict(job_line=f"{s.job} · {s.site.address}, {s.site.city}".strip(" ,·"),
-                rev_line=f"GSX · Jade Pender 303-550-9558 · {date.today().strftime('%B %d, %Y')} · Rev 0 FOR REVIEW",
+                rev_line=(f"GS Exterior Experts · {date.today().strftime('%B %d, %Y')} · Rev 0" if customer else f"GSX · Jade Pender 303-550-9558 · {date.today().strftime('%B %d, %Y')} · Rev 0 FOR REVIEW"),
                 footer=("Design intent. The stamped engineering set governs structure, dimensions and locations. Field verify. Do not scale." if s.extras.engineered
                         else "Design intent per 2021 IRC R507 prescriptive. Field verify. Do not scale.") + (" Oil finish is an option; base timbers unfinished, end grain sealed." if s.is_timber and s.framing.finish != "oil" else ""))
 
@@ -534,7 +534,7 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
         if k in S.materials:
             _MAT_COLORS[k] = S.materials[k]["color"]
     FILL["deck"] = _MAT_COLORS.get("deck", FILL["deck"]); FILL["border"] = _MAT_COLORS.get("border", FILL["border"])
-    meta = sheet_meta(L)
+    meta = sheet_meta(L, customer=customer)
     return [("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta)),
             ("S-100", "Foundation plan", sheet_foundation(L, S, meta)),
             ("S-101", "Framing plan", sheet_framing(L, S, t, meta)),
