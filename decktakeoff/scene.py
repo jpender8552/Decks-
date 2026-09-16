@@ -656,7 +656,7 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
     poly = [(float(x), float(y)) for x, y in spec.geometry.outline]
     out: List[Box] = []
     for b in boxes:
-        if b.kind not in DECK_KINDS or b.rot:
+        if b.kind not in DECK_KINDS or b.rot or b.kind == "fascia":   # fascia hangs outside the outline by its own thickness: never clip it
             out.append(b); continue
         cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
         along_x = (b.x1 - b.x0) >= (b.y1 - b.y0)
