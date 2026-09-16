@@ -430,8 +430,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             beam_pieces += [(nom, b - a, f"{bl.kind} beam")] * plies
         cuts.append(CutPiece(f"{bl.label} beam", nom, bl.length, plies * len(bl.pieces), f"y {ftin(bl.y)}; posts at " + " / ".join(ftin(x) for x in bl.posts_x)
                              + (f"; pieces " + " · ".join(ftin(b - a) for a, b in bl.pieces) + ", spliced over posts" if len(bl.pieces) > 1 else "")))
-        post_pieces += [(spec.framing.post_size, bl.post_len + 1.0, "post")] * bl.n_posts
-        cuts.append(CutPiece(f"Posts under {bl.label}", spec.framing.post_size, bl.post_len, bl.n_posts, "field-measure each"))
+        if not spec.framing.existing_posts:
+            post_pieces += [(spec.framing.post_size, bl.post_len + 1.0, "post")] * bl.n_posts
+            cuts.append(CutPiece(f"Posts under {bl.label}", spec.framing.post_size, bl.post_len, bl.n_posts, "field-measure each"))
         caps_end += 2 if bl.n_posts >= 2 else bl.n_posts
         caps_mid += max(0, bl.n_posts - 2)
         timber_sf += plies * 2 * (bw_ + bd_) / 12 * bl.length / 12
@@ -462,7 +463,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
 
     # ================= FOOTINGS
     ft = spec.framing.footing_type
-    if ft == "diamond_pier":
+    if ft == "existing" or spec.framing.existing_posts:
+        base_screws = 0
+        if not spec.framing.existing_posts:
+            bkeys = TIMBER_BASE.get(spec.framing.post_size, ("ABU66Z_black", "ABU66Z"))
+            bkey = bkeys[0] if black else bkeys[1]
+            d_, uc, src = _item("footings", bkey)
+            lines.append(Line("Footings", d_ + " — on the existing caisson, epoxy-set", n_posts, n_posts, "ea", "exact  (existing caissons stay; tops chipped level)", uc, src, bkey))
+            lines.append(Line("Footings", "Simpson SET-3G epoxy + 5/8\" x 8\" threaded rod, 2 per base", n_posts * 2, n_posts * 2, "ea", "exact  (drilled into the existing caisson — engineer confirms embed)", 9.5, "est."))
+    elif ft == "diamond_pier":
         model = fr0.footing_model
         uc, src = _price("footings", model)
         lines.append(Line("Footings", _desc("footings", model, f"Diamond Pier {model}"), n_posts, n_posts, "ea", "exact — confirm stock", uc, src, model,
@@ -890,7 +899,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         design_load=f"{max(z.frame.total_psf for z in L.zones):g} psf ({fr0.load_note})" + (" · engineered" if spec.extras.engineered else ""),
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
-        rail=(f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
+        rail=("Existing stucco parapet stays — no rail in this scope" if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
         stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide" for s_ in stairs],
         material_cost=round(sum(l.ext for l in lines), 2),
     )

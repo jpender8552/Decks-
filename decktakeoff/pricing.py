@@ -78,6 +78,9 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append((f"Caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' (frost {s.site.frost_depth_in:g}\")", n_posts, "hole", lr["caisson_each"], "base rate"))
         if L.frame.footing_dia_in >= 20:
             lab.append(("Large footings 20\" add-on", n_posts, "footing", lr["large_footing_addon_each"], "rate card add-on"))
+    elif ft == "existing":
+        if not s.framing.existing_posts:
+            lab.append(("Set standoff bases on the existing caissons (epoxy anchors)", n_posts, "ea", 45.0, "EST — no rate-card line"))
     else:
         lab.append(("Concrete piers (dig, form, pour)", n_posts, "pier", lr["concrete_footing_each"], "rate card"))
     lab.append(("Frame", sf, "SF", lr["frame_per_sf"], "base rate" + (" — no larger-timber / 12\" OC up-charge (owner 7 Sep 2026)" if timber else "")))

@@ -98,6 +98,12 @@ def run_flags(L: Layout) -> List[Flag]:
         add("STOP", "footing", f"post load {fr.footing_load_lb:,.0f} lb exceeds {fr.footing_model} ({fr.footing_capacity_lb:,} lb) — more posts or concrete piers", "Pin Foundations chart")
     if fr.footing_type == "diamond_pier":
         add("CHECK", "footing", f"Diamond Pier: pins 50\" — locate utilities (811) before driving; bearing {fr.footing_load_lb:,.0f} lb/post vs {fr.footing_capacity_lb:,} lb allowable (manufacturer chart, confirm)")
+    if fr.footing_type == "existing":
+        add("ENGINEER", "footing", f"existing caissons reused — the engineer verifies capacity for the new loads ({fr.footing_load_lb:,.0f} lb worst post); core or probe if no record", "IRC R507.3")
+        if s.framing.existing_posts:
+            add("ENGINEER", "engineering", "existing stucco columns reused — the engineer verifies the column core, its connection to the caisson, and details the new column caps")
+    if s.railing.existing_parapet:
+        add("CODE", "guard", "existing stucco parapet reused as the guard — verify 36\" min above the new deck surface and 200 lb top-rail load; if the new deck surface rises, the parapet height drops", "IRC R312.1")
     if fr.footing_type == "concrete":
         add("CODE", "frost", f"concrete piers bear {ftin(fr.footing_depth_in - 6)} below grade — frost depth {ftin(site.frost_depth_in)} for {site.city or 'this jurisdiction'}; confirm the local frost line and soil bearing ({site.soil_bearing_psf:,.0f} psf assumed)", "IRC R403.1.4")
     if site.soil_bearing_psf < 1500:
@@ -146,7 +152,8 @@ def run_flags(L: Layout) -> List[Flag]:
     hi = max(g.height_in, g.height_high_in or 0)
     if hi > eng.GUARD_TRIGGER_HEIGHT:
         if rl is None or not rl.sections:
-            add("STOP", "guard", f"deck surface {ftin(hi)} above grade — guards required on every open side, none specified", "IRC R312.1.1")
+            if not s.railing.existing_parapet:
+                add("STOP", "guard", f"deck surface {ftin(hi)} above grade — guards required on every open side, none specified", "IRC R312.1.1")
         else:
             if rl.height < eng.GUARD_HEIGHT_RES:
                 add("STOP", "guard", f"guard height {rl.height:g}\" < 36\" minimum", "IRC R312.1.2")

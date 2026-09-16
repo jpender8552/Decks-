@@ -570,7 +570,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     beam_depth = max([b.depth for b in beams], default=jd)
     dk = decking_facts(spec.decking.collection)
     drop = any(b.kind == "drop" for b in beams)
-    standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF}.get(fr.footing_type, CONC_STANDOFF)
+    standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(fr.footing_type, CONC_STANDOFF)
     for bl in beams:
         bl.post_len = max(6.0, g.height_in - dk["thick"] - (jd if bl.kind == "drop" else 0.0) - bl.depth - standoff)
     post_len = max([bl.post_len for bl in beams], default=max(6.0, g.height_in - dk["thick"] - jd - standoff))
@@ -583,7 +583,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     if fr.footing_type == "concrete":
         dia = eng.concrete_footing_diameter(worst_load, spec.site.soil_bearing_psf)
         depth = spec.site.frost_depth_in + 6
-    elif fr.footing_type == "caisson":
+    elif fr.footing_type in ("caisson", "existing"):
         dia = float(fr.caisson_dia_in)
         depth = float(fr.caisson_depth_in) if fr.caisson_depth_in else spec.site.frost_depth_in + 2
         cap_lb = math.pi * (dia / 24) ** 2 * spec.site.soil_bearing_psf + math.pi * dia / 12 * depth / 12 * 400.0   # end bearing + ~400 psf skin friction (estimate; engineer sizes)

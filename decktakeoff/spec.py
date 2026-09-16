@@ -95,6 +95,7 @@ class Geometry:
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
                                                                         # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
+    house_finish: str = "lap"            # how the house is drawn: "lap" siding | "stucco" | "brick"
 
 
 @dataclass
@@ -121,7 +122,8 @@ class Framing:
     ledger_fastener: str = "LedgerLOK"   # "LedgerLOK" | "1/2 lag" | "1/2 bolt"
     beams: List[Beam] = field(default_factory=lambda: [Beam()])
     post_size: str = "6x6"
-    footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete"
+    footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
+    existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
     blocking_rows: Optional[int] = None  # None -> 1 row over each beam (composite), 2 for PVC
     joist_tape: bool = True
@@ -162,6 +164,7 @@ class RailOpening:
 @dataclass
 class Railing:
     system: str = "Fulton"               # "Fulton" | "Impression" | "Classic Composite" | "none"
+    existing_parapet: bool = False       # an existing stucco / masonry parapet stays on the open edges: no rail in the takeoff, drawn in the model
     color: str = "Black"
     height_in: float = 36.0
     sides: List[str] = field(default_factory=lambda: ["left", "right", "front"])

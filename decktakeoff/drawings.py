@@ -115,7 +115,12 @@ def house_outline(o, X, Y, sc, S: Scene):
                 o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["house"], INK, 1.2))
         if b.kind == "privacy":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["privacy"], "#7a7267", 0.8))
-            o.append(T(X((b.x0 + b.x1) / 2) - 8, Y((b.y0 + b.y1) / 2), "PRIVACY / LOT WALL — nothing fastens, no rail", 7, 700, "middle", MUTE, rot=-90))
+            lbl = "EXISTING STUCCO PARAPET — stays" if "parapet" in (b.tag or "") else "PRIVACY / LOT WALL — nothing fastens, no rail"
+            horiz = (b.x1 - b.x0) > (b.y1 - b.y0)
+            if horiz:
+                o.append(T(X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2) + 3, lbl, 7, 700, "middle", MUTE))
+            else:
+                o.append(T(X((b.x0 + b.x1) / 2) - 8, Y((b.y0 + b.y1) / 2), lbl, 7, 700, "middle", MUTE, rot=-90))
     for z in S.meta["zones"]:
         o.append(T(X(z["x0"] + z["W"] / 2), Y(z["wall_y"]) - 6, (f"HOUSE — {z['name']}" if z.get("ledger", True) else f"OPEN — {z['name']} (rear beam, no ledger)"), 8, 800, "middle", "#a89b84"))
 
@@ -241,7 +246,9 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     ft = L.frame
     desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, 5/8\" x 8\" cast-in anchor",
             "diamond_pier": f"Diamond Pier {ft.footing_model} (head + 4 x 50\" pins), 3,300 lb allowable",
-            "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base"}[L.spec.framing.footing_type]
+            "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base",
+            "existing": ("Existing caissons and columns stay — verify plumb, bearing and condition; new column caps (engineered)" if L.spec.framing.existing_posts
+                         else "Existing caissons stay — tops chipped level, standoff bases on epoxy-set 5/8\" rods (engineer confirms capacity)")}[L.spec.framing.footing_type]
     yy = 40
     for ln in textwrap.wrap(desc, 44):
         o.append(T(sx, yy, ln, 8, 500)); yy += 11

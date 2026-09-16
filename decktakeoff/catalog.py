@@ -132,6 +132,8 @@ FOOTING_CAPACITY_LB = {"DP-50/50": 3300, "DP-75/63": 6000}
 
 def post_cap(post: str, beam_size: str) -> str:
     plies, nom, w, d = parse_beam(beam_size)
+    if post == "8x8":
+        return "CCQ68SDS2.5" if nom.startswith("6x") else "CCQ88SDS2.5"
     if post == "6x6":
         if nom.startswith("4x"):
             return "BC46Z"

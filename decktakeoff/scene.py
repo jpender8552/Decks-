@@ -74,7 +74,9 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         stone=dict(color="#8c8478", pattern="stone", rough=0.95, label="ledgestone veneer"),
         brick=dict(color="#8e4a3a", pattern="brick", rough=0.95, label="brick"),
         stonecap=dict(color="#a8a297", rough=0.9),
-        house=dict(color="#5b544d" if timber else "#cfc6b4", pattern="lap", rough=0.9),
+        house=(dict(color="#d9d0bf", rough=0.95, label="stucco") if spec.geometry.house_finish == "stucco"
+               else dict(color="#8e4a3a", pattern="brick", rough=0.95, label="brick") if spec.geometry.house_finish == "brick"
+               else dict(color="#5b544d" if timber else "#cfc6b4", pattern="lap", rough=0.9)),
         trim=dict(color="#24221f" if timber else "#f2efe8", rough=0.8),
         roof=dict(color="#2a2624", rough=0.9),
         privacy=dict(color="#6a625a", pattern="batten", rough=0.9),
@@ -179,8 +181,8 @@ def build_scene(L) -> Scene:
             add("beam", a * IN, b * IN, y - bw_ / 2, y + bw_ / 2, top - bd_, top, "timber", 4, tag=ln.label)
         for pi, px in enumerate(ln.posts_x):
             x = px * IN
-            if ft == "caisson":
-                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, 0.5, "concrete", 1, tag=f"caisson P{li}-{pi + 1}", shape="cyl")
+            if ft in ("caisson", "existing"):
+                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, 0.5, "concrete", 1, tag=f"caisson P{li}-{pi + 1}" + (" (existing)" if ft == "existing" else ""), shape="cyl")
                 base_top = 0.5
             elif ft == "diamond_pier":
                 add("footing", x - 0.45, x + 0.45, y - 0.45, y + 0.45, -0.2, 0.3, "concrete", 1, tag="Diamond Pier")
@@ -188,8 +190,11 @@ def build_scene(L) -> Scene:
             else:
                 add("footing", x - 0.6, x + 0.6, y - 0.6, y + 0.6, -1.0, 0.15, "concrete", 1, shape="cyl")
                 base_top = 0.15
-            add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
-            add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1}")
+            if spec.framing.existing_posts:   # the existing stucco column stays: 16" square, no base
+                add("post", x - 0.67, x + 0.67, y - 0.67, y + 0.67, base_top, top - bd_, "house", 2, tag=f"existing column P{pi + 1}")
+            else:
+                add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
+                add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1}")
             add("cap", x - pb_ / 2 - 0.03, x + pb_ / 2 + 0.03, y - bw_ / 2 - 0.03, y + bw_ / 2 + 0.03, top - bd_ - 0.02, top - bd_ + 0.35, "steel", 4)
             if spec.extras.stone_bases:
                 add("stone", x - 1.0, x + 1.0, y - 1.0, y + 1.0, 0.0, 3.0, "stone", 3)
@@ -430,6 +435,25 @@ def build_scene(L) -> Scene:
         # landing pad
         sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, -0.3, 0.02, "concrete", 1, tag=f"landing pad {st.side}")
 
+    # ---------------- an existing stucco parapet on the open edges (stays; nothing in the takeoff)
+    if spec.railing.existing_parapet:
+        for e in L.edges:
+            if not e.exposed:
+                continue
+            ex0, ey0, ex1, ey1 = e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN
+            L_ = ((ex1 - ex0) ** 2 + (ey1 - ey0) ** 2) ** 0.5
+            if L_ < 0.1:
+                continue
+            ux, uy = (ex1 - ex0) / L_, (ey1 - ey0) / L_
+            nx, ny = uy, -ux      # inward normal (clockwise outline)
+            th = 0.67             # 8" stucco wall
+            cx0, cy0 = ex0 + nx * th / 2, ey0 + ny * th / 2
+            cx1, cy1 = ex1 + nx * th / 2, ey1 + ny * th / 2
+            xa, xb = min(cx0, cx1) - (th / 2 if abs(ux) < 0.01 else 0), max(cx0, cx1) + (th / 2 if abs(ux) < 0.01 else 0)
+            ya, yb = min(cy0, cy1) - (th / 2 if abs(uy) < 0.01 else 0), max(cy0, cy1) + (th / 2 if abs(uy) < 0.01 else 0)
+            add("privacy", xa, xb, ya, yb, zt - 0.3, zt + 3.5, "house", 8, tag="existing stucco parapet (stays)")
+            add("trim", xa - 0.05, xb + 0.05, ya - 0.05, yb + 0.05, zt + 3.5, zt + 3.62, "stonecap", 8, tag="parapet cap")
+
     # ---------------- furnishings: hot tub in its zone against the wall
     if spec.extras.hot_tub:
         zn = spec.extras.hot_tub_zone
@@ -493,7 +517,8 @@ def step_captions(L: Layout) -> Dict[int, str]:
     n_posts = L.n_footings
     ft = {"caisson": f"{n_posts} caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' below frost",
           "diamond_pier": f"{n_posts} Diamond Pier {L.frame.footing_model} driven-pin footings",
-          "concrete": f"{n_posts} concrete piers {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}'"}[s.framing.footing_type]
+          "concrete": f"{n_posts} concrete piers {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}'",
+          "existing": f"{n_posts} existing caissons stay" + (" with the existing columns" if s.framing.existing_posts else ", new standoff bases")}[s.framing.footing_type]
     beams = " · ".join(f"{bl.label} ({bl.n_posts} posts)" for bl in L.beam_lines)
     out = {1: f"Step 1 · Footings — {ft}",
            2: f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases",
@@ -501,7 +526,7 @@ def step_captions(L: Layout) -> Dict[int, str]:
            4: f"Step 4 · Beams — {beams}",
            5: f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if L.frame.blocking_rows_y else ""),
            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}" + (f", {s.decking.border_color} border" if s.decking.border_color else "") + (", hidden fasteners" if (s.decking.fastener_system or '') != 'Cap-Tor xd face screw' else ""),
-           7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else "Step 7 · (no rail)",
+           7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else ("Step 7 · Rail — existing stucco parapet stays" if s.railing.existing_parapet else "Step 7 · (no rail)"),
            8: "Step 8 · Your room" + (" — hot tub" if s.extras.hot_tub else "")}
     return out
 
