@@ -1,7 +1,7 @@
 {
   "job": "Covered Porch Deck \u2014 37 x 30",
   "client": "",
-  "notes": "From the homeowner's top-down plan + photo. House along the top; brick chimney projects into the middle bay; porch cover (26.5' x 10.5') over the chimney bay + right bay with its 6x6 cedar posts on the deck. Left end is OPEN (rail) \u2014 the 30' on the plan is the overall depth, not a wall. The wing's inner edge jogs: two 10'5\" diagonals along the house side (a shallow angled bay) are framed here as a 2'-6\" x 20' rectangular house bump on the wing's inner edge \u2014 diagonal cuts and the two angled rail/rim joints are not counted until it is measured. Plan says 8' high at the left, 6' at the right: frame set at 8', posts cut to grade. Widths set so they sum to the plan's 37' overall (10'6\" wing + 10'6\" chimney bay + 16' porch); the '9'' between the notch and the chimney could instead be its own bay, which would make the deck 46' wide \u2014 verify on site. PHOTOS (jobs/summit_point_photos): the existing deck is the 26.5' x 10.5' run along the big window wall plus the bay by the door \u2014 stained wood, black aluminum balusters, flat dark top rail, 6x6 posts; the wing exists too (photo 6: rail on its outer edge, brick house wall with the chimney on its inner edge) \u2014 the whole deck is demo'd. Existing translucent-panel cover on 6x6 posts stands on the deck by the door: take it down and reset it on the new frame (not priced \u2014 RFI). Existing boards run perpendicular to the house (diagonal in the wide section); the plan says both joists and boards run perpendicular, which cannot both be true \u2014 GSX frame kept (joists perpendicular, boards parallel); flipping to perpendicular boards is a rerun. PHOTOS 6-10: the existing top rail is a flat drink-rail cap (keep the drink rail). Photo 10: an existing straight stair, 4' wide, runs down along the house siding to a concrete pad \u2014 put on the right end (end:right) next to the house, one rail (house on the other side); confirm which end.",
+  "notes": "From the homeowner's top-down plan (annotated: the wing's top edge is 6', not 10') + site photos. House along the top with the brick chimney projecting into the chimney bay; the wing's inner edge is the brick house wall with the chimney's angled faces (two 10'5\" diagonals, ~2' deep at the middle) \u2014 framed here as a straight wall, so the diagonal rim cuts are not counted. Left end open (rail). Bays left to right: wing 6' x 30' (wall 30' back), middle bay 9' wide with its wall 10' back, chimney bay 10'6\" wide with the chimney face 6'6\" back, right bay with the wall 10'6\" back. Right bay set to 11'6\" so the bays sum to the plan's 37' overall: the plan's 26'6\" for the porch cover cannot also be true \u2014 if the deck right of the chimney really is 26'6\", the deck is 52' wide and this takeoff is ~40% short. FIELD MEASURE FIRST. Plan says 8' high at the left, 6' at the right: frame at 8', posts cut to grade. Plan says joists AND boards run perpendicular to the house, which cannot both be true \u2014 GSX frame kept (joists perpendicular, boards parallel); flipping to perpendicular boards is a rerun. Existing deck (all of it) is demo'd: stained wood, black aluminum balusters with a flat drink-rail cap, 6x6 posts. Existing translucent-panel cover on 6x6 posts stands on the deck by the door: take down and reset on the new frame (RFI, not priced). Existing straight 4' stair down along the house siding to a concrete pad \u2014 put on the right end (end:right) next to the house, one rail; confirm which end.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -21,15 +21,15 @@
     "zones": [
       {
         "name": "W",
-        "label": "Left wing",
-        "width": 8,
+        "label": "Left wing (6' ledger at the top)",
+        "width": 6,
         "depth": 30,
         "wall_offset": 23.5
       },
       {
-        "name": "N",
-        "label": "Wing beside the bay",
-        "width": 2.5,
+        "name": "M",
+        "label": "Middle bay under the 9' wall",
+        "width": 9,
         "depth": 10,
         "wall_offset": 3.5
       },
@@ -42,8 +42,8 @@
       },
       {
         "name": "C",
-        "label": "Covered porch",
-        "width": 16,
+        "label": "Right bay (covered porch)",
+        "width": 11.5,
         "depth": 10.5,
         "wall_offset": 4
       }
@@ -79,7 +79,7 @@
     "edges": [
       "end:left",
       "front:W",
-      "front:N",
+      "front:M",
       "front:B",
       "front:C",
       "end:right"
