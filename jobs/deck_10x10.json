@@ -1,7 +1,7 @@
 {
   "job": "Deck 2 \u2014 10 x 10",
   "client": "",
-  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck.",
+  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -57,5 +57,8 @@
     "drink_rail": true
   },
   "stairs": [],
-  "extras": {}
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 100
+  }
 }

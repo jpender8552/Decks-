@@ -1,7 +1,7 @@
 {
   "job": "Covered Porch Deck \u2014 37 x 30",
   "client": "",
-  "notes": "From the homeowner's top-down plan + photo. House along the top; brick chimney projects into the middle bay; porch cover (26.5' x 10.5') over the chimney bay + right bay with its 6x6 cedar posts on the deck. Left end is OPEN (rail) \u2014 the 30' on the plan is the overall depth, not a wall. The wing's inner edge jogs: two 10'5\" diagonals along the house side (a shallow angled bay) are framed here as a 2'-6\" x 20' rectangular house bump on the wing's inner edge \u2014 diagonal cuts and the two angled rail/rim joints are not counted until it is measured. Plan says 8' high at the left, 6' at the right: frame set at 8', posts cut to grade. Widths set so they sum to the plan's 37' overall (10'6\" wing + 10'6\" chimney bay + 16' porch); the '9'' between the notch and the chimney could instead be its own bay, which would make the deck 46' wide \u2014 verify on site.",
+  "notes": "From the homeowner's top-down plan + photo. House along the top; brick chimney projects into the middle bay; porch cover (26.5' x 10.5') over the chimney bay + right bay with its 6x6 cedar posts on the deck. Left end is OPEN (rail) \u2014 the 30' on the plan is the overall depth, not a wall. The wing's inner edge jogs: two 10'5\" diagonals along the house side (a shallow angled bay) are framed here as a 2'-6\" x 20' rectangular house bump on the wing's inner edge \u2014 diagonal cuts and the two angled rail/rim joints are not counted until it is measured. Plan says 8' high at the left, 6' at the right: frame set at 8', posts cut to grade. Widths set so they sum to the plan's 37' overall (10'6\" wing + 10'6\" chimney bay + 16' porch); the '9'' between the notch and the chimney could instead be its own bay, which would make the deck 46' wide \u2014 verify on site. PHOTOS (jobs/summit_point_photos): the existing deck is the 26.5' x 10.5' run along the big window wall plus the bay by the door \u2014 stained wood, black aluminum balusters, flat dark top rail, 6x6 posts; the 10' x 30' wing is NEW (the yellow arrow points past the brick chimney to where it goes). Existing translucent-panel cover on 6x6 posts stands on the deck by the door: take it down and reset it on the new frame (not priced \u2014 RFI). Existing boards run perpendicular to the house (diagonal in the wide section); the plan says both joists and boards run perpendicular, which cannot both be true \u2014 GSX frame kept (joists perpendicular, boards parallel); flipping to perpendicular boards is a rerun.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -89,6 +89,8 @@
   "stairs": [],
   "extras": {
     "roof_over": true,
-    "engineered": true
+    "engineered": true,
+    "demo_existing": true,
+    "demo_sf": 280
   }
 }
