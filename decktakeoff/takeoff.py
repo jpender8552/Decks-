@@ -743,7 +743,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             nb = Qz.border_screws
             bboxes = max(1, int(math.ceil(nb / d["count"])))
             lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {bcolor} plugs — borders + dividers", bboxes, bboxes, "box", f"{nb} screws", d["each"], d["source"]))
-        sched["Field"] = f"Cortex hidden fasteners: 2 per board at every joist and at both ends of every run, color-matched plugs ({n} field + {Qz.border_screws} border/divider)"
+        sched["Field"] = f"Cortex face screws with color-matched plugs: 2 per board at every joist and at both ends of every run, color-matched plugs ({n} field + {Qz.border_screws} border/divider)"
         face = 0; stair_face = 0
     else:
         n = Qz.clips

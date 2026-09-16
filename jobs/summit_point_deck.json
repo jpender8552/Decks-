@@ -1,7 +1,7 @@
 {
   "job": "1675 Summit Point Ct \u2014 Deck with Porch Cover",
   "client": "William Wright",
-  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them.",
+  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -10,7 +10,18 @@
     "wind_speed_mph": 115,
     "frost_depth_in": 30,
     "soil_bearing_psf": 1500,
-    "wui_fire_zone": false
+    "wui_fire_zone": true,
+    "zip": "80919",
+    "seismic_design_category": "B",
+    "rear_setback_required_ft": 25,
+    "side_setback_required_ft": 5,
+    "deck_to_rear_line_ft": 62.8,
+    "deck_to_side_line_ft": 7.6,
+    "easements": [
+      "Check the plat for rear/side utility + drainage easements (typical 5-10')"
+    ],
+    "hoa": false,
+    "notes": "Parcel 7311205063 (0.389 ac / 16,961 sf), zoning PDZ HS (Planned Development Zone, dev. plan CPC P 85-68(HS)); overlays WUI-O and Hillside HS-O. Setbacks below are the R-1 6000 / HS base standards (rear 25', side 5') \u2014 VERIFY against the recorded development plan and an ILC before layout. Distances are scaled from City GIS building/parcel lines (existing deck footprint): rear line ~62.8', east side line ~7.6' at the stair end, west side ~7.8'. Hillside overlay: grading/retaining review if footing excavation disturbs the slope. WUI-O: ignition-resistant deck surface (Class A PVC), 1/8\" ember screening, no combustible skirting."
   },
   "geometry": {
     "height_in": 96,
@@ -249,14 +260,17 @@
       }
     ],
     "post_size": "6x6",
-    "footing_type": "concrete"
+    "footing_type": "concrete",
+    "joist_spacing_in": 12
   },
   "decking": {
     "brand": "TimberTech",
-    "collection": "Prime+",
-    "color": "Coconut Husk",
-    "profile": "grooved",
-    "fascia": true
+    "collection": "Vintage",
+    "color": "Weathered Teak",
+    "profile": "square",
+    "fascia": true,
+    "fastener_system": "Cortex",
+    "gap_in": 0.1875
   },
   "railing": {
     "system": "Cinch",
@@ -270,7 +284,9 @@
       "front:P",
       "end:right"
     ],
-    "drink_rail": true
+    "drink_rail": true,
+    "drink_rail_collection": "Vintage",
+    "drink_rail_color": "Weathered Teak"
   },
   "stairs": [
     {

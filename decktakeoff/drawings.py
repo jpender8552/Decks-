@@ -148,15 +148,23 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
     for ln in [x for x in lines if x]:
         o.append(T(24, y, ln, 10, 600)); y += 14
     o.append(T(24, y + 12, "DESIGN CRITERIA", 9, 800, fill=GOLD)); y += 28
-    crit = [("Live load", "40 psf (IRC R507)"), ("Ground / roof snow", f"{s.site.ground_snow_psf:g} psf" + (" — governs over 40 psf live" if s.site.ground_snow_psf > 40 else "")),
-            ("Dead load", "10 psf"), ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "")),
-            ("Wind", f"{s.site.wind_speed_mph:g} mph ultimate (ASCE 7)"), ("Frost depth", ftin(s.site.frost_depth_in)),
+    cover = bool(s.geometry.cover)
+    crit = [("Deck live load", "40 psf uniform (IRC Table R301.5); guards 200 lb concentrated / 50 plf"),
+            ("Ground snow", f"{s.site.ground_snow_psf:g} psf (ground; deck design uses the larger of snow and live)" + (" — snow governs" if s.site.ground_snow_psf > 40 else " — 40 psf live governs")),
+            ("Dead load", "10 psf deck" + (" · 15 psf porch cover (shingles, sheathing, Hardie soffit) carried on the deck posts" if cover else "")),
+            ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow (PPRBD minimum 30 psf), drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
+            ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf on the deck" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "") + (" · cover posts add roof snow + dead to the deck frame and footings (engineered)" if cover else "")),
+            ("Wind", f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + " (footings bear below)"),
             ("Soil bearing", f"{s.site.soil_bearing_psf:,.0f} psf presumptive (IRC R401.4.1) — no soils report"), ("Seismic", s.site.seismic_design_category),
-            ("Wildfire", "WUI / Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall" if s.site.wui_fire_zone else "not in a WUI zone"),
-            ("Codes", "2021 IRC R507 (prescriptive) — timber members outside the tables: stamped design" if s.is_timber else "2021 IRC R507 prescriptive; Tables R507.5 / R507.6 / R507.4 / R507.9"),
+            ("Wildfire (WUI)", ("Ignition-resistant construction: Class A / WUI-listed decking (TimberTech Advanced PVC), noncombustible rail (steel), fiber-cement skirt, soffit and fascia, "
+                                "26 ga flashing at every wall, Class A roof on the cover; under-deck kept clear of combustibles (Colorado Springs WUI Code / IWUIC 504)") if s.site.wui_fire_zone else "not in a WUI zone"),
+            ("Codes", ("2021 IRC as amended by Pikes Peak Regional Building Dept; IRC R507 decks; ASCE 7-16 loads; IWUIC / Colorado Springs Wildland-Urban Interface Code; "
+                       + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9"))),
             ("Engineering", ("Stamped structural set by a Colorado PE required — the stamped set governs" if s.extras.engineered else "Prescriptive; no engineering required by this design"))]
     for k, v in crit:
-        o.append(T(24, y, k, 8.5, 800)); o.append(T(150, y, textwrap.shorten(v, 92, placeholder="…"), 8.5, 400)); y += 13
+        for i, ln in enumerate(textwrap.wrap(v, 92)[:3]):
+            o.append(T(24, y, k if i == 0 else "", 8.5, 800)); o.append(T(150, y, ln, 8.5, 400)); y += 12
+        y += 1
     o.append(T(24, y + 12, "STRUCTURE", 9, 800, fill=GOLD)); y += 28
     sm = t.summary
     struct = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]), ("Beams", "; ".join(sm["beams"])), ("Joists", sm["joists"]), ("Rims", sm["rims"]),

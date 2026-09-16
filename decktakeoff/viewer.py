@@ -17,7 +17,7 @@ const STILL = q.get('still') === '1';
 const VIEW0 = q.get('view') || 'yard';
 const PHASE0 = parseInt(q.get('phase') || '8', 10);
 const EXPLODE0 = q.get('explode') === '1';
-const root = document.getElementById('v3d');
+const root = document.getElementById('__UID__');
 const W = root.clientWidth || window.innerWidth, H = root.clientHeight || window.innerHeight;
 const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
 renderer.setPixelRatio(STILL ? 1 : Math.min(window.devicePixelRatio, 2));
@@ -157,7 +157,7 @@ function setView(name) {
   const v = VIEWS[name] || VIEWS.yard; cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
   cam.up.set(...(v.up || [0, 1, 0]));
   cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target)); update();
-  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+  root.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
 }
 function update() { cam.position.setFromSpherical(sph).add(target); cam.lookAt(target); }
 let drag = null, pinch = null;
@@ -170,14 +170,14 @@ el.addEventListener('wheel', e => { e.preventDefault(); sph.radius = Math.max(4,
 el.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }, {passive: true});
 el.addEventListener('touchmove', e => { if (e.touches.length === 2 && pinch) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); sph.radius = Math.max(4, Math.min(600, sph.radius * pinch / d)); pinch = d; update(); } }, {passive: true});
 // ui
-const cap = document.getElementById('v3d-cap');
+const cap = root.querySelector('.v3d-cap');
 let phase = PHASE0, exploded = EXPLODE0;
 function setPhase(n) { phase = n; applyPhase(n); if (cap) cap.textContent = (D.meta.step_text[n] || '') + (exploded ? ' · exploded' : '');
-  document.querySelectorAll('[data-step]').forEach(b => b.classList.toggle('on', parseInt(b.dataset.step, 10) === n)); }
-document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
-document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => setPhase(parseInt(b.dataset.step, 10))));
-const ex = document.getElementById('v3d-explode'); if (ex) ex.addEventListener('click', () => { exploded = !exploded; explode(exploded); ex.classList.toggle('on', exploded); setPhase(phase); });
-if (STILL) { document.querySelectorAll('.v3d-ui').forEach(u => u.style.display = 'none'); }
+  root.querySelectorAll('[data-step]').forEach(b => b.classList.toggle('on', parseInt(b.dataset.step, 10) === n)); }
+root.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+root.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => setPhase(parseInt(b.dataset.step, 10))));
+const ex = root.querySelector('.v3d-explode'); if (ex) ex.addEventListener('click', () => { exploded = !exploded; explode(exploded); ex.classList.toggle('on', exploded); setPhase(phase); });
+if (STILL) { root.querySelectorAll('.v3d-ui').forEach(u => u.style.display = 'none'); }
 explode(exploded); if (ex) ex.classList.toggle('on', exploded);
 setPhase(phase); setView(VIEW0);
 function frame() { renderer.render(scene, cam); }
@@ -188,19 +188,19 @@ window.addEventListener('resize', () => { const w = root.clientWidth, h = root.c
 """
 
 
-def viewer_html(scene: Scene, three_src: Optional[str] = None, title: str = "3D model", standalone: bool = True) -> str:
+def viewer_html(scene: Scene, three_src: Optional[str] = None, title: str = "3D model", standalone: bool = True, uid: str = "v3d") -> str:
     """three_src: None -> cdnjs script tag; a string -> inlined three.js source (for headless renders)."""
     data = json.dumps(scene.to_dict())
     three = CDN_THREE if three_src is None else f"<script>{three_src}</script>"
     steps = "".join(f'<button type="button" data-step="{n}">{n}</button>' for n in range(1, 9))
-    ui = f'''<div class="v3d-ui v3d-top"><span class="v3d-title">{title}</span><span id="v3d-cap" class="v3d-cap"></span></div>
+    ui = f'''<div class="v3d-ui v3d-top"><span class="v3d-title">{title}</span><span class="v3d-cap"></span></div>
 <div class="v3d-ui v3d-bar">
   <span class="grp"><button type="button" data-view="yard" class="on">Yard</button><button type="button" data-view="corner">Corner</button><button type="button" data-view="ondeck">On deck</button><button type="button" data-view="iso">Iso</button><button type="button" data-view="plan">Plan</button><button type="button" data-view="under">Under</button></span>
-  <span class="grp"><span class="lbl">Step</span>{steps}<button type="button" id="v3d-explode">Exploded</button></span>
+  <span class="grp"><span class="lbl">Step</span>{steps}<button type="button" class="v3d-explode">Exploded</button></span>
 </div>'''
     css = '''<style>
-#v3d{position:relative;width:100%;height:100%;min-height:360px;background:#dbe7f1;overflow:hidden;touch-action:none;}
-#v3d canvas{display:block;width:100%!important;height:100%!important;}
+.v3d-root{position:relative;width:100%;height:100%;min-height:360px;background:#dbe7f1;overflow:hidden;touch-action:none;}
+.v3d-root canvas{display:block;width:100%!important;height:100%!important;}
 .v3d-ui{position:absolute;left:0;right:0;font-family:"Nunito Sans",system-ui,sans-serif;pointer-events:none;}
 .v3d-top{top:0;padding:8px 12px;display:flex;justify-content:space-between;gap:10px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);font-size:13px;flex-wrap:wrap;}
 .v3d-title{font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px;}
@@ -211,7 +211,7 @@ def viewer_html(scene: Scene, three_src: Optional[str] = None, title: str = "3D 
 .v3d-bar button.on{background:#d49e1b;color:#111;border-color:#d49e1b;}
 .v3d-bar button:focus-visible{outline:2px solid #fff;}
 </style>'''
-    body = f'{css}<div id="v3d">{ui}</div>{three}<script>{JS.replace("__DATA__", data)}</script>'
+    body = f'{css}<div id="{uid}" class="v3d-root">{ui}</div>{three}<script>{JS.replace("__DATA__", data).replace("__UID__", uid)}</script>'
     if standalone:
         return f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title><style>html,body{{margin:0;height:100%;}}</style></head><body>{body}</body></html>'
     return body

@@ -1,7 +1,7 @@
 {
   "job": "Deck 2 \u2014 10 x 10",
-  "client": "",
-  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place.",
+  "client": "William Wright",
+  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -10,8 +10,18 @@
     "wind_speed_mph": 115,
     "frost_depth_in": 30,
     "soil_bearing_psf": 1500,
-    "wui_fire_zone": false,
-    "notes": "Pikes Peak Regional Building Dept: 30 psf snow, 30\" frost, Vult 115 mph east of the foothills \u2014 confirm the lot is not in the 130-150 mph special wind region."
+    "wui_fire_zone": true,
+    "notes": "Same parcel 7311205063, zoning PDZ HS, overlays WUI-O + HS-O. Deck 2 sits at the SGD-1 door on the west end \u2014 west side line ~7.8' from the existing wall face by City GIS; the 10 x 10 projects toward the rear (~62'+ clear). Verify against the development plan CPC P 85-68(HS) and an ILC. PPRBD: 30 psf snow, 30\" frost, Vult 115 mph east of the foothills \u2014 confirm the lot is not in the 130-150 mph special wind region.",
+    "zip": "80919",
+    "seismic_design_category": "B",
+    "rear_setback_required_ft": 25,
+    "side_setback_required_ft": 5,
+    "deck_to_rear_line_ft": 62.8,
+    "deck_to_side_line_ft": 7.8,
+    "easements": [
+      "Check the plat for rear/side utility + drainage easements (typical 5-10')"
+    ],
+    "hoa": false
   },
   "geometry": {
     "width": 10,
@@ -36,14 +46,17 @@
       }
     ],
     "post_size": "6x6",
-    "footing_type": "concrete"
+    "footing_type": "concrete",
+    "joist_spacing_in": 12
   },
   "decking": {
     "brand": "TimberTech",
-    "collection": "Prime+",
-    "color": "Coconut Husk",
-    "profile": "grooved",
-    "fascia": true
+    "collection": "Vintage",
+    "color": "Weathered Teak",
+    "profile": "square",
+    "fascia": true,
+    "fastener_system": "Cortex",
+    "gap_in": 0.1875
   },
   "railing": {
     "system": "Cinch",
@@ -54,11 +67,14 @@
       "right",
       "front"
     ],
-    "drink_rail": true
+    "drink_rail": true,
+    "drink_rail_collection": "Vintage",
+    "drink_rail_color": "Weathered Teak"
   },
   "stairs": [],
   "extras": {
     "demo_existing": true,
-    "demo_sf": 100
+    "demo_sf": 100,
+    "hardie_skirt": "4/4 x 12 Timber Bark"
   }
 }
