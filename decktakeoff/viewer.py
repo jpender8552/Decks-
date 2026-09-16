@@ -75,6 +75,9 @@ function patternTex(kind, hex, seed) {
   } else if (kind === 'batten') {  // board & batten, 12" battens
     for (let x = 0; x < 512; x += 64) { g.fillStyle = shade(hex, -0.25); g.fillRect(x, 0, 6, 512); g.fillStyle = shade(hex, 0.08); g.fillRect(x + 6, 0, 2, 512); }
     g.globalAlpha = 0.18; for (let i = 0; i < 120; i++) { g.fillStyle = rnd() > 0.5 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 40 + rnd() * 120); } g.globalAlpha = 1;
+  } else if (kind === 'seam') {    // standing seam: 1-1/2" ribs at 16" OC (512px = 8'), a highlight and a shadow on each rib
+    for (let x = 0; x < 512; x += 85.33) { g.fillStyle = shade(hex, 0.35); g.fillRect(x, 0, 5, 512); g.fillStyle = shade(hex, -0.45); g.fillRect(x + 5, 0, 4, 512); }
+    g.globalAlpha = 0.08; for (let i = 0; i < 300; i++) { g.fillStyle = i % 2 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 20 + rnd() * 80); } g.globalAlpha = 1;
   } else if (kind === 'grass') {
     for (let i = 0; i < 26000; i++) { g.fillStyle = [shade(hex, -0.16), shade(hex, -0.08), shade(hex, 0.08), shade(hex, 0.16), '#93a267', '#6f8c48'][Math.floor(rnd() * 6)]; g.globalAlpha = 0.6 + rnd() * 0.4; g.fillRect(rnd() * 512, rnd() * 512, 1, 1 + rnd() * 2); } g.globalAlpha = 1;
   } else if (kind === 'gravel') {

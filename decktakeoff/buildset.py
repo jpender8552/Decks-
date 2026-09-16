@@ -69,6 +69,20 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         goes_in=items(lambda l: l.category == "Rail"),
         how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else []),
         check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—", "Cables tensioned / balusters under 4\" clear", "End of construction"]))
+    if s.geometry.cover:
+        from .takeoff import cover_size
+        along, out, area = cover_size(s)
+        ss = s.extras.cover_roof.lower().startswith("standing")
+        steps.append(dict(n=8, code="T-407", title="Porch cover", still="step8",
+            goes_in=items(lambda l: l.category == "Porch cover", 14),
+            how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 cedar posts on the deck over blocked joists, (2)2x10 beam at the rail line; 2x8 rafters @ 16\" OC with hurricane ties, {out + 1.5:.1f}' with the 18\" overhang; 2x8 sub-fascia and OSB.",
+                 ("High-temp self-adhered underlayment over every sheet, headwall flashing counterflashed into the house wall, eave trim, then the 24 ga snap-lock panels one piece eave to headwall — clips 18\" OC on each seam, no face screws in the field; rake trim and closures last; snow retention bar clamped to the seams 12-18\" above the low eave, the full width."
+                  if ss else "Synthetic underlayment, drip edge, starter, architectural shingles 6 nails each, step flashing at the house wall.")]
+                + ([f"5\" K gutter on the low eave, hangers 24\" OC, 1/16\" per foot toward the outlets; 2x3 downspouts strapped to the cover posts, offset past the deck edge, down the deck post to a splash block 3'+ from the footing."] if s.extras.cover_gutters else [])
+                + ([f"Ceiling: {s.extras.cover_soffit} panels 6\" OC stainless ring-shank at every rafter; " + (f"{s.extras.cover_fascia} fascia and rakes over the 2x8 sub-fascia, color-matched trim screws." if s.extras.cover_fascia else "")] if s.extras.cover_soffit else ["1x6 T&G ceiling, blind-nailed."]),
+            check=["Ledger flashed and counterflashed — hose test before the ceiling closes", "Posts plumb over blocking, beam level, rafters tied",
+                   "Panels straight, seams engaged full length, no oil-canning; snow bar continuous" if ss else "Shingles straight, ridge cap sealed",
+                   "Gutter falls to the outlets, downspouts discharge away from the footings" if s.extras.cover_gutters else "Water sheds clear of the deck edge"]))
     return steps
 
 

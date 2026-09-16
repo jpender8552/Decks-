@@ -78,6 +78,8 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         roof=dict(color="#2a2624", rough=0.9),
         privacy=dict(color="#6a625a", pattern="batten", rough=0.9),
         glass=dict(color="#5f7f99", metal=0.6, rough=0.15),
+        ssroof=dict(color=_roof_hex(spec.extras.cover_roof_color), pattern="seam", metal=0.55, rough=0.45, label=f"standing seam steel {spec.extras.cover_roof_color or '(color TBD)'}"),
+        gutter=dict(color="#4b3f34", metal=0.35, rough=0.5, label=f"5\" K gutter {spec.extras.cover_gutter_color or 'to match the fascia'}"),
         ground=dict(color="#7d9958", pattern="grass", rough=1.0),
         gravel=dict(color="#857b6e", pattern="gravel", rough=1.0),
         water=dict(color="#3a93c6", metal=0.2, rough=0.08),
@@ -566,8 +568,10 @@ def draw_house_from_spec(add, spec, zt, H_house):
         # posts + beam at the low edge, ledger at the high edge
         if along_x:
             xl, xh = (cx1 - 0.5, cx0 + 0.15) if slope == "+x" else (cx0 + 0.5, cx1 - 0.15)
-            for py in (cy0 + 0.5, cy1 - 0.5):
-                add("post", xl - 0.23, xl + 0.23, py - 0.23, py + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post (existing, reset)")
+            n_cp = max(2, int(math.ceil((cy1 - cy0) / 8.5)) + 1)
+            for k in range(n_cp):
+                py = cy0 + 0.5 + k * (cy1 - cy0 - 1.0) / (n_cp - 1)
+                add("post", xl - 0.23, xl + 0.23, py - 0.23, py + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post 6x6 cedar")
             add("beam", xl - 0.25, xl + 0.25, cy0, cy1, lo - 0.5, lo, "timber", 8, tag="cover beam")
             add("ledger", xh - 0.08, xh + 0.08, cy0, cy1, hi - 0.6, hi, "timber", 8, tag="cover ledger")
             n = max(2, int((cy1 - cy0) / 2))
@@ -576,12 +580,15 @@ def draw_house_from_spec(add, spec, zt, H_house):
                 ry = cy0 + k * (cy1 - cy0) / n
                 add("joist", (cx0 + cx1) / 2 - L_r / 2, (cx0 + cx1) / 2 + L_r / 2, ry - 0.08, ry + 0.08, (hi + lo) / 2, (hi + lo) / 2 + 0.45, "timber", 8,
                     tag="cover rafter", rot=(-theta if slope == "+x" else theta), rot_axis="y")
-            add("glass", (cx0 + cx1) / 2 - L_r / 2 - 0.3, (cx0 + cx1) / 2 + L_r / 2 + 0.3, cy0 - 0.4, cy1 + 0.4, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
-                tag="cover panels", rot=(-theta if slope == "+x" else theta), rot_axis="y")
+            ss = spec.extras.cover_roof.lower().startswith("standing")
+            add("ssroof" if ss else "glass", (cx0 + cx1) / 2 - L_r / 2 - 0.3, (cx0 + cx1) / 2 + L_r / 2 + 0.3, cy0 - 0.4, cy1 + 0.4, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + (0.56 if ss else 0.52), "ssroof" if ss else "glass", 8,
+                tag="standing seam steel roof" if ss else "cover panels", rot=(-theta if slope == "+x" else theta), rot_axis="y")
         else:
             yl, yh = (cy1 - 0.5, cy0 + 0.15) if slope == "+y" else (cy0 + 0.5, cy1 - 0.15)
-            for px in (cx0 + 0.5, cx1 - 0.5):
-                add("post", px - 0.23, px + 0.23, yl - 0.23, yl + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post (existing, reset)")
+            n_cp = max(2, int(math.ceil((cx1 - cx0) / 8.5)) + 1)      # same rule as the takeoff: posts ≤ 8'-6" OC at the rail line
+            for k in range(n_cp):
+                px = cx0 + 0.5 + k * (cx1 - cx0 - 1.0) / (n_cp - 1)
+                add("post", px - 0.23, px + 0.23, yl - 0.23, yl + 0.23, zt, lo - 0.5, "timber", 8, tag="cover post 6x6 cedar")
             add("beam", cx0, cx1, yl - 0.25, yl + 0.25, lo - 0.5, lo, "timber", 8, tag="cover beam")
             add("ledger", cx0, cx1, yh - 0.08, yh + 0.08, hi - 0.6, hi, "timber", 8, tag="cover ledger")
             n = max(2, int((cx1 - cx0) / 2))
@@ -590,8 +597,20 @@ def draw_house_from_spec(add, spec, zt, H_house):
                 rx = cx0 + k * (cx1 - cx0) / n
                 add("joist", rx - 0.08, rx + 0.08, (cy0 + cy1) / 2 - L_r / 2, (cy0 + cy1) / 2 + L_r / 2, (hi + lo) / 2, (hi + lo) / 2 + 0.45, "timber", 8,
                     tag="cover rafter", rot=(theta if slope == "+y" else -theta), rot_axis="x")
-            add("glass", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + 0.52, "glass", 8,
-                tag="cover panels", rot=(theta if slope == "+y" else -theta), rot_axis="x")
+            ss = spec.extras.cover_roof.lower().startswith("standing")
+            add("ssroof" if ss else "glass", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 + 0.45, (hi + lo) / 2 + (0.56 if ss else 0.52), "ssroof" if ss else "glass", 8,
+                tag="standing seam steel roof" if ss else "cover panels", rot=(theta if slope == "+y" else -theta), rot_axis="x")
+            if ss:   # snow retention bar 15" up from the low eave
+                yb = (cy1 + 0.4 - 1.25) if slope == "+y" else (cy0 - 0.4 + 1.25)
+                zb = lo + 0.45 + 0.56 + (1.25 * (hi - lo) / run)
+                add("trim", cx0 - 0.3, cx1 + 0.3, yb - 0.08, yb + 0.08, zb, zb + 0.2, "steel", 8, tag="snow retention bar")
+            if spec.extras.cover_gutters:   # 5" K gutter on the low eave, 2x3 downspouts strapped to the cover posts and down to grade
+                ye = (cy1 + 0.6) if slope == "+y" else (cy0 - 0.6)
+                yg0, yg1 = (ye + 0.08, ye + 0.5) if slope == "+y" else (ye - 0.5, ye - 0.08)
+                add("gutter", cx0 - 0.4, cx1 + 0.4, yg0, yg1, lo + 0.45 - 0.42, lo + 0.45, "gutter", 8, tag="5\" K gutter")
+                for px in (cx0 + 0.5, cx1 - 0.5):
+                    xd = px + (0.45 if px < (cx0 + cx1) / 2 else -0.45)
+                    add("gutter", xd - 0.1, xd + 0.15, yg0 - 0.05, yg0 + 0.2, 0.0, lo + 0.45 - 0.42, "gutter", 8, tag="2x3 downspout")
             if spec.extras.cover_soffit:      # ceiling under the rafters
                 add("soffit", cx0 - 0.4, cx1 + 0.4, (cy0 + cy1) / 2 - L_r / 2 - 0.3, (cy0 + cy1) / 2 + L_r / 2 + 0.3, (hi + lo) / 2 - 0.04, (hi + lo) / 2, "soffit", 8,
                     tag="HardieSoffit ceiling", rot=(theta if slope == "+y" else -theta), rot_axis="x")
@@ -693,6 +712,14 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
             out.append(Box("fascia", cx - nx * fas_t / 2 - L_e / 2, cx - nx * fas_t / 2 + L_e / 2, cy - ny * fas_t / 2 - fas_t / 2, cy - ny * fas_t / 2 + fas_t / 2, jbot - 0.15, zt - 0.02, "fascia", 6,
                            tag=f"angled fascia {L_e:.1f}' mitred", rot=phi, rot_axis="z"))
     return out
+
+
+def _roof_hex(color: str) -> str:
+    c = (color or "").lower()
+    for k, v in (("black", "#1c1c1e"), ("charcoal", "#3a3c3f"), ("slate", "#4a4c48"), ("bronze", "#4a3a2a"), ("brown", "#4b3f34"), ("gray", "#6b6e70"), ("grey", "#6b6e70"), ("green", "#2f4a3a"), ("red", "#7a2a22"), ("white", "#e8e6e0")):
+        if k in c:
+            return v
+    return "#3a3c3f"
 
 
 def angled_wall(x0, y0, x1, y1, z0=0.0, z1=18.0, thick=0.5) -> Box:

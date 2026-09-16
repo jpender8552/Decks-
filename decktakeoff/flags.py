@@ -54,6 +54,11 @@ def run_flags(L: Layout) -> List[Flag]:
         add("ENGINEER", "engineering", "hot tub — 100 psf live load; joists 12\" OC, added beam/posts and footings under the tub, engineered design", "IRC R507 / ASCE 7")
     if ex.roof_over:
         add("ENGINEER", "engineering", "roof over the deck — roof snow + deck loads on the posts and footings; engineered")
+    if ex.cover_roof.lower().startswith("standing"):
+        add("CODE", "snow", "standing seam roof over the deck — metal sheds its snow load onto the deck and the stair below: snow retention bar the full low eave (S-5! ColorGard or equal, seam clamps, no penetrations), sized for the ground snow", "ASCE 7 Ch. 7 / manufacturer")
+        add("INFO", "snow", "standing seam on a low-slope shed (~1:12 to 2:12): mechanically seamed or snap-lock rated for the pitch, high-temp self-adhered underlayment under every panel, headwall flashing counterflashed into the house wall")
+    if ex.cover_gutters:
+        add("INFO", "footing", "gutter downspouts discharge onto splash blocks 3'+ from the deck footings and the house foundation, downhill; no downspout dumping at a post")
     if ex.privacy_wall:
         add("ENGINEER", "engineering", "privacy wall — wind load on the posts and rail attachment; engineered detail")
     for chk in fr.joist_checks:

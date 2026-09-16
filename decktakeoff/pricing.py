@@ -104,6 +104,10 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         along, out, area = cover_size(s)
         lab.append(("Porch cover — frame, sheath, roof, ceiling", round(area), "SF", lr["cover_per_sf"], "ESTIMATE — no cover rate on the card; confirm"))
         lab.append(("Porch cover — post blocking in the deck frame", 1, "lot", lr["cover_post_blocking_lot"], "est."))
+        if s.extras.cover_roof.lower().startswith("standing"):
+            lab.append(("Porch cover — standing seam steel in place of shingles (panels, trims, headwall, snow bar)", round(area), "SF", lr["cover_standing_seam_adder_per_sf"], "ESTIMATE — metal roofer's install rate; confirm"))
+        if s.extras.cover_gutters:
+            lab.append(("Porch cover — 5\" gutter + downspouts hung", round(along), "LF", lr["gutters_per_lf"], "ESTIMATE — gutter sub; confirm"))
     return lab
 
 
@@ -179,7 +183,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if s.geometry.cover:
         cover_m = mats(lambda l: l.category == "Porch cover")
         finish = ("Hardie soffit, fascia and rakes" if (s.extras.cover_soffit or s.extras.cover_fascia) else "T&G ceiling")
-        parts.append((f"Porch cover — shed roof on 6x6 cedar posts, shingles, {finish}", round(comp(cover_m, labsum("Porch cover")))))
+        roof = ("standing seam steel roof with snow retention" if s.extras.cover_roof.lower().startswith("standing") else "shingles") + (", gutter and downspouts" if s.extras.cover_gutters else "")
+        parts.append((f"Porch cover — shed roof on 6x6 cedar posts, {roof}, {finish}", round(comp(cover_m, labsum("Porch cover")))))
     main = rest - sum(v for _, v in parts)
     if s.is_timber:
         label = ("Timber-frame deck: caissons, Douglas fir frame (end grain sealed), " + f"{s.decking.color} decking, "

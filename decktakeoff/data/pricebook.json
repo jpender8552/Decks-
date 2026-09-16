@@ -49,7 +49,7 @@
     },
     "4x10_DF#1": {
       "per_lf": 5.75,
-      "source": "EST \u2014 Henry to quote (handoff v32)"
+      "source": "EST — Henry to quote (handoff v32)"
     },
     "4x12_DF#1": {
       "per_lf": 7.5,
@@ -61,7 +61,7 @@
     },
     "6x12_DF#1": {
       "per_lf": 16.0,
-      "source": "EST \u2014 request quote (handoff v32)"
+      "source": "EST — request quote (handoff v32)"
     },
     "6x10_DF#1": {
       "per_lf": 13.0,
@@ -69,7 +69,7 @@
     },
     "8x8_DF#1": {
       "per_lf": 12.5,
-      "source": "EST \u2014 8x8x8 $100 (handoff v32)"
+      "source": "EST — 8x8x8 $100 (handoff v32)"
     },
     "8x10_DF#1": {
       "per_lf": 16.0,
@@ -77,7 +77,7 @@
     },
     "2x10_pt": {
       "per_lf": 3.75,
-      "source": "EST \u2014 D&D 2x8 TFJ x 1.30 (handoff)"
+      "source": "EST — D&D 2x8 TFJ x 1.30 (handoff)"
     }
   },
   "footings": {
@@ -86,14 +86,14 @@
       "source": "est.",
       "desc": "Diamond Pier DP-50/50 (head + 4 x 50\" pins, plugs, caps)",
       "capacity_lb": 3300,
-      "capacity_source": "Pin Foundations chart \u2014 confirm"
+      "capacity_source": "Pin Foundations chart — confirm"
     },
     "DP-75/63": {
       "each": 215.0,
       "source": "est.",
       "desc": "Diamond Pier DP-75/63 (head + 4 x 63\" pins, plugs, caps)",
       "capacity_lb": 6000,
-      "capacity_source": "Pin Foundations chart \u2014 confirm"
+      "capacity_source": "Pin Foundations chart — confirm"
     },
     "concrete_80lb": {
       "each": 7.5,
@@ -169,12 +169,12 @@
     "stone_base_kit": {
       "each": 380.0,
       "source": "EST",
-      "desc": "Stone veneer column base 2'-0\" x 2'-0\" x 3'-0\" \u2014 cement board wrap, lath, scratch coat, ledgestone veneer (~24 SF) + 24\" x 24\" stone cap"
+      "desc": "Stone veneer column base 2'-0\" x 2'-0\" x 3'-0\" — cement board wrap, lath, scratch coat, ledgestone veneer (~24 SF) + 24\" x 24\" stone cap"
     },
     "sonotube_20": {
       "each": 120.0,
       "source": "EST",
-      "desc": "Sonotube 20\" x 12' (cut to length \u2014 3 caissons per tube)",
+      "desc": "Sonotube 20\" x 12' (cut to length — 3 caissons per tube)",
       "per_lf": 10.0
     },
     "quikrete_80": {
@@ -447,7 +447,7 @@
     "end_grain_sealer_gal": {
       "each": 60.0,
       "source": "EST",
-      "desc": "End-grain sealer (Anchorseal class) \u2014 every cut"
+      "desc": "End-grain sealer (Anchorseal class) — every cut"
     },
     "timber_oil_gal": {
       "each": 75.0,
@@ -512,7 +512,7 @@
     "LedgerLOK6_50": {
       "each": 90.0,
       "source": "EST",
-      "desc": "FastenMaster LedgerLOK 6\" (50 ct) \u2014 4x ledger to the house rim, 2 rows staggered 16\"",
+      "desc": "FastenMaster LedgerLOK 6\" (50 ct) — 4x ledger to the house rim, 2 rows staggered 16\"",
       "count": 50
     },
     "LedgerLOK5_50": {
@@ -524,7 +524,7 @@
     "HeadLOK6_50": {
       "each": 52.0,
       "source": "EST",
-      "desc": "FastenMaster HeadLOK 6\" (50 ct) \u2014 rail posts 4 ea",
+      "desc": "FastenMaster HeadLOK 6\" (50 ct) — rail posts 4 ea",
       "count": 50
     },
     "vycor_12x75": {
@@ -562,12 +562,12 @@
     "drink_rail_bracket_kit": {
       "each": 42.0,
       "source": "EST",
-      "desc": "TimberTech drink-rail brackets, black \u2014 per 8' section (Build SOP: always TimberTech drink-rail brackets)"
+      "desc": "TimberTech drink-rail brackets, black — per 8' section (Build SOP: always TimberTech drink-rail brackets)"
     },
     "cinch_drink_rail_bracket_kit": {
       "each": 26.0,
-      "source": "est. \u2014 confirm D&D",
-      "desc": "Cinch drink-rail bracket kit, black \u2014 per panel"
+      "source": "est. — confirm D&D",
+      "desc": "Cinch drink-rail bracket kit, black — per panel"
     }
   },
   "decking": {
@@ -606,15 +606,15 @@
     },
     "TimberTech|Terrain+|per_lf": {
       "each": 3.6,
-      "source": "est. \u2014 get D&D quote"
+      "source": "est. — get D&D quote"
     },
     "TimberTech|Reserve|per_lf": {
       "each": 4.6,
-      "source": "est. \u2014 get D&D quote"
+      "source": "est. — get D&D quote"
     },
     "TimberTech|Legacy|per_lf": {
       "each": 4.9,
-      "source": "est. \u2014 get D&D quote"
+      "source": "est. — get D&D quote"
     },
     "TimberTech|Terrain|per_lf": {
       "each": 3.3,
@@ -638,7 +638,7 @@
     },
     "TimberTech|Harvest+|per_lf": {
       "each": 6.0,
-      "source": "est. \u2014 get D&D quote"
+      "source": "est. — get D&D quote"
     },
     "TimberTech|Vintage|per_lf": {
       "each": 7.0,
@@ -712,7 +712,7 @@
       "each": 52.0,
       "source": "est.",
       "count": 224,
-      "desc": "Cortex for TimberTech 2-1/2\" \u2014 100 LF (224 screws + plugs), color-matched"
+      "desc": "Cortex for TimberTech 2-1/2\" — 100 LF (224 screws + plugs), color-matched"
     },
     "Cortex_TimberTech_350": {
       "each": 98.0,
@@ -828,7 +828,7 @@
     },
     "IRX|kit|8": {
       "each": 395.0,
-      "source": "EST \u2014 Henry to quote",
+      "source": "EST — Henry to quote",
       "desc": "TimberTech IRX Cable Rail kit 8' x 36\" black (top rail, cable, fittings; cut to bay)"
     },
     "IRX|kit|6": {
@@ -838,7 +838,7 @@
     },
     "IRX|post_kit": {
       "each": 92.0,
-      "source": "EST \u2014 Henry to quote",
+      "source": "EST — Henry to quote",
       "desc": "TimberTech IRX 36\" post kit (post + cap + skirt) black"
     },
     "IRX|stair_kit|8": {
@@ -852,45 +852,45 @@
     },
     "Cinch|panel|8|level": {
       "each": 118.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "Cinch HD Rail 8' x 36\" level panel Satin Black (welded steel balusters, brackets on, cut to bay)"
     },
     "Cinch|panel|6|level": {
       "each": 95.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "Cinch HD Rail 6' x 36\" level panel Satin Black"
     },
     "Cinch|panel|8|stair": {
       "each": 145.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|panel|6|stair": {
       "each": 118.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|post|END": {
       "each": 58.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|post|LINE": {
       "each": 58.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|post|CORNER": {
       "each": 58.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|post|STAIR": {
       "each": 66.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|handrail_kit": {
       "each": 85.0,
-      "source": "est. \u2014 confirm D&D"
+      "source": "est. — confirm D&D"
     },
     "Cinch|post_kit": {
       "each": 58.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "Cinch HD 2\" post (welded base, cap, skirt, screws), Satin Black"
     }
   },
@@ -913,7 +913,7 @@
     "end_seal_each_timber": 0.0,
     "hot_tub_bay_each": 350.0,
     "wall_flashing_per_lf": 0.0,
-    "_card": "GSX Subcontractor Labor Rates rev 14 Jul 2026 \u2014 base rates + add-ons; NO steel / larger-timber / PVC / 12-in-OC up-charges (owner 7 Sep 2026)",
+    "_card": "GSX Subcontractor Labor Rates rev 14 Jul 2026 — base rates + add-ons; NO steel / larger-timber / PVC / 12-in-OC up-charges (owner 7 Sep 2026)",
     "cable_rail_addon_per_lf": 40.0,
     "large_footing_addon_each": 150.0,
     "extra_beam_set": 200.0,
@@ -922,7 +922,9 @@
     "oil_pre_oil_per_lf": 0.2455,
     "oil_in_place_lot": 333.27,
     "cover_per_sf": 28.0,
-    "cover_post_blocking_lot": 300.0
+    "cover_post_blocking_lot": 300.0,
+    "cover_standing_seam_adder_per_sf": 6.5,
+    "gutters_per_lf": 6.0
   },
   "general_conditions": {
     "per_sf": 4.0,
@@ -978,15 +980,15 @@
   "tax_mode": "flat",
   "_tax_note": "standing rule (Eagle's Nest): sales tax 4% on factored materials. tax_mode 'destination' uses the city table instead.",
   "dealer_fee_financed": 0.125,
-  "_dealer_fee_note": "GSX rule: 12.5% dealer fee is added manually to financed quotes; the 7% check/ACH spread does not cover it \u2014 owner to confirm whether the retail line absorbs it (open, 7 Sep 2026)",
+  "_dealer_fee_note": "GSX rule: 12.5% dealer fee is added manually to financed quotes; the 7% check/ACH spread does not cover it — owner to confirm whether the retail line absorbs it (open, 7 Sep 2026)",
   "gc_template": [
     {
       "item": "Project management & supervision",
       "amount": 1700.0,
-      "why": "20 hr \u2014 layout, holds, engineer + D&D coordination, QC gates"
+      "why": "20 hr — layout, holds, engineer + D&D coordination, QC gates"
     },
     {
-      "item": "Mobilization / demobilization \u2014 trailer, tools, lift",
+      "item": "Mobilization / demobilization — trailer, tools, lift",
       "amount": 800.0,
       "why": ""
     },
@@ -996,7 +998,7 @@
       "why": ""
     },
     {
-      "item": "Dumpster 20 yd \u2014 demo + construction",
+      "item": "Dumpster 20 yd — demo + construction",
       "amount": 650.0,
       "why": ""
     },
@@ -1006,17 +1008,17 @@
       "why": ""
     },
     {
-      "item": "Material delivery \u2014 2 drops",
+      "item": "Material delivery — 2 drops",
       "amount": 700.0,
       "why": "boom truck for timbers"
     },
     {
-      "item": "Equipment \u2014 auger rig, lift day",
+      "item": "Equipment — auger rig, lift day",
       "amount": 600.0,
       "why": ""
     },
     {
-      "item": "Site protection \u2014 Ram Board, plywood paths, tarps",
+      "item": "Site protection — Ram Board, plywood paths, tarps",
       "amount": 250.0,
       "why": ""
     },
@@ -1039,7 +1041,7 @@
   "cover": {
     "osb_7_16_sheet": {
       "each": 24.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "7/16\" OSB roof sheathing 4x8"
     },
     "underlayment_roll": {
@@ -1084,22 +1086,22 @@
     },
     "cedar_6x6_lf": {
       "each": 9.5,
-      "source": "est. \u2014 plan calls for cedar posts",
+      "source": "est. — plan calls for cedar posts",
       "desc": "6x6 Western red cedar post, per LF"
     },
     "hardie_trim_4_4x12_12ft": {
       "each": 62.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "HardieTrim 4/4 x 12 (11-1/4\") x 12' smooth ColorPlus Timber Bark"
     },
     "hardie_trim_4_4x7_25_rustic_12ft": {
       "each": 44.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "HardieTrim 4/4 x 7-1/4 x 12' rustic grain ColorPlus Timber Bark"
     },
     "hardie_soffit_4x10_cedarmill": {
       "each": 98.0,
-      "source": "est. \u2014 confirm D&D",
+      "source": "est. — confirm D&D",
       "desc": "HardieSoffit 4' x 10' cedarmill ColorPlus Timber Bark (non-vented)"
     },
     "hardie_soffit_4x10_cedarmill_vented": {
@@ -1121,6 +1123,101 @@
       "each": 9.0,
       "source": "est.",
       "desc": "Stainless ring-shank siding nails 2\", per lb"
+    },
+    "ss_panel_sf": {
+      "each": 5.25,
+      "source": "est. — confirm metal supplier",
+      "desc": "24 ga standing seam steel, 16\" snap-lock panels, Kynar/PVDF color, per SF (cut to length)"
+    },
+    "ss_eave_trim_10ft": {
+      "each": 28.0,
+      "source": "est.",
+      "desc": "Standing seam eave / drip trim 10', color-matched"
+    },
+    "ss_rake_trim_10ft": {
+      "each": 30.0,
+      "source": "est.",
+      "desc": "Standing seam gable / rake trim 10', color-matched"
+    },
+    "ss_headwall_flash_10ft": {
+      "each": 34.0,
+      "source": "est.",
+      "desc": "Headwall (ledger) flashing with Z-closure 10', color-matched — into the house siding / counterflash"
+    },
+    "ss_closure_10ft": {
+      "each": 14.0,
+      "source": "est.",
+      "desc": "Foam + metal closure strips at eave and headwall, 10'"
+    },
+    "ss_clip_screw_kit_250": {
+      "each": 68.0,
+      "source": "est.",
+      "desc": "Panel clips + pancake-head screws, box of 250"
+    },
+    "ss_trim_screws_250": {
+      "each": 42.0,
+      "source": "est.",
+      "desc": "Color-matched #10 woodgrip trim screws w/ washers, 250"
+    },
+    "ss_butyl_sealant": {
+      "each": 12.0,
+      "source": "est.",
+      "desc": "Butyl tape / polyurethane sealant, per roll or tube"
+    },
+    "ht_underlayment_roll": {
+      "each": 135.0,
+      "source": "est.",
+      "desc": "High-temp self-adhered ice & water underlayment, 2 sq roll (under every metal panel)"
+    },
+    "snow_guard_bar_lf": {
+      "each": 16.0,
+      "source": "est. — confirm (S-5! ColorGard or equal)",
+      "desc": "Clamp-on snow retention bar with seam clamps, per LF, color-matched"
+    },
+    "gutter_5k_10ft": {
+      "each": 24.0,
+      "source": "est. — seamless sub quotes by the LF",
+      "desc": "5\" K-style .027 aluminum gutter 10' section, color"
+    },
+    "gutter_end_cap": {
+      "each": 4.0,
+      "source": "est.",
+      "desc": "5\" K gutter end cap"
+    },
+    "gutter_outlet": {
+      "each": 5.0,
+      "source": "est.",
+      "desc": "2x3 gutter outlet / drop"
+    },
+    "gutter_hanger": {
+      "each": 2.5,
+      "source": "est.",
+      "desc": "Hidden gutter hanger w/ screw, 24\" OC"
+    },
+    "gutter_seam_sealant": {
+      "each": 9.0,
+      "source": "est.",
+      "desc": "Gutter seam sealer, tube"
+    },
+    "downspout_2x3_10ft": {
+      "each": 20.0,
+      "source": "est.",
+      "desc": "2x3 aluminum downspout 10', color"
+    },
+    "downspout_elbow": {
+      "each": 5.0,
+      "source": "est.",
+      "desc": "2x3 A/B elbow"
+    },
+    "downspout_strap": {
+      "each": 3.0,
+      "source": "est.",
+      "desc": "2x3 downspout strap / bracket"
+    },
+    "splash_block": {
+      "each": 12.0,
+      "source": "est.",
+      "desc": "Splash block (discharge away from the footings)"
     }
   }
 }

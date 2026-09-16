@@ -899,7 +899,9 @@ def cover_size(spec) -> Tuple[float, float, float]:
 
 def cover_lines(spec) -> List[Line]:
     """Porch cover over the deck: shed roof, ledger on the house, 2x8 rafters @ 16", (2)2x10 beam on 6x6 cedar posts at the rail line,
-    OSB, underlayment, architectural shingles, drip edge, T&G ceiling. Every price is an estimate until D&D quotes it."""
+    OSB, underlayment, then architectural shingles + drip edge OR a standing seam steel roof (24 ga snap-lock panels on high-temp
+    underlayment, eave / rake / headwall trims, snow retention bar), 5" K gutter + downspouts when asked, T&G or Hardie ceiling.
+    Every price is an estimate until D&D / the metal supplier quotes it."""
     import math as _m
     along, out, area = cover_size(spec)
     out_lines: List[Line] = []
@@ -925,12 +927,43 @@ def cover_lines(spec) -> List[Line]:
     L_(f"2x8x16 #1 SYP — cover fascia / sub-fascia", fpcs, fpcs + 1, "ea", f"+1  ({fascia_lf:.0f} LF)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * 16)
     sheets = int(_m.ceil(area / 32 * 1.1))
     L_(None, sheets, sheets, "sheet", f"{area:.0f} SF + 10% cuts", key="osb_7_16_sheet")
-    L_(None, 1, 1, "roll", f"{area:.0f} SF", key="underlayment_roll")
-    bundles = int(_m.ceil(area / 100 * 3 * 1.12))
-    L_(None, bundles, bundles, "bundle", f"{area / 100:.1f} sq + 12% waste (starter, ridge cap)", key="shingle_bundle")
-    de = int(_m.ceil(fascia_lf / 10))
-    L_(None, de, de, "ea", f"{fascia_lf:.0f} LF", key="drip_edge_10ft")
-    L_(None, round(along), round(along), "LF", "flashing at the ledger", key="ridge_flash_lf")
+    ss = spec.extras.cover_roof.lower().startswith("standing")
+    if not ss:
+        L_(None, 1, 1, "roll", f"{area:.0f} SF", key="underlayment_roll")
+    if ss:
+        color = spec.extras.cover_roof_color or "color TBD"
+        panel_len = out + 1.5
+        n_panels = int(_m.ceil(along / (16 / 12)))
+        L_(f"Standing seam roof — 24 ga steel 16\" snap-lock panels x {panel_len:.1f}' ({color}, PVDF), {n_panels} panels", round(area), round(area * 1.05), "SF", f"{n_panels} panels x {panel_len:.1f}' + 5% (one-piece eave to headwall, no end laps)", key="ss_panel_sf")
+        L_(None, int(_m.ceil(area / 200)), int(_m.ceil(area / 200)), "roll", f"{area:.0f} SF — full coverage under metal (high-temp)", key="ht_underlayment_roll")
+        L_(None, int(_m.ceil(along / 10)), int(_m.ceil(along / 10)) + 1, "ea", f"{along:.0f} LF low eave + 1", key="ss_eave_trim_10ft")
+        L_(None, int(_m.ceil(2 * panel_len / 10)), int(_m.ceil(2 * panel_len / 10)) + 1, "ea", f"two rakes x {panel_len:.1f}' + 1", key="ss_rake_trim_10ft")
+        L_(None, int(_m.ceil(along / 10)), int(_m.ceil(along / 10)) + 1, "ea", f"{along:.0f} LF at the house — counterflash into the siding / brick", key="ss_headwall_flash_10ft")
+        L_(None, int(_m.ceil(2 * along / 10)), int(_m.ceil(2 * along / 10)), "ea", "eave + headwall closures", key="ss_closure_10ft")
+        n_clips = n_panels * int(_m.ceil(panel_len / 1.5))
+        L_(None, int(_m.ceil(n_clips / 250)), int(_m.ceil(n_clips / 250)), "box", f"{n_clips} clips @ 18\" OC on each seam", key="ss_clip_screw_kit_250")
+        L_(None, 1, 1, "box", "trims, closures, snow bar", key="ss_trim_screws_250")
+        L_(None, 3, 3, "ea", "headwall, eave, rake laps", key="ss_butyl_sealant")
+        L_(f"Snow retention — clamp-on bar across the low eave over the deck ({color})", round(along), round(along) + 2, "LF", f"{along:.0f}' — metal sheds 30 psf snow onto the deck and stair below; one bar 12-18\" above the eave", key="snow_guard_bar_lf")
+    else:
+        bundles = int(_m.ceil(area / 100 * 3 * 1.12))
+        L_(None, bundles, bundles, "bundle", f"{area / 100:.1f} sq + 12% waste (starter, ridge cap)", key="shingle_bundle")
+        de = int(_m.ceil(fascia_lf / 10))
+        L_(None, de, de, "ea", f"{fascia_lf:.0f} LF", key="drip_edge_10ft")
+        L_(None, round(along), round(along), "LF", "flashing at the ledger", key="ridge_flash_lf")
+    if spec.extras.cover_gutters:
+        gcolor = spec.extras.cover_gutter_color or "color to match the fascia"
+        n_ds = 2 if along > 20 else 1
+        ds_drop = 8.5 + 1.0     # cover post height to grade at the low eave (deck 8' + post), field-verify
+        L_(f"Gutter — 5\" K-style aluminum on the low eave, {gcolor} ({along:.0f} LF, 1/16\" per ft fall to the outlets)", int(_m.ceil(along / 10)), int(_m.ceil(along / 10)) + 1, "ea", f"{along:.0f} LF — or one seamless run by the gutter sub", key="gutter_5k_10ft")
+        L_(None, 2, 2, "ea", "one each end", key="gutter_end_cap")
+        L_(None, n_ds, n_ds, "ea", f"{n_ds} downspout{'s' if n_ds > 1 else ''} — at the cover posts", key="gutter_outlet")
+        L_(None, int(_m.ceil(along / 2)) + 1, int(_m.ceil(along / 2)) + 1, "ea", "24\" OC (30 psf snow — 16\" OC if the sub asks)", key="gutter_hanger")
+        L_(None, 1, 1, "tube", "end caps, outlets, section laps", key="gutter_seam_sealant")
+        L_(f"Downspout — 2x3 aluminum, {gcolor}, strapped to the cover post, down the deck post to a splash block at grade", n_ds * int(_m.ceil(ds_drop * 2 / 10)), n_ds * int(_m.ceil(ds_drop * 2 / 10)), "ea", f"{n_ds} x ~{ds_drop * 2:.0f}' (eave to grade past the deck, 2 offsets) — field-measure", key="downspout_2x3_10ft")
+        L_(None, n_ds * 4, n_ds * 4, "ea", "2 offsets at the deck edge + 1 at grade + 1 spare, per drop", key="downspout_elbow")
+        L_(None, n_ds * 4, n_ds * 4, "ea", "every 5' on the post", key="downspout_strap")
+        L_(None, n_ds, n_ds, "ea", "discharge 3'+ from the footings, downhill", key="splash_block")
     if spec.extras.cover_soffit:
         panels = int(_m.ceil(area / 40 * 1.1))
         L_(f"Porch ceiling — HardieSoffit 4' x 10' cedarmill ColorPlus {spec.extras.cover_soffit.split()[-2]} {spec.extras.cover_soffit.split()[-1]} (non-vented; 1 in 3 vented if the roof is closed)", panels, panels, "panel", f"{area:.0f} SF + 10% cuts", key="hardie_soffit_4x10_cedarmill")

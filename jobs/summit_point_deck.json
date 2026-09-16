@@ -306,6 +306,10 @@
     "demo_existing": true,
     "hardie_skirt": "4/4 x 12 Timber Bark",
     "cover_soffit": "HardieSoffit 4x10 cedarmill Timber Bark",
-    "cover_fascia": "HardieTrim 4/4 x 7.25 rustic Timber Bark"
+    "cover_fascia": "HardieTrim 4/4 x 7.25 rustic Timber Bark",
+    "cover_roof": "standing seam",
+    "cover_roof_color": "",
+    "cover_gutters": true,
+    "cover_gutter_color": ""
   }
 }

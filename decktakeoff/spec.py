@@ -208,6 +208,10 @@ class Extras:
     hardie_skirt: Optional[str] = None   # deck skirt / rim wrap in HardieTrim instead of the decking fascia: "4/4 x 12 Timber Bark"
     cover_soffit: Optional[str] = None   # porch cover ceiling: "HardieSoffit 4x10 cedarmill Timber Bark" (None -> 1x6 T&G pine)
     cover_fascia: Optional[str] = None   # porch cover fascia + rakes: "HardieTrim 4/4 x 7.25 rustic Timber Bark" (None -> painted 2x8)
+    cover_roof: str = "shingles"         # porch cover roofing: "shingles" | "standing seam" (24 ga steel, snap-lock, 16" panels, HT underlayment, snow retention)
+    cover_roof_color: str = ""           # roof panel color ("Charcoal", "Matte Black", "Burnished Slate"); "" -> to be selected
+    cover_gutters: bool = False          # 5" K-style seamless aluminum gutter on the low eave + 2x3 downspouts on the cover posts
+    cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
 
 
 @dataclass
