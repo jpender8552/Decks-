@@ -1,7 +1,7 @@
 {
   "job": "Covered Porch Deck \u2014 37 x 30",
   "client": "",
-  "notes": "From the homeowner's top-down plan (annotated: the wing's top edge is 6', not 10') + site photos. House along the top with the brick chimney projecting into the chimney bay; the wing's inner edge is the brick house wall with the chimney's angled faces (two 10'5\" diagonals, ~2' deep at the middle) \u2014 framed here as a straight wall, so the diagonal rim cuts are not counted. Left end open (rail). Bays left to right: wing 6' x 30' (wall 30' back), middle bay 9' wide with its wall 10' back, chimney bay 10'6\" wide with the chimney face 6'6\" back, right bay with the wall 10'6\" back. Right bay set to 11'6\" so the bays sum to the plan's 37' overall: the plan's 26'6\" for the porch cover cannot also be true \u2014 if the deck right of the chimney really is 26'6\", the deck is 52' wide and this takeoff is ~40% short. FIELD MEASURE FIRST. Plan says 8' high at the left, 6' at the right: frame at 8', posts cut to grade. Plan says joists AND boards run perpendicular to the house, which cannot both be true \u2014 GSX frame kept (joists perpendicular, boards parallel); flipping to perpendicular boards is a rerun. Existing deck (all of it) is demo'd: stained wood, black aluminum balusters with a flat drink-rail cap, 6x6 posts. Existing translucent-panel cover on 6x6 posts stands on the deck by the door: take down and reset on the new frame (RFI, not priced). Existing straight 4' stair down along the house siding to a concrete pad \u2014 put on the right end (end:right) next to the house, one rail; confirm which end.",
+  "notes": "GEOMETRY from the HOVER report (4 Apr 2025, jobs/summit_point_photos/hover_measurements.pdf), the site photos and Google satellite imagery \u2014 the homeowner's plan is drawn mirrored (its left is the yard-facing RIGHT). Facing the house from the yard, left to right: the deck starts at the 2'4\" bump with the DirecTV dish (SGD-2), runs 26'11\" along the back wall under the tall gable windows (10'6\" deep; walkout and covered patio below \u2014 the plan's 'porch cover, deck above'), passes the brick chimney (projects 2'10\") and the 32\" door, reaches the house corner, and a 6' wing continues 30' out along the brick side wall (BR-13, 108\" door D-1 onto it, pergola cover over it). The wing's inner wall is HOVER's 8'4\" / 9'10\" / 8'11\" segments with 1' jogs in and out (the plan's diagonals) \u2014 framed straight here. Wing outer edge and far end are open (rail). Overall 37' along the back = 26'11\" + 4'1\" + 6' \u2014 the plan's numbers close on the HOVER walls. Heights: ~8' at the window bay (walkout), ~6' at the wing; frame at 8', posts cut to grade. STAIR: 4' wide, 9 risers (66\" rise) to a concrete pad, leaves the wing's far end and runs on down along the side wall (siding + basement windows, one rail) \u2014 modelled on the wing's outer edge near its end (same quantities; the 3D shows it turned 90 degrees). Engine frames the wing with joists running its length on intermediate beams; a 30' ledger on the brick side wall with 6' joists is the alternative for the engineer. Plan says joists AND boards run perpendicular to the house \u2014 GSX frame kept (boards parallel). Existing deck (all of it) is demo'd: stained wood, black aluminum balusters with a flat drink-rail cap, 6x6 posts. Existing translucent-panel cover on 6x6 posts stands on the wing: take down and reset on the new frame (RFI, not priced). PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -20,32 +20,25 @@
     "picture_frame": true,
     "zones": [
       {
-        "name": "W",
-        "label": "Left wing (6' ledger at the top)",
-        "width": 6,
-        "depth": 30,
-        "wall_offset": 23.5
-      },
-      {
-        "name": "M",
-        "label": "Middle bay under the 9' wall",
-        "width": 9,
-        "depth": 10,
-        "wall_offset": 3.5
+        "name": "P",
+        "label": "Window bay \u2014 the 26'11\" back wall under the tall windows (covered porch below)",
+        "width": 26.9,
+        "depth": 10.5,
+        "wall_offset": 2.83
       },
       {
         "name": "B",
-        "label": "Chimney bay",
-        "width": 10.5,
-        "depth": 6.5,
+        "label": "Chimney + door bay",
+        "width": 4.1,
+        "depth": 7.67,
         "wall_offset": 0
       },
       {
-        "name": "C",
-        "label": "Right bay (covered porch)",
-        "width": 11.5,
-        "depth": 10.5,
-        "wall_offset": 4
+        "name": "W",
+        "label": "Wing along the brick side wall",
+        "width": 6,
+        "depth": 30,
+        "wall_offset": 22.33
       }
     ]
   },
@@ -78,10 +71,9 @@
     "height_in": 36,
     "edges": [
       "end:left",
-      "front:W",
-      "front:M",
+      "front:P",
       "front:B",
-      "front:C",
+      "front:W",
       "end:right"
     ],
     "drink_rail": true
@@ -90,7 +82,8 @@
     {
       "side": "end:right",
       "width_in": 48,
-      "position_in": 12,
+      "position_in": 300,
+      "total_rise_in": 66,
       "landing": "concrete pad",
       "rails": 1,
       "stringer_size": "2x12",
