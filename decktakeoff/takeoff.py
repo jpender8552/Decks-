@@ -758,6 +758,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         sysd = RAIL_SYSTEMS.get(sysn, RAIL_SYSTEMS["Fulton"])
         cable = sysd.get("cable", False)
         pk = Counter(p.kind for p in rl.posts)
+        rbrand = sysd.get("brand", brand)         # rail lines carry the rail maker (Cinch), not the decking brand
+        rname = sysn if rbrand == sysn else f"{rbrand} {sysn}"
         if cable:
             kits = Counter(8 if s_.ctc <= 96.01 else 8 for s_ in rl.sections)
             for kft, n in sorted(kits.items()):
@@ -772,8 +774,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             for (stock_in, kind), n in sorted(sec_count.items()):
                 cuts_txt = sorted(set(ftin(s_.cut_len) for s_ in rl.sections if s_.panel_stock_in == stock_in and s_.kind == kind))
                 key = f"{sysn}|panel|{stock_in // 12}|{kind}"
-                d_, uc, src = _item("rail", key, f"{brand} {sysn} Rail {stock_in // 12}' x {rl.height:g}\" {kind} panel {rl.color}")
-                lines.append(Line("Rail", d_ if "Fulton Rail 8'" in d_ or "panel" in d_.lower() else f"{brand} {sysn} Rail {stock_in // 12}' x {rl.height:g}\" {kind} panel {rl.color}", n, n, "ea",
+                d_, uc, src = _item("rail", key, f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" {kind} panel {rl.color}")
+                lines.append(Line("Rail", d_ if "Fulton Rail 8'" in d_ or "panel" in d_.lower() else f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" {kind} panel {rl.color}", n, n, "ea",
                                   f"exact  (cut to {' / '.join(cuts_txt)})", uc, src))
             if timber and f"{sysn}|post_kit" in PRICEBOOK["rail"]:
                 d_, uc, src = _item("rail", f"{sysn}|post_kit")
@@ -781,7 +783,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             else:
                 for kind, n in sorted(pk.items()):
                     uc, src = _price("rail", f"{sysn}|post|{kind}")
-                    lines.append(Line("Rail", f"{brand} {sysn} 2\" {kind} post {rl.height:g}\" {rl.color} w/ brackets, cap, skirt", n, n, "ea", "exact", uc, src))
+                    lines.append(Line("Rail", f"{rname} 2\" {kind} post {rl.height:g}\" {rl.color} w/ brackets, cap, skirt", n, n, "ea", "exact", uc, src))
         if spec.railing.drink_rail:
             dcoll = spec.railing.drink_rail_collection or bcoll
             dcolor = spec.railing.drink_rail_color or bcolor
@@ -799,22 +801,22 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 pieces.append((f"drink rail {name}", rem))
             packed_d = pack_boards(pieces, stocks=(16,))
             nb = sum(len(v) for v in packed_d.values())
-            uc, src = _price("decking", f"{brand}|{dcoll}|16|square")
-            lines.append(Line("Rail", f"Drink rail — {brand} {dcoll} {dcolor} 1x6x16 Square Edge laid flat on the top rail, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
-            d_, uc, src = _item("hardware", "drink_rail_bracket_kit")
+            uc, src = _price("decking", f"{spec.decking.brand}|{dcoll}|16|square")
+            lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge laid flat on the top rail, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
+            d_, uc, src = _item("hardware", f"{sysn.lower()}_drink_rail_bracket_kit" if f"{sysn.lower()}_drink_rail_bracket_kit" in PRICEBOOK["hardware"] else "drink_rail_bracket_kit")
             lines.append(Line("Rail", d_, len(rl.sections), len(rl.sections), "kit", "exact  (one per bay)", uc, src))
         for st in stairs:
             sc = Counter(s_.panel_stock_in for s_ in st.stair_sections)
             for stock_in, n in sorted(sc.items()):
                 if cable:
                     uc, src = _price("rail", f"{sysn}|stair_kit|{stock_in // 12}")
-                    lines.append(Line("Stairs", f"{brand} {sysn} stair cable rail kit {stock_in // 12}' ({st.side} stair)", n, n, "kit", "exact", uc, src))
+                    lines.append(Line("Stairs", f"{rname} stair cable rail kit {stock_in // 12}' ({st.side} stair)", n, n, "kit", "exact", uc, src))
                 else:
                     uc, src = _price("rail", f"{sysn}|panel|{stock_in // 12}|stair")
-                    lines.append(Line("Stairs", f"{brand} {sysn} Rail {stock_in // 12}' x {rl.height:g}\" STAIR panel {rl.color} ({st.side} stair)", n, n, "ea", "exact", uc, src))
+                    lines.append(Line("Stairs", f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" STAIR panel {rl.color} ({st.side} stair)", n, n, "ea", "exact", uc, src))
             if st.stair_posts:
                 uc, src = _price("rail", f"{sysn}|post|STAIR")
-                lines.append(Line("Stairs", f"{brand} {sysn} 2\" STAIR post {rl.color} w/ brackets, cap ({st.side} stair)", st.stair_posts, st.stair_posts, "ea", "exact  (top + bottom of each rail side)", uc, src))
+                lines.append(Line("Stairs", f"{rname} 2\" STAIR post {rl.color} w/ brackets, cap ({st.side} stair)", st.stair_posts, st.stair_posts, "ea", "exact  (top + bottom of each rail side)", uc, src))
             if st.geo.handrail_required and st.stair_rail_sides:
                 uc, src = _price("rail", f"{sysn}|handrail_kit")
                 lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
@@ -824,7 +826,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         sched["Rail"] = (f"{sysn} {rl.height:g}\" — {len(rl.posts)} posts ({', '.join(f'{v} {k}' for k, v in sorted(pk.items()))})"
                          + (f", {len(rl.sections)} bays at " + " / ".join(sorted(set(ftin(s_.ctc) for s_ in rl.sections))) + " CTC (8' kits cut to bay), posts on the divider lines, no bottom rail; HeadLOK 6\" x 4 per post" if cable
                             else " inside the outer rim ply, inner ply pocketed 2\" wide, (2) 7/16\" x 4-1/2\" bolts per post")
-                         + ("; drink rail board on TimberTech drink-rail brackets, mitred at every turn" if spec.railing.drink_rail else ""))
+                         + (f"; drink rail board on {rbrand} drink-rail brackets, mitred at every turn" if spec.railing.drink_rail else ""))
         for n in rl.notes:
             notes.append(n)
 

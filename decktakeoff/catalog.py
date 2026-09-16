@@ -155,6 +155,10 @@ RAIL_SYSTEMS = {
     "Impression": dict(panels={72: 70.0, 96: 94.0}, post_w=2.5, bracket_allow=0.25, heights=[36, 42], post_types=["POST"], noncombustible=True, note="aluminum"),
     "Classic Composite": dict(panels={72: 68.0, 96: 92.0}, post_w=5.5, bracket_allow=0.5, heights=[36, 42], post_types=["POST"], noncombustible=False, note="composite sleeve over 4x4"),
 }
+RAIL_SYSTEMS["Cinch"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
+                             noncombustible=True, max_ctc=96.0, brand="Cinch", colors=["Satin Black", "Bronze"],
+                             note="Cinch HD: heavy-gauge galvanized steel, factory-welded and powder-coated panels with the brackets welded on and screws in the box; 2\" posts with welded base, caps and skirts; "
+                                  "level and stair panels 6' / 8' cut to bay; Cinch drink-rail bracket kit takes a deck board on top; 15-year finish warranty")
 RAIL_SYSTEMS["Fulton"]["noncombustible"] = True
 RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
 RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]

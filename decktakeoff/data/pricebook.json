@@ -563,6 +563,11 @@
       "each": 42.0,
       "source": "EST",
       "desc": "TimberTech drink-rail brackets, black \u2014 per 8' section (Build SOP: always TimberTech drink-rail brackets)"
+    },
+    "cinch_drink_rail_bracket_kit": {
+      "each": 26.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "Cinch drink-rail bracket kit, black \u2014 per panel"
     }
   },
   "decking": {
@@ -844,6 +849,49 @@
       "each": 72.0,
       "source": "GS sheet",
       "desc": "TimberTech Fulton Rail 2\" post kit (post + brackets + cap + skirt), black"
+    },
+    "Cinch|panel|8|level": {
+      "each": 118.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "Cinch HD Rail 8' x 36\" level panel Satin Black (welded steel balusters, brackets on, cut to bay)"
+    },
+    "Cinch|panel|6|level": {
+      "each": 95.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "Cinch HD Rail 6' x 36\" level panel Satin Black"
+    },
+    "Cinch|panel|8|stair": {
+      "each": 145.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|panel|6|stair": {
+      "each": 118.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|post|END": {
+      "each": 58.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|post|LINE": {
+      "each": 58.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|post|CORNER": {
+      "each": 58.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|post|STAIR": {
+      "each": 66.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|handrail_kit": {
+      "each": 85.0,
+      "source": "est. \u2014 confirm D&D"
+    },
+    "Cinch|post_kit": {
+      "each": 58.0,
+      "source": "est. \u2014 confirm D&D",
+      "desc": "Cinch HD 2\" post (welded base, cap, skirt, screws), Satin Black"
     }
   },
   "labor": {
