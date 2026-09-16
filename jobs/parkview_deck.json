@@ -1,11 +1,11 @@
 {
-  "job": "Parkview Dr \u2014 12 x 20 deck with landing and stair",
+  "job": "Center Ave \u2014 12 x 20 deck with landing and stair",
   "client": "Alan",
   "site": {
-    "address": "9083 W. Parkview Dr",
-    "city": "Littleton",
+    "address": "11215 W Center Ave",
+    "city": "Lakewood",
     "state": "CO",
-    "zip": "80123",
+    "zip": "80226",
     "ground_snow_psf": 30,
     "wind_speed_mph": 115,
     "frost_depth_in": 36,
@@ -13,7 +13,7 @@
     "wui_fire_zone": false,
     "seismic_design_category": "B",
     "tax_rate": 0.045,
-    "notes": "Unincorporated Jefferson County (Columbine). Existing deck, pergola and stair come out."
+    "notes": "Lakewood, CO. Existing deck, pergola and stair come out."
   },
   "geometry": {
     "height_in": 96,
@@ -161,7 +161,7 @@
       "cable_rail_addon_per_lf": 0
     },
     "extra_beam_sets": 1,
-    "engineering_note": "If the county asks for a stamped set, GSX provides the engineer and the engineering is billed at cost, separate from this price.",
+    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price.",
     "sell_override": 59790,
     "retail_markup": 0.07
   },
@@ -575,6 +575,6 @@
       "source": "D&D quote 979610"
     }
   ],
-  "quoted_ref": "Decks & Docks quote 979610 \u00b7 09/11/2026 \u00b7 Henry Frederick \u00b7 ship to 9083 W. Parkview Dr",
+  "quoted_ref": "Decks & Docks quote 979610 \u00b7 09/11/2026",
   "quoted_tax": 1156.12
 }
