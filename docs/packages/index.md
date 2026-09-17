@@ -17,6 +17,10 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 
 The September 13 page https://claude.ai/artifact/LWbS2wTYKKY7x57pRZUfw4 is Eagle's Nest in the earlier layout, kept for reference.
 
+## PDFs
+
+Every package printed to Letter is in `docs/pdf/` (the 3D model page becomes a still; the sheets print expanded).
+
 ## Open items
 
 - Glengarry stair rise: 13 risers reach 8'4"; the deck is 12' and the lower level was drawn at 2'4" (9'8" between). The pages run 7 + 6 as drawn.
