@@ -108,6 +108,8 @@ class Beam:
     position_in: Optional[float] = None  # explicit CL from the house face (overrides setback; single-zone only)
     zones: Optional[List[str]] = None    # multi-zone plans: which zones this beam runs under (None = all). A drop beam at the same
                                          # setback in adjacent zones is one continuous beam line with shared posts.
+    posts_x_ft: Optional[List[float]] = None   # explicit post positions along the beam line (feet from the left frame face): the
+                                               # existing columns, or the count the photos show — overrides the span-table spacing
 
 
 @dataclass

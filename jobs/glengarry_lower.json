@@ -1,0 +1,126 @@
+{
+  "job": "Glengarry Pl \u2014 lower deck",
+  "client": "",
+  "site": {
+    "address": "166 Glengarry Pl",
+    "city": "Castle Rock",
+    "state": "CO",
+    "zip": "80108",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": true,
+    "seismic_design_category": "B",
+    "tax_rate": 0.079,
+    "notes": "Castle Rock (Douglas County) \u2014 combined sales tax 7.9%. Lower deck 2'4\" above grade in the alcove under the upper deck; the stucco parapet walls stay, no rail. Ponderosa lot \u2014 WUI."
+  },
+  "geometry": {
+    "height_in": 28,
+    "attachment": "ledger",
+    "picture_frame": true,
+    "board_direction": "parallel",
+    "house_finish": "stucco",
+    "zones": [
+      {
+        "name": "S",
+        "width_in": 25,
+        "depth_in": 122,
+        "wall_offset_in": -98,
+        "label": "Step \u2014 2'1\" beside the alcove's west wall, 10'2\" deep to the front"
+      },
+      {
+        "name": "A",
+        "width_in": 204,
+        "depth_in": 220,
+        "wall_offset_in": 0,
+        "label": "Alcove \u2014 17' wall, 18'4\" deep, ends at the east wing wall",
+        "end_wall": "house",
+        "privacy_wall": true
+      }
+    ],
+    "house_blocks": [
+      [
+        -30,
+        0,
+        -30,
+        0
+      ],
+      [
+        0,
+        2.083,
+        -0.001,
+        8.167
+      ],
+      [
+        0,
+        17,
+        -30,
+        0
+      ],
+      [
+        17,
+        30,
+        -30,
+        18.5
+      ]
+    ],
+    "house_openings": [
+      [
+        5,
+        9,
+        0,
+        0.5,
+        7.5
+      ],
+      [
+        11,
+        14,
+        0,
+        1.0,
+        7.0
+      ]
+    ]
+  },
+  "framing": {
+    "system": "dimensional",
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "joist_spacing_in": 12,
+    "rim_plies": 2,
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "6x12",
+        "species": "DF",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50",
+    "ledger_fastener": "LedgerLOK"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Vintage",
+    "color": "Coastline",
+    "profile": "square",
+    "fascia": true,
+    "fastener_system": "Cortex",
+    "border_collection": "Vintage",
+    "border_color": "Dark Hickory",
+    "dividers": true
+  },
+  "railing": {
+    "system": "none",
+    "existing_parapet": true
+  },
+  "stairs": [],
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 330,
+    "engineered": true,
+    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price."
+  }
+}

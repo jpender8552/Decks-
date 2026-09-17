@@ -99,7 +99,8 @@ def run_flags(L: Layout) -> List[Flag]:
     if fr.footing_type == "diamond_pier":
         add("CHECK", "footing", f"Diamond Pier: pins 50\" — locate utilities (811) before driving; bearing {fr.footing_load_lb:,.0f} lb/post vs {fr.footing_capacity_lb:,} lb allowable (manufacturer chart, confirm)")
     if fr.footing_type == "existing":
-        add("ENGINEER", "footing", f"existing caissons reused — the engineer verifies capacity for the new loads ({fr.footing_load_lb:,.0f} lb worst post); core or probe if no record", "IRC R507.3")
+        _worst = max([max(bl.post_loads) for bl in L.beam_lines if bl.post_loads] + [fr.footing_load_lb])
+        add("ENGINEER", "footing", f"existing caissons reused — the engineer verifies capacity for the new loads ({_worst:,.0f} lb worst post); core or probe if no record", "IRC R507.3")
         if s.framing.existing_posts:
             add("ENGINEER", "engineering", "existing stucco columns reused — the engineer verifies the column core, its connection to the caisson, and details the new column caps")
     if s.railing.existing_parapet:

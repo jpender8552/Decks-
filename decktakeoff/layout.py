@@ -895,7 +895,15 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             boundaries = [m[2].x0 for m in members[1:]]
             allow_by_seg = [m[3].check.allowable_in for m in members]
             end_in = 18.0 if timber else POST_END_OVERHANG
-            posts = _place_posts_line(x0, x1, boundaries, allow_by_seg, end_in)
+            explicit = next((bb.posts_x_ft for bb in spec.framing.beams if bb.posts_x_ft and bb.kind == b.kind and bb.size == b.size
+                             and (not bb.zones or members[0][2].name in bb.zones)), None)
+            if explicit:
+                posts = sorted(px * 12.0 for px in explicit if x0 - 1 <= px * 12.0 <= x1 + 1)
+                spans = [b_ - a_ for a_, b_ in zip(posts, posts[1:])]
+                if spans and max(spans) > min(allow_by_seg) + 0.5:
+                    pass    # span-table exceedance is reported through the beam check / flags; the engineer sizes it
+            else:
+                posts = _place_posts_line(x0, x1, boundaries, allow_by_seg, end_in)
             # zone of each post (boundary posts belong to the zone on the left) and its load
             pz, loads = [], []
             for i, px in enumerate(posts):
