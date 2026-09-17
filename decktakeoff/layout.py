@@ -245,6 +245,12 @@ class Layout:
         """Sold square footage: over the fascia when there is one (Jason Ct 187), frame area when the rim is exposed (Eagle's Nest 617.2)."""
         if not self.zones:
             return self.decking.sf
+        if self.spec.geometry.outline:      # a true outline (curves, bay facets, notches): its polygon area is the sold square footage
+            pts = [(float(x), float(y)) for x, y in self.spec.geometry.outline]
+            a = 0.0
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+                a += x0 * y1 - x1 * y0
+            return round(abs(a) / 2.0, 1)
         if self.spec.decking.fascia:
             return int(round(sum(z.decking.deck_w * z.decking.deck_d for z in self.zones) / 144.0))
         return round(sum(z.W * z.D for z in self.zones) / 144.0, 1)
@@ -701,7 +707,9 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
     max_ctc = sysd.get("max_ctc", max(panels.values()) + post_w + 2 * allow)
     RP = RAIL_POST_INSET
     exposed = [e for e in edges if e.exposed]
-    if r.edges:
+    if r.existing_parapet:          # the parapet is the guard on every deck edge; the system is only for the stairs
+        sel, missing = [], set()
+    elif r.edges:
         sel = [e for e in exposed if e.name in r.edges]
         missing = set(r.edges) - {e.name for e in exposed}
     else:

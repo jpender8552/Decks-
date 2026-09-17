@@ -92,7 +92,7 @@ def _item(section: str, key: str, default_desc: str = "") -> Tuple[str, float, s
 
 
 def _lumber_price(nominal: str, stock_ft: int, timber: bool = False):
-    key = f"{nominal}_DF#1" if timber and f"{nominal}_DF#1" in PRICEBOOK["lumber"] else nominal
+    key = f"{nominal}_DF#1" if (timber or nominal not in PRICEBOOK["lumber"]) and f"{nominal}_DF#1" in PRICEBOOK["lumber"] else nominal
     d = PRICEBOOK["lumber"].get(key)
     if not d:
         return 0.0, "no price on file"
@@ -452,7 +452,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             cuts.append(CutPiece(f"Stair carrier ({st_.side})", car, st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         uc, src = _lumber_price(nom, st, timber)
-        desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if timber else '#2 GC'}"
+        desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else '#2 GC'}"
         lens = sorted(set(ftin(bl.post_len) for bl in L.beam_lines))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if timber:
@@ -525,6 +525,22 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if st.landing == "concrete pad":
             uc, src = _price("footings", "concrete_pad")
             lines.append(Line("Footings", f"Stair landing pad ({st.side} stair) — 4\" slab, stringers bear on the pad", 1, 1, "ea", "exact", uc, src))
+    # intermediate stair landings: a framed platform (joist-size rims + joists at the deck spacing) on four posts, decked in the field board
+    for st_s in spec.stairs:
+        for li, (lw, ld) in enumerate(st_s.landings or []):
+            lw, ld = float(lw), float(ld)
+            n_j = int(lw / spec.joist_spacing) + 2
+            pcs = int(math.ceil((2 * (lw + ld) / 12 + n_j * ld / 12) / 12)) + 1
+            uc, src = _lumber_price(jsize, 12, timber)
+            lines.append(Line("Stairs", f"{jsize}x12 {SPECIES_NAMES.get(jsp, jsp)} — landing {li + 1} frame ({ftin(lw)} x {ftin(ld)}, {st_s.side} stair)", pcs, pcs, "ea", f"+1  (rims + {n_j} joists @ {spec.joist_spacing:g}\")", uc, src))
+            uc, src = _lumber_price(spec.framing.post_size, 8, timber or spec.framing.post_size.startswith("8x"))
+            lines.append(Line("Stairs", f"{spec.framing.post_size}x8 — landing {li + 1} posts (4)", 4, 4, "ea", "exact", uc, src))
+            uc, src = _price("footings", "concrete_pad")
+            lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
+            sf_l = lw * ld / 144
+            dk = decking_facts(spec.decking.collection)
+            nb = int(math.ceil(sf_l / (dk["width"] / 12 * 12) * 1.1))
+            lines.append(Line("Stairs", f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color} 1x6x12 — landing {li + 1} decking ({sf_l:.0f} SF)", nb, nb, "ea", "+10% cuts", *_price("decking", f"{spec.decking.brand}|{spec.decking.collection}|12|{spec.decking.profile}")))
 
     # ================= HARDWARE / CONNECTORS
     hanger = HANGER_FOR_JOIST.get(jsize, "LUS28Z")
@@ -900,7 +916,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
         rail=("Existing stucco parapet stays — no rail in this scope" if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
-        stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide" for s_ in stairs],
+        stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide"
+                + ("; landings " + " + ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "")
+                for s_, ss in zip(stairs, spec.stairs)],
         material_cost=round(sum(l.ext for l in lines), 2),
     )
     return Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)

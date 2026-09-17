@@ -8,6 +8,7 @@
   options = full installed deltas: cost delta ÷ (1 − GM), both prices
 Jason Ct (dimensional) uses the same engine with tax 8.5% destination, factor 1.0, GM 45% and $4/SF GC set on the job."""
 from __future__ import annotations
+from .units import ftin
 
 import copy
 from dataclasses import dataclass, field
@@ -108,6 +109,10 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
     for st in L.stairs:
         lab.append((f"Stairs ({st.side})", st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
+    for ss in s.stairs:
+        for lw, ld in ss.landings or []:
+            sf_l = float(lw) * float(ld) / 144
+            lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck, 4 footings", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"] + 40.0, "EST — frame + decking rate + footings"))
     if s.geometry.cover:
         from .takeoff import cover_size
         along, out, area = cover_size(s)

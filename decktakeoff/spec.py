@@ -187,6 +187,7 @@ class Stair:
     stringer_size: str = "2x12"
     closed_risers: bool = True
     mid_support: Optional[bool] = None   # a carrier beam on two posts / footings at mid-run under the stringers (None -> yes when the run is over 6')
+    landings: List[List[float]] = field(default_factory=list)   # intermediate landings [[width_in, depth_in], ...] — framed platforms on 4 posts, decked, counted with the stairs
 
 
 @dataclass

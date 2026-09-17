@@ -310,14 +310,57 @@ def build_scene(L) -> Scene:
         cable = sysd.get("cable", False)
         pw = sysd["post_w"] * IN
         h = rl.height * IN
+        # posts on a curved run move onto the curve (inset RP), so the rail between them follows the outline without a kink
+        RP_ = 2.5 * IN
+        shift: Dict[Tuple[float, float], Tuple[float, float]] = {}
+        for e in L.edges:
+            if not e.exposed:
+                continue
+            ex0, ey0, ex1, ey1 = e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN
+            cv = outline_path(spec, (ex0, ey0), (ex1, ey1))
+            if not cv or abs(ey1 - ey0) > 0.05:
+                continue     # only front (x-running) runs curve
+            poly_ = [(ex0, ey0)] + cv + [(ex1, ey1)]
+            def y_at(x):
+                for (p0, q0), (p1, q1) in zip(poly_, poly_[1:]):
+                    if min(p0, p1) - 1e-6 <= x <= max(p0, p1) + 1e-6 and abs(p1 - p0) > 1e-6:
+                        return q0 + (q1 - q0) * (x - p0) / (p1 - p0)
+                return None
+            for p in rl.posts:
+                px_, py_ = p.x * IN, p.y * IN
+                if min(ex0, ex1) - 0.05 <= px_ <= max(ex0, ex1) + 0.05 and abs(py_ - (ey0 - RP_)) < 0.3:
+                    yy = y_at(px_)
+                    if yy is not None:
+                        shift[(round(px_, 3), round(py_, 3))] = (px_, yy - RP_)
+        def sh(x, y):
+            return shift.get((round(x, 3), round(y, 3)), (x, y))
         for p in rl.posts:
-            x, y = p.x * IN, p.y * IN
+            x, y = sh(p.x * IN, p.y * IN)
             add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "steel", 7, tag=p.kind)
             add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "steel", 7)
         # sections: reconstruct post pairs along each edge run from the post list order
         posts = [(p.x * IN, p.y * IN) for p in rl.posts]
         pairs = _rail_pairs(rl)
         for (xa, ya), (xb, yb) in pairs:
+            curve = outline_path(spec, (xa, ya + RP_), (xb, yb + RP_)) if abs(yb - ya) < 0.05 else []
+            if curve:
+                # a curved run: rail along the outline, inset RP toward the deck; the end posts already sit on the curve
+                (xa, ya), (xb, yb) = sh(xa, ya), sh(xb, yb)
+                pts_ = [(xa, ya)] + [(px, py - RP_) for px, py in curve] + [(xb, yb)]
+                for (p0, q0), (p1, q1) in zip(pts_, pts_[1:]):
+                    B.append(rot_box("toprail", p0, q0, p1, q1, zt + h - 0.08, zt + h, "steel", 7, 0.12))
+                    if cable:
+                        for k in range(10):
+                            zc = zt + 0.3 + k * 0.27
+                            B.append(rot_box("cable", p0, q0, p1, q1, zc - 0.01, zc + 0.01, "cable", 7, 0.02))
+                    else:
+                        B.append(rot_box("botrail", p0, q0, p1, q1, zt + 0.25, zt + 0.33, "steel", 7, 0.12))
+                        n_ = int(math.hypot(p1 - p0, q1 - q0) / (4 * IN))
+                        for k in range(1, n_):
+                            t_ = k / n_
+                            bx_, by_ = p0 + (p1 - p0) * t_, q0 + (q1 - q0) * t_
+                            add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "steel", 7)
+                continue
             horiz = abs(yb - ya) < 0.01
             if horiz:
                 x0_, x1_ = min(xa, xb), max(xa, xb); y0_, y1_ = ya - 0.06, ya + 0.06
@@ -443,6 +486,15 @@ def build_scene(L) -> Scene:
             ex0, ey0, ex1, ey1 = e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN
             L_ = ((ex1 - ex0) ** 2 + (ey1 - ey0) ** 2) ** 0.5
             if L_ < 0.1:
+                continue
+            curve = outline_path(spec, (ex0, ey0), (ex1, ey1))
+            if curve:
+                pts_ = [(ex0, ey0)] + curve + [(ex1, ey1)]
+                for (p0, q0), (p1, q1) in zip(pts_, pts_[1:]):
+                    seg = math.hypot(p1 - p0, q1 - q0); ph_ = math.atan2(q1 - q0, p1 - p0)
+                    nx_, ny_ = math.sin(ph_), -math.cos(ph_)
+                    B.append(Box("privacy", (p0 + p1) / 2 - seg / 2, (p0 + p1) / 2 + seg / 2, (q0 + q1) / 2 + ny_ * 0.33 - 0.33, (q0 + q1) / 2 + ny_ * 0.33 + 0.33, zt - 0.3, zt + 3.5, "house", 8, tag="existing stucco parapet (stays)", rot=ph_, rot_axis="z"))
+                    B.append(Box("trim", (p0 + p1) / 2 - seg / 2, (p0 + p1) / 2 + seg / 2, (q0 + q1) / 2 + ny_ * 0.33 - 0.38, (q0 + q1) / 2 + ny_ * 0.33 + 0.38, zt + 3.5, zt + 3.62, "stonecap", 8, tag="parapet cap", rot=ph_, rot_axis="z"))
                 continue
             ux, uy = (ex1 - ex0) / L_, (ey1 - ey0) / L_
             nx, ny = uy, -ux      # inward normal (clockwise outline)
@@ -780,6 +832,33 @@ def _roof_hex(color: str) -> str:
         if k in c:
             return v
     return "#3a3c3f"
+
+
+def outline_path(spec, a, b, tol=3.0):
+    """Outline vertices (feet) strictly between points a and b along the straight a->b, within tol ft of it — the curve of a
+    front edge. Empty when the outline is absent or straight there."""
+    poly = [(float(x), float(y)) for x, y in (spec.geometry.outline or [])]
+    if not poly:
+        return []
+    ax, ay = a; bx, by = b
+    L_ = math.hypot(bx - ax, by - ay)
+    if L_ < 0.1:
+        return []
+    ux, uy = (bx - ax) / L_, (by - ay) / L_
+    pts = []
+    for px, py in poly:
+        t = ((px - ax) * ux + (py - ay) * uy) / L_
+        d = abs((px - ax) * -uy + (py - ay) * ux)
+        if 0.02 < t < 0.98 and d < tol and d > 0.02:
+            pts.append((t, px, py))
+    pts.sort()
+    return [(px, py) for _, px, py in pts]
+
+
+def rot_box(kind, x0, y0, x1, y1, z0, z1, mat, phase, thick, tag="", tone=0.0) -> Box:
+    L_w = math.hypot(x1 - x0, y1 - y0); phi = math.atan2(y1 - y0, x1 - x0)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    return Box(kind, cx - L_w / 2, cx + L_w / 2, cy - thick / 2, cy + thick / 2, z0, z1, mat, phase, tag=tag, rot=phi, rot_axis="z", tone=tone)
 
 
 def angled_wall(x0, y0, x1, y1, z0=0.0, z1=18.0, thick=0.5) -> Box:
