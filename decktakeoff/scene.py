@@ -386,12 +386,13 @@ def build_scene(L) -> Scene:
                 else:
                     add("drink", xa - bw / 2, xa + bw / 2, y0_ - pw / 2, y1_ + pw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())
 
-    # ---------------- stairs: stringers (rotated boxes), treads, closed risers, stair rail, landing pad
-    for st in L.stairs:
+    # ---------------- stairs: one or more flights (stringers as rotated boxes, treads, closed risers, stair rail), landings, pad
+    house_rects = [tuple(float(v) for v in h[:4]) for h in (spec.geometry.house_blocks or [])]
+    def in_house(px, py):
+        return any(hx0 <= px <= hx1 and hy0 <= py <= hy1 for hx0, hx1, hy0, hy1 in house_rects)
+    for st, ss in zip(L.stairs, spec.stairs):
         g = st.geo
         rise, run, width = g.riser_in * IN, g.tread_in * IN, st.width * IN
-        n_r, n_t = g.risers, g.treads
-        total_run = g.total_run_in * IN
         side = st.side
         if side in ("right", "end:right"):
             zz = L.zones[-1]; direction = "+x"; u0 = (zz.x0 + zz.W) * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
@@ -418,74 +419,249 @@ def build_scene(L) -> Scene:
         v_b = v_a + width
         H_st = g.total_rise_in * IN            # the stair's own drop (to a lower deck or a pad), not the deck height
         z_low = zt - H_st
-        theta = math.atan2(H_st, total_run)
-        def sb(kind, ua, ub, va, vb, za, zb, mat, phase, tag="", rot=0.0, tone_=0.0):
-            if direction == "+x":
-                add(kind, u0 + ua, u0 + ub, va, vb, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="y", tone=tone_)
-            elif direction == "-x":
-                add(kind, u0 - ub, u0 - ua, va, vb, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="y", tone=tone_)
-            elif direction == "-y":
-                add(kind, va, vb, u0 - ub, u0 - ua, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="x", tone=tone_)
-            else:
-                add(kind, va, vb, u0 + ua, u0 + ub, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="x", tone=tone_)
-        # stringers: a 2x12 along the slope, centred under the nosing line
         depth = 11.25 * IN
-        slope_len = math.hypot(total_run, H_st)
-        nst = max(2, st.stringers)
-        for i in range(nst):
-            v = v_a + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
-            zc = z_low + H_st / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
-            sb("stringer", total_run / 2 - slope_len / 2, total_run / 2 + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {st.side}", rot=theta)
-        for k in range(1, n_r + 1):
-            ztop = zt - k * rise
-            # riser board k at the back of tread k (the last riser sits at the pad)
-            sb("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, v_a, v_b, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
-            if k <= n_t:
-                sb("tread", (k - 1) * run, k * run + NOSE * IN, v_a - 0.02, v_b + 0.02, ztop - bt, ztop, "deck", 6, tag=f"tread {k}", tone_=tone())
-        # stair rail on the open side(s): posts top and bottom, a sloped top rail, a baluster per tread
-        if st.stair_rail_sides and L.rail:
+        REV = {"+x": "-x", "-x": "+x", "+y": "-y", "-y": "+y"}
+
+        def sbf(dir_, u0_, kind, ua, ub, va, vb, za, zb, mat, phase, tag="", rot=0.0, tone_=0.0):
+            """Stair-local (u along the travel from u0_, v across) -> world."""
+            if dir_ == "+x":
+                add(kind, u0_ + ua, u0_ + ub, va, vb, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="y", tone=tone_)
+            elif dir_ == "-x":
+                add(kind, u0_ - ub, u0_ - ua, va, vb, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="y", tone=tone_)
+            elif dir_ == "-y":
+                add(kind, va, vb, u0_ - ub, u0_ - ua, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="x", tone=tone_)
+            else:
+                add(kind, va, vb, u0_ + ua, u0_ + ub, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="x", tone=tone_)
+
+        def world(dir_, u0_, u):
+            return u0_ + u if dir_ in ("+x", "+y") else u0_ - u
+
+        def rect_world(dir_, u0_, ua, ub, va, vb):
+            """A stair-local rectangle as a world (x0, x1, y0, y1)."""
+            wa, wb = sorted((world(dir_, u0_, ua), world(dir_, u0_, ub)))
+            return (wa, wb, va, vb) if dir_ in ("+x", "-x") else (va, vb, wa, wb)
+
+        def draw_flight(fg, z_top, dir_, u0_, va_, vb_, rail_sides, tag_, mid):
+            """One flight from the walking surface at z_top down fg.risers risers. rail_sides: subset of ("a", "b")."""
+            n_r, n_t = fg.risers, fg.treads
+            trun = fg.run_in * IN
+            H = fg.rise_in * IN
+            zb0 = z_top - H
+            theta = math.atan2(H, trun) if trun > 0 else 0.0
+            sb_ = lambda *a, **k: sbf(dir_, u0_, *a, **k)
+            slope_len = math.hypot(trun, H)
+            nst = max(2, st.stringers)
+            for i in range(nst):
+                v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
+                zc = zb0 + H / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
+                sb_("stringer", trun / 2 - slope_len / 2, trun / 2 + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {tag_}", rot=theta)
+            for k in range(1, n_r + 1):
+                ztop = z_top - k * rise
+                sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
+                if k <= n_t:
+                    sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - 0.02, vb_ + 0.02, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
+            if rail_sides and L.rail:
+                sysd = RAIL_SYSTEMS.get(L.rail.system, RAIL_SYSTEMS["Fulton"])
+                pw = sysd["post_w"] * IN
+                hr = L.rail.height * IN
+                for sd in rail_sides:
+                    vc = va_ + pw / 2 + 0.02 if sd == "a" else vb_ - pw / 2 - 0.02
+                    for u_, zb_ in ((0.25, z_top - rise), (trun - 0.25, zb0)):
+                        sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "steel", 7, tag="stair post")
+                    rail_len = math.hypot(trun - 0.5, H - rise)
+                    zc = zb0 + (H - rise) / 2 + hr + 0.1
+                    sb_("toprail", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
+                    if spec.railing.drink_rail:
+                        sb_("drink", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
+                    if RAIL_SYSTEMS.get(L.rail.system, {}).get("cable"):
+                        n_c = int((hr - 0.25) / (3.125 * IN))
+                        for i in range(1, n_c + 1):
+                            zc_ = zb0 + (H - rise) / 2 + i * 3.125 * IN + 0.1
+                            sb_("cable", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.01, vc + 0.01, zc_ - 0.01, zc_ + 0.01, "cable", 7, rot=theta)
+                        if rail_len > 6.5:
+                            u_ = trun / 2
+                            sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb0 + (H - rise) / 2, zb0 + (H - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
+                    else:
+                        for k in range(1, n_t + 1):
+                            for frac in (0.3, 0.7):
+                                u_ = (k - 1) * run + frac * run
+                                ztop = z_top - k * rise
+                                sb_("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "steel", 7)
+            if mid:
+                # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
+                um = trun / 2
+                z_under = z_top - 0.5 * H - 1.5 * IN - depth / math.cos(theta) + 0.3
+                zc_top = z_under - 0.02
+                sb_("beam", um - 1.5 * IN, um + 1.5 * IN, va_ - 0.25, vb_ + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
+                for vp in (va_ + 0.25, vb_ - 0.25):
+                    sb_("post", um - pb_ / 2, um + pb_ / 2, vp - pb_ / 2, vp + pb_ / 2, 0.55, zc_top - 5.5 * IN, "timber", 2, tag="stair carrier post")
+                    sb_("base", um - pb_ / 2 - 0.02, um + pb_ / 2 + 0.02, vp - pb_ / 2 - 0.02, vp + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
+                    sb_("footing", um - 0.55, um + 0.55, vp - 0.55, vp + 0.55, -0.1, 0.45, "concrete", 1, tag="stair footing")
+            return zb0, trun
+
+        def draw_landing(rw, z_top, li):
+            """A framed, decked landing platform on four posts: rw = world (x0, x1, y0, y1)."""
+            x0_, x1_, y0_, y1_ = rw
+            # decked in the field board, boards across the landing (parallel with the treads of the flight it serves)
+            along_x = direction in ("+y", "-y")
+            span = (y1_ - y0_) if along_x else (x1_ - x0_)
+            nb_ = max(1, int(round(span / (bw + gap))))
+            for i in range(nb_):
+                a0 = i * span / nb_; a1 = a0 + span / nb_ - gap
+                if along_x:
+                    add("board", x0_, x1_, y0_ + a0, y0_ + a1, z_top - bt, z_top, "deck", 6, tag=f"landing {li} {st.side}", tone=tone())
+                else:
+                    add("board", x0_ + a0, x0_ + a1, y0_, y1_, z_top - bt, z_top, "deck", 6, tag=f"landing {li} {st.side}", tone=tone())
+            for (xa_, xb_, ya_, yb_) in ((x0_, x1_, y0_, y0_ + 1.5 * IN), (x0_, x1_, y1_ - 1.5 * IN, y1_), (x0_, x0_ + 1.5 * IN, y0_, y1_), (x1_ - 1.5 * IN, x1_, y0_, y1_)):
+                add("rim", xa_, xb_, ya_, yb_, z_top - bt - jd, z_top - bt, "timber", 4, tag=f"landing {li} rim")
+            add("fascia", x0_ - fas_t, x1_ + fas_t, y0_ - fas_t, y0_, z_top - bt - jd, z_top, "fascia", 6, tone=tone())
+            add("fascia", x0_ - fas_t, x1_ + fas_t, y1_, y1_ + fas_t, z_top - bt - jd, z_top, "fascia", 6, tone=tone())
+            add("fascia", x0_ - fas_t, x0_, y0_, y1_, z_top - bt - jd, z_top, "fascia", 6, tone=tone())
+            add("fascia", x1_, x1_ + fas_t, y0_, y1_, z_top - bt - jd, z_top, "fascia", 6, tone=tone())
+            nj = max(2, int((x1_ - x0_) / (spec.joist_spacing * IN)))
+            for j in range(1, nj):
+                xj = x0_ + (x1_ - x0_) * j / nj
+                add("joist", xj - 0.75 * IN, xj + 0.75 * IN, y0_ + 1.5 * IN, y1_ - 1.5 * IN, z_top - bt - jd, z_top - bt, "timber", 4, tag=f"landing {li} joist")
+            ins = max(0.5, pb_ / 2 + 0.1)
+            for px in (x0_ + ins, x1_ - ins):
+                for py in (y0_ + ins, y1_ - ins):
+                    add("post", px - pb_ / 2, px + pb_ / 2, py - pb_ / 2, py + pb_ / 2, 0.55, z_top - bt - jd, "timber", 2, tag=f"landing {li} post")
+                    add("base", px - pb_ / 2 - 0.02, px + pb_ / 2 + 0.02, py - pb_ / 2 - 0.02, py + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
+                    add("footing", px - 0.55, px + 0.55, py - 0.55, py + 0.55, -0.1, 0.45, "concrete", 1, tag="landing footing")
+
+        def landing_guard(rects, z_top, openings):
+            """Level guard on the landings' open sides: the union outline of the landing rectangles less the house side and the flight openings.
+            openings: world rectangles (x0, x1, y0, y1) where a flight arrives or leaves — an outline segment inside one is left open."""
+            if not L.rail:
+                return
             sysd = RAIL_SYSTEMS.get(L.rail.system, RAIL_SYSTEMS["Fulton"])
             pw = sysd["post_w"] * IN
             hr = L.rail.height * IN
-            sides = [v_b - pw / 2 - 0.02] if st.stair_rail_sides == 1 else [v_a + pw / 2 + 0.02, v_b - pw / 2 - 0.02]
-            for vc in sides:
-                for u_, zb_ in ((0.25, zt - rise), (total_run - 0.25, z_low)):
-                    sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "steel", 7, tag="stair post")
-                rail_len = math.hypot(total_run - 0.5, H_st - rise)
-                zc = z_low + (H_st - rise) / 2 + hr + 0.1
-                sb("toprail", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
-                if spec.railing.drink_rail:
-                    sb("drink", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
-                if RAIL_SYSTEMS.get(L.rail.system, {}).get("cable"):
-                    # horizontal cable infill runs parallel to the slope, 3-1/8" apart, plus a mid post on a run over 6'
-                    n_c = int((hr - 0.25) / (3.125 * IN))
-                    for i in range(1, n_c + 1):
-                        zc_ = z_low + (H_st - rise) / 2 + i * 3.125 * IN + 0.1
-                        sb("cable", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.01, vc + 0.01, zc_ - 0.01, zc_ + 0.01, "cable", 7, rot=theta)
-                    if rail_len > 6.5:
-                        u_ = total_run / 2
-                        sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, z_low + (H_st - rise) / 2, z_low + (H_st - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
+            xs = sorted({v for r in rects for v in (r[0], r[1])}); ys = sorted({v for r in rects for v in (r[2], r[3])})
+            inside = lambda px, py: any(r[0] - 1e-6 <= px <= r[1] + 1e-6 and r[2] - 1e-6 <= py <= r[3] + 1e-6 for r in rects)
+            raw = {}      # (axis, line, normal) -> list of intervals along the segment
+            for i in range(len(xs) - 1):
+                for j in range(len(ys) - 1):
+                    xa_, xb_, ya_, yb_ = xs[i], xs[i + 1], ys[j], ys[j + 1]
+                    if not inside((xa_ + xb_) / 2, (ya_ + yb_) / 2):
+                        continue
+                    for (axis, line, a0, a1, nx, ny) in (("x", ya_, xa_, xb_, 0, -1), ("x", yb_, xa_, xb_, 0, 1), ("y", xa_, ya_, yb_, -1, 0), ("y", xb_, ya_, yb_, 1, 0)):
+                        mx, my = ((a0 + a1) / 2, line) if axis == "x" else (line, (a0 + a1) / 2)
+                        ox, oy = mx + nx * 0.1, my + ny * 0.1
+                        if inside(ox, oy) or in_house(ox, oy):
+                            continue
+                        raw.setdefault((axis, round(line, 4), nx, ny), []).append([a0, a1])
+            segs = []
+            for (axis, line, nx, ny), ivs in raw.items():
+                ivs.sort()
+                merged = []
+                for a0, a1 in ivs:
+                    if merged and a0 <= merged[-1][1] + 1e-6:
+                        merged[-1][1] = max(merged[-1][1], a1)
+                    else:
+                        merged.append([a0, a1])
+                # cut the flight openings out of each run
+                for a0, a1 in merged:
+                    parts = [[a0, a1]]
+                    for o in openings:
+                        lo, hi = (o[0], o[1]) if axis == "x" else (o[2], o[3])
+                        perp = (o[2] - 0.05 <= line <= o[3] + 0.05) if axis == "x" else (o[0] - 0.05 <= line <= o[1] + 0.05)
+                        if not perp:
+                            continue
+                        nxt = []
+                        for p0, p1 in parts:
+                            if hi <= p0 or lo >= p1:
+                                nxt.append([p0, p1]); continue
+                            if lo > p0:
+                                nxt.append([p0, lo])
+                            if hi < p1:
+                                nxt.append([hi, p1])
+                        parts = nxt
+                    for p0, p1 in parts:
+                        if p1 - p0 > 0.5:
+                            segs.append((axis, line, p0, p1, nx, ny))
+            for (axis, line, p0, p1, nx, ny) in segs:
+                # posts at both ends inset half a post, a top rail, a baluster every 4"
+                c_line = line - nx * (pw / 2 + 0.02) if axis == "y" else line - ny * (pw / 2 + 0.02)
+                e0, e1 = p0 + pw / 2, p1 - pw / 2
+                for e in (e0, e1):
+                    cx, cy = (e, c_line) if axis == "x" else (c_line, e)
+                    add("railpost", cx - pw / 2, cx + pw / 2, cy - pw / 2, cy + pw / 2, z_top, z_top + hr + 0.3, "steel", 7, tag="landing post")
+                if axis == "x":
+                    add("toprail", e0, e1, c_line - 0.06, c_line + 0.06, z_top + hr, z_top + hr + 0.1, "steel", 7, tag="landing rail")
                 else:
-                    for k in range(1, n_t + 1):
-                        for frac in (0.3, 0.7):
-                            u_ = (k - 1) * run + frac * run
-                            ztop = zt - k * rise
-                            sb("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "steel", 7)
-        # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
-        if st.mid_support:
-            um = st.mid_run_in * IN
-            z_under = zt - (um / total_run) * H_st - 1.5 * IN - depth / math.cos(theta) + 0.3   # underside of the stringers at mid-run
-            zc_top = z_under - 0.02
-            sb("beam", um - 1.5 * IN, um + 1.5 * IN, v_a - 0.25, v_b + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
-            for vp in (v_a + 0.25, v_b - 0.25):
-                sb("post", um - pb_ / 2, um + pb_ / 2, vp - pb_ / 2, vp + pb_ / 2, 0.55, zc_top - 5.5 * IN, "timber", 2, tag="stair carrier post")
-                sb("base", um - pb_ / 2 - 0.02, um + pb_ / 2 + 0.02, vp - pb_ / 2 - 0.02, vp + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
-                sb("footing", um - 0.55, um + 0.55, vp - 0.55, vp + 0.55, -0.1, 0.45, "concrete", 1, tag="stair footing")
-        # landing pad
-        if st.landing == "deck":
-            sb("board", total_run - 0.4, total_run + 4.0, v_a - 0.5, v_b + 0.5, z_low - bt, z_low, "deck", 6, tag=f"lower deck at the {st.side} stair")
-        else:
-            sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, z_low - 0.3, z_low + 0.02, "concrete", 1, tag=f"landing pad {st.side}")
+                    add("toprail", c_line - 0.06, c_line + 0.06, e0, e1, z_top + hr, z_top + hr + 0.1, "steel", 7, tag="landing rail")
+                n_b = max(1, int((e1 - e0) / (4 * IN)))
+                for i in range(1, n_b):
+                    e = e0 + (e1 - e0) * i / n_b
+                    cx, cy = (e, c_line) if axis == "x" else (c_line, e)
+                    add("baluster", cx - 0.03, cx + 0.03, cy - 0.03, cy + 0.03, z_top + 0.02, z_top + hr - 0.02, "steel", 7)
+
+        flights = g.flights
+        frails = list(st.flight_rails) + [st.stair_rail_sides] * (len(flights) - len(st.flight_rails))
+        turn_left = (ss.turn_side or "left") == "left"
+        multi = len(flights) > 1
+        # flight 1 from the deck
+        def sides_for(n_sides, fi):
+            if n_sides >= 2:
+                return ("a", "b")
+            if n_sides == 1:
+                if multi:
+                    return ("a",) if turn_left else ("b",)      # the open side is the turn side; the other side is the house or the first flight
+                return ("b",)
+            return ()
+        cur_dir, cur_u0, cur_va, cur_vb, z_cur = direction, u0, v_a, v_b, zt
+        openings = []
+        land_rects = []
+        z_land = None
+        for fi, fg in enumerate(flights):
+            mid = st.mid_support and fg.run_in >= max(f_.run_in for f_ in flights) - 1e-6
+            z_next, trun = draw_flight(fg, z_cur, cur_dir, cur_u0, cur_va, cur_vb, sides_for(frails[fi], fi), f"{st.side}" + (f" flight {fi + 1}" if multi else ""), mid)
+            if fi == len(flights) - 1:
+                # the bottom: a lower deck or a pad in the last flight's frame
+                if st.landing == "deck":
+                    sbf(cur_dir, cur_u0, "board", trun - 0.4, trun + 4.0, cur_va - 0.5, cur_vb + 0.5, z_next - bt, z_next, "deck", 6, tag=f"lower deck at the {st.side} stair")
+                else:
+                    sbf(cur_dir, cur_u0, "footing", trun - 0.4, trun + 3.6, cur_va - 0.5, cur_vb + 0.5, z_next - 0.3, z_next + 0.02, "concrete", 1, tag=f"landing pad {st.side}")
+                break
+            # a landing at the foot of this flight
+            lands = [(float(a) * IN, float(b) * IN) for a, b in (ss.landings or [])] or [(width, 3.0)]
+            lw, ld = lands[0] if fi == 0 else lands[min(fi, len(lands) - 1)]
+            openings.append(rect_world(cur_dir, cur_u0, trun - 0.3, trun + 0.3, cur_va, cur_vb))
+            if turn_left:
+                sq_va, sq_vb = cur_vb - lw, cur_vb
+            else:
+                sq_va, sq_vb = cur_va, cur_va + lw
+            r1 = rect_world(cur_dir, cur_u0, trun, trun + ld, sq_va, sq_vb)
+            rects = [r1]
+            draw_landing(r1, z_next, len(land_rects) + 1)
+            if ss.turn == "switchback":
+                # the big landing beside the turn square on the turn side; flight 2 leaves its near edge running back alongside flight 1
+                if fi == 0 and len(lands) > 1:
+                    lw2, ld2 = lands[1]
+                    if turn_left:
+                        l_va, l_vb = sq_va - lw2, sq_va
+                    else:
+                        l_va, l_vb = sq_vb, sq_vb + lw2
+                    r2 = rect_world(cur_dir, cur_u0, trun, trun + ld2, l_va, l_vb)
+                    draw_landing(r2, z_next, len(land_rects) + 2)
+                    rects.append(r2)
+                else:
+                    l_va, l_vb = sq_va, sq_vb
+                n_va, n_vb = (l_va, l_va + width) if turn_left else (l_vb - width, l_vb)
+                openings.append(rect_world(cur_dir, cur_u0, trun - 0.3, trun + 0.3, n_va, n_vb))
+                cur_u0 = world(cur_dir, cur_u0, trun)
+                cur_dir = REV[cur_dir]
+                cur_va, cur_vb = n_va, n_vb
+            else:
+                # straight through: the next flight leaves the far edge of the landing
+                openings.append(rect_world(cur_dir, cur_u0, trun + ld - 0.3, trun + ld + 0.3, cur_va, cur_vb))
+                cur_u0 = world(cur_dir, cur_u0, trun + ld)
+            land_rects += rects
+            z_land = z_next
+            if st.landing_rail_lf and frails[fi]:
+                landing_guard(rects, z_next, openings)
+            z_cur = z_next
 
     # ---------------- an existing stucco parapet on the open edges (stays; nothing in the takeoff)
     if spec.railing.existing_parapet:
@@ -796,6 +972,8 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
     out: List[Box] = []
     for b in boxes:
         if b.kind not in DECK_KINDS or b.rot or b.kind == "fascia":   # fascia hangs outside the outline by its own thickness: never clip it
+            out.append(b); continue
+        if b.tag and (b.tag.startswith("landing") or b.tag.startswith("tread") or "stair" in b.tag):   # stairs and landings sit outside the deck outline
             out.append(b); continue
         cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
         along_x = (b.x1 - b.x0) >= (b.y1 - b.y0)

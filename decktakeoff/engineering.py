@@ -6,7 +6,7 @@ scales for load and FLAGS engineering — it never silently invents a span.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .catalog import LUMBER, parse_beam
@@ -206,6 +206,17 @@ def ledger_fastener_count(ledger_len_in: float, joist_span_in: float, fastener: 
 
 
 @dataclass
+class FlightGeometry:
+    """One straight run of stair between two walking surfaces (deck, landing, pad)."""
+    risers: int
+    treads: int
+    rise_in: float
+    run_in: float
+    stringer_len_in: float
+    stringer_stock_ft: int
+
+
+@dataclass
 class StairGeometry:
     total_rise_in: float
     risers: int
@@ -219,29 +230,49 @@ class StairGeometry:
     handrail_required: bool
     guard_required: bool
     notes: List[str]
+    flights: List[FlightGeometry] = field(default_factory=list)   # top down; one entry for a straight stair
+
+
+def _stringer_stock(length_in: float) -> int:
+    return next((s for s in (8, 10, 12, 14, 16, 20) if s * 12 >= length_in), 20)
 
 
 def stair_geometry(total_rise_in: float, width_in: float, composite_treads: bool = True, tread_in: float = 10.9,
-                   stringer_oc: Optional[float] = None) -> StairGeometry:
+                   stringer_oc: Optional[float] = None, flights: Optional[List[int]] = None) -> StairGeometry:
+    """flights: risers per flight, top down (e.g. [7, 6] — down 7 to a landing, then 6 more). None -> one flight at the code
+    minimum riser count. The riser height is the same in every flight (IRC R311.7.5.1: 3/8" max variation in a flight)."""
     notes = []
-    risers = max(1, int(math.ceil(total_rise_in / RISER_MAX - 1e-9)))
+    flights = [int(f) for f in (flights or []) if int(f) > 0]
+    if flights:
+        risers = sum(flights)
+        if risers < int(math.ceil(total_rise_in / RISER_MAX - 1e-9)):
+            notes.append(f"{risers} risers over {total_rise_in:.0f}\" is {total_rise_in / risers:.2f}\" a riser — over 7-3/4\"; add a riser or check the rise")
+    else:
+        risers = max(1, int(math.ceil(total_rise_in / RISER_MAX - 1e-9)))
+        flights = [risers]
     riser = total_rise_in / risers
-    treads = risers - 1                       # top tread is the deck
+    treads = risers - len(flights)            # the top tread of every flight is the deck or the landing
     run = treads * tread_in
     oc = stringer_oc or (STRINGER_OC_COMPOSITE if composite_treads else STRINGER_OC_WOOD)
     stringers = int(math.ceil(width_in / oc - 1e-9)) + 1
-    length = math.hypot(run, total_rise_in) + 12   # +12" for the top connection and bottom cut
-    stock = next((s for s in (8, 10, 12, 14, 16, 20) if s * 12 >= length), 20)
+    fl = []
+    for nr in flights:
+        nt = nr - 1
+        r_ = nt * tread_in
+        ln = math.hypot(r_, nr * riser) + 12     # +12" for the top connection and bottom cut
+        fl.append(FlightGeometry(nr, nt, round(nr * riser, 3), round(r_, 3), round(ln, 1), _stringer_stock(ln)))
+        if r_ > STRINGER_MAX_SPAN_CUT:
+            notes.append(f"stringer horizontal run {r_/12:.1f}' > 6' — add an intermediate support/landing or use solid stringers (DCA6)")
+    length = max(f.stringer_len_in for f in fl)
+    stock = max(f.stringer_stock_ft for f in fl)
     if width_in < STAIR_WIDTH_MIN:
         notes.append(f"stair width {width_in:.0f}\" < 36\" minimum (IRC R311.7.1)")
     if riser > RISER_MAX + 0.01:
         notes.append("riser exceeds 7-3/4\"")
-    if run > STRINGER_MAX_SPAN_CUT:
-        notes.append(f"stringer horizontal run {run/12:.1f}' > 6' — add an intermediate support/landing or use solid stringers (DCA6)")
     if riser < 4:
         notes.append("riser under 4\" — check with the deck height; maybe a single step or a landing instead")
     return StairGeometry(total_rise_in, risers, round(riser, 3), treads, tread_in, run, length, stock, stringers,
-                         risers >= HANDRAIL_MIN_RISERS, total_rise_in > GUARD_TRIGGER_HEIGHT, notes)
+                         risers >= HANDRAIL_MIN_RISERS, total_rise_in > GUARD_TRIGGER_HEIGHT, notes, fl)
 
 
 # ------------------------------------------------------------- solid-sawn timber (pre-engineering estimate, NDS-style)

@@ -84,6 +84,12 @@ default, so a spec can be as small as `{"geometry": {"width": 12, "depth": 16, "
 Conventions: plan view with the house at the top; **left / right are as you stand in the yard facing the house**;
 width runs along the house, depth runs out from it. Rail openings and stairs are located the same way.
 
+Stairs can be one straight flight or several: `"flights": [7, 6]` is down 7 risers to a landing, then 6 more; `"turn"`
+is `switchback` (a horseshoe: flight 2 runs back alongside flight 1, on the `turn_side`) or `straight`; `landings`
+lists the platforms between flights (framed on four posts, decked, counted with the stairs); `flight_rails` gives the
+rail sides per flight and `landing_guard_lf` the guard on the landings' open sides (defaulted from the landing
+perimeter less the stair widths in and out). The riser height is the same in every flight.
+
 ## What it decides (and states)
 
 - **Nominal size in, frame size out** — "12 x 16" means 12' x 16' max over the fascia. The engine sizes the frame

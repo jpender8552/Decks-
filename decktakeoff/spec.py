@@ -190,6 +190,11 @@ class Stair:
     closed_risers: bool = True
     mid_support: Optional[bool] = None   # a carrier beam on two posts / footings at mid-run under the stringers (None -> yes when the run is over 6')
     landings: List[List[float]] = field(default_factory=list)   # intermediate landings [[width_in, depth_in], ...] — framed platforms on 4 posts, decked, counted with the stairs
+    flights: List[int] = field(default_factory=list)   # risers per flight, top down ([7, 6]: down 7 to the landing, turn, 6 more); [] -> one straight flight
+    turn: str = "switchback"             # how flight 2 leaves the landing: "switchback" (180°, back alongside flight 1) | "straight" (same direction)
+    turn_side: str = "left"              # switchback: which side of flight 1 the landing extends to and flight 2 runs down ("left" = toward the stair's low edge in plan)
+    flight_rails: List[int] = field(default_factory=list)   # rail sides per flight ([1, 2]); [] -> `rails` on every flight
+    landing_guard_lf: Optional[float] = None   # LF of guard on the landings' open sides (None -> each landing's perimeter less the stair widths in and out)
 
 
 @dataclass

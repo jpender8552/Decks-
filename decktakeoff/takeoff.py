@@ -398,10 +398,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         Qz.border_screws = sum(2 * (int(math.floor(Lb / 16)) + 2) for _, Lb in Qz.border_pieces)
     # stairs lumber
     for st in stairs:
-        Qz.lumber += [("2x12", st.geo.stringer_len_in, "stair stringer")] * st.stringers
-        cuts.append(CutPiece(f"Stair stringers ({st.side})", "2x12", st.geo.stringer_len_in, st.stringers,
-                             f"{st.geo.risers} risers @ {st.geo.riser_in:.3f}\" · {st.geo.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
-        Qz.lumber += [("2x6", st.width + 3, "stair kicker/hanger board")] * 2
+        multi = len(st.geo.flights) > 1
+        for fi, fg in enumerate(st.geo.flights):
+            Qz.lumber += [("2x12", fg.stringer_len_in, "stair stringer")] * st.stringers
+            cuts.append(CutPiece(f"Stair stringers ({st.side}" + (f", flight {fi + 1}" if multi else "") + ")", "2x12", fg.stringer_len_in, st.stringers,
+                                 f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
+            Qz.lumber += [("2x6", st.width + 3, "stair kicker/hanger board")] * 2
     # rail post blocks (timber / IRX: 10-1/2" blocks at every rail post)
     n_rail_posts = (len(rl.posts) if rl else 0) + sum(s.stair_posts for s in stairs)
     if rl and timber:
@@ -644,7 +646,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Hardware", d_, nb, nb + 2, "ea", f"+2  ({n_rail_posts} rail posts x 2)", uc, src))
     for st in stairs:
         d = PRICEBOOK["hardware"]["LSCZ"]
-        lines.append(Line("Hardware", d["desc"], st.stringers, st.stringers, "ea", f"exact  ({st.side} stair, 1 per stringer at the rim)", d["each"], d["source"], "LSCZ"))
+        n_sc = st.stringers * len(st.geo.flights)
+        lines.append(Line("Hardware", d["desc"], n_sc, n_sc, "ea", f"exact  ({st.side} stair, 1 per stringer at the rim" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else "") + ")", d["each"], d["source"], "LSCZ"))
     if spec.extras.hot_tub:
         d_, uc, src, sku = _hw("tub_bay_lot", False)
         lines.append(Line("Hardware", d_, 1, 1, "lot", f"tub bay in zone {spec.extras.hot_tub_zone or 'A'} — RFI to the engineer", uc, src))
@@ -861,7 +864,19 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                     lines.append(Line("Stairs", f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" STAIR panel {rl.color} ({st.side} stair)", n, n, "ea", "exact", uc, src))
             if st.stair_posts:
                 uc, src = _price("rail", f"{sysn}|post|STAIR")
-                lines.append(Line("Stairs", f"{rname} 2\" STAIR post {rl.color} w/ brackets, cap ({st.side} stair)", st.stair_posts, st.stair_posts, "ea", "exact  (top + bottom of each rail side)", uc, src))
+                lines.append(Line("Stairs", f"{rname} 2\" STAIR post {rl.color} w/ brackets, cap ({st.side} stair)", st.stair_posts, st.stair_posts, "ea",
+                                  "exact  (top + bottom of each rail side" + (f", {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else "") + ")", uc, src))
+            if st.landing_sections:
+                lc = Counter(s_.panel_stock_in for s_ in st.landing_sections)
+                for stock_in, n in sorted(lc.items()):
+                    if cable:
+                        uc, src = _price("rail", f"{sysn}|kit|{stock_in // 12}")
+                        lines.append(Line("Stairs", f"{rname} level cable rail kit {stock_in // 12}' — landing guard ({st.side} stair, {st.landing_rail_lf:g} LF)", n, n, "kit", "exact", uc, src))
+                    else:
+                        uc, src = _price("rail", f"{sysn}|panel|{stock_in // 12}|level")
+                        lines.append(Line("Stairs", f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" LEVEL panel {rl.color} — landing guard ({st.side} stair, {st.landing_rail_lf:g} LF)", n, n, "ea", "exact  (open sides of the landings)", uc, src))
+                uc, src = _price("rail", f"{sysn}|post|{'CORNER' if 'CORNER' in RAIL_SYSTEMS.get(sysn, {}).get('post_types', []) else 'POST'}")
+                lines.append(Line("Stairs", f"{rname} 2\" post {rl.color} w/ brackets, cap — landing guard ({st.side} stair)", st.landing_posts, st.landing_posts, "ea", "exact  (bay ends + turn corners)", uc, src))
             if st.geo.handrail_required and st.stair_rail_sides:
                 uc, src = _price("rail", f"{sysn}|handrail_kit")
                 lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
@@ -917,7 +932,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
         rail=("Existing stucco parapet stays — no rail in this scope" if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
         stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide"
+                + (" — " + " + ".join(f"{fg.risers} risers" for fg in s_.geo.flights) + f" ({ss.turn})" if len(s_.geo.flights) > 1 else "")
                 + ("; landings " + " + ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "")
+                + (f"; landing guard {s_.landing_rail_lf:g} LF" if s_.landing_rail_lf else "")
                 for s_, ss in zip(stairs, spec.stairs)],
         material_cost=round(sum(l.ext for l in lines), 2),
     )

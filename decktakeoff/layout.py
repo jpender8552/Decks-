@@ -193,6 +193,10 @@ class StairLayout:
     notes: List[str] = field(default_factory=list)
     mid_support: bool = False            # carrier beam on 2 posts + 2 footings at mid-run under the stringers (stringer run over 6')
     mid_run_in: float = 0.0              # horizontal distance from the top riser to the carrier CL
+    flight_rails: List[int] = field(default_factory=list)      # rail sides per flight, top down
+    landing_sections: List[RailSection] = field(default_factory=list)   # level guard on the landings' open sides
+    landing_posts: int = 0
+    landing_rail_lf: float = 0.0
 
 
 @dataclass
@@ -824,31 +828,56 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
     tread_w = 2 * dkl.bw + dkl.gap + NOSE          # two deck boards + gap + nosing over the riser
     for s in spec.stairs:
         rise = s.total_rise_in if s.total_rise_in else spec.geometry.height_in
-        geo = eng.stair_geometry(rise, s.width_in, composite, tread_w)
+        geo = eng.stair_geometry(rise, s.width_in, composite, tread_w, flights=s.flights or None)
         pieces_per_board = max(1, int(math.floor(144 / (s.width_in + 0.25))))
         tread_pieces = geo.treads * 2
         riser_pieces = geo.risers if s.closed_risers else 0
-        # stair rail: one section per side along the slope
-        slope_len = math.hypot(geo.total_run_in, geo.total_rise_in - geo.riser_in)
         sysd = RAIL_SYSTEMS.get(spec.railing.system, RAIL_SYSTEMS["Fulton"])
+        # rail sides per flight: the spec's list, else `rails` on every flight
+        frails = [int(r) for r in (s.flight_rails or [])][:len(geo.flights)]
+        frails += [s.rails] * (len(geo.flights) - len(frails))
+        # stair rail: one or more sections per rail side along each flight's slope
         secs = []
-        n = max(1, int(math.ceil(slope_len / (max(sysd["panels"].values()) + 2))))
-        for _ in range(s.rails):
-            for _ in range(n):
-                cut = slope_len / n - sysd["post_w"] - 2 * sysd["bracket_allow"]
+        stair_posts = 0
+        for fi, (fg, nr_sides) in enumerate(zip(geo.flights, frails)):
+            slope_len = math.hypot(fg.run_in, fg.rise_in - geo.riser_in)
+            n = max(1, int(math.ceil(slope_len / (max(sysd["panels"].values()) + 2))))
+            tagf = f"stair {s.side}" + (f" flight {fi + 1}" if len(geo.flights) > 1 else "")
+            for _ in range(nr_sides):
+                for _ in range(n):
+                    cut = slope_len / n - sysd["post_w"] - 2 * sysd["bracket_allow"]
+                    stock = next((st for st, mx in sorted(sysd["panels"].items()) if cut <= mx + 1e-6), max(sysd["panels"]))
+                    secs.append(RailSection(tagf, round(slope_len / n, 2), stock, round(cut, 2), kind="stair"))
+            stair_posts += nr_sides * (n + 1)
+        # landing guard: level panels along the landings' open sides (the landing is a walking surface over 30")
+        land_secs = []; land_posts = 0; land_lf = 0.0
+        if s.landings and geo.guard_required and (rise - geo.flights[0].rise_in) > eng.GUARD_TRIGGER_HEIGHT and any(frails):
+            if s.landing_guard_lf is not None:
+                land_lf = float(s.landing_guard_lf)
+            else:
+                land_lf = sum(max(0.0, 2 * (float(a) + float(b)) - 2 * s.width_in) for a, b in s.landings) / 12
+            if land_lf > 0:
+                max_ctc = max(sysd["panels"].values()) + sysd["post_w"] + 2 * sysd["bracket_allow"]
+                nb = max(1, int(math.ceil(land_lf * 12 / max_ctc - 1e-9)))
+                ctc = land_lf * 12 / nb
+                cut = ctc - sysd["post_w"] - 2 * sysd["bracket_allow"]
                 stock = next((st for st, mx in sorted(sysd["panels"].items()) if cut <= mx + 1e-6), max(sysd["panels"]))
-                secs.append(RailSection("stair " + s.side, round(slope_len / n, 2), stock, round(cut, 2), kind="stair"))
-        stair_posts = s.rails * (n + 1) if s.rails else 0
+                land_secs = [RailSection(f"landing {s.side}", round(ctc, 2), stock, round(cut, 2), kind="level")] * nb
+                land_posts = nb + 1 + max(0, len(s.landings) - 1)      # a post at each bay end plus one per turn corner
         pos = s.position_in if s.position_in is not None else ((W - s.width_in) / 2 if s.side == "front" else (0.0 if s.side.startswith("step:") else (D - s.width_in - 12)))
         opening = RailOpening(s.side, pos, s.width_in, f"stair {s.width_in:.0f}\" wide")
         notes = list(geo.notes)
         if geo.handrail_required:
             notes.append(f"{geo.risers} risers — graspable handrail 34–38\" on at least one side (IRC R311.7.8)")
-        mid = s.mid_support if s.mid_support is not None else geo.total_run_in > 72.0
+        if len(geo.flights) > 1:
+            notes.append("flights: " + " · ".join(f"{fg.risers} risers / {fg.treads} treads, run {fg.run_in / 12:.1f}'" for fg in geo.flights)
+                         + f" — {s.turn} at the landing" + (f"; landing guard {land_lf:.0f} LF" if land_lf else ""))
+        longest = max(fg.run_in for fg in geo.flights)
+        mid = s.mid_support if s.mid_support is not None else longest > 72.0
         if mid:
-            notes.append(f"stringer run {geo.total_run_in / 12:.1f}' — carrier beam on two {spec.framing.post_size} posts and footings at mid-run under the stringers")
-        out.append(StairLayout(s.side, s.width_in, geo, 2, tread_pieces, riser_pieces, geo.stringers, geo.stringer_stock_ft, s.rails, secs, stair_posts,
-                               s.landing, opening, notes, mid, round(geo.total_run_in / 2.0, 1) if mid else 0.0))
+            notes.append(f"stringer run {longest / 12:.1f}' — carrier beam on two {spec.framing.post_size} posts and footings at mid-run under the stringers")
+        out.append(StairLayout(s.side, s.width_in, geo, 2, tread_pieces, riser_pieces, geo.stringers, geo.stringer_stock_ft, max(frails) if frails else s.rails, secs, stair_posts,
+                               s.landing, opening, notes, mid, round(longest / 2.0, 1) if mid else 0.0, frails, land_secs, land_posts, round(land_lf, 1)))
     return out
 
 

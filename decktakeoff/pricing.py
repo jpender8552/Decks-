@@ -108,7 +108,9 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Timber oil — pre-oil the 4x10 joists / rims / ledgers on horses, coat 1 all faces", round(t.joist_lf), "LF", lr["oil_pre_oil_per_lf"], "EST — no rate-card line"))
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
     for st in L.stairs:
-        lab.append((f"Stairs ({st.side})", st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
+        lab.append((f"Stairs ({st.side})" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
+        if st.landing_rail_lf:
+            lab.append((f"Landing guard rail ({st.side} stair)", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
     for ss in s.stairs:
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144

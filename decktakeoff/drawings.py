@@ -139,7 +139,12 @@ def deck_outline(S: Scene) -> List[Tuple[float, float]]:
 
 
 def plan_bounds(S: Scene):
-    return -3.0, S.W + 3.0, S.y_min - 4.0, S.y_front + 4.0
+    """The plan window: the deck plus 3-4' of margin, widened to take in stairs and landings that run past the frame."""
+    x0, x1, y0, y1 = -3.0, S.W + 3.0, S.y_min - 4.0, S.y_front + 4.0
+    for b in S.boxes:
+        if b.tag and (b.tag.startswith("tread") or b.tag.startswith("landing") or "stair" in b.tag or "lower deck" in b.tag):
+            x0, x1, y0, y1 = min(x0, b.x0 - 2.0), max(x1, b.x1 + 2.0), min(y0, b.y0 - 2.0), max(y1, b.y1 + 2.0)
+    return x0, x1, y0, y1
 
 
 # ------------------------------------------------------------------ sheets
@@ -224,13 +229,17 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
             x, y = px * IN, bl.y * IN
             o.append(T(X(x), Y(y) - 12 * (1 if bl.kind == "drop" else -1) - (0 if bl.kind == "drop" else 4), f"P{n}", 8, 800, "middle"))
             rows.append((f"P{n}", ftin(px), ftin(bl.y), zn, f"{ld:,.0f} lb"))
-    for st in L.stairs:
-        if st.mid_support:
-            for b in [q for q in S.boxes if q.tag == "stair footing"]:
-                n += 1
-                cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
-                o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
-                rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "carrier"))
+    if any(st.mid_support for st in L.stairs):
+        for b in [q for q in S.boxes if q.tag == "stair footing"]:
+            n += 1
+            cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+            o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
+            rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "carrier"))
+    for b in [q for q in S.boxes if q.tag == "landing footing"]:
+        n += 1
+        cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+        o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
+        rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "landing"))
     for bl in L.beam_lines:
         o.append(T(X(bl.x0) + 4, Y(bl.y * IN) - 6, bl.label, 7.5, 800, fill=MUTE))
     # dims: beam lines from the front, zone widths
