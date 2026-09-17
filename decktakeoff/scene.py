@@ -252,7 +252,7 @@ def build_scene(L) -> Scene:
         nonlocal seed
         seed = (seed * 1103515245 + 12345) % (2 ** 31)
         return (seed / 2 ** 31) * 2 - 1
-    for zi, z in enumerate(L.zones):
+    for zi, z in enumerate(L.zones if L.plan is None else []):
         dk = z.decking
         x0, W_z = z.x0 * IN, z.W * IN
         yw = z.wall_y * IN
@@ -298,9 +298,33 @@ def build_scene(L) -> Scene:
             add("border", xa, xa + bw, yw, y_out, zt - bt, zt, "border", 6, tone=tone())
         if pf and right_end:
             add("border", xb - bw, xb, yw, y_out, zt - bt, zt, "border", 6, tone=tone())
-    for dx, Ld, lab in L.divider_x:
-        x = dx * IN
-        add("border", x - bw / 2, x + bw / 2, y_front - Ld * IN, y_front + edge, zt - bt, zt, "border", 6, tag=lab, tone=tone())
+    if L.plan is None:
+        for dx, Ld, lab in L.divider_x:
+            x = dx * IN
+            add("border", x - bw / 2, x + bw / 2, y_front - Ld * IN, y_front + edge, zt - bt, zt, "border", 6, tag=lab, tone=tone())
+    else:
+        # boards from the outline plan: one piece per row segment, borders along every exposed edge (the curve in mitred segments), breakers
+        P = L.plan
+        for r in P.rows:
+            add("board", r.x0 * IN, r.x1 * IN, r.y0 * IN, r.y1 * IN, zt - bt, zt, "deck", 6, tag="pf field" + (" rip" if r.rip else ""), tone=tone())
+        from .layout import _poly_orient
+        poly_in = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
+        sgn = _poly_orient(poly_in)
+        for x0_, y0_, x1_, y1_, _ in P.borders:
+            L_e = math.hypot(x1_ - x0_, y1_ - y0_) * IN
+            ux, uy = (x1_ - x0_) / (L_e / IN), (y1_ - y0_) / (L_e / IN)
+            nx, ny = -uy * sgn, ux * sgn                       # inward
+            off = bw / 2 - edge                                  # the border's centre line: half a board in from the overhang
+            cx, cy = (x0_ + x1_) / 2 * IN + nx * off, (y0_ + y1_) / 2 * IN + ny * off
+            if abs(y1_ - y0_) < 0.5:
+                add("border", cx - L_e / 2 - bw / 2, cx + L_e / 2 + bw / 2, cy - bw / 2, cy + bw / 2, zt - bt, zt, "border", 6, tag="pf border", tone=tone())
+            elif abs(x1_ - x0_) < 0.5:
+                add("border", cx - bw / 2, cx + bw / 2, cy - L_e / 2 - bw / 2, cy + L_e / 2 + bw / 2, zt - bt, zt, "border", 6, tag="pf border", tone=tone())
+            else:
+                phi = math.atan2(y1_ - y0_, x1_ - x0_)
+                add("border", cx - L_e / 2 - 0.1, cx + L_e / 2 + 0.1, cy - bw / 2, cy + bw / 2, zt - bt, zt, "border", 6, tag="pf border (mitred)", rot=phi, rot_axis="z", tone=tone())
+        for x, y_lo, y_hi, lab in P.dividers:
+            add("border", x * IN - bw / 2, x * IN + bw / 2, y_lo * IN, y_hi * IN, zt - bt, zt, "border", 6, tag=f"breaker {lab}", tone=tone())
     fixed = B
 
     # ---------------- rail
@@ -599,7 +623,11 @@ def build_scene(L) -> Scene:
 
         flights = g.flights
         frails = list(st.flight_rails) + [st.stair_rail_sides] * (len(flights) - len(st.flight_rails))
-        turn_left = (ss.turn_side or "left") == "left"
+        LEFT = {"-y": "-x", "+y": "+x", "+x": "-y", "-x": "+y"}     # facing down the flight, the left hand
+        RIGHT = {v: k for k, v in LEFT.items()}
+        turn = ss.turn or "switchback"
+        side_dir = (RIGHT if (ss.turn_side or "left") == "right" else LEFT)[direction] if turn in ("switchback", "straight") else (LEFT if turn == "left" else RIGHT)[direction]
+        turn_left = side_dir in ("-x", "-y")          # the landing extends toward the low-v side of the flight
         multi = len(flights) > 1
         # flight 1 from the deck
         def sides_for(n_sides, fi):
@@ -635,8 +663,9 @@ def build_scene(L) -> Scene:
             r1 = rect_world(cur_dir, cur_u0, trun, trun + ld, sq_va, sq_vb)
             rects = [r1]
             draw_landing(r1, z_next, len(land_rects) + 1)
-            if ss.turn == "switchback":
-                # the big landing beside the turn square on the turn side; flight 2 leaves its near edge running back alongside flight 1
+            if turn in ("switchback", "left", "right"):
+                # the big landing beside the turn square on the turn side; flight 2 leaves it: back alongside flight 1 (switchback)
+                # or straight out of its outer edge (a 90° turn)
                 if fi == 0 and len(lands) > 1:
                     lw2, ld2 = lands[1]
                     if turn_left:
@@ -648,11 +677,20 @@ def build_scene(L) -> Scene:
                     rects.append(r2)
                 else:
                     l_va, l_vb = sq_va, sq_vb
-                n_va, n_vb = (l_va, l_va + width) if turn_left else (l_vb - width, l_vb)
-                openings.append(rect_world(cur_dir, cur_u0, trun - 0.3, trun + 0.3, n_va, n_vb))
-                cur_u0 = world(cur_dir, cur_u0, trun)
-                cur_dir = REV[cur_dir]
-                cur_va, cur_vb = n_va, n_vb
+                if turn == "switchback":
+                    n_va, n_vb = (l_va, l_va + width) if turn_left else (l_vb - width, l_vb)
+                    openings.append(rect_world(cur_dir, cur_u0, trun - 0.3, trun + 0.3, n_va, n_vb))
+                    cur_u0 = world(cur_dir, cur_u0, trun)
+                    cur_dir = REV[cur_dir]
+                    cur_va, cur_vb = n_va, n_vb
+                else:
+                    # 90°: flight 2 leaves the outer edge of the landing, its width along the landing from the deck-side line
+                    l_edge = l_va if turn_left else l_vb
+                    openings.append(rect_world(cur_dir, cur_u0, trun, trun + width, l_edge - 0.3, l_edge + 0.3))
+                    n_va, n_vb = sorted((world(cur_dir, cur_u0, trun), world(cur_dir, cur_u0, trun + width)))
+                    cur_u0 = l_edge
+                    cur_dir = side_dir
+                    cur_va, cur_vb = n_va, n_vb
             else:
                 # straight through: the next flight leaves the far edge of the landing
                 openings.append(rect_world(cur_dir, cur_u0, trun + ld - 0.3, trun + ld + 0.3, cur_va, cur_vb))
@@ -973,8 +1011,8 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
     for b in boxes:
         if b.kind not in DECK_KINDS or b.rot or b.kind == "fascia":   # fascia hangs outside the outline by its own thickness: never clip it
             out.append(b); continue
-        if b.tag and (b.tag.startswith("landing") or b.tag.startswith("tread") or "stair" in b.tag):   # stairs and landings sit outside the deck outline
-            out.append(b); continue
+        if b.tag and (b.tag.startswith("landing") or b.tag.startswith("tread") or "stair" in b.tag or b.tag.startswith("pf ") or b.tag.startswith("breaker")):
+            out.append(b); continue          # stairs and landings sit outside the outline; plan-laid boards and borders are already cut to it
         cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
         along_x = (b.x1 - b.x0) >= (b.y1 - b.y0)
         if along_x:

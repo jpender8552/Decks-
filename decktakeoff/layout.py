@@ -200,6 +200,49 @@ class StairLayout:
 
 
 @dataclass
+class RowSeg:
+    """One field board: a y band and an x run (inches, plan frame). Ends: border | divider | house | cut (angled house wall)."""
+    y0: float
+    y1: float
+    x0: float
+    x1: float
+    panel: int
+    rip: bool = False
+    left: str = "border"
+    right: str = "border"
+
+    @property
+    def length(self) -> float:
+        return self.x1 - self.x0
+
+    @property
+    def height(self) -> float:
+        return self.y1 - self.y0
+
+
+@dataclass
+class FieldPlan:
+    """Boards laid from the deck's true outline: rows on one grid per panel (the strips between breaker boards), every
+    board one piece wall to border, borders on every exposed edge, breakers only where a run would exceed the longest stock."""
+    rows: List[RowSeg] = field(default_factory=list)
+    borders: List[Tuple[float, float, float, float, str]] = field(default_factory=list)   # exposed outline edges (x0, y0, x1, y1, kind) inches
+    dividers: List[Tuple[float, float, float, str]] = field(default_factory=list)         # (x, y_lo, y_hi, label) inches
+    panels: List[Tuple[float, float, int, float]] = field(default_factory=list)           # (x0, x1, rows, y_top)
+    notes: List[str] = field(default_factory=list)
+    dropped: int = 0
+    dropped_at: List[Tuple[float, float]] = field(default_factory=list)
+
+    @property
+    def n_rows(self) -> int:
+        return max((n for _, _, n, _ in self.panels), default=0)
+
+    def summary(self) -> str:
+        parts = [f"panel {i + 1} ({ftin(a)}–{ftin(b)}) {n} rows" for i, (a, b, n, _) in enumerate(self.panels)]
+        rips = sum(1 for r in self.rows if r.rip)
+        return "Rows per panel: " + " · ".join(parts) + (f" · {rips} ripped pieces" if rips else " · no rips") + (f" · {len(self.dividers)} breaker{'s' if len(self.dividers) != 1 else ''}" if self.dividers else " · no breakers")
+
+
+@dataclass
 class Edge:
     """One straight run of the deck's outer outline (plan coordinates; y grows toward the yard)."""
     name: str            # "front:A" | "step:C-B" | "end:left" | "end:right"
@@ -243,6 +286,7 @@ class Layout:
     beam_lines: List[BeamLine] = field(default_factory=list)
     divider_x: List[Tuple[float, float, str]] = field(default_factory=list)   # (x, length from the front, label) contrast divider boards
     wall_lf: float = 0.0          # LF of house wall that gets membrane + flashing (ledgers + return walls; never a privacy wall)
+    plan: Optional[FieldPlan] = None      # outline-laid decking (multi-zone plans with an outline and breakers)
 
     @property
     def deck_sf(self) -> float:
@@ -991,6 +1035,219 @@ def build_dividers(spec: DeckSpec, zl: List[ZoneLayout], max_run_in: float = 192
     return sorted(out)
 
 
+# ================================================================== decking from the outline (continuous boards, breakers only where needed)
+def _poly_orient(poly: List[Tuple[float, float]]) -> float:
+    a = 0.0
+    for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+        a += x0 * y1 - x1 * y0
+    return 1.0 if a > 0 else -1.0
+
+
+def _inset_polygon(poly: List[Tuple[float, float]], d: List[float]) -> List[Tuple[float, float]]:
+    """Offset every edge inward by its own distance and re-intersect the neighbours (a simple polygon)."""
+    n = len(poly)
+    sgn = _poly_orient(poly)
+    lines = []
+    for i in range(n):
+        (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+        L_ = math.hypot(x1 - x0, y1 - y0)
+        if L_ < 1e-9:
+            lines.append(None); continue
+        ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        nx, ny = -uy * sgn, ux * sgn
+        lines.append((x0 + nx * d[i], y0 + ny * d[i], ux, uy))
+    out = []
+    for i in range(n):
+        a, b = lines[i - 1], lines[i]
+        if a is None or b is None:
+            out.append(poly[i]); continue
+        px, py, ux, uy = a; qx, qy, vx, vy = b
+        den = ux * vy - uy * vx
+        if abs(den) < 1e-9:
+            out.append((qx, qy)); continue
+        t = ((qx - px) * vy - (qy - py) * vx) / den
+        out.append((px + ux * t, py + uy * t))
+    return out
+
+
+def _poly_inside(poly, x, y) -> bool:
+    n = len(poly); inside = False; j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]; xj, yj = poly[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-9) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _row_cross(poly, y) -> List[Tuple[float, int]]:
+    xs = []
+    n = len(poly)
+    for i in range(n):
+        (xa, ya), (xb, yb) = poly[i], poly[(i + 1) % n]
+        if (ya > y) != (yb > y):
+            xs.append((xa + (y - ya) * (xb - xa) / (yb - ya), i))
+    xs.sort()
+    return xs
+
+
+def _edge_kinds(spec: DeckSpec, poly_in: List[Tuple[float, float]]) -> List[str]:
+    """house | border for every outline edge: the house side is inside a house block or on an angled house wall."""
+    blocks = [tuple(float(v) * 12 for v in h[:4]) for h in (spec.geometry.house_blocks or [])]
+    walls = [tuple(float(v) * 12 for v in w[:4]) for w in (spec.geometry.house_walls or [])]
+    sgn = _poly_orient(poly_in)
+    kinds = []
+    n = len(poly_in)
+    for i in range(n):
+        (x0, y0), (x1, y1) = poly_in[i], poly_in[(i + 1) % n]
+        L_ = math.hypot(x1 - x0, y1 - y0)
+        if L_ < 1e-9:
+            kinds.append("border"); continue
+        ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        nx, ny = -uy * sgn, ux * sgn            # inward
+        mx, my = (x0 + x1) / 2 - nx * 2.0, (y0 + y1) / 2 - ny * 2.0     # 2" outside the edge
+        house = any(bx0 - 0.5 <= mx <= bx1 + 0.5 and by0 - 0.5 <= my <= by1 + 0.5 for bx0, bx1, by0, by1 in blocks)
+        if not house:
+            for wx0, wy0, wx1, wy1 in walls:
+                wl = math.hypot(wx1 - wx0, wy1 - wy0) or 1e-9
+                t = max(0.0, min(1.0, ((mx - wx0) * (wx1 - wx0) + (my - wy0) * (wy1 - wy0)) / wl ** 2))
+                if math.hypot(mx - (wx0 + t * (wx1 - wx0)), my - (wy0 + t * (wy1 - wy0))) < 4.0:
+                    house = True; break
+        kinds.append("house" if house else "border")
+    return kinds
+
+
+def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -> Optional[FieldPlan]:
+    """Rows from the outline. Panels between breakers each carry their own row grid from their outermost front edge."""
+    if not spec.geometry.outline or spec.geometry.board_direction != "parallel":
+        return None
+    poly = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
+    if len(poly) < 3:
+        return None
+    bw, gap = dkl.bw, dkl.gap
+    edge = (dkl.fascia_t + NOSE) if spec.decking.fascia else OVERHANG_NO_FASCIA   # board overhang past the frame (fascia + nose)
+    pf = spec.geometry.picture_frame
+    kinds = _edge_kinds(spec, poly)
+    inset = _inset_polygon(poly, [((bw + gap - edge) if (pf and k == "border") else (-edge if k == "border" else 0.0)) for k in kinds])
+    xs_all = [x for x, _ in poly]; ys_all = [y for _, y in poly]
+    xmin, xmax, ymin, ymax = min(xs_all), max(xs_all), min(ys_all), max(ys_all)
+    stock_max = max(STOCK_LENGTHS_FT) * 12.0
+    trim_d = bw / 2 + gap                   # a field board stops this short of a breaker line
+    # ---- breaker lines: explicit, else only where a raw row would exceed the longest stock, on zone (house-corner) lines
+    plan = FieldPlan()
+    if spec.decking.divider_x_ft:
+        div_x = sorted(float(v) * 12 for v in spec.decking.divider_x_ft)
+    elif spec.decking.dividers:
+        cands = sorted({z.x0 for z in zl[1:]})
+        div_x: List[float] = []
+        raw_rows = []
+        yy = ymax - 0.5
+        while yy > ymin:
+            xs = _row_cross(poly, yy)
+            for (a, _), (b, _) in zip(xs[0::2], xs[1::2]):
+                raw_rows.append((b - a, a, b))
+            yy -= bw + gap
+        for _, a, b in sorted(raw_rows, reverse=True):
+            cuts = sorted(x for x in div_x if a - 6 <= x <= b + 6)
+            start = a
+            for c in cuts + [b]:
+                if c <= start + 6:            # a breaker already sits at (or within 6" of) this end
+                    start = max(start, c); continue
+                # a board between two breaker lines is the line spacing less a half board and a gap at each end
+                allow = stock_max + (2 * trim_d if start != a else trim_d)
+                while c - start > allow:
+                    ok = [x for x in cands if start + 24 < x <= start + allow and x < c - 24]
+                    x_new = max(ok) if ok else start + (c - start) / math.ceil((c - start) / allow)
+                    allow = stock_max + 2 * trim_d
+                    x_new = round(x_new * 2) / 2
+                    div_x.append(x_new); div_x.sort()
+                    start = x_new
+                start = c
+    else:
+        div_x = []
+    bounds = [xmin] + div_x + [xmax]
+    # ---- rows per panel
+    for pi, (pa, pb) in enumerate(zip(bounds, bounds[1:])):
+        # the panel's outermost front: the outline's highest y inside the panel (vertices and the crossings at its sides)
+        ys_p = [y for x, y in poly if pa - 0.01 <= x <= pb + 0.01]
+        for xb in (pa, pb):
+            for i in range(len(poly)):
+                (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % len(poly)]
+                if (x0 > xb) != (x1 > xb):
+                    ys_p.append(y0 + (xb - x0) * (y1 - y0) / (x1 - x0))
+        y_top = (max(ys_p) if ys_p else ymax) + edge
+        y1 = y_top - ((bw + gap) if pf else 0.0)
+        n_rows = 0
+        lo = pa + (trim_d if pi > 0 else -edge - 1.0)
+        hi = pb - (trim_d if pi < len(bounds) - 2 else -edge - 1.0)
+        while y1 > ymin - bw:
+            yc = y1 - bw / 2
+            xs = _row_cross(inset, yc)
+            got = False
+            for (a, ia), (b, ib) in zip(xs[0::2], xs[1::2]):
+                x0_, x1_ = max(a, lo), min(b, hi)
+                if x1_ - x0_ < 6.0:
+                    if x1_ - x0_ > 0.5:
+                        plan.dropped += 1
+                        plan.dropped_at.append((round((x0_ + x1_) / 2, 1), round(yc, 1)))
+                    continue
+                xm = (x0_ + x1_) / 2
+                top_in = _poly_inside(inset, xm, y1 - 0.05)
+                bot_in = _poly_inside(inset, xm, y1 - bw + 0.05)
+                yb0, yb1 = y1 - bw, y1
+                rip = False
+                if top_in and not bot_in:
+                    lo_y, hi_y = y1 - bw, y1
+                    for _ in range(24):
+                        m = (lo_y + hi_y) / 2
+                        if _poly_inside(inset, xm, m): hi_y = m
+                        else: lo_y = m
+                    yb0 = hi_y; rip = True
+                elif bot_in and not top_in:
+                    lo_y, hi_y = y1 - bw, y1
+                    for _ in range(24):
+                        m = (lo_y + hi_y) / 2
+                        if _poly_inside(inset, xm, m): lo_y = m
+                        else: hi_y = m
+                    yb1 = lo_y; rip = True
+                elif not top_in and not bot_in:
+                    continue
+                if yb1 - yb0 < 1.0:
+                    continue
+                left = "divider" if abs(x0_ - lo) < 0.05 and pi > 0 else ("house" if kinds[ia] == "house" else "border")
+                right = "divider" if abs(x1_ - hi) < 0.05 and pi < len(bounds) - 2 else ("house" if kinds[ib] == "house" else "border")
+                for k_, (i_, x_) in (("l", (ia, x0_)), ("r", (ib, x1_))):
+                    (ex0, ey0), (ex1, ey1) = poly[i_], poly[(i_ + 1) % len(poly)]
+                    if kinds[i_] == "house" and abs(ex0 - ex1) > 0.5 and abs(ey0 - ey1) > 0.5:
+                        if k_ == "l" and left == "house": left = "cut"
+                        if k_ == "r" and right == "house": right = "cut"
+                plan.rows.append(RowSeg(round(yb0, 3), round(yb1, 3), round(x0_, 3), round(x1_, 3), pi, rip, left, right))
+                got = True
+            if got:
+                n_rows += 1
+            y1 -= bw + gap
+        plan.panels.append((pa, pb, n_rows, y_top))
+    # ---- breakers: from the panel front down to the last row that runs past the line
+    for k, x in enumerate(div_x):
+        y_hi = max(plan.panels[k][3], plan.panels[k + 1][3])
+        y_lo = y_hi - bw - gap
+        for r in plan.rows:
+            if (r.x0 + 1.0 < x < r.x1 - 1.0) or (abs(r.x1 - (x - trim_d)) < 0.1) or (abs(r.x0 - (x + trim_d)) < 0.1):
+                y_lo = min(y_lo, r.y0)
+        lab = next((f"D{a.name}/{b.name}" for a, b in zip(zl, zl[1:]) if abs(b.x0 - x) < 0.6), f"D@{ftin(x)}")
+        plan.dividers.append((x, y_lo, y_hi, lab))
+    # ---- borders on every exposed edge
+    if pf:
+        for i, k in enumerate(kinds):
+            if k == "border":
+                (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % len(poly)]
+                if math.hypot(x1 - x0, y1 - y0) > 0.5:
+                    plan.borders.append((x0, y0, x1, y1, "border"))
+    if plan.dropped:
+        plan.notes.append(f"{plan.dropped} slivers under 6\" beside the breakers / bay are not laid as boards (the border or breaker covers)")
+    return plan
+
+
 # ================================================================== whole layout
 def _floor_to(x: float, step: float) -> float:
     return math.floor(x / step + 1e-9) * step
@@ -1057,6 +1314,11 @@ def build_layout(spec: DeckSpec) -> Layout:
         st = stair_layouts(spec, deepest.W, deepest.D, deepest.decking)
         lines = build_beam_lines(spec, zl)
         divs = build_dividers(spec, zl)
+        plan = build_field_plan(spec, zl, zl[0].decking) if (spec.decking.dividers or spec.decking.divider_x_ft) else None
+        if plan is not None:
+            divs = [(x, y_hi - y_lo, lab) for x, y_lo, y_hi, lab in plan.dividers]
+            notes.append(plan.summary())
+            notes += plan.notes
         rl = rail_layout_edges(spec, edges, [q.opening for q in st], forced_x=[d[0] for d in divs])
         notes.append(f"{len(zl)} zones, {sum(q.W for q in zl) / 12:.1f}' along the house, outline "
                      + " · ".join(f"{e.name} {ftin(e.length)}" for e in edges if e.exposed))
@@ -1065,6 +1327,7 @@ def build_layout(spec: DeckSpec) -> Layout:
                          + (f"; pieces " + " · ".join(ftin(b - a) for a, b in ln.pieces) if len(ln.pieces) > 1 else ""))
         wall_lf = sum(q.W for q in zl if q.frame.ledger) + sum(abs(a.wall_y - b.wall_y) for a, b in zip(zl, zl[1:]) if a.frame.ledger and b.frame.ledger)
         L = Layout(spec, zl[0].frame, zl[0].decking, rl, st, x, deepest.D, notes, zl, edges, True, lines, divs, wall_lf)
+        L.plan = plan
         return L
     W, D = float(g.width_in), float(g.depth_in)
     if g.size_mode == "nominal":

@@ -60,3 +60,21 @@ def test_switchback_stair_flights():
     f1 = [b for b in treads if "flight 1" in b.tag]; f2 = [b for b in treads if "flight 2" in b.tag]
     assert min(b.z1 for b in f2) < min(b.z1 for b in f1)
     assert max(b.x1 for b in f2) < min(b.x0 for b in f1)
+
+
+def test_outline_field_plan_breakers():
+    """Glengarry: boards laid from the outline — two breakers (the bay corner line and the wall jog), no board over 20',
+    every row one piece, borders on the exposed edges only."""
+    import json
+    from decktakeoff import run
+    from decktakeoff.spec import DeckSpec
+    sp = DeckSpec.from_dict(json.load(open("jobs/glengarry_2_fulton_new.json")))
+    t, flags, p = run(sp)
+    P = t.layout.plan
+    assert P is not None and len(P.dividers) == 2
+    assert [round(x / 12, 2) for x, _, _, _ in P.dividers] == [18.25, 38.17]
+    assert max(r.length for r in P.rows) <= 240.0
+    assert all(r.x1 > r.x0 + 6 for r in P.rows)
+    # a row in the main run crosses the old zone lines P2/W with no joint
+    assert any(r.x0 < 6.7 * 12 + 60 and r.x1 > 18 * 12 for r in P.rows)
+    assert sum(1 for l in t.lines if l.category == "Decking" and "Square Edge" in l.item and "border" not in l.item) == 3

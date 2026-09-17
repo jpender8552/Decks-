@@ -69,7 +69,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps.append(dict(n=6, code="T-405", title="Decking", still="step6",
         goes_in=items(lambda l: l.category in ("Decking", "Fasteners", "Fascia")),
         how=[t.schedule.get("Field", ""), t.schedule.get("Face screws", "Borders first, then the field."),
-             "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones) + ". Borders and dividers first, then the field rows from the outer edge toward the house."],
+             (L.plan.summary() if L.plan is not None else "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones)) + ". Borders and breakers first, then the field rows from the outer edge toward the house."],
         check=[f"{ftin(s.deck_gap)} gaps held", "No cut end shows at the outer edge", "Color: every board from the same run"]))
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
         goes_in=items(lambda l: l.category == "Rail"),

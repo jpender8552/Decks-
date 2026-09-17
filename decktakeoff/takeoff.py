@@ -12,10 +12,10 @@ from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple
 
 from . import engineering as eng
-from .catalog import (DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
+from .catalog import (STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
                       POST_CAP_SCREWS, PRICEBOOK, SPECIES_NAMES, TIMBER_BASE, actual, decking_facts, default_fastener_system, parse_beam,
                       RAIL_SYSTEMS)
-from .layout import Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
+from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
 from .spec import DeckSpec
 from .units import ftin
 
@@ -240,6 +240,33 @@ def _field_runs(spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> List[Tuple
     return out
 
 
+def _accumulate_field_plan(Q_: Q, spec: DeckSpec, L: Layout) -> None:
+    """Field boards from the outline plan: every row segment is one board (no butt joints), rips are whole boards ripped."""
+    P = L.plan
+    fr0 = L.zones[0].frame
+    cortex = (spec.decking.fastener_system or default_fastener_system(spec.decking.collection, spec.decking.profile)) == "Cortex"
+    cut_groups: Dict[Tuple[int, int, bool], int] = {}
+    for r in P.rows:
+        key = (r.panel, int(round(r.length)), r.rip)
+        cut_groups[key] = cut_groups.get(key, 0) + 1
+        crossings = int(round(r.length / fr0.spacing)) + 2
+        Q_.clips += crossings * (2 if cortex else 1)
+        Q_.bearing_points += crossings
+    # cut the rows from stock: the short rows beside the steps and the bay come two or three to a board
+    packed = pack_boards([(f"panel {r.panel + 1}", r.length + 0.25) for r in P.rows], stocks=tuple(STOCK_LENGTHS_FT))
+    for stock, boards in sorted(packed.items()):
+        Q_.field_boards[stock] += len(boards)
+        multi = sum(1 for b in boards if len(b) > 1)
+        Q_.field_piece_note.append(f"{len(boards)} x {stock}'" + (f" ({multi} cut into 2-3 rows)" if multi else ""))
+    Q_.field_piece_note.append(" · ".join(f"panel {i + 1} {n} rows" for i, (_, _, n, _) in enumerate(P.panels)) + " · every row one piece")
+    for (pi, ln, rip), n in sorted(cut_groups.items()):
+        Q_.cuts.append(CutPiece(f"Field boards panel {pi + 1}" + (" (rip)" if rip else ""), f"{spec.decking.collection} {spec.decking.color}", float(ln), n,
+                                "one board wall to border, no joints" + ("; ripped to fit the border / the house" if rip else "")))
+    Q_.field_rows += P.n_rows
+    if P.dropped:
+        Q_.cuts.append(CutPiece("Slivers under 6\" (not laid)", f"{spec.decking.collection} {spec.decking.color}", 0.0, P.dropped, "beside the breakers at the bay — the breaker / border covers"))
+
+
 def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None:
     fr, dk = z.frame, z.decking
     tag = f" ({z.name})" if L.multi else ""
@@ -325,8 +352,8 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
     if timber:
         pieces_here = (n_field + n_pf + n_div_here) * (2 if flush_mid else 1) + 2 * fr.rim_plies + (0 if front_flush else fr.rim_plies) + (1 if fr.ledger else fr.rim_plies) + fr.n_blocks_per_row * n_block_rows
         Q_.timber_ends += 2 * pieces_here
-    # ---- decking: field boards per run, rips, cortex per run
-    runs = _field_runs(spec, L, z, zi) if L.multi else [(dk.rows, dk.field_len, z.name)]
+    # ---- decking: field boards per run, rips, cortex per run (an outline-laid plan is counted once, after the zones)
+    runs = ([] if L.plan is not None else (_field_runs(spec, L, z, zi) if L.multi else [(dk.rows, dk.field_len, z.name)]))
     for n_rows, run_len, lab in runs:
         k = max(1, int(math.ceil(run_len / 240.0)))
         piece = run_len / k
@@ -341,8 +368,8 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
         else:
             Q_.clips += n_rows * crossings
         Q_.bearing_points += crossings
-    Q_.field_rows += dk.rows
-    if dk.last_row_dev < -0.5:
+    Q_.field_rows += dk.rows if L.plan is None else 0
+    if dk.last_row_dev < -0.5 and L.plan is None:
         rip = -dk.last_row_dev - dk.gap
         Q_.rip_strips += [rip] * len(runs)
         Q_.cuts.append(CutPiece(f"Rip at the house{tag}", f"{spec.decking.collection} {spec.decking.color}", runs[0][1], len(runs), f"rip to {rip:.2f}\""))
@@ -379,11 +406,29 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     Qz = Q(n_zones=len(L.zones))
     for zi, z in enumerate(L.zones):
         accumulate(Qz, spec, L, z, zi)
+    if L.plan is not None:
+        _accumulate_field_plan(Qz, spec, L)
     cuts = Qz.cuts
     if Qz.front_flush:
         notes.append("front flush beam IS the front rim — joists hang into it, posts under it, no separate rim plies")
+    # ---- outline-laid plan: a border piece on every exposed edge (the curve as mitred segments), split at the breakers; the breakers
+    if L.plan is not None and spec.geometry.picture_frame:
+        edge = (dk0.fascia_t + NOSE) if spec.decking.fascia else OVERHANG_NO_FASCIA
+        bw, gap = dk0.bw, dk0.gap
+        div_xs = [x for x, _, _, _ in L.plan.dividers]
+        for x0, y0, x1, y1, _ in L.plan.borders:
+            xa, xb = sorted((x0, x1))
+            cuts_x = [xa] + [x for x in div_xs if xa + 1 < x < xb - 1] + [xb]
+            if abs(y1 - y0) < 0.5 and len(cuts_x) > 2:
+                for a, b in zip(cuts_x, cuts_x[1:]):
+                    Qz.border_pieces.append((f"border {ftin(a)}-{ftin(b)}", b - a - (bw / 2 + gap) * ((a != xa) + (b != xb))))
+            else:
+                Qz.border_pieces.append((f"border {ftin(xa)},{ftin(min(y0, y1))}", math.hypot(x1 - x0, y1 - y0) + (bw if abs(y1 - y0) > 0.5 and abs(x1 - x0) > 0.5 else edge)))
+        for x, y_lo, y_hi, lab in L.plan.dividers:
+            Qz.border_pieces.append((f"breaker {lab}", y_hi - y_lo))
+        Qz.border_screws = sum(2 * (int(math.floor(Lb / 16)) + 2) for _, Lb in Qz.border_pieces)
     # ---- multi-zone picture frame: outer border segmented at the dividers, end borders, dividers
-    if L.multi and spec.geometry.picture_frame:
+    elif L.multi and spec.geometry.picture_frame:
         edge = (dk0.deck_w - L.zones[0].W) / 2
         bw, gap = dk0.bw, dk0.gap
         front_edges = [e for e in L.edges if e.name.startswith("front")]

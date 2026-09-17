@@ -88,7 +88,14 @@ Stairs can be one straight flight or several: `"flights": [7, 6]` is down 7 rise
 is `switchback` (a horseshoe: flight 2 runs back alongside flight 1, on the `turn_side`) or `straight`; `landings`
 lists the platforms between flights (framed on four posts, decked, counted with the stairs); `flight_rails` gives the
 rail sides per flight and `landing_guard_lf` the guard on the landings' open sides (defaulted from the landing
-perimeter less the stair widths in and out). The riser height is the same in every flight.
+perimeter less the stair widths in and out). The riser height is the same in every flight. `turn` can also be `left`
+or `right`: a 90° turn, flight 2 leaving the outer edge of the landing.
+
+**Decking from the outline.** A multi-zone plan with an `outline` and `dividers: true` lays its boards from the true
+outline instead of zone by zone: one row grid per panel (the strips between breaker boards), every board one piece
+from the house wall or border to the next, borders on every exposed edge (a curve as mitred segments), and breakers only
+where a row would exceed a 20' board, placed on zone (house-corner) lines. `divider_x_ft` fixes the breaker lines by
+hand. Short rows beside steps and bays are cut two or three to a board in the order.
 
 ## What it decides (and states)
 

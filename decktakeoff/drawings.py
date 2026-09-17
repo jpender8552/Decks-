@@ -325,11 +325,19 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("border",), "#222", 0.3)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("railpost",), INK, 0.5)
     zs = S.meta["zones"]
-    for zl, z in zip(L.zones, zs):
-        dk = zl.decking
-        o.append(T(X(z["x0"] + z["W"] / 2), Y((z["wall_y"] + z["front"]) / 2), f"{z['name']} · {dk.rows} rows", 9, 800, "middle", "#fff"))
-    for dx, Ld, lab in L.divider_x:
-        o.append(T(X(dx * IN), Y(S.y_front) + 8, lab, 6.5, 700, "middle", MUTE))
+    if L.plan is None:
+        for zl, z in zip(L.zones, zs):
+            dk = zl.decking
+            o.append(T(X(z["x0"] + z["W"] / 2), Y((z["wall_y"] + z["front"]) / 2), f"{z['name']} · {dk.rows} rows", 9, 800, "middle", "#fff"))
+        for dx, Ld, lab in L.divider_x:
+            o.append(T(X(dx * IN), Y(S.y_front) + 8, lab, 6.5, 700, "middle", MUTE))
+    else:
+        for i, (a, b, n, y_top) in enumerate(L.plan.panels):
+            rows_p = [r for r in L.plan.rows if r.panel == i]
+            ymid = (min(r.y0 for r in rows_p) + max(r.y1 for r in rows_p)) / 2 * IN if rows_p else y_top * IN / 2
+            o.append(T(X((a + b) / 2 * IN), Y(ymid), f"panel {i + 1} · {n} rows", 9, 800, "middle", "#fff"))
+        for x, y_lo, y_hi, lab in L.plan.dividers:
+            o.append(T(X(x * IN), Y(y_hi * IN) + 8, f"breaker {lab} · {ftin(y_hi - y_lo)}", 6.5, 700, "middle", MUTE))
     dim_h(o, X, Y(S.y_front) + 22, -S.meta["edge"], S.W + S.meta["edge"], ftin((S.W + 2 * S.meta["edge"]) * 12) + " over the edge boards", up=False)
     nx = 760
     o.append(T(nx, 24, "DECKING", 9, 800, fill=GOLD))
@@ -339,7 +347,8 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
              f"Border{' & dividers' if L.divider_x else ''}: {s.decking.border_collection or s.decking.collection} {s.decking.border_color or s.decking.color}" if s.geometry.picture_frame else "No picture frame",
              f"Boards run {'parallel to' if s.geometry.board_direction == 'parallel' else 'out from'} the house; edge overhang {ftin(S.meta['edge'] * 12)}" + (" over the fascia" if s.decking.fascia else " — no fascia, rim exposed"),
              t.schedule.get("Field", ""), t.schedule.get("Face screws", ""),
-             "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones) + (" (rip at the house)" if any(z.decking.last_row_dev < -0.5 for z in L.zones) else " (no rips)")]
+             (L.plan.summary() + " — every board one piece wall to border, no butt joints" if L.plan is not None else
+              "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones) + (" (rip at the house)" if any(z.decking.last_row_dev < -0.5 for z in L.zones) else " (no rips)"))]
     yy = 40
     for n in notes:
         for ln in textwrap.wrap(n, 40)[:4]:

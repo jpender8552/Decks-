@@ -408,14 +408,14 @@
         7,
         6
       ],
-      "turn": "switchback",
+      "turn": "left",
       "turn_side": "left",
       "flight_rails": [
         1,
         2
       ],
       "landing_guard_lf": 21.0,
-      "label": "Down 7 risers along the house's west wall to a 4' x 4' turn square, then the 7'8\" x 5'8\" landing beside it, horseshoe turn, 6 risers back down to level 1. Flight 1 rail on the open (west) side, flight 2 both sides; landing guard 21 LF (square north 4' + landing north 7'8\" + west 5'8\" + south 3'8\")"
+      "label": "Down 7 risers along the house's west wall to the 4' x 4' turn square, the 7'8\" x 5'8\" landing beside it, turn left, 6 risers down (west) to level 1. Flight 1 rail on the open (west) side, flight 2 both sides; landing guard 21 LF (square north 4' + landing north 7'8\" + west 1'8\" beside the stair + south 7'8\")"
     }
   ],
   "extras": {

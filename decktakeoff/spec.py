@@ -152,7 +152,8 @@ class Decking:
     gap_in: Optional[float] = None       # override the line's field gap (Eagle's Nest: 1/8" on square-shoulder Vintage)
     border_collection: Optional[str] = None    # contrast picture frame / dividers (None -> field collection)
     border_color: Optional[str] = None
-    dividers: bool = False               # a divider board at every zone boundary (multi-zone plans)
+    dividers: bool = False               # breaker boards: with an outline, only where a run would exceed the longest stock (on zone lines); else one on every zone boundary
+    divider_x_ft: List[float] = field(default_factory=list)   # explicit breaker lines, feet from the left frame face (overrides the rule)
 
 
 @dataclass
