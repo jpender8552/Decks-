@@ -313,14 +313,11 @@ def build_scene(L) -> Scene:
         # posts on a curved run move onto the curve (inset RP), so the rail between them follows the outline without a kink
         RP_ = 2.5 * IN
         shift: Dict[Tuple[float, float], Tuple[float, float]] = {}
-        for e in L.edges:
-            if not e.exposed:
-                continue
-            ex0, ey0, ex1, ey1 = e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN
-            cv = outline_path(spec, (ex0, ey0), (ex1, ey1))
-            if not cv or abs(ey1 - ey0) > 0.05:
-                continue     # only front (x-running) runs curve
-            poly_ = [(ex0, ey0)] + cv + [(ex1, ey1)]
+        for ex0, ex1, ey0 in front_runs(L):
+            ey1 = ey0
+            if not outline_path(spec, (ex0, ey0), (ex1, ey1)):
+                continue     # straight run
+            poly_ = outline_path(spec, (ex0, ey0), (ex1, ey1), ends=True)
             def y_at(x):
                 for (p0, q0), (p1, q1) in zip(poly_, poly_[1:]):
                     if min(p0, p1) - 1e-6 <= x <= max(p0, p1) + 1e-6 and abs(p1 - p0) > 1e-6:
@@ -409,26 +406,35 @@ def build_scene(L) -> Scene:
                 direction = "-x"; v_a = (za.wall_y + za.D) * IN + edge + st.opening.start_in * IN
             else:
                 direction = "+x"; v_a = (zb.wall_y + zb.D) * IN + edge + st.opening.start_in * IN
+        elif side.startswith("wall:"):
+            # a freestanding zone's open rear edge: the stair leaves it away from the deck (-y); the opening is measured from the zone's right end
+            zn = side.split(":")[1]
+            zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "-y"
+            u0 = zz.wall_y * IN - edge; v_a = (zz.x0 + zz.W) * IN - st.opening.start_in * IN - width
         else:
             zn = side.split(":")[1] if ":" in side else None
             zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "+y"
             u0 = (zz.wall_y + zz.D) * IN + edge; v_a = zz.x0 * IN + st.opening.start_in * IN
         v_b = v_a + width
-        theta = math.atan2(zt, total_run)
+        H_st = g.total_rise_in * IN            # the stair's own drop (to a lower deck or a pad), not the deck height
+        z_low = zt - H_st
+        theta = math.atan2(H_st, total_run)
         def sb(kind, ua, ub, va, vb, za, zb, mat, phase, tag="", rot=0.0, tone_=0.0):
             if direction == "+x":
                 add(kind, u0 + ua, u0 + ub, va, vb, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="y", tone=tone_)
             elif direction == "-x":
                 add(kind, u0 - ub, u0 - ua, va, vb, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="y", tone=tone_)
+            elif direction == "-y":
+                add(kind, va, vb, u0 - ub, u0 - ua, za, zb, mat, phase, tag=tag, rot=-rot, rot_axis="x", tone=tone_)
             else:
                 add(kind, va, vb, u0 + ua, u0 + ub, za, zb, mat, phase, tag=tag, rot=rot, rot_axis="x", tone=tone_)
         # stringers: a 2x12 along the slope, centred under the nosing line
         depth = 11.25 * IN
-        slope_len = math.hypot(total_run, zt)
+        slope_len = math.hypot(total_run, H_st)
         nst = max(2, st.stringers)
         for i in range(nst):
             v = v_a + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
-            zc = zt / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
+            zc = z_low + H_st / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
             sb("stringer", total_run / 2 - slope_len / 2, total_run / 2 + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {st.side}", rot=theta)
         for k in range(1, n_r + 1):
             ztop = zt - k * rise
@@ -443,10 +449,10 @@ def build_scene(L) -> Scene:
             hr = L.rail.height * IN
             sides = [v_b - pw / 2 - 0.02] if st.stair_rail_sides == 1 else [v_a + pw / 2 + 0.02, v_b - pw / 2 - 0.02]
             for vc in sides:
-                for u_, zb_ in ((0.25, zt - rise), (total_run - 0.25, 0.0)):
+                for u_, zb_ in ((0.25, zt - rise), (total_run - 0.25, z_low)):
                     sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "steel", 7, tag="stair post")
-                rail_len = math.hypot(total_run - 0.5, zt - rise)
-                zc = (zt - rise) / 2 + hr + 0.1
+                rail_len = math.hypot(total_run - 0.5, H_st - rise)
+                zc = z_low + (H_st - rise) / 2 + hr + 0.1
                 sb("toprail", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
                 if spec.railing.drink_rail:
                     sb("drink", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
@@ -454,11 +460,11 @@ def build_scene(L) -> Scene:
                     # horizontal cable infill runs parallel to the slope, 3-1/8" apart, plus a mid post on a run over 6'
                     n_c = int((hr - 0.25) / (3.125 * IN))
                     for i in range(1, n_c + 1):
-                        zc_ = (zt - rise) / 2 + i * 3.125 * IN + 0.1
+                        zc_ = z_low + (H_st - rise) / 2 + i * 3.125 * IN + 0.1
                         sb("cable", total_run / 2 - rail_len / 2, total_run / 2 + rail_len / 2, vc - 0.01, vc + 0.01, zc_ - 0.01, zc_ + 0.01, "cable", 7, rot=theta)
                     if rail_len > 6.5:
                         u_ = total_run / 2
-                        sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, (zt - rise) / 2, (zt - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
+                        sb("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, z_low + (H_st - rise) / 2, z_low + (H_st - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
                 else:
                     for k in range(1, n_t + 1):
                         for frac in (0.3, 0.7):
@@ -468,7 +474,7 @@ def build_scene(L) -> Scene:
         # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
         if st.mid_support:
             um = st.mid_run_in * IN
-            z_under = zt - (um / total_run) * zt - 1.5 * IN - depth / math.cos(theta) + 0.3   # underside of the stringers at mid-run
+            z_under = zt - (um / total_run) * H_st - 1.5 * IN - depth / math.cos(theta) + 0.3   # underside of the stringers at mid-run
             zc_top = z_under - 0.02
             sb("beam", um - 1.5 * IN, um + 1.5 * IN, v_a - 0.25, v_b + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
             for vp in (v_a + 0.25, v_b - 0.25):
@@ -476,20 +482,22 @@ def build_scene(L) -> Scene:
                 sb("base", um - pb_ / 2 - 0.02, um + pb_ / 2 + 0.02, vp - pb_ / 2 - 0.02, vp + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
                 sb("footing", um - 0.55, um + 0.55, vp - 0.55, vp + 0.55, -0.1, 0.45, "concrete", 1, tag="stair footing")
         # landing pad
-        sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, -0.3, 0.02, "concrete", 1, tag=f"landing pad {st.side}")
+        if st.landing == "deck":
+            sb("board", total_run - 0.4, total_run + 4.0, v_a - 0.5, v_b + 0.5, z_low - bt, z_low, "deck", 6, tag=f"lower deck at the {st.side} stair")
+        else:
+            sb("footing", total_run - 0.4, total_run + 3.6, v_a - 0.5, v_b + 0.5, z_low - 0.3, z_low + 0.02, "concrete", 1, tag=f"landing pad {st.side}")
 
     # ---------------- an existing stucco parapet on the open edges (stays; nothing in the takeoff)
     if spec.railing.existing_parapet:
-        for e in L.edges:
-            if not e.exposed:
-                continue
-            ex0, ey0, ex1, ey1 = e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN
+        runs_ = front_runs(L)
+        segs_ = [(a, y, b, y) for a, b, y in runs_] + [(e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN) for e in L.edges if e.exposed and abs(e.y1 - e.y0) > 0.05]
+        for ex0, ey0, ex1, ey1 in segs_:
             L_ = ((ex1 - ex0) ** 2 + (ey1 - ey0) ** 2) ** 0.5
             if L_ < 0.1:
                 continue
-            curve = outline_path(spec, (ex0, ey0), (ex1, ey1))
-            if curve:
-                pts_ = [(ex0, ey0)] + curve + [(ex1, ey1)]
+            curve = outline_path(spec, (ex0, ey0), (ex1, ey1), ends=True) if abs(ey1 - ey0) < 0.05 else []
+            if curve and any(abs(py - ey0) > 0.05 for px, py in curve):
+                pts_ = curve
                 for (p0, q0), (p1, q1) in zip(pts_, pts_[1:]):
                     seg = math.hypot(p1 - p0, q1 - q0); ph_ = math.atan2(q1 - q0, p1 - p0)
                     nx_, ny_ = math.sin(ph_), -math.cos(ph_)
@@ -834,9 +842,10 @@ def _roof_hex(color: str) -> str:
     return "#3a3c3f"
 
 
-def outline_path(spec, a, b, tol=3.0):
-    """Outline vertices (feet) strictly between points a and b along the straight a->b, within tol ft of it — the curve of a
-    front edge. Empty when the outline is absent or straight there."""
+def outline_path(spec, a, b, tol=3.0, ends=False):
+    """Outline vertices (feet) between points a and b along the straight a->b, within tol ft of it — the curve of a front
+    edge. ends=True also returns the vertices at the ends of the run (for interpolation); the default is strictly between.
+    Empty when the outline is absent or straight there."""
     poly = [(float(x), float(y)) for x, y in (spec.geometry.outline or [])]
     if not poly:
         return []
@@ -845,14 +854,33 @@ def outline_path(spec, a, b, tol=3.0):
     if L_ < 0.1:
         return []
     ux, uy = (bx - ax) / L_, (by - ay) / L_
+    lo, hi = (-0.02, 1.02) if ends else (0.02, 0.98)
     pts = []
     for px, py in poly:
         t = ((px - ax) * ux + (py - ay) * uy) / L_
         d = abs((px - ax) * -uy + (py - ay) * ux)
-        if 0.02 < t < 0.98 and d < tol and d > 0.02:
+        if lo < t < hi and d < tol and (ends or d > 0.02):
             pts.append((t, px, py))
     pts.sort()
-    return [(px, py) for _, px, py in pts]
+    out = [(px, py) for _, px, py in pts]
+    if not ends and not any(abs(py - ay) > 0.05 or abs(py - by) > 0.05 for px, py in out):
+        return []      # every vertex sits on the straight line: not a curve
+    return out
+
+
+def front_runs(L):
+    """Merged collinear x-running exposed edges (feet): [(x0, x1, y), ...] — the runs a curved outline is measured against."""
+    runs = []
+    for e in L.edges:
+        if not e.exposed or abs(e.y1 - e.y0) > 0.05:
+            continue
+        y = e.y0 / 12.0; xa, xb = min(e.x0, e.x1) / 12.0, max(e.x0, e.x1) / 12.0
+        for r in runs:
+            if abs(r[2] - y) < 0.05 and (abs(r[1] - xa) < 0.1 or abs(r[0] - xb) < 0.1):
+                r[0], r[1] = min(r[0], xa), max(r[1], xb); break
+        else:
+            runs.append([xa, xb, y])
+    return runs
 
 
 def rot_box(kind, x0, y0, x1, y1, z0, z1, mat, phase, thick, tag="", tone=0.0) -> Box:

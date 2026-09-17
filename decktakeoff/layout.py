@@ -424,8 +424,8 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         allow_j, _ = eng.joist_allowable(jsize, jsp, spacing, total_psf)
     beams: List[BeamLayout] = []
     declared = list(fr.beams) if fr.beams else []
-    if not ledger:
-        # freestanding: a rear drop beam 12" in from the rear rim face mirrors the front beam
+    if not ledger and not any((not b.zones) or (zone in b.zones) for b in declared):
+        # freestanding with nothing declared for this zone: a rear drop beam 12" in from the rear rim face mirrors the front beam
         from .spec import Beam as _B
         rear = _B(kind="drop", size=declared[0].size if declared else ("6x12" if timber else "4x10"), species=declared[0].species if declared else "DF", setback_in=12.0)
         rear.position_in = 12.0 + parse_beam(rear.size)[2] / 2
@@ -433,6 +433,8 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         rear_auto = rear
     else:
         rear_auto = None
+        if not ledger:
+            notes.append("freestanding zone framed on its declared beam; no ledger — lateral bracing per the engineer")
     # resolve centrelines
     cls = []
     engineered = spec.extras.engineered
@@ -853,7 +855,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
 # ================================================================== beam lines across zones
 def _place_posts_line(x0: float, x1: float, boundaries: List[float], allow_by_seg: List[float], end_in: float) -> List[float]:
     """Posts end_in from each end, at every zone boundary, then evenly within each segment at or under that segment's allowable span."""
-    fixed = [x0 + end_in] + [b for b in boundaries if x0 + end_in + 12 < b < x1 - end_in - 12] + [x1 - end_in]
+    fixed = [x0 + end_in] + [b for b in boundaries if x0 + end_in + 36 < b < x1 - end_in - 36] + [x1 - end_in]   # a boundary post only when it is 3'+ from an end post
     fixed = sorted(set(round(v, 3) for v in fixed))
     out = []
     for i, (a, b) in enumerate(zip(fixed, fixed[1:])):
@@ -997,6 +999,23 @@ def build_layout(spec: DeckSpec) -> Layout:
             zl.append(ZoneLayout(z.name, z.label, x, -float(z.wall_offset_in), W, D, fr, dk, tub))
             x += W
         edges = outline_edges(zl, spec)
+        if g.outline:
+            poly = [(float(x) * 12, float(y) * 12) for x, y in g.outline]
+            def _inside(x, y):
+                c = False
+                for (ax, ay), (bx, by) in zip(poly, poly[1:] + poly[:1]):
+                    if (ay > y) != (by > y) and x < (bx - ax) * (y - ay) / (by - ay) + ax:
+                        c = not c
+                return c
+            for e in edges:
+                if not e.exposed or e.length < 1:
+                    continue
+                ux, uy = (e.x1 - e.x0) / e.length, (e.y1 - e.y0) / e.length
+                nx, ny = uy, -ux           # inward normal: the outline runs clockwise
+                # five points along the edge, 12" inside it: the edge is real if any of them is deck
+                hits = [_inside(e.x0 + (e.x1 - e.x0) * t + nx * 12, e.y0 + (e.y1 - e.y0) * t + ny * 12) for t in (0.1, 0.3, 0.5, 0.7, 0.9)]
+                if not any(hits):
+                    e.exposed = False
         deepest = max(zl, key=lambda q: q.D)
         st = stair_layouts(spec, deepest.W, deepest.D, deepest.decking)
         lines = build_beam_lines(spec, zl)

@@ -24,29 +24,37 @@
     "zones": [
       {
         "name": "L",
-        "width_in": 80,
+        "width_in": 52,
+        "depth_in": 52,
+        "wall_offset_in": 52,
+        "freestanding": true,
+        "label": "Stair pocket \u2014 4'4\" x 4'4\" past the house's west wall; the stair leaves its north edge along the wall"
+      },
+      {
+        "name": "P",
+        "width_in": 28,
         "depth_in": 124,
         "wall_offset_in": 52,
-        "label": "West pocket \u2014 6'8\" along the recessed wall: the 4'4\" stair landing pocket plus the 2'4\" strip beside the bay (the model clips the notch)"
+        "label": "West pocket \u2014 2'4\" beside the bay, ledgered to the recessed wall"
       },
       {
         "name": "P2",
         "width_in": 51,
-        "depth_in": 184,
+        "depth_in": 202,
         "wall_offset_in": 52,
         "label": "West strip \u2014 4'3\" from the recessed wall to the curved front"
       },
       {
         "name": "W",
         "width_in": 88,
-        "depth_in": 60,
+        "depth_in": 78,
         "wall_offset_in": -72,
         "label": "In front of the bay window \u2014 7'4\" x 5', the bay projects 6' (multi-angle facets in the model)"
       },
       {
         "name": "M",
         "width_in": 239,
-        "depth_in": 132,
+        "depth_in": 150,
         "wall_offset_in": 0,
         "label": "Main run \u2014 19'11\" wall, 11' deep"
       },
@@ -93,43 +101,59 @@
         11
       ],
       [
-        8.624,
-        11.548
+        8.916,
+        11.401
       ],
       [
-        10.583,
-        11.968
+        11.166,
+        11.738
       ],
       [
-        12.541,
-        12.265
+        13.416,
+        12.013
       ],
       [
-        14.499,
-        12.441
+        15.666,
+        12.227
       ],
       [
-        16.458,
+        17.916,
+        12.379
+      ],
+      [
+        20.166,
+        12.47
+      ],
+      [
+        22.416,
         12.5
       ],
       [
-        18.416,
-        12.441
+        24.666,
+        12.47
       ],
       [
-        20.374,
-        12.265
+        26.916,
+        12.379
       ],
       [
-        22.332,
-        11.968
+        29.166,
+        12.227
       ],
       [
-        24.291,
-        11.548
+        31.416,
+        12.013
       ],
       [
-        26.249000000000002,
+        33.666,
+        11.738
+      ],
+      [
+        35.916,
+        11.401
+      ],
+      [
+        38.166000000000004,
         11
       ],
       [
@@ -209,8 +233,8 @@
     ],
     "house_blocks": [
       [
-        -8,
-        10.916,
+        4.333,
+        6.667,
         -30,
         -4.333
       ],
@@ -294,11 +318,19 @@
         "kind": "drop",
         "size": "6x12",
         "species": "DF",
-        "setback_in": 24,
+        "setback_in": 42,
         "zones": [
           "P2",
           "W",
-          "M",
+          "M"
+        ]
+      },
+      {
+        "kind": "drop",
+        "size": "6x12",
+        "species": "DF",
+        "setback_in": 24,
+        "zones": [
           "S",
           "A"
         ]
@@ -307,9 +339,18 @@
         "kind": "drop",
         "size": "6x12",
         "species": "DF",
-        "setback_in": 78,
+        "setback_in": 6,
         "zones": [
           "L"
+        ]
+      },
+      {
+        "kind": "drop",
+        "size": "6x12",
+        "species": "DF",
+        "setback_in": 78,
+        "zones": [
+          "P"
         ]
       }
     ],
@@ -338,7 +379,7 @@
   },
   "stairs": [
     {
-      "side": "end:left",
+      "side": "wall:L",
       "width_in": 48,
       "position_in": 0,
       "total_rise_in": 96,
