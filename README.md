@@ -173,6 +173,10 @@ tests/
 - Setback / frost / snow / wind values are inputs — the engine checks them, it does not look them up.
 
 
+## Where the built documents live
+
+Every job package, latest version, is under `docs/packages/` (see `docs/packages/index.md` for the list with live links and prices).
+
 ## The job page — one template, every job
 
 `decktakeoff/page.py` builds the document for a job. It is the only page builder; every job runs through it so they look the same.
