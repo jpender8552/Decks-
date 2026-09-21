@@ -422,6 +422,8 @@
     "demo_existing": true,
     "demo_sf": 700,
     "engineered": true,
-    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price."
+    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price.",
+    "sell_override": 128893,
+    "price_note": "Owner-set: the stucco-parapet twin of this deck at $118,896 plus $9,997 for the Fulton rail (the engine computes $8,997)"
   }
 }

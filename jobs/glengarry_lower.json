@@ -136,7 +136,11 @@
     "fastener_system": "Cortex",
     "border_collection": "Vintage",
     "border_color": "Dark Hickory",
-    "dividers": true
+    "dividers": true,
+    "divider_x_ft": [
+      2.083
+    ],
+    "divider_note": "One breaker board on the 2'1\" step line (the house corner), front edge to the wall \u2014 picture frame and breaker like the upper deck"
   },
   "railing": {
     "system": "none",
