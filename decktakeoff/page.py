@@ -519,3 +519,122 @@ def render_pdf(page: str, files: Dict[str, str], pdf_path: str, key: str, hero: 
         pg.pdf(path=pdf_path, format="Letter", print_background=True, prefer_css_page_size=True)
         b.close()
     return pdf_path
+
+
+# ================================================================== several decks in one homeowner document
+EXTRA_CSS = """<style>
+.short{list-style:none;margin:0;padding:0;display:grid;gap:10px;} .short li{display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:16px;line-height:1.45;} .short b{color:var(--ink-3);font-size:12px;letter-spacing:.14em;text-transform:uppercase;padding-top:4px;font-weight:800;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;} .two .reads{grid-template-columns:86px 1fr;}
+.bigtab td,.bigtab th{font-size:16px;padding:12px 10px;} .bigtab tr.total td{font-weight:900;font-size:19px;border-top:2px solid var(--ink);}
+.deckhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:8px 0 12px;} .deckhead .price{font-size:26px;font-weight:900;letter-spacing:-.01em;} .deckhead .sub{color:var(--ink-3);font-size:13px;}
+@media (max-width:640px){.two{grid-template-columns:1fr;} .short li{grid-template-columns:1fr;gap:2px;}}
+</style>"""
+
+
+def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, hero_from: int = 0, hero: str = "corner",
+                    short: Optional[list] = None, pdf: bool = False, date_line: Optional[str] = None) -> dict:
+    """One homeowner document for several decks. parts = [dict(spec, renders_dir, key, title, blurb, options=[(label, DeckSpec)])].
+    Sections: cover (both prices), the short version, one block per deck (two pictures, at a glance, what it is), the choices,
+    the pictures (isometrics and exploded views), investment (per deck, both, options), next step, 3D."""
+    from . import run
+    from .buildset import build_set
+    from .viewer import viewer_html
+    from datetime import date
+    out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
+    built = []
+    files: Dict[str, str] = {}
+    for pt in parts:
+        t, flags, p = run(pt["spec"])
+        r = build_set(t, flags, str(out / f"buildset-{pt['key']}"), render=False, customer=True)
+        rd = Path(pt["renders_dir"])
+        have = {q.stem for q in rd.glob("*.jpg")}
+        files.update({f"r/{pt['key']}-{q.stem}.jpg": str(q) for q in rd.glob("*.jpg")})
+        opts = [(lab, run(sp_)[2]) for lab, sp_ in pt.get("options", [])]
+        built.append(dict(pt, t=t, p=p, L=t.layout, sm=t.summary, S=r["scene"], have=have, opts=opts, qmd=quote_markdown(t, p)))
+    spec0 = parts[0]["spec"]
+    addr = ", ".join(x for x in (spec0.site.address, spec0.site.city, f"{spec0.site.state} {spec0.site.zip}".strip()) if x)
+    today = date_line or date.today().strftime("%B %d, %Y")
+    sell = sum(b["p"].sell for b in built); retail = sum(b["p"].retail for b in built); monthly = sum(b["p"].monthly for b in built)
+    hk = parts[hero_from]["key"]
+    o = []; w = o.append
+    w(f'<section class="job" id="job-{key}">')
+    # the short version
+    w('<h2 class="kicker" id="g-short">The short version</h2>')
+    if short:
+        w('<ul class="short">' + "".join(f"<li><b>{E(a)}</b><span>{E(b)}</span></li>" for a, b in short) + "</ul>")
+    # one block per deck
+    for b in built:
+        p = b["p"]
+        w(f'<h2 class="kicker pb" id="g-{b["key"]}">{E(b["title"])}</h2>')
+        w(f'<div class="deckhead"><span class="price">{money(p.sell)}</span><span class="sub">check or ACH · {money(p.retail)} financed · {money(p.monthly)} a month</span></div>')
+        if b.get("blurb"):
+            w(f'<p>{E(b["blurb"])}</p>')
+        w(_gallery(b["key"], ["yard", "iso2"], b["have"]))
+        w(_reads_lite(b["t"], b["L"], b["sm"]))
+        qmd = b["qmd"]
+        inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
+        sp_ = b["spec"]
+        beams = sorted({bm.size for bm in sp_.framing.beams}) if sp_.framing.beams else []
+        frame_lite = f"{b['sm']['joists']}; {b['sm']['rims']}" + (f"; {' / '.join(beams)} Douglas fir beams" if beams else "") + "."
+        inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
+        w('<h3>What it is</h3>' + md_to_html(inc))
+    # the choices
+    if any(b["opts"] for b in built):
+        w('<h2 class="kicker pb" id="g-choices">Your choices</h2>')
+        for b in built:
+            if b["opts"]:
+                w(f'<p><b>{E(b["title"])}.</b> The price above keeps everything that stays. Each line below is the whole difference, installed, to replace that item instead. Pick any, or all.</p>')
+                w(_options_table(b["p"], b["opts"]).replace("<h3>Options</h3><p>Each line is the whole difference, installed, against the price above.</p>", ""))
+    # the pictures
+    w('<h2 class="kicker pb" id="g-pictures">The pictures <span class="tag">3D model · design intent</span></h2>')
+    for b in built:
+        w(f'<h3>{E(b["title"])}</h3>')
+        w(_gallery(b["key"], ["corner", "ondeck", "iso", "underiso"], b["have"]))
+        w(_gallery(b["key"], ["exploded", "exploded-corner"], b["have"]))
+    # investment
+    w('<h2 class="kicker pb" id="g-investment">Investment</h2><div class="quote">')
+    rows = [[E(b["title"]), money(b["p"].sell), money(b["p"].retail), money(b["p"].monthly)] for b in built]
+    w('<div class="tw"><table class="bigtab"><thead><tr><th>Deck</th><th class="num">Check or ACH</th><th class="num">Financed</th><th class="num">Monthly</th></tr></thead><tbody>'
+      + "".join(f"<tr><td>{r_[0]}</td><td class='num'>{r_[1]}</td><td class='num'>{r_[2]}</td><td class='num'>{r_[3]}</td></tr>" for r_ in rows)
+      + f"<tr class='total'><td>Both decks</td><td class='num'>{money(sell)}</td><td class='num'>{money(retail)}</td><td class='num'>{money(monthly)}</td></tr></tbody></table></div>")
+    w('<p>Financed: no money down, 12 or 18 months with no payments, then 6.99% for 10 years. Check or ACH saves 7%. Each deck can be done on its own at its own price.</p>')
+    for b in built:
+        if b["opts"]:
+            w(f'<h3>{E(b["title"])} — choices</h3>' + _options_table(b["p"], b["opts"]).replace("<h3>Options</h3>", ""))
+    qmd0 = built[0]["qmd"]
+    eng = re.search(r"\*\*Engineering — .*?\n", qmd0)
+    if eng:
+        w(md_to_html(eng.group(0)))
+    w(md_to_html(qmd0[qmd0.index("## NEXT STEP"):]))
+    w("</div>")
+    w('<h2 class="kicker" id="g-3d">3D models <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
+    for b in built:
+        w(f'<h3>{E(b["title"])}</h3>')
+        w(viewer_html(b["S"], None, title=f"{b['title']} — 3D", standalone=False, uid=f"v3d-{b['key']}"))
+    w("</section>")
+    section = "".join(o)
+    who = "Prepared for the owner" + (f" · {addr}" if addr else "") + f" · {today}"
+    have0 = built[hero_from]["have"]
+    head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name)}</h1><p class="who">{E(who)}</p>'
+            f'<div class="pricebar"><div><span class="l">Both decks · check or ACH</span><span class="v">{money(sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(retail)}</span><span class="s">no money down</span></div>'
+            f'<div><span class="l">Monthly</span><span class="v">{money(monthly)}</span><span class="s">6.99% · 10 years</span></div></div>'
+            + (f'<img class="herofig" src="r/{hk}-{hero}.jpg" alt="rendering">' if hero in have0 else "")
+            + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
+    body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
+    title = f"{name} — Proposal"
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{EXTRA_CSS}</head><body>"
+            + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script></body></html>\n")
+    page = page.replace(CDN, "", 1)
+    scripts = re.findall(r"<script>\n\(function\(\)\{\nconst D = .*?\n\}\)\(\);\n</script>", page, flags=re.S)
+    for sc in scripts:
+        page = page.replace(sc, "", 1)
+    page = page.replace(CDN, CDN + "\n" + "\n".join(scripts) + "\n", 1)
+    txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    for bad in ("internal", "INTERNAL", "owner-directed", "rate card", "cost stack", "GM"):
+        assert bad not in txt, f"customer page carries internal wording: {bad}"
+    (out / "page.html").write_text(page)
+    json.dump(files, open(out / "files.json", "w"), indent=1)
+    result = dict(html=str(out / "page.html"), files=files, sell=sell, retail=retail, monthly=monthly)
+    if pdf:
+        result["pdf"] = render_pdf(page, files, str(out / "page.pdf"), hk, hero="isolow" if "isolow" in have0 else hero)
+    return result

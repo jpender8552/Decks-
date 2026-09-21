@@ -177,6 +177,9 @@ tests/
 views, under the deck, investment with options priced as full installed deltas, and the 3D model. No sheets, cut lists,
 schedules or step pages. `render_page(..., mode="proposal", options=[(label, other_spec)])` from Python.
 
+`render_combined(parts, out_dir, key, name, lede, short=[...])` puts several decks in one homeowner document: cover with
+the combined price, the short version, one block per deck, the choices, the pictures, investment per deck and together.
+
 ## Where the built documents live
 
 Every job package, latest version, is under `docs/packages/` (see `docs/packages/index.md` for the list with live links and prices).

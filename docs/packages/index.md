@@ -12,7 +12,8 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | | 4 · stucco parapet stays · new caissons and 8x8 DF posts | `glengarry-4-parapet-new/` | [V5](https://claude.ai/artifact/V7vb6joT4ESHyZXLAv7ZeW) | $130,330 | $140,140 | $1,626 |
 | | 5 · stucco parapet stays · new 8x8 DF posts on the existing caissons | `glengarry-5-parapet-newposts/` | [V1](https://claude.ai/artifact/JJuB5Rbn9npD7N7mWeRYuq) | $123,601 | $132,904 | $1,542 |
 | | Lower deck · 2'4" in the alcove · parapet walls, no rail | `glengarry-lower/` | [V2](https://claude.ai/artifact/PNtja4QkwJMeAaj8tRC32J) | $38,319 | $41,203 | $478 |
-| Glengarry Pl — customer proposals | Upper deck · parapet, columns and caissons stay; each replacement priced as an option | `glengarry-proposal-upper/` | [V3](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
+| Glengarry Pl — customer proposals | Both decks in one document | `glengarry-proposal-both/` | [V1](https://claude.ai/artifact/P3xLbQpxgXibZx5n7es5ZJ) | $157,215 | $169,048 | $1,962 |
+| | Upper deck · parapet, columns and caissons stay; each replacement priced as an option | `glengarry-proposal-upper/` | [V3](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
 | | Lower deck · under the upper deck, parapet stays, front open | `glengarry-proposal-lower/` | [V3](https://claude.ai/artifact/Mht1tT1SXjxg9wT1mdLbVp) | $38,319 | $41,203 | $478 |
 | Center Ave, Lakewood (Alan) | 12 x 20 deck with landing and stair — proposal + PDF | `center-ave-proposal/` | [V6](https://claude.ai/artifact/CcGknredfUyG8ZHCuiQuDV) | $59,790 | $63,975 | $742 |
 | Summit Point Ct | Main deck + porch cover + the 10 x 10, permit package | `summit-point-package/` | [V15](https://claude.ai/artifact/4SzpniuvUQKA6JjHkLQX27) | $133,429 | $143,472 | $1,665 |
