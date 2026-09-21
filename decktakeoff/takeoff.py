@@ -970,8 +970,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         joists=f"{Qz.n_joists} {jsize} {SPECIES_NAMES['DF#1'] if timber else SPECIES_NAMES.get(jsp, jsp)} @ {fr0.spacing:g}\" OC" + ("" if L.multi else f" x {ftin(fr0.joist_len)}") + (f" — {joist_lf:,.0f} LF incl. rims, ledgers, blocking" if timber else ""),
         rims=(f"{fr0.rim_plies}-ply {jsize} sides; front rim = flush beam" if Qz.front_flush else (f"single {jsize} rims" if timber else f"{fr0.rim_plies}-ply {jsize} front and sides")) + ("" if fr0.ledger else " and rear (freestanding)"),
         beams=[f"{bl.label}: {ftin(bl.length)}, {bl.n_posts} posts at " + " / ".join(ftin(x) for x in bl.posts_x) + f" (worst {max(bl.post_loads):,.0f} lb)" for bl in L.beam_lines],
-        posts=f"{n_posts} x {spec.framing.post_size} on " + (
-            fr0.footing_model if ft == "diamond_pier" else f"{int(fr0.footing_dia_in)}\" {'caissons' if ft == 'caisson' else 'concrete piers'} {ftin(fr0.footing_depth_in)} deep") + (" with stone column bases" if spec.extras.stone_bases else ""),
+        posts=((f"the {n_posts} existing stucco columns and caissons stay; new post bases epoxy-set on the caissons" if spec.framing.existing_posts else
+                f"{n_posts} x {spec.framing.post_size} on the {n_posts} existing caissons, epoxy-set bases") if ft == "existing" else
+               f"{n_posts} x {spec.framing.post_size} on " + (
+            fr0.footing_model if ft == "diamond_pier" else f"{int(fr0.footing_dia_in)}\" {'caissons' if ft == 'caisson' else 'concrete piers'} {ftin(fr0.footing_depth_in)} deep") + (" with stone column bases" if spec.extras.stone_bases else "")),
         design_load=f"{max(z.frame.total_psf for z in L.zones):g} psf ({fr0.load_note})" + (" · engineered" if spec.extras.engineered else ""),
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",

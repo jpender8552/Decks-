@@ -220,10 +220,14 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         stair_m = mats(lambda l: l.category == "Stairs")
         alloc.append(("Foundation & structure", round(comp(frame_m, labsum("Frame", "Diamond Pier", "Caissons", "Large footings", "Concrete piers", "Extra beam", "Hot-tub")))))
         alloc.append(("Decking & fascia", round(comp(deck_m, labsum("Decking")))))
-        if L.rail:
-            alloc.append(("Railing", round(comp(rail_m, labsum("Railing", "Cable rail")))))
+        rail_c = round(comp(rail_m, labsum("Railing", "Cable rail"))) if L.rail else 0
+        stair_c = round(comp(stair_m, labsum("Stairs"))) if L.stairs else 0
+        if L.rail and (rail_c >= 100 or not L.stairs):
+            alloc.append(("Railing", rail_c))
+        else:
+            stair_c += rail_c            # a parapet deck: the only rail is on the stair, so it rides with the stairs
         if L.stairs:
-            alloc.append(("Stairs", round(comp(stair_m, labsum("Stairs")))))
+            alloc.append(("Stairs" + (" & stair rail" if s.railing.existing_parapet else ""), stair_c))
         alloc += parts
     if gc:
         alloc.append(("Site & project services", round(gc)))

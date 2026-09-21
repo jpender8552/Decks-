@@ -236,7 +236,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
       + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else 'matching fascia'}. {f['fire']}; {f['warranty']}. |")
-    if rl:
+    if rl and s.railing.existing_parapet:
+        w(f"| Railing | The existing stucco parapet stays on the deck edges. {s.decking.brand} {rl.system} Rail, {rl.color}, {rl.height:g}\" on the new stair and landings. |")
+    elif rl:
         rs = RAIL_SYSTEMS.get(rl.system, {})
         w(f"| Railing | {s.decking.brand} {rl.system}{' cable rail' if rs.get('cable') else ' Rail'}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
           + (f"; {s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "") + f". {rl.rail_lf} LF. |")
@@ -248,7 +250,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Frame | {sm['joists']}; {sm['rims']}; {'; '.join(sm['beams'])}. |")
     if s.extras.stone_bases:
         w(f"| Column bases | Stone veneer 2'x2' x 3' with a 24\" stone cap at all {n_posts} posts. |")
-    _fd = sm['posts'].split(' on ')[-1]
+    _fd = sm['posts'] if s.framing.footing_type == "existing" else sm['posts'].split(' on ')[-1]
     w(f"| Foundation | {(_fd[0].upper() + _fd[1:]) if _fd else ''}" + (f" (frost depth {ftin(s.site.frost_depth_in)})" if s.framing.footing_type in ('caisson', 'concrete') else "") + ". |")
     w(f"| Design load | {s.site.ground_snow_psf:g} psf snow" + (", stamped by a Colorado engineer" if s.extras.engineered else "")
       + (". Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall" if s.site.wui_fire_zone else "") + ". |")

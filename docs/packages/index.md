@@ -11,6 +11,9 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | | 3 · stucco parapet stays · existing columns and caissons | `glengarry-3-parapet-existing/` | [V5](https://claude.ai/artifact/8Rd9mqBfq4aaujNvE9JW2c) | $118,896 | $127,845 | $1,484 |
 | | 4 · stucco parapet stays · new caissons and 8x8 DF posts | `glengarry-4-parapet-new/` | [V5](https://claude.ai/artifact/V7vb6joT4ESHyZXLAv7ZeW) | $130,330 | $140,140 | $1,626 |
 | | Lower deck · 2'4" in the alcove · parapet walls, no rail | `glengarry-lower/` | [V2](https://claude.ai/artifact/PNtja4QkwJMeAaj8tRC32J) | $37,866 | $40,716 | $473 |
+| Glengarry Pl — customer proposals | Upper deck · Option A · existing columns stay (options priced inside) | `glengarry-proposal-upper-A/` | [V1](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
+| | Upper deck · Option B · new caissons and 8x8 posts | `glengarry-proposal-upper-B/` | [V1](https://claude.ai/artifact/GhYoGXfkWNrjfn7sKbstFV) | $130,330 | $140,140 | $1,626 |
+| | Lower deck | `glengarry-proposal-lower/` | [V1](https://claude.ai/artifact/Mht1tT1SXjxg9wT1mdLbVp) | $37,866 | $40,716 | $473 |
 | Center Ave, Lakewood (Alan) | 12 x 20 deck with landing and stair — proposal + PDF | `center-ave-proposal/` | [V6](https://claude.ai/artifact/CcGknredfUyG8ZHCuiQuDV) | $59,790 | $63,975 | $742 |
 | Summit Point Ct | Main deck + porch cover + the 10 x 10, permit package | `summit-point-package/` | [V15](https://claude.ai/artifact/4SzpniuvUQKA6JjHkLQX27) | $133,429 | $143,472 | $1,665 |
 | Eagle's Nest, Silverthorne | Takeoff + build set (the template) | `eagles-nest/` | [V1](https://claude.ai/artifact/3L81czJeCf3UBor7LWfPF9) | $122,615 | $131,844 | $1,530 |
@@ -32,6 +35,8 @@ Every package printed to Letter is in `docs/pdf/` (the 3D model page becomes a s
 
 ```
 python -m decktakeoff jobs/glengarry_2_fulton_new.json --page internal --key gl2 --out out/gl2
+# customer proposal (toned down: cover, at a glance, what it is, renders, isometrics, exploded, investment with options, 3D)
+python -m decktakeoff jobs/glengarry_3_parapet_existing.json --page proposal --key gl3 --out out/glp3 --pdf
 ```
 
 Then copy `out/<key>/page.html` to the folder as `index.html` and the renders it lists in `files.json` to `r/`.

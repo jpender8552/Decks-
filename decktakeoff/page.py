@@ -289,15 +289,64 @@ def _steps(key, steps, cap, customer):
     return "".join(out)
 
 
+def _reads_lite(t, L, sm):
+    """The homeowner's at-a-glance: what it is, not how it is framed."""
+    s = t.spec
+    from .catalog import decking_facts
+    fsys = s.decking.fastener_system or "hidden"
+    deck = f"{sm['deck_sf']:g} SF · {sm['height']} above grade · {sm['finished_deck']}"
+    decking = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    if s.geometry.picture_frame and s.decking.border_color:
+        decking += f", picture frame{' and breaker boards' if L.divider_x else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}"
+    decking += f" · {fsys} fasteners" + (" with color-matched plugs" if fsys == "Cortex" else "")
+    rl = L.rail
+    if s.railing.existing_parapet:
+        rail = "The existing stucco parapet stays" + (f"; {rl.system} {rl.color} {rl.height:g}\" rail on the new stair and landings" if rl and L.stairs else "")
+    elif rl:
+        rail = f"{s.decking.brand} {rl.system} {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+    else:
+        rail = "None"
+    stairs = []
+    for st, ss in zip(L.stairs, s.stairs):
+        g = st.geo
+        txt = f"{g.risers} risers at {g.riser_in:.1f}\", {ftin(st.width)} wide"
+        if len(g.flights) > 1:
+            lands = " and ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "a landing"
+            turn = {"switchback": "turn back", "left": "turn left", "right": "turn right", "straight": "continue"}.get(ss.turn, ss.turn)
+            txt += ": " + " then ".join(f"{fg.risers} down" for fg in g.flights[:1]) + f" to the {lands} landing, {turn}, " + " then ".join(f"{fg.risers} down" for fg in g.flights[1:]) + " to the lower level"
+            if st.landing_rail_lf:
+                txt += f" · guard rail on the landings"
+        stairs.append(txt)
+    fr = L.zones[0].frame
+    beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
+    structure = f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {' / '.join(beams)} Douglas fir beams" if beams else "") + f"; {sm['posts']}"
+    reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
+    return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
+
+
+def _options_table(p, options):
+    """Full installed deltas against this proposal: [(label, other pricing)]."""
+    if not options:
+        return ""
+    def d(v):
+        return ("+" if v >= 0 else "−") + money(abs(v))
+    rows = [[E(lab), d(q.sell - p.sell), d(q.retail - p.retail), d(q.monthly - p.monthly) + "/mo"] for lab, q in options]
+    return ('<h3>Options</h3><p>Each line is the whole difference, installed, against the price above.</p>'
+            + table(["Option", "Check or ACH", "Financed", "Monthly"], rows, "", ["l", "r", "r", "r"]))
+
+
 def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str = "job", name: Optional[str] = None, sub: str = "",
                 lede: str = "", hero: str = "corner", render: bool = True, renders_dir: Optional[str] = None, pdf: bool = False,
-                date_line: Optional[str] = None) -> dict:
-    """Build the page. mode = "internal" | "customer". Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
+                date_line: Optional[str] = None, options: Optional[list] = None) -> dict:
+    """Build the page. mode = "internal" | "customer" | "proposal" (the customer page without the sheets, schedules and
+    step-by-step: cover, at a glance, what it is, renders, isometrics, exploded views, under the deck, investment with
+    options, 3D). options = [(label, DeckSpec)] priced as full installed deltas. Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
     from . import run
     from .buildset import build_set
     from .viewer import viewer_html
     from datetime import date
-    customer = mode == "customer"
+    proposal = mode == "proposal"
+    customer = mode == "customer" or proposal
     out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     t, flags, p = run(spec)
     L, sm = t.layout, t.summary
@@ -315,7 +364,31 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     o = []
     w = o.append
     w(f'<section class="job" id="job-{key}" data-job="{key}">')
-    if customer:
+    if proposal:
+        opts = [(lab, run(sp_)[2]) for lab, sp_ in (options or [])]
+        w('<h2 class="kicker" id="g-reads">At a glance</h2>')
+        w(_gallery(key, ["yard", "iso2"], have))
+        w(_reads_lite(t, L, sm))
+        w('<h2 class="kicker" id="g-what">What it is <span class="tag">included in the price</span></h2>')
+        inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
+        beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
+        frame_lite = f"{sm['joists']}; {sm['rims']}" + (f"; {' / '.join(beams)} Douglas fir beams" if beams else "") + "."
+        inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
+        w(md_to_html(inc))
+        w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
+        w(_gallery(key, ["corner", "ondeck", "isolow", "under"], have))
+        w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
+        w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
+        w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
+        w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
+        w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, beams, frame</span></h2>')
+        w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
+        w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
+        q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
+        w('<div class="quote">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
+        w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
+        w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
+    elif customer:
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
         w(_reads(t, L, sm, n_piers, True))

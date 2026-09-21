@@ -173,6 +173,10 @@ tests/
 - Setback / frost / snow / wind values are inputs — the engine checks them, it does not look them up.
 
 
+`--page proposal` is the toned-down homeowner proposal: cover, at a glance, what it is, renders, isometrics, exploded
+views, under the deck, investment with options priced as full installed deltas, and the 3D model. No sheets, cut lists,
+schedules or step pages. `render_page(..., mode="proposal", options=[(label, other_spec)])` from Python.
+
 ## Where the built documents live
 
 Every job package, latest version, is under `docs/packages/` (see `docs/packages/index.md` for the list with live links and prices).
