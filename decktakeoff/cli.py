@@ -25,7 +25,7 @@ def main(argv=None):
     ap.add_argument("--quote", action="store_true", help="print the client quote (implies --price)")
     ap.add_argument("--buildset", action="store_true", help="with --out: write the drawing sheets, 3D viewer, renders and build steps under OUT/buildset")
     ap.add_argument("--no-render", action="store_true", help="skip the headless renders (sheets + viewer only)")
-    ap.add_argument("--page", choices=["internal", "customer", "proposal"], help="with --out: write the job page (OUT/page.html + files.json) — the takeoff + build set page, the full customer page, or the toned-down proposal")
+    ap.add_argument("--page", choices=["internal", "customer", "proposal", "cost"], help="with --out: write the job page (OUT/page.html + files.json) — the takeoff + build set page, the full customer page, or the toned-down proposal")
     ap.add_argument("--pdf", action="store_true", help="with --page: also print OUT/page.pdf")
     ap.add_argument("--key", default="job", help="short key for the page's render file names (r/<key>-<still>.jpg)")
     ap.add_argument("--lede", default="", help="customer page: the one paragraph under the cover image")

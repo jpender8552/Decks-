@@ -275,6 +275,27 @@ def _stack(p):
     return "".join(out)
 
 
+def _cost_stack(p, t):
+    """The sold job: what it costs to build, everything in, no margin lines."""
+    tax_raw = round(p.materials * p.tax_rate, 2)
+    total = round(p.materials + tax_raw + p.labor + p.gc, 2)
+    out = ['<h2 class="kicker">Cost to build <span class="tag">materials at invoice · labor at the rate card · site services at cost</span></h2>']
+    rows = [("Materials — every line of the order", money(p.materials, True)), (f"Sales tax {p.tax_rate:.2%} on materials", money(tax_raw, True)),
+            ("Labor", money(p.labor, True)), ("Site & project services at cost", money(p.gc, True)), ("<b>Total cost to build</b>", f"<b>{money(total, True)}</b>")]
+    out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in rows) + "</tbody></table></div>")
+    cats = t.by_category()
+    out.append("<h3>Materials by category</h3>")
+    out.append(table(["Category", "Lines", "Cost"], [[E(c), str(len(ls)), money(sum(l.ext for l in ls), True)] for c, ls in cats.items()] + [["<b>Materials</b>", "", f"<b>{money(p.materials, True)}</b>"]], "", ["l", "r", "r"]))
+    out.append("<h3>Labor</h3>")
+    out.append(table(["Line", "Qty", "Unit", "Rate", "Ext"], [[E(i), qfmt(q), E(u), money(r, True), money(e, True)] for i, q, u, r, e in p.labor_lines] + [["<b>Labor</b>", "", "", "", f"<b>{money(p.labor, True)}</b>"]], "", ["l", "r", "l", "r", "r"]))
+    if p.gc_lines:
+        out.append("<h3>Site & project services — at cost</h3>")
+        out.append(table(["Item", "Amount", "Why"], [[E(i), money(a), E(why)] for i, a, why in p.gc_lines], "", ["l", "r", "l"]))
+    if p.engineering:
+        out.append(f"<p><b>Engineering and permit</b> — {money(p.engineering[0])} to {money(p.engineering[1])}, billed at cost on top of the above.</p>")
+    return "".join(out), total, tax_raw
+
+
 def _gallery(key, names, have):
     return '<div class="gal">' + "".join(f'<figure><img src="r/{key}-{n}.jpg" alt="{E(CAP.get(n, n))}" loading="lazy"><figcaption>{E(CAP.get(n, n))}</figcaption></figure>' for n in names if n in have) + "</div>"
 
@@ -348,6 +369,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     from .viewer import viewer_html
     from datetime import date
     proposal = mode == "proposal"
+    cost_only = mode == "cost"
     customer = mode == "customer" or proposal
     out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     t, flags, p = run(spec)
@@ -438,9 +460,13 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
         w('<details><summary>Cut list</summary>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]) + "</details>")
-        w(_stack(p))
-        w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
-        w('<div class="quote">' + md_to_html(qmd) + "</div>")
+        if cost_only:
+            cost_html, cost_total, tax_raw = _cost_stack(p, t)
+            w(cost_html)
+        else:
+            w(_stack(p))
+            w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
+            w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · timbers shown ' + ("with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "as specified") + "</span></h2>")
         w(_gallery(key, ["yard", "corner", "ondeck", "under"], have))
         w('<h2 class="kicker">Isometrics</h2>')
@@ -470,6 +496,17 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                 + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
         body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
         title = f"{name} — Proposal"
+    elif cost_only:
+        tax_raw = round(p.materials * p.tax_rate, 2)
+        cost_total = round(p.materials + tax_raw + p.labor + p.gc, 2)
+        strip = ('<div class="strip"><div><span class="sl">Cost to build</span><span class="sv">%s</span></div><div><span class="sl">Materials</span><span class="sv">%s</span></div>'
+                 '<div><span class="sl">Tax</span><span class="sv">%s</span></div><div><span class="sl">Labor</span><span class="sv">%s</span></div>'
+                 '<div><span class="sl">Site services</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
+                 % (money(cost_total), money(p.materials), money(tax_raw), money(p.labor), money(p.gc), L.deck_sf))
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · sold — cost to build</div><h1>{E(name)}</h1>'
+                f'<p>{E(sub or addr)}</p></div></header>')
+        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Cost to build: materials at invoice, labor at the rate card, site services at cost. Internal.</span></footer></main>'
+        title = f"{name} — Cost to Build"
     else:
         head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div><h1>{E(name)}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')

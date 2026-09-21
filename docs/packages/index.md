@@ -15,8 +15,7 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | Glengarry Pl — customer proposals | Both decks in one document | `glengarry-proposal-both/` | [V1](https://claude.ai/artifact/P3xLbQpxgXibZx5n7es5ZJ) | $157,215 | $169,048 | $1,962 |
 | | Upper deck · parapet, columns and caissons stay; each replacement priced as an option | `glengarry-proposal-upper/` | [V3](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
 | | Lower deck · under the upper deck, parapet stays, front open | `glengarry-proposal-lower/` | [V3](https://claude.ai/artifact/Mht1tT1SXjxg9wT1mdLbVp) | $38,319 | $41,203 | $478 |
-| 10 x 10 Deck · Sea Salt Gray | Proposal | `deck-10x10-seasalt-proposal/` | [V1](https://claude.ai/artifact/SMpGkRTk48yqXNgAoVxZqb) | $12,261 | $13,184 | $153 |
-| | Takeoff + build set | `deck-10x10-seasalt/` | [V1](https://claude.ai/artifact/DXbf975L3JdzQ7NQ9Rit7s) | $12,261 | $13,184 | $153 |
+| 10 x 10 Deck · Sea Salt Gray (sold) | Cost to build: materials, order, labor, drawings, build set | `deck-10x10-seasalt/` | [V2](https://claude.ai/artifact/DXbf975L3JdzQ7NQ9Rit7s) | cost $6,637 | | |
 | Center Ave, Lakewood (Alan) | 12 x 20 deck with landing and stair — proposal + PDF | `center-ave-proposal/` | [V6](https://claude.ai/artifact/CcGknredfUyG8ZHCuiQuDV) | $59,790 | $63,975 | $742 |
 | Summit Point Ct | Main deck + porch cover + the 10 x 10, permit package | `summit-point-package/` | [V15](https://claude.ai/artifact/4SzpniuvUQKA6JjHkLQX27) | $133,429 | $143,472 | $1,665 |
 | Eagle's Nest, Silverthorne | Takeoff + build set (the template) | `eagles-nest/` | [V1](https://claude.ai/artifact/3L81czJeCf3UBor7LWfPF9) | $122,615 | $131,844 | $1,530 |

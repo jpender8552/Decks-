@@ -180,6 +180,9 @@ schedules or step pages. `render_page(..., mode="proposal", options=[(label, oth
 `render_combined(parts, out_dir, key, name, lede, short=[...])` puts several decks in one homeowner document: cover with
 the combined price, the short version, one block per deck, the choices, the pictures, investment per deck and together.
 
+`--page cost` is the sold-job page: the same takeoff and build set with a cost-to-build stack (materials at invoice, tax,
+labor at the rate card, site services at cost) and no quote or margin lines.
+
 ## Where the built documents live
 
 Every job package, latest version, is under `docs/packages/` (see `docs/packages/index.md` for the list with live links and prices).
