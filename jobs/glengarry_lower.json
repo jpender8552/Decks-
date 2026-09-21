@@ -54,12 +54,12 @@
       ],
       [
         0,
-        17,
+        19.083,
         -30,
         0
       ],
       [
-        17,
+        19.083,
         30,
         -30,
         18.5
@@ -106,7 +106,30 @@
         2.083,
         8.167
       ]
-    ]
+    ],
+    "overhead": [
+      [
+        8.0,
+        19.083,
+        0.0,
+        26.5,
+        10.9,
+        12.0
+      ]
+    ],
+    "through_columns": [
+      [
+        9.0,
+        12.2,
+        0.67
+      ],
+      [
+        18.0,
+        12.2,
+        0.67
+      ]
+    ],
+    "label_note": "The upper deck's alcove bay sits over the east 11' of this deck (its underside about 8'6\" above the new surface); two of its stucco columns pass through this deck and stay. The front is open toward the yard; parapet on the west."
   },
   "framing": {
     "system": "dimensional",
@@ -144,7 +167,11 @@
   },
   "railing": {
     "system": "none",
-    "existing_parapet": true
+    "existing_parapet": true,
+    "parapet_sides": [
+      "end:left"
+    ],
+    "parapet_note": "The existing stucco parapet walls stay. The front is open \u2014 the way out onto the yard, 2'4\" above grade, so no rail is required there."
   },
   "stairs": [],
   "extras": {

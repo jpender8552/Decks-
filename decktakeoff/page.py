@@ -300,7 +300,9 @@ def _reads_lite(t, L, sm):
         decking += f", picture frame{' and breaker boards' if L.divider_x else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}"
     decking += f" · {fsys} fasteners" + (" with color-matched plugs" if fsys == "Cortex" else "")
     rl = L.rail
-    if s.railing.existing_parapet:
+    if s.railing.existing_parapet and s.railing.parapet_note:
+        rail = s.railing.parapet_note
+    elif s.railing.existing_parapet:
         rail = "The existing stucco parapet stays" + (f"; {rl.system} {rl.color} {rl.height:g}\" rail on the new stair and landings" if rl and L.stairs else "")
     elif rl:
         rail = f"{s.decking.brand} {rl.system} {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"

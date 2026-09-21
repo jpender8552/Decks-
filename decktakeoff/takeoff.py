@@ -977,7 +977,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         design_load=f"{max(z.frame.total_psf for z in L.zones):g} psf ({fr0.load_note})" + (" · engineered" if spec.extras.engineered else ""),
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
-        rail=("Existing stucco parapet stays — no rail in this scope" if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
+        rail=((spec.railing.parapet_note or "Existing stucco parapet stays — no rail in this scope") if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
         stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide"
                 + (" — " + " + ".join(f"{fg.risers} risers" for fg in s_.geo.flights) + f" ({ss.turn})" if len(s_.geo.flights) > 1 else "")
                 + ("; landings " + " + ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "")

@@ -105,6 +105,12 @@ def run_flags(L: Layout) -> List[Flag]:
             add("ENGINEER", "engineering", "existing stucco columns reused — the engineer verifies the column core, its connection to the caisson, and details the new column caps")
     if s.railing.existing_parapet:
         add("CODE", "guard", "existing stucco parapet reused as the guard — verify 36\" min above the new deck surface and 200 lb top-rail load; if the new deck surface rises, the parapet height drops", "IRC R312.1")
+        if s.railing.parapet_sides:
+            open_edges = [e.name for e in L.edges if e.exposed and e.name not in s.railing.parapet_sides]
+            if open_edges:
+                hi_ = max(g.height_in, g.height_high_in or 0)
+                add("STOP" if hi_ > eng.GUARD_TRIGGER_HEIGHT else "INFO", "guard",
+                    f"open edge(s) {', '.join(open_edges)} carry no parapet and no rail — " + (f"{ftin(hi_)} above grade, a guard is required" if hi_ > eng.GUARD_TRIGGER_HEIGHT else f"{ftin(hi_)} above grade, under 30\", no guard required (the way out)"), "IRC R312.1.1")
     if fr.footing_type == "concrete":
         add("CODE", "frost", f"concrete piers bear {ftin(fr.footing_depth_in - 6)} below grade — frost depth {ftin(site.frost_depth_in)} for {site.city or 'this jurisdiction'}; confirm the local frost line and soil bearing ({site.soil_bearing_psf:,.0f} psf assumed)", "IRC R403.1.4")
     if site.soil_bearing_psf < 1500:

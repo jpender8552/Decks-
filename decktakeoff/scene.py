@@ -122,6 +122,16 @@ def build_scene(L) -> Scene:
     door_h = 6.75
     if spec.geometry.house_blocks:
         draw_house_from_spec(add, spec, zt, H_house)
+    # a deck or roof above this one (existing, drawn for context) and the columns that carry it through this deck
+    for ov in (spec.geometry.overhead or []):
+        ox0, ox1, oy0, oy1, zu, zo = [float(v) for v in ov[:6]]
+        add("house", ox0, ox1, oy0, oy1, zu, zo, "soffit", 8, tag="deck above (existing)")
+        add("trim", ox0 - 0.05, ox1 + 0.05, oy1 - 0.08, oy1 + 0.05, zu - 0.9, zo, "house", 8, tag="rim of the deck above")
+        add("privacy", ox0, ox1, oy1 - 0.3, oy1 + 0.35, zo, zo + 3.5, "house", 8, tag="parapet of the deck above")
+    for tc in (spec.geometry.through_columns or []):
+        cx_, cy_, sz = float(tc[0]), float(tc[1]), float(tc[2]) if len(tc) > 2 else 0.67
+        z_top = max([float(ov[4]) for ov in (spec.geometry.overhead or [])] + [zt + 8.0])
+        add("post", cx_ - sz / 2, cx_ + sz / 2, cy_ - sz / 2, cy_ + sz / 2, 0.0, z_top, "house", 8, tag="existing column through the deck (stays)")
     else:
         for zi, z in enumerate(L.zones):
             yw = z.wall_y * IN
@@ -703,8 +713,12 @@ def build_scene(L) -> Scene:
 
     # ---------------- an existing stucco parapet on the open edges (stays; nothing in the takeoff)
     if spec.railing.existing_parapet:
-        runs_ = front_runs(L)
-        segs_ = [(a, y, b, y) for a, b, y in runs_] + [(e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN) for e in L.edges if e.exposed and abs(e.y1 - e.y0) > 0.05]
+        psides = set(spec.railing.parapet_sides or [])
+        if psides:
+            segs_ = [(e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN) for e in L.edges if e.exposed and e.name in psides]
+        else:
+            runs_ = front_runs(L)
+            segs_ = [(a, y, b, y) for a, b, y in runs_] + [(e.x0 * IN, e.y0 * IN, e.x1 * IN, e.y1 * IN) for e in L.edges if e.exposed and abs(e.y1 - e.y0) > 0.05]
         for ex0, ey0, ex1, ey1 in segs_:
             L_ = ((ex1 - ex0) ** 2 + (ey1 - ey0) ** 2) ** 0.5
             if L_ < 0.1:

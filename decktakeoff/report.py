@@ -236,7 +236,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
       + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else 'matching fascia'}. {f['fire']}; {f['warranty']}. |")
-    if rl and s.railing.existing_parapet:
+    if s.railing.existing_parapet and s.railing.parapet_note:
+        w(f"| Railing | {s.railing.parapet_note} |")
+    elif rl and s.railing.existing_parapet:
         w(f"| Railing | The existing stucco parapet stays on the deck edges. {s.decking.brand} {rl.system} Rail, {rl.color}, {rl.height:g}\" on the new stair and landings. |")
     elif rl:
         rs = RAIL_SYSTEMS.get(rl.system, {})

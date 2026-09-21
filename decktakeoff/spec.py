@@ -95,6 +95,8 @@ class Geometry:
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
                                                                         # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
+    overhead: List[List[float]] = field(default_factory=list)           # a deck / roof above this one, drawn: [x0, x1, y0, y1, z_under_ft, z_top_ft] (feet, grade = 0)
+    through_columns: List[List[float]] = field(default_factory=list)    # existing columns that pass through the deck to the structure above: [x_ft, y_ft, size_ft]
     house_finish: str = "lap"            # how the house is drawn: "lap" siding | "stucco" | "brick"
 
 
@@ -168,6 +170,8 @@ class RailOpening:
 class Railing:
     system: str = "Fulton"               # "Fulton" | "Impression" | "Classic Composite" | "none"
     existing_parapet: bool = False       # an existing stucco / masonry parapet stays on the open edges: no rail in the takeoff, drawn in the model
+    parapet_sides: List[str] = field(default_factory=list)   # edge names that carry the parapet ("end:left", "front:A"); [] -> every exposed edge
+    parapet_note: str = ""               # customer wording for the rail line when the parapet stays (e.g. which side is open)
     color: str = "Black"
     height_in: float = 36.0
     sides: List[str] = field(default_factory=lambda: ["left", "right", "front"])
