@@ -211,3 +211,11 @@ BOARDS_PALETTE = {
     ("Premier", "Dark Teak"): ["#4c3a2d", "#544133", "#5a4636"], ("Premier", "Maritime Gray"): ["#6b6f70", "#727677", "#787c7d"],
     ("Wood", "Cedar"): ["#9c6b3f", "#ad7a49", "#bd8a57", "#caa06c", "#d6b283"], ("Wood", "PT"): ["#9a8a5e", "#ab9a6a", "#b9a979", "#c6b78a", "#d1c49a"],
 }
+
+
+def rail_system_for(spec_railing) -> dict:
+    """The rail system's numbers for a job, with the job's post size applied (a 3" post shortens every panel cut)."""
+    d = dict(RAIL_SYSTEMS.get(spec_railing.system, RAIL_SYSTEMS["Fulton"]))
+    if getattr(spec_railing, "post_size_in", None):
+        d["post_w"] = float(spec_railing.post_size_in)
+    return d

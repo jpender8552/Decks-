@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple
 
 from . import engineering as eng
-from .catalog import (STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
+from .catalog import (rail_system_for, STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
                       POST_CAP_SCREWS, PRICEBOOK, SPECIES_NAMES, TIMBER_BASE, actual, decking_facts, default_fastener_system, parse_beam,
                       RAIL_SYSTEMS)
 from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
@@ -791,10 +791,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             hd = PRICEBOOK["cover"]["hardie_trim_4_4x12_12ft"]
             lines.append(Line("Fascia", f"Deck skirt — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {spec.extras.hardie_skirt.split()[-2] + ' ' + spec.extras.hardie_skirt.split()[-1] if len(spec.extras.hardie_skirt.split()) > 1 else spec.extras.hardie_skirt} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
             scr = int(-(-nf * 12 * 2 // 12)) * 2 + 20     # 2 screws per bearing point @ 12" plus corners
+            hcol = " ".join(spec.extras.hardie_skirt.split()[-2:]) if len(spec.extras.hardie_skirt.split()) > 1 else spec.extras.hardie_skirt
             sc_ = PRICEBOOK["cover"]["hardie_trim_screws_100"]
-            lines.append(Line("Fascia", sc_["desc"], -(-scr // 100), -(-scr // 100), "box", f"{scr} color-matched screws, pre-drilled, 2 per joist line", sc_["each"], sc_["source"]))
+            lines.append(Line("Fascia", sc_["desc"].replace("Timber Bark", hcol), -(-scr // 100), -(-scr // 100), "box", f"{scr} color-matched screws, pre-drilled, 2 per joist line", sc_["each"], sc_["source"]))
             tu = PRICEBOOK["cover"]["hardie_touchup"]
-            lines.append(Line("Fascia", tu["desc"], 1, 1, "kit", "cut ends", tu["each"], tu["source"]))
+            lines.append(Line("Fascia", tu["desc"].replace("Timber Bark", hcol), 1, 1, "kit", "cut ends", tu["each"], tu["source"]))
         else:
             lines.append(Line("Fascia", f"{brand} {coll} Fascia {spec.decking.fascia_color or color} {fas['thick']:g}x{fas['width']:g}x12", nf, nf + 1, "ea", why, uc, src))
         for name, Lf in Qz.fascia_pieces:
@@ -848,7 +849,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     # ================= RAIL
     if rl:
         sysn = rl.system
-        sysd = RAIL_SYSTEMS.get(sysn, RAIL_SYSTEMS["Fulton"])
+        sysd = rail_system_for(spec.railing)
         cable = sysd.get("cable", False)
         pk = Counter(p.kind for p in rl.posts)
         rbrand = sysd.get("brand", brand)         # rail lines carry the rail maker (Cinch), not the decking brand
@@ -925,6 +926,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             if st.geo.handrail_required and st.stair_rail_sides:
                 uc, src = _price("rail", f"{sysn}|handrail_kit")
                 lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
+        if spec.railing.post_size_in and rl:
+            ps = spec.railing.post_size_in
+            for l in lines:
+                if l.category in ("Rail", "Stairs") and " post " in l.item and '2"' in l.item:
+                    l.item = l.item.replace('2"', f'{ps:g}"')
+                    l.note = (l.note + " · " if l.note else "") + f"{ps:g}\" post — confirm the SKU and price with {sysn} (priced at the stock post rate)"
         if spec.geometry.cover:
             lines += cover_lines(spec)
         if not timber:

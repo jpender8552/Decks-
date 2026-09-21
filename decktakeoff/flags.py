@@ -155,6 +155,8 @@ def run_flags(L: Layout) -> List[Flag]:
     if s.is_timber:
         add("ENGINEER", "engineering", "timber frame (DF #1 4x joists, 6x beams, 8x8 posts) is outside the IRC prescriptive tables — spans here are pre-engineering estimates; the stamped set governs sizes, post locations and caissons", "IRC R301.1.3")
 
+    if s.railing.post_size_in and rl:
+        add("CHECK", "product", f"{s.railing.system} rail on {s.railing.post_size_in:g}\" posts — confirm the post SKU, price and bracket set; the order carries the stock post price", "supplier")
     # ---------------- guards & stairs
     hi = max(g.height_in, g.height_high_in or 0)
     if hi > eng.GUARD_TRIGGER_HEIGHT:

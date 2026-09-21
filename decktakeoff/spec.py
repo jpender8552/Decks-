@@ -172,6 +172,7 @@ class Railing:
     existing_parapet: bool = False       # an existing stucco / masonry parapet stays on the open edges: no rail in the takeoff, drawn in the model
     parapet_sides: List[str] = field(default_factory=list)   # edge names that carry the parapet ("end:left", "front:A"); [] -> every exposed edge
     parapet_note: str = ""               # customer wording for the rail line when the parapet stays (e.g. which side is open)
+    post_size_in: Optional[float] = None # rail post width override (e.g. 3.0 for a 3" post) — the system's stock post otherwise
     color: str = "Black"
     height_in: float = 36.0
     sides: List[str] = field(default_factory=lambda: ["left", "right", "front"])

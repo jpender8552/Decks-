@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from . import engineering as eng
-from .catalog import (DECKING, FASCIA, NOSE, RAIL_SYSTEMS, RISER, STOCK_LENGTHS_FT, actual, decking_facts,
+from .catalog import (rail_system_for, DECKING, FASCIA, NOSE, RAIL_SYSTEMS, RISER, STOCK_LENGTHS_FT, actual, decking_facts,
                       parse_beam, FOOTING_CAPACITY_LB)
 from .spec import DeckSpec, RailOpening
 from .units import ftin
@@ -581,6 +581,12 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         else:
             allow_b, table_b, bnote = eng.beam_allowable(b.size, b.species, max(span_for_table, 72), total_psf)
         posts, sp = _place_posts(length, allow_b, b.post_spacing_max_in)
+        x0 = BEAM_HOLD_IN if b.kind == "drop" else (0.0 if (b.kind == "flush" and abs(cl - (D - front_t / 2)) < 1.0) else rim_t)
+        if b.posts_x_ft:          # the owner placed the posts: positions from the left frame face
+            posts = sorted(float(px) * 12 - x0 for px in b.posts_x_ft)
+            sp = max([q - p_ for p_, q in zip(posts, posts[1:])] + [0.0])
+            if len(posts) < 2 or sp > allow_b + 0.5:
+                notes.append(f"{b.size} {b.species} beam: owner-placed posts give a {ftin(sp)} span against {ftin(allow_b)} allowable — engineer confirms")
         chk = (eng.check_timber_beam(b.size, bsp_key, max(trib, 36), sp, total_psf) if timber
                else eng.check_beam(b.size, b.species, span_for_table, sp, total_psf))
         if bnote:
@@ -681,7 +687,7 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
     r = spec.railing
     if not r.system or r.system.lower() == "none" or not r.sides:
         return None
-    sysd = RAIL_SYSTEMS.get(r.system, RAIL_SYSTEMS["Fulton"])
+    sysd = rail_system_for(r)
     panels = sysd["panels"]           # stock -> max cut length
     post_w, allow = sysd["post_w"], sysd["bracket_allow"]
     RP = RAIL_POST_INSET
@@ -752,7 +758,7 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
     r = spec.railing
     if not r.system or r.system.lower() == "none":
         return None
-    sysd = RAIL_SYSTEMS.get(r.system, RAIL_SYSTEMS["Fulton"])
+    sysd = rail_system_for(r)
     panels, post_w, allow = sysd["panels"], sysd["post_w"], sysd["bracket_allow"]
     max_ctc = sysd.get("max_ctc", max(panels.values()) + post_w + 2 * allow)
     RP = RAIL_POST_INSET
@@ -876,7 +882,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         pieces_per_board = max(1, int(math.floor(144 / (s.width_in + 0.25))))
         tread_pieces = geo.treads * 2
         riser_pieces = geo.risers if s.closed_risers else 0
-        sysd = RAIL_SYSTEMS.get(spec.railing.system, RAIL_SYSTEMS["Fulton"])
+        sysd = rail_system_for(spec.railing)
         # rail sides per flight: the spec's list, else `rails` on every flight
         frails = [int(r) for r in (s.flight_rails or [])][:len(geo.flights)]
         frails += [s.rails] * (len(geo.flights) - len(frails))

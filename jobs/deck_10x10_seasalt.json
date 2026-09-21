@@ -1,0 +1,77 @@
+{
+  "job": "10 x 10 Deck \u2014 TimberTech Prime+ Sea Salt Gray",
+  "client": "",
+  "notes": "OWNER 21 Sep: 10' x 10', ledger to the house on one side, 10' off the ground. (2) 6x6 Douglas fir posts, 2x8 frame at 16\" OC, 4x10 Douglas fir drop beam. TimberTech Prime+ Sea Salt Gray, picture frame in the same board with color-matched face screws, hidden fasteners in the field. Cinch rail, 3\" posts, black, on three sides. Hardie fascia (HardieTrim skirt). No address given \u2014 site defaults, confirm.",
+  "site": {
+    "address": "",
+    "city": "",
+    "state": "CO",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false
+  },
+  "geometry": {
+    "width": 10,
+    "depth": 10,
+    "size_mode": "nominal",
+    "height_in": 120,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true
+  },
+  "framing": {
+    "joist_size": "2x8",
+    "joist_species": "SYP",
+    "joist_spacing_in": 16,
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "4x10",
+        "species": "DF",
+        "setback_in": 24,
+        "posts_x_ft": [
+          1.5,
+          8.35
+        ],
+        "label": "(2) 6x6 DF posts at 1'-6\" and 8'-4\" \u2014 1'-6\" cantilevers, 6'-10\" span"
+      }
+    ],
+    "post_size": "6x6",
+    "post_species": "DF",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Prime+",
+    "color": "Sea Salt Gray",
+    "profile": "grooved",
+    "fascia": true,
+    "fastener_system": "Camo EdgeClip",
+    "gap_in": 0.1875,
+    "border_collection": "Prime+",
+    "border_color": "Sea Salt Gray"
+  },
+  "railing": {
+    "system": "Cinch",
+    "color": "Satin Black",
+    "height_in": 36,
+    "sides": [
+      "left",
+      "right",
+      "front"
+    ],
+    "post_size_in": 3.0,
+    "drink_rail": false
+  },
+  "stairs": [],
+  "extras": {
+    "hardie_skirt": "4/4 x 12 (color TBD)",
+    "engineered": true,
+    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price."
+  }
+}

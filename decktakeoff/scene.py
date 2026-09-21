@@ -10,7 +10,7 @@ import math
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple
 
-from .catalog import BOARDS_PALETTE, RAIL_SYSTEMS, actual, decking_facts, parse_beam
+from .catalog import rail_system_for, BOARDS_PALETTE, RAIL_SYSTEMS, actual, decking_facts, parse_beam
 from .layout import Layout, NOSE, OVERHANG_NO_FASCIA, RAIL_POST_INSET
 from .spec import DeckSpec
 
@@ -340,7 +340,7 @@ def build_scene(L) -> Scene:
     # ---------------- rail
     rl = L.rail
     if rl:
-        sysd = RAIL_SYSTEMS.get(rl.system, RAIL_SYSTEMS["Fulton"])
+        sysd = rail_system_for(spec.railing)
         cable = sysd.get("cable", False)
         pw = sysd["post_w"] * IN
         h = rl.height * IN
@@ -495,7 +495,7 @@ def build_scene(L) -> Scene:
                 if k <= n_t:
                     sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - 0.02, vb_ + 0.02, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
             if rail_sides and L.rail:
-                sysd = RAIL_SYSTEMS.get(L.rail.system, RAIL_SYSTEMS["Fulton"])
+                sysd = rail_system_for(spec.railing)
                 pw = sysd["post_w"] * IN
                 hr = L.rail.height * IN
                 for sd in rail_sides:
@@ -568,7 +568,7 @@ def build_scene(L) -> Scene:
             openings: world rectangles (x0, x1, y0, y1) where a flight arrives or leaves — an outline segment inside one is left open."""
             if not L.rail:
                 return
-            sysd = RAIL_SYSTEMS.get(L.rail.system, RAIL_SYSTEMS["Fulton"])
+            sysd = rail_system_for(spec.railing)
             pw = sysd["post_w"] * IN
             hr = L.rail.height * IN
             xs = sorted({v for r in rects for v in (r[0], r[1])}); ys = sorted({v for r in rects for v in (r[2], r[3])})
