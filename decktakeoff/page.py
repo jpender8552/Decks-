@@ -675,3 +675,77 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
     if pdf:
         result["pdf"] = render_pdf(page, files, str(out / "page.pdf"), hk, hero="isolow" if "isolow" in have0 else hero)
     return result
+
+
+# ================================================================== permit set: the drawing sheets only, no money anywhere
+PERMIT_CSS = """<style>
+.sheet-page{margin:0 0 28px;} .sheet-page svg{width:100%;height:auto;display:block;border:1px solid var(--line);background:#fff;}
+.index{columns:2;column-gap:28px;font-size:14px;} .index li{break-inside:avoid;}
+@media print{@page{size:Letter landscape;margin:0.3in;} .band{padding:0.35in 0.5in;} .wrap{padding:0 0.2in;} .sheet-page{break-after:page;page-break-after:always;margin:0;} .sheet-page svg{border:0;max-height:7.6in;}
+  .cover-list{break-after:page;page-break-after:always;} h2.kicker{margin-top:10px;} figure{break-inside:avoid;} .gal{gap:8px;}}
+</style>"""
+
+
+def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str = "", pdf: bool = False, date_line: Optional[str] = None,
+                      renders: Optional[dict] = None) -> dict:
+    """parts = [dict(spec, title)]. Sheets G · S · A · D for every part, one sheet per landscape page, then a few 3D views for the
+    reviewer. Nothing financial: no prices, no quote, no stack. renders = {title: [(caption, jpg path), ...]} (optional)."""
+    from . import run
+    from .buildset import build_set
+    from datetime import date
+    out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
+    today = date_line or date.today().strftime("%B %d, %Y")
+    spec0 = parts[0]["spec"]
+    addr = ", ".join(x for x in (spec0.site.address, spec0.site.city, f"{spec0.site.state} {spec0.site.zip}".strip()) if x)
+    files: Dict[str, str] = {}
+    o = []; w = o.append
+    index = []
+    sheet_html = []
+    for pi, pt in enumerate(parts):
+        t, flags, p = run(pt["spec"])
+        r = build_set(t, flags, str(out / f"buildset-{pi + 1}"), render=False, customer=True)   # no internal flags block on G-001
+        for num, ttl, svg in r["sheets"]:
+            svg = re.sub(r"GS Exterior Experts · ([A-Z][a-z]+ \d{1,2}, \d{4}) · Rev 0", r"GSX · Jade Pender 303-550-9558 · \1 · Rev 0 · PERMIT SET", svg)
+            svg = re.sub(r"<text[^>]*>(?:T-400|T-700)</text>\s*<text[^>]*>[^<]*</text>", "", svg)   # the build-set and takeoff sheets are not in a permit set
+            index.append((pt["title"], num, ttl))
+            sheet_html.append(f'<div class="sheet-page" id="s-{pi + 1}-{num}"><h3>{E(pt["title"])} · {num} · {E(ttl)}</h3>{svg}</div>')
+    w(f'<section class="job" id="job-{key}">')
+    w('<div class="cover-list"><h2 class="kicker" id="g-index">Sheet index</h2><ol class="index">' + "".join(f"<li>{E(a)} · <b>{b}</b> {E(c)}</li>" for a, b, c in index) + "</ol>")
+    w('<p>Design intent. The stamped engineering set governs structure, dimensions and locations. Field verify. Do not scale. This set carries no pricing.</p></div>')
+    w("".join(sheet_html))
+    if renders:
+        w('<h2 class="kicker" id="g-views">3D views <span class="tag">design intent</span></h2>')
+        for ttl, items in renders.items():
+            w(f"<h3>{E(ttl)}</h3><div class=\"gal\">")
+            for cap, path in items:
+                fn = f"r/{key}-{Path(path).stem}.jpg"; files[fn] = str(Path(path).resolve())
+                w(f'<figure><img src="{fn}" alt="{E(cap)}" loading="lazy"><figcaption>{E(cap)}</figcaption></figure>')
+            w("</div>")
+    w("</section>")
+    head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · permit set</div><h1>{E(name)}</h1>'
+            f'<p>{E(sub or addr)} · {E(today)}</p></div></header>')
+    body = head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division · Jade Pender 303-550-9558</span><span>Permit set — drawings only. Design intent; the stamped engineering set governs.</span></footer></main>'
+    title = f"{name} — Permit Set"
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{PERMIT_CSS}</head><body>"
+            + body + "</body></html>\n")
+    txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    for bad in ("$", "financ", "Check or ACH", "gross profit", "rate card"):
+        assert bad not in txt, f"permit set carries money wording: {bad}"
+    (out / "page.html").write_text(page)
+    json.dump(files, open(out / "files.json", "w"), indent=1)
+    result = dict(html=str(out / "page.html"), files=files, sheets=len(index))
+    if pdf:
+        from .render import _chromium
+        from playwright.sync_api import sync_playwright
+        for k, v in files.items():
+            (out / k).parent.mkdir(parents=True, exist_ok=True); shutil.copy(v, out / k)
+        (out / "_print.html").write_text(page.replace(' loading="lazy"', ""))
+        with sync_playwright() as pw:
+            b = pw.chromium.launch(executable_path=_chromium(), args=["--no-sandbox"])
+            pg = b.new_page(viewport={"width": 1400, "height": 1000})
+            pg.goto("file://" + str(out / "_print.html")); pg.wait_for_timeout(2000)
+            pg.emulate_media(media="print")
+            pg.pdf(path=str(out / "page.pdf"), format="Letter", landscape=True, print_background=True, prefer_css_page_size=True)
+            b.close()
+        result["pdf"] = str(out / "page.pdf")
+    return result

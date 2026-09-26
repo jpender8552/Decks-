@@ -18,6 +18,7 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | 10 x 10 Deck · Sea Salt Gray (sold) | Cost to build: materials, order, labor, drawings, build set | `deck-10x10-seasalt/` | [V2](https://claude.ai/artifact/DXbf975L3JdzQ7NQ9Rit7s) | cost $6,637 | | |
 | Center Ave, Lakewood (Alan) | 12 x 20 deck with landing and stair — proposal + PDF | `center-ave-proposal/` | [V6](https://claude.ai/artifact/CcGknredfUyG8ZHCuiQuDV) | $59,790 | $63,975 | $742 |
 | Summit Point Ct | Main deck + porch cover + the 10 x 10, permit package | `summit-point-package/` | [V15](https://claude.ai/artifact/4SzpniuvUQKA6JjHkLQX27) | $133,429 | $143,472 | $1,665 |
+| Summit Point Ct — permit set | G · S · A · D sheets for both decks, no pricing | `summit-point-permit-set/` | [V1](https://claude.ai/artifact/JmroeYzuKQ1ParAgfVuovG) | | | |
 | Eagle's Nest, Silverthorne | Takeoff + build set (the template) | `eagles-nest/` | [V1](https://claude.ai/artifact/3L81czJeCf3UBor7LWfPF9) | $122,615 | $131,844 | $1,530 |
 
 The September 13 page https://claude.ai/artifact/LWbS2wTYKKY7x57pRZUfw4 is Eagle's Nest in the earlier layout, kept for reference.

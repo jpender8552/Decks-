@@ -183,6 +183,9 @@ the combined price, the short version, one block per deck, the choices, the pict
 `--page cost` is the sold-job page: the same takeoff and build set with a cost-to-build stack (materials at invoice, tax,
 labor at the rate card, site services at cost) and no quote or margin lines.
 
+`render_permit_set(parts, out_dir, key, name, ...)` prints the permit set: the G · S · A · D sheets for every deck in the job,
+one sheet per landscape Letter page, a few 3D views, and nothing financial (the builder refuses a page with a price on it).
+
 ## Where the built documents live
 
 Every job package, latest version, is under `docs/packages/` (see `docs/packages/index.md` for the list with live links and prices).
