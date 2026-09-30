@@ -76,7 +76,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         stonecap=dict(color="#a8a297", rough=0.9),
         house=(dict(color="#d9d0bf", rough=0.95, label="stucco") if spec.geometry.house_finish == "stucco"
                else dict(color="#8e4a3a", pattern="brick", rough=0.95, label="brick") if spec.geometry.house_finish == "brick"
-               else dict(color="#5b544d" if timber else "#cfc6b4", pattern="lap", rough=0.9)),
+               else dict(color=spec.geometry.house_color or ("#5b544d" if timber else "#cfc6b4"), pattern="lap", rough=0.9)),
         trim=dict(color="#24221f" if timber else "#f2efe8", rough=0.8),
         roof=dict(color="#2a2624", rough=0.9),
         privacy=dict(color="#6a625a", pattern="batten", rough=0.9),
@@ -481,14 +481,18 @@ def build_scene(L) -> Scene:
             trun = fg.run_in * IN
             H = fg.rise_in * IN
             zb0 = z_top - H
-            theta = math.atan2(H, trun) if trun > 0 else 0.0
+            theta = math.atan2(rise, run) if run > 0 else 0.0     # the tread pitch: stringers and the stair rail run at rise / run
             sb_ = lambda *a, **k: sbf(dir_, u0_, *a, **k)
-            slope_len = math.hypot(trun, H)
+            # a cut stringer drawn as its uncut board: top edge under the back of every tread, from the rim down past the last riser to the pad
+            u_end = trun + run
+            slope_len = u_end / math.cos(theta)
+            uc = u_end / 2
+            z_top_edge = z_top - rise - bt - 0.02 - math.tan(theta) * uc
             nst = max(2, st.stringers)
             for i in range(nst):
                 v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
-                zc = zb0 + H / 2 - (depth / 2) / math.cos(theta) - 1.5 * IN
-                sb_("stringer", trun / 2 - slope_len / 2, trun / 2 + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {tag_}", rot=theta)
+                zc = z_top_edge - (depth / 2) / math.cos(theta)
+                sb_("stringer", uc - slope_len / 2, uc + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {tag_}", rot=theta)
             for k in range(1, n_r + 1):
                 ztop = z_top - k * rise
                 sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
@@ -524,7 +528,7 @@ def build_scene(L) -> Scene:
             if mid:
                 # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
                 um = trun / 2
-                z_under = z_top - 0.5 * H - 1.5 * IN - depth / math.cos(theta) + 0.3
+                z_under = z_top - rise - bt - math.tan(theta) * um - depth / math.cos(theta)
                 zc_top = z_under - 0.02
                 sb_("beam", um - 1.5 * IN, um + 1.5 * IN, va_ - 0.25, vb_ + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
                 for vp in (va_ + 0.25, vb_ - 0.25):

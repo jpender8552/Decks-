@@ -98,6 +98,7 @@ class Geometry:
     overhead: List[List[float]] = field(default_factory=list)           # a deck / roof above this one, drawn: [x0, x1, y0, y1, z_under_ft, z_top_ft] (feet, grade = 0)
     through_columns: List[List[float]] = field(default_factory=list)    # existing columns that pass through the deck to the structure above: [x_ft, y_ft, size_ft]
     house_finish: str = "lap"            # how the house is drawn: "lap" siding | "stucco" | "brick"
+    house_color: Optional[str] = None    # the siding color to draw (hex), from the photos — the finish's default otherwise
 
 
 @dataclass

@@ -1,0 +1,78 @@
+{
+  "job": "16 x 14 Deck \u2014 TimberTech Prime+ Sea Salt Gray, Fulton rail",
+  "client": "",
+  "notes": "OWNER 30 Sep: 16' wide x 14' deep, 2x10 frame, Diamond Piers, TimberTech Prime+ Sea Salt Gray, single picture frame, Fulton rail, 5' wide stair. PHOTOS: two-storey house with lap siding, slider door centred-right on the rear wall; existing painted wood deck ~2'-4\" up with rail on both sides and the front either side of a centred stair (3 treads) onto an existing concrete pad. Replace in place: demo the old deck, new stair lands on the existing pad. No address given \u2014 Colorado defaults, confirm.",
+  "site": {
+    "address": "",
+    "city": "",
+    "state": "CO",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false
+  },
+  "geometry": {
+    "width": 16,
+    "depth": 14,
+    "size_mode": "nominal",
+    "height_in": 28,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true,
+    "house_color": "#5f6b4c"
+  },
+  "framing": {
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "joist_spacing_in": 16,
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "4x10",
+        "species": "DF",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Prime+",
+    "color": "Sea Salt Gray",
+    "profile": "grooved",
+    "fascia": true,
+    "fastener_system": "Camo EdgeClip",
+    "gap_in": 0.1875,
+    "border_collection": "Prime+",
+    "border_color": "Sea Salt Gray"
+  },
+  "railing": {
+    "system": "Fulton",
+    "color": "Black",
+    "height_in": 36,
+    "sides": [
+      "left",
+      "right",
+      "front"
+    ],
+    "drink_rail": false
+  },
+  "stairs": [
+    {
+      "side": "front",
+      "width_in": 60,
+      "landing": "existing",
+      "rails": 2,
+      "closed_risers": true
+    }
+  ],
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 224
+  }
+}
