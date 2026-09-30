@@ -15,8 +15,8 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | Glengarry Pl — customer proposals | Both decks in one document | `glengarry-proposal-both/` | [V1](https://claude.ai/artifact/P3xLbQpxgXibZx5n7es5ZJ) | $157,215 | $169,048 | $1,962 |
 | | Upper deck · parapet, columns and caissons stay; each replacement priced as an option | `glengarry-proposal-upper/` | [V3](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
 | | Lower deck · under the upper deck, parapet stays, front open | `glengarry-proposal-lower/` | [V3](https://claude.ai/artifact/Mht1tT1SXjxg9wT1mdLbVp) | $38,319 | $41,203 | $478 |
-| 16 x 14 Deck · Sea Salt Gray · Fulton | Proposal | `deck-16x14-seasalt-proposal/` | [V1](https://claude.ai/artifact/3xXARWbL3i1Y4FdvccqMBQ) | $27,289 | $29,343 | $341 |
-| | Takeoff + build set | `deck-16x14-seasalt/` | [V1](https://claude.ai/artifact/ELc43SenyufxB7GRyN36Hf) | $27,289 | $29,343 | $341 |
+| 16 x 14 Deck · Sea Salt Gray · Fulton | Proposal | `deck-16x14-seasalt-proposal/` | [V1](https://claude.ai/artifact/3xXARWbL3i1Y4FdvccqMBQ) | $23,376 | $25,135 | $292 |
+| | Takeoff + build set | `deck-16x14-seasalt/` | [V1](https://claude.ai/artifact/ELc43SenyufxB7GRyN36Hf) | $23,376 | $25,135 | $292 |
 | | Permit set | `deck-16x14-seasalt-permit-set/` | [V1](https://claude.ai/artifact/YDftnYuccuJuMhSDp2gNwc) | | | |
 | 10 x 10 Deck · Sea Salt Gray (sold) | Cost to build: materials, order, labor, drawings, build set | `deck-10x10-seasalt/` | [V2](https://claude.ai/artifact/DXbf975L3JdzQ7NQ9Rit7s) | cost $6,637 | | |
 | Center Ave, Lakewood (Alan) | 12 x 20 deck with landing and stair — proposal + PDF | `center-ave-proposal/` | [V6](https://claude.ai/artifact/CcGknredfUyG8ZHCuiQuDV) | $59,790 | $63,975 | $742 |

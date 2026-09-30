@@ -142,7 +142,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     s, L = t.spec, t.layout
     pb = PRICEBOOK
     gm = gm if gm is not None else (s.extras.gm if s.extras.gm is not None else pb["gm_default"])
-    gm = max(gm, pb["gm_floor"])
+    if not s.extras.gm_below_floor:
+        gm = max(gm, pb["gm_floor"])
     factor = s.extras.material_factor if s.extras.material_factor is not None else pb.get("material_factor", 1.0)
     if tax_rate is not None:
         rate = tax_rate

@@ -215,6 +215,7 @@ class Extras:
     privacy_wall: bool = False
     lighting: bool = False
     gm: Optional[float] = None           # gross-margin override (default 42.5%, 40% floor)
+    gm_below_floor: bool = False         # the owner set a margin under the 40% floor on purpose — use it as given
     material_factor: Optional[float] = None    # None -> pricebook 1.15 (owner: materials +15%)
     site_extras: List[dict] = field(default_factory=list)   # [{"item": "Dumpster + portable toilet", "cost": 800}] (per-SF GC method)
     general_conditions: List[dict] = field(default_factory=list)   # itemized GC at cost [{"item","amount","why"}]; empty -> $4/SF + site_extras

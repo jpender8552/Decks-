@@ -1,7 +1,7 @@
 {
   "job": "16 x 14 Deck \u2014 TimberTech Prime+ Sea Salt Gray, Fulton rail",
   "client": "",
-  "notes": "OWNER 30 Sep: 16' wide x 14' deep, 2x10 frame, Diamond Piers, TimberTech Prime+ Sea Salt Gray, single picture frame, Fulton rail, 5' wide stair. PHOTOS: two-storey house with lap siding, slider door centred-right on the rear wall; existing painted wood deck ~2'-4\" up with rail on both sides and the front either side of a centred stair (3 treads) onto an existing concrete pad. Replace in place: demo the old deck, new stair lands on the existing pad. No address given \u2014 Colorado defaults, confirm.",
+  "notes": "OWNER 30 Sep: 16' wide x 14' deep, 2x10 frame, Diamond Piers, TimberTech Prime+ Sea Salt Gray, single picture frame, Fulton rail, 5' wide stair. PHOTOS: two-storey house with lap siding, slider door centred-right on the rear wall; existing painted wood deck ~2'-4\" up with rail on both sides and the front either side of a centred stair (3 treads) onto an existing concrete pad. Replace in place: demo the old deck, new stair lands on the existing pad. No address given \u2014 Colorado defaults, confirm. OWNER 30 Sep: margin set to 32.5% (under the 40% floor, on purpose).",
   "site": {
     "address": "",
     "city": "",
@@ -73,6 +73,8 @@
   ],
   "extras": {
     "demo_existing": true,
-    "demo_sf": 224
+    "demo_sf": 224,
+    "gm": 0.325,
+    "gm_below_floor": true
   }
 }
