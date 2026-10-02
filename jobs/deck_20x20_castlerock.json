@@ -1,7 +1,7 @@
 {
   "job": "20 x 20 Deck \u2014 TimberTech Advanced PVC, Fulton + drink rail, Castle Rock",
   "client": "",
-  "notes": "OWNER 2 Oct: 20' x 20', south Castle Rock, 10' off the ground, attached to the house. TimberTech PVC, no butt joints, stairs, Hardie fascia, Fulton with drink rail. READS: Vintage Coastline (color to confirm), square shoulder, Cortex with plugs; picture frame in the same board so every field board is one piece wall to border; stair off the right end with a landing (16 risers at 10' is too long for one run); Hardie skirt color TBD; new deck, no demo. Town of Castle Rock loads to confirm.",
+  "notes": "OWNER 2 Oct: 20' x 20', south Castle Rock, 10' off the ground, attached to the house. TimberTech PVC, no butt joints, stairs, Hardie fascia, Fulton with drink rail. READS: Vintage Coastline (color to confirm), square shoulder, Cortex with plugs; picture frame in the same board so every field board is one piece wall to border; stair off the right end as one straight run, 16 risers, two carriers at the third points (OWNER 2 Oct: no landing, straight run); Hardie skirt color TBD; new deck, no demo. Town of Castle Rock loads to confirm.",
   "site": {
     "address": "",
     "city": "Castle Rock",
@@ -77,17 +77,6 @@
       "landing": "concrete pad",
       "rails": 2,
       "closed_risers": true,
-      "flights": [
-        8,
-        8
-      ],
-      "turn": "straight",
-      "landings": [
-        [
-          48,
-          48
-        ]
-      ],
       "mid_support": true
     }
   ],

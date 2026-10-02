@@ -492,17 +492,20 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if st_.mid_support:
             fl_ = st_.geo.flights or []
             idx = st_.carrier_flights or [0]
+            fracs = st_.carrier_fracs or [0.5]
             for fi in idx:
                 below = sum(f.rise_in for f in fl_[fi + 1:]) if fl_ else 0.0
-                h_mid = below + (fl_[fi].rise_in / 2.0 if fl_ else st_.geo.total_rise_in / 2.0)
-                tagf = f"{st_.side}" + (f", flight {fi + 1}" if len(fl_) > 1 else "")
-                post_pieces += [(spec.framing.post_size, h_mid + 6.0, "stair carrier post")] * 2
-                cuts.append(CutPiece(f"Stair carrier posts ({tagf})", spec.framing.post_size, h_mid, 2, "under the stringers at mid-run — field-measure"))
-                cuts.append(CutPiece(f"Stair carrier ({tagf})", "2x6" if not timber else "4x6", st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
+                f_rise = fl_[fi].rise_in if fl_ else st_.geo.total_rise_in
+                for fr_ in fracs:
+                    h_c = below + f_rise * (1 - fr_)
+                    tagf = f"{st_.side}" + (f", flight {fi + 1}" if len(fl_) > 1 else "") + (f", carrier {fracs.index(fr_) + 1} of {len(fracs)}" if len(fracs) > 1 else "")
+                    post_pieces += [(spec.framing.post_size, h_c + 6.0, "stair carrier post")] * 2
+                    cuts.append(CutPiece(f"Stair carrier posts ({tagf})", spec.framing.post_size, h_c, 2, "under the stringers — field-measure"))
+                    cuts.append(CutPiece(f"Stair carrier ({tagf})", "2x6" if not timber else "4x6", st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
             car = "2x6" if not timber else "4x6"
-            n_car = len(idx)
+            n_car = len(idx) * len(fracs)
             uc, src = _lumber_price(car, 12, timber)
-            lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at mid-run ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
+            lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at each carrier ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
                               3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         uc, src = _lumber_price(nom, st, timber)

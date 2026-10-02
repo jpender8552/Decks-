@@ -15,8 +15,8 @@ Current as of September 17, 2026. Prices are cash / financed / monthly.
 | Glengarry Pl — customer proposals | Both decks in one document | `glengarry-proposal-both/` | [V1](https://claude.ai/artifact/P3xLbQpxgXibZx5n7es5ZJ) | $157,215 | $169,048 | $1,962 |
 | | Upper deck · parapet, columns and caissons stay; each replacement priced as an option | `glengarry-proposal-upper/` | [V3](https://claude.ai/artifact/B3Vyb6yfcWXfXBVkZhcGxe) | $118,896 | $127,845 | $1,484 |
 | | Lower deck · under the upper deck, parapet stays, front open | `glengarry-proposal-lower/` | [V3](https://claude.ai/artifact/Mht1tT1SXjxg9wT1mdLbVp) | $38,319 | $41,203 | $478 |
-| 20 x 20 Deck · Castle Rock | Proposal | `deck-20x20-castlerock-proposal/` | [V1](https://claude.ai/artifact/LceiNgfbKQ1PNHyYL4G3S1) | $72,229 | $77,666 | $901 |
-| | Takeoff + build set | `deck-20x20-castlerock/` | [V1](https://claude.ai/artifact/NCtnPDjDHGqoZjXkgLqSRQ) | $72,229 | $77,666 | $901 |
+| 20 x 20 Deck · Castle Rock | Proposal | `deck-20x20-castlerock-proposal/` | [V1](https://claude.ai/artifact/LceiNgfbKQ1PNHyYL4G3S1) | $65,806 | $70,759 | $821 |
+| | Takeoff + build set | `deck-20x20-castlerock/` | [V1](https://claude.ai/artifact/NCtnPDjDHGqoZjXkgLqSRQ) | $65,806 | $70,759 | $821 |
 | | Permit set | `deck-20x20-castlerock-permit-set/` | [V1](https://claude.ai/artifact/9YZm9Cm78XX7NJt6at9dVJ) | | | |
 | 16 x 14 Deck · Sea Salt Gray · Fulton | Proposal | `deck-16x14-seasalt-proposal/` | [V1](https://claude.ai/artifact/3xXARWbL3i1Y4FdvccqMBQ) | $23,376 | $25,135 | $292 |
 | | Takeoff + build set | `deck-16x14-seasalt/` | [V1](https://claude.ai/artifact/ELc43SenyufxB7GRyN36Hf) | $23,376 | $25,135 | $292 |

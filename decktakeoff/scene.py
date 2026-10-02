@@ -524,9 +524,9 @@ def build_scene(L) -> Scene:
                                 u_ = (k - 1) * run + frac * run
                                 ztop = z_top - k * rise
                                 sb_("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "steel", 7)
-            if mid:
-                # mid-run carrier: (2)2x6 under the stringers on two posts and footings — the stringer run is over 6'
-                um = trun / 2
+            for frac in (st.carrier_fracs or [0.5]) if mid else []:
+                # carriers: (2)2x6 under the stringers on two posts and footings — no stringer span over 6'
+                um = trun * frac
                 z_under = z_top - rise - bt - math.tan(theta) * um - depth / math.cos(theta)
                 zc_top = z_under - 0.02
                 sb_("beam", um - 1.5 * IN, um + 1.5 * IN, va_ - 0.25, vb_ + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
