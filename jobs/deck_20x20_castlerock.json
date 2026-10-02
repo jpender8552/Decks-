@@ -1,0 +1,99 @@
+{
+  "job": "20 x 20 Deck \u2014 TimberTech Advanced PVC, Fulton + drink rail, Castle Rock",
+  "client": "",
+  "notes": "OWNER 2 Oct: 20' x 20', south Castle Rock, 10' off the ground, attached to the house. TimberTech PVC, no butt joints, stairs, Hardie fascia, Fulton with drink rail. READS: Vintage Coastline (color to confirm), square shoulder, Cortex with plugs; picture frame in the same board so every field board is one piece wall to border; stair off the right end with a landing (16 risers at 10' is too long for one run); Hardie skirt color TBD; new deck, no demo. Town of Castle Rock loads to confirm.",
+  "site": {
+    "address": "",
+    "city": "Castle Rock",
+    "state": "CO",
+    "zip": "80104",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false
+  },
+  "geometry": {
+    "width": 20,
+    "depth": 20,
+    "size_mode": "nominal",
+    "height_in": 120,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true
+  },
+  "framing": {
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "joist_spacing_in": 12,
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "4x12",
+        "species": "DF",
+        "position_in": 108
+      },
+      {
+        "kind": "drop",
+        "size": "4x12",
+        "species": "DF",
+        "setback_in": 24
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50"
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Vintage",
+    "color": "Coastline",
+    "profile": "square",
+    "fascia": true,
+    "fastener_system": "Cortex",
+    "gap_in": 0.1875,
+    "border_collection": "Vintage",
+    "border_color": "Coastline"
+  },
+  "railing": {
+    "system": "Fulton",
+    "color": "Black",
+    "height_in": 36,
+    "sides": [
+      "left",
+      "right",
+      "front"
+    ],
+    "drink_rail": true,
+    "drink_rail_collection": "Vintage",
+    "drink_rail_color": "Coastline"
+  },
+  "stairs": [
+    {
+      "side": "right",
+      "width_in": 48,
+      "landing": "concrete pad",
+      "rails": 2,
+      "closed_risers": true,
+      "flights": [
+        8,
+        8
+      ],
+      "turn": "straight",
+      "landings": [
+        [
+          48,
+          48
+        ]
+      ],
+      "mid_support": true
+    }
+  ],
+  "extras": {
+    "hardie_skirt": "4/4 x 12 (color TBD)",
+    "engineered": true,
+    "engineering_note": "GSX provides the engineer and pulls the permit. Engineering and the permit are billed at cost, separate from this price."
+  }
+}

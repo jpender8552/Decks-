@@ -490,13 +490,20 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  ({_summarize_labels(labels)}: " + " · ".join(bl.label for bl in L.beam_lines) + ")", uc, src))
     for st_ in L.stairs:
         if st_.mid_support:
-            post_pieces += [(spec.framing.post_size, zt_post := (st_.geo.total_rise_in / 2.0 + 6.0), "stair carrier post")] * 2
-            cuts.append(CutPiece(f"Stair carrier posts ({st_.side})", spec.framing.post_size, st_.geo.total_rise_in / 2.0, 2, "under the stringers at mid-run — field-measure"))
+            fl_ = st_.geo.flights or []
+            idx = st_.carrier_flights or [0]
+            for fi in idx:
+                below = sum(f.rise_in for f in fl_[fi + 1:]) if fl_ else 0.0
+                h_mid = below + (fl_[fi].rise_in / 2.0 if fl_ else st_.geo.total_rise_in / 2.0)
+                tagf = f"{st_.side}" + (f", flight {fi + 1}" if len(fl_) > 1 else "")
+                post_pieces += [(spec.framing.post_size, h_mid + 6.0, "stair carrier post")] * 2
+                cuts.append(CutPiece(f"Stair carrier posts ({tagf})", spec.framing.post_size, h_mid, 2, "under the stringers at mid-run — field-measure"))
+                cuts.append(CutPiece(f"Stair carrier ({tagf})", "2x6" if not timber else "4x6", st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
             car = "2x6" if not timber else "4x6"
+            n_car = len(idx)
             uc, src = _lumber_price(car, 12, timber)
-            lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at mid-run ({st_.side})", 3, 3, "ea",
-                              f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks; 1 spare)", uc, src))
-            cuts.append(CutPiece(f"Stair carrier ({st_.side})", car, st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
+            lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at mid-run ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
+                              3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         uc, src = _lumber_price(nom, st, timber)
         desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else '#2 GC'}"
@@ -582,8 +589,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Stairs", f"{jsize}x12 {SPECIES_NAMES.get(jsp, jsp)} — landing {li + 1} frame ({ftin(lw)} x {ftin(ld)}, {st_s.side} stair)", pcs, pcs, "ea", f"+1  (rims + {n_j} joists @ {spec.joist_spacing:g}\")", uc, src))
             uc, src = _lumber_price(spec.framing.post_size, 8, timber or spec.framing.post_size.startswith("8x"))
             lines.append(Line("Stairs", f"{spec.framing.post_size}x8 — landing {li + 1} posts (4)", 4, 4, "ea", "exact", uc, src))
-            uc, src = _price("footings", "concrete_pad")
-            lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
+            if spec.framing.footing_type == "diamond_pier":     # the landing sits on the same footing the deck does
+                ucp, srcp = _price("footings", spec.framing.footing_model)
+                lines.append(Line("Stairs", f"Diamond Pier {spec.framing.footing_model} — landing {li + 1} footings", 4, 4, "ea", "exact  (one under each landing post)", ucp, srcp))
+                ucb, srcb = _price("footings", "ABA66Z" if spec.framing.post_size == "6x6" else "ABA44Z")
+                lines.append(Line("Stairs", f"Simpson {'ABA66Z' if spec.framing.post_size == '6x6' else 'ABA44Z'} post base on the pier bolt — landing {li + 1}", 4, 4, "ea", "exact", ucb, srcb))
+            else:
+                uc, src = _price("footings", "concrete_pad")
+                lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
             sf_l = lw * ld / 144
             dk = decking_facts(spec.decking.collection)
             nb = int(math.ceil(sf_l / (dk["width"] / 12 * 12) * 1.1))

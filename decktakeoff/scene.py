@@ -509,8 +509,7 @@ def build_scene(L) -> Scene:
                     rail_len = math.hypot(trun - 0.5, H - rise)
                     zc = zb0 + (H - rise) / 2 + hr + 0.1
                     sb_("toprail", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
-                    if spec.railing.drink_rail:
-                        sb_("drink", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - bw / 2, vc + bw / 2, zc + 0.06, zc + 0.06 + bt, "drink", 7, rot=theta, tone_=tone())
+                    # no drink rail on a stair: the graspable handrail is the stair's top
                     if RAIL_SYSTEMS.get(L.rail.system, {}).get("cable"):
                         n_c = int((hr - 0.25) / (3.125 * IN))
                         for i in range(1, n_c + 1):

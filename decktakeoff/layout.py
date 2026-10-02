@@ -197,6 +197,7 @@ class StairLayout:
     landing_sections: List[RailSection] = field(default_factory=list)   # level guard on the landings' open sides
     landing_posts: int = 0
     landing_rail_lf: float = 0.0
+    carrier_flights: List[int] = field(default_factory=list)   # flights (top down) that get a mid-run carrier on two posts
 
 
 @dataclass
@@ -309,7 +310,7 @@ class Layout:
 
     @property
     def stair_support_posts(self) -> int:
-        return sum(2 for st in self.stairs if st.mid_support)
+        return sum(2 * max(1, len(st.carrier_flights)) for st in self.stairs if st.mid_support)
 
     @property
     def n_footings(self) -> int:
@@ -926,8 +927,13 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         mid = s.mid_support if s.mid_support is not None else longest > 72.0
         if mid:
             notes.append(f"stringer run {longest / 12:.1f}' — carrier beam on two {spec.framing.post_size} posts and footings at mid-run under the stringers")
+        carriers = [i for i, fg in enumerate(geo.flights) if fg.run_in >= longest - 1e-6] if mid else []
+        if mid:      # the carrier is the intermediate support DCA6 asks for
+            notes = [n for n in notes if not n.startswith("stringer horizontal run")]
+        if mid and len(carriers) > 1:
+            notes.append(f"{len(carriers)} flights at {longest / 12:.1f}' each — a mid-run carrier under each flight ({2 * len(carriers)} posts and footings)")
         out.append(StairLayout(s.side, s.width_in, geo, 2, tread_pieces, riser_pieces, geo.stringers, geo.stringer_stock_ft, max(frails) if frails else s.rails, secs, stair_posts,
-                               s.landing, opening, notes, mid, round(longest / 2.0, 1) if mid else 0.0, frails, land_secs, land_posts, round(land_lf, 1)))
+                               s.landing, opening, notes, mid, round(longest / 2.0, 1) if mid else 0.0, frails, land_secs, land_posts, round(land_lf, 1), carriers))
     return out
 
 
