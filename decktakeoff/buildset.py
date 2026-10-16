@@ -56,17 +56,42 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             goes_in=items(lambda l: "Stone" in l.item),
             how=["Mason after the posts and before the beams or after the frame — owner's call on access. Cement board wrap, lath, scratch, ledgestone, 24\" cap.", "Keep the cap 1/2\" clear of the post; caulk the joint."],
             check=["Stone plumb and square to the deck; caps level", "Sample color approved by the homeowner"]))
+    if s.framing.system == "steel":
+        steps[-1] = dict(n=2, code="T-401", title="Posts", still="step2",
+            goes_in=items(lambda l: "HSS" in l.item or "pier-head" in l.item.lower() or "side bracket" in l.item.lower() or "ABA66Z" in l.item),
+            how=["Deck-only piers: 3x3 galvanized HSS stubs on the pier-head brackets, cut so the boxed steel beam top lands at the joist top (flush beams): "
+                 + " / ".join(f"{bl.label} {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
+                 "Where a roof-cover post lands on the deck beam line it stands on the same Diamond Pier on an ABA66Z base; the 6x6 Douglas fir post runs up to the cover beam and the deck beam bolts to it with the steel side bracket.",
+                 "Plumb both ways and brace until the beams are on."],
+            check=["Stubs and cover posts plumb to a string; tops on the beam line", "Every bracket fastened: thru-bolts and #12 screws per the engineer"])
     steps.append(dict(n=4, code="T-403", title="Beams", still="step4",
         goes_in=items(lambda l: l.category == "Lumber" and ("6x" in l.item or "4x10x" in l.item and not timber or "4x12" in l.item)) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware"),
         how=[f"{bl.label}: {ftin(bl.length)} " + (f"in {len(bl.pieces)} pieces spliced over posts" if len(bl.pieces) > 1 else "one piece") + f", {bl.n_posts} posts @ {ftin(max((b - a) for a, b in zip(bl.posts_x, bl.posts_x[1:])) if bl.n_posts > 1 else bl.length)} max" for bl in L.beam_lines]
             + ["Crown up, strung straight, caps screwed off with the SDS screws in the box."],
         check=["Beam top = joist bottom (drop) / joist top (flush)", "Splices land on a post; caps fully fastened"]))
+    if s.framing.system == "steel":
+        steps[-1] = dict(n=4, code="T-403", title="Beams", still="step4",
+            goes_in=items(lambda l: "boxed beams" in l.item or "side bracket" in l.item.lower()),
+            how=[f"{bl.label}: {ftin(bl.length)} one piece, {bl.n_posts} posts @ {ftin(max((b - a) for a, b in zip(bl.posts_x, bl.posts_x[1:])) if bl.n_posts > 1 else bl.length)} max" for bl in L.beam_lines]
+                + ["Box two C sections toe-to-toe, #12 self-drilling screws per the engineer's pattern; set flush with the joist tops; brackets to the stubs and cover posts."],
+            check=["Beam top = joist top (flush)", "Brackets fully fastened; cut ends cold-galvanized"])
     steps.append(dict(n=5, code="T-404", title="Frame", still="step5",
         goes_in=items(lambda l: l.category == "Lumber" and s.framing.joist_size in l.item, 6) + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane")), 8),
         how=[t.schedule.get("Ledger", "Ledger per the schedule."),
              "; ".join(f"{z.name}: {len(z.frame.joist_x)} joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones) + ". Crown up, hangers at the ledger" + (", both faces of the flush beam" if any(b.kind == "flush" for b in L.beam_lines) else "") + ".",
              t.schedule.get("Blocking", "Blocking one row over the beam, staggered."), t.schedule.get("Joist tape", "Tape every joist top.")],
         check=["Frame square: diagonals within 1/8\"", "Every hanger fully nailed; ledger fasteners per the schedule", "Tape continuous; photos of the ledger, hangers and footings before decking"]))
+    if s.framing.system == "steel":
+        steps[-1] = dict(n=5, code="T-404", title="Frame", still="step5",
+            goes_in=items(lambda l: l.category == "Lumber" and ("C-joist" in l.item or "track" in l.item or "ledger angle" in l.item))
+                    + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("clip angle", "self-drilling", "Structural screw", "tension tie", "Vycor", "flashing", "poly", "gravel")), 8),
+            how=[t.schedule.get("Ledger", "Ledger per the schedule."),
+                 "; ".join(f"{z.name}: {len(z.frame.joist_x) + len(z.frame.pf_x)} CEMCO 7-1/4\" C-joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones)
+                 + ". Joists seat on the ledger angle and clip to the ledger track and the boxed beams with clip angles, 4 #12 screws per leg.",
+                 "Track caps every joist end at the rims; picture-frame and breaker joists doubled where the borders land.",
+                 "Gravel over 6-mil poly under the frame before the decking (2\" min. clear at the walkway low end).",
+                 t.schedule.get("Steel frame", "")],
+            check=["Frame square: diagonals within 1/8\"", "Every clip fully screwed; ledger screws per the schedule", "Cut ends cold-galvanized; photos of the ledger, clips and footings before decking"])
     steps.append(dict(n=6, code="T-405", title="Decking", still="step6",
         goes_in=items(lambda l: l.category in ("Decking", "Fasteners", "Fascia")),
         how=[t.schedule.get("Field", ""), t.schedule.get("Face screws", "Borders first, then the field."),
@@ -84,7 +109,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             goes_in=items(lambda l: l.category == "Porch cover", 14),
             how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 {'Douglas fir' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts "
                  + ("on ABA66Z bases on the Diamond Piers (shared with the deck beam where they line up)" if any(c_.get("footing") in ("diamond_pier", "deck_pier") for c_ in covers_of(s)) else "on the deck over blocked joists")
-                 + f", (2)2x10 beam on the posts; 2x8 rafters @ 16\" OC with hurricane ties and the overhang; 2x8 sub-fascia and OSB.",
+                 + f", {(covers_of(s) or [{}])[0].get('beam', '(2)2x10')} beam on AC6Z caps; 2x8 rafters @ 16\" OC with H2.5AZ ties and the overhang; 2x8 sub-fascia and OSB. Cover framing is wood (SYP rafters / beam, Douglas fir posts).",
                  ("High-temp self-adhered underlayment over every sheet, headwall flashing counterflashed into the house wall, eave trim, then the 24 ga snap-lock panels one piece eave to headwall — clips 18\" OC on each seam, no face screws in the field; rake trim and closures last; snow retention bar clamped to the seams 12-18\" above the low eave, the full width."
                   if ss else "Synthetic underlayment, drip edge, starter, architectural shingles 6 nails each, step flashing at the house wall.")]
                 + ([f"5\" K gutter on the low eave, hangers 24\" OC, 1/16\" per foot toward the outlets; 2x3 downspouts strapped to the cover posts, offset past the deck edge, down the deck post to a splash block 3'+ from the footing."] if s.extras.cover_gutters else [])

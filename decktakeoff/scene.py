@@ -29,6 +29,7 @@ class Box:
     tone: float = 0.0   # per-board tone jitter (-1..1)
     rot: float = 0.0    # radians about the box centre: stair stringers / stair rails (axis below); 0 = axis-aligned
     rot_axis: str = "y" # "y": run along x (viewer rotation.z) | "x": run along y (viewer rotation.x)
+    xg: float = 0.0     # extra lift in the exploded view (ft) on top of the phase gap: layers within one phase pull apart
 
 
 @dataclass
@@ -143,6 +144,8 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         hardie=dict(color=_hardie_hex(spec.extras.hardie_color), pattern="lap", rough=0.8, label=f"James Hardie ColorPlus {spec.extras.hardie_color or 'Timber Bark'}"),
         soffit=dict(color=_hardie_hex(spec.extras.hardie_color), pattern="batten", rough=0.85, label=f"HardieSoffit cedarmill {spec.extras.hardie_color or 'Timber Bark'}"),
         shade=dict(color="#7a5c45", rough=0.9, opacity=0.82, label="the owner's roll-down blinds (kept)"),
+        osb=dict(color="#c9a46a", rough=0.95, label="7/16\" OSB roof sheathing"),
+        underlay=dict(color="#3d4651", rough=0.9, label="high-temp self-adhered underlayment"),
         steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
@@ -899,13 +902,16 @@ def step_captions(L: Layout) -> Dict[int, str]:
           "existing": f"{n_posts} existing caissons stay" + (" with the existing columns" if s.framing.existing_posts else ", new standoff bases")}[s.framing.footing_type]
     beams = " · ".join(f"{bl.label} ({bl.n_posts} posts)" for bl in L.beam_lines)
     out = {1: f"Step 1 · Footings — {ft}",
-           2: f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases",
+           2: (("Step 2 · Posts — 3x3 galvanized steel stubs on pier-head brackets" + ("; 6x6 Douglas fir cover posts carry the deck beams where they line up" if any(c.get("footing") == "deck_pier" for c in covers_of(s)) else ""))
+               if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
            4: f"Step 4 · Beams — {beams}",
-           5: f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if L.frame.blocking_rows_y else ""),
+           5: (f"Step 5 · Frame — CEMCO 7-1/4\" steel C-joists at {L.frame.spacing:g}\" OC, steel track rims, ledger track on a steel angle, clip angles" if s.framing.system == "steel" else
+               f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if L.frame.blocking_rows_y else "")),
            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}" + (f", {s.decking.border_color} border" if s.decking.border_color else "") + (", hidden fasteners" if (s.decking.fastener_system or '') != 'Cap-Tor xd face screw' else ""),
            7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else ("Step 7 · Rail — existing stucco parapet stays" if s.railing.existing_parapet else "Step 7 · (no rail)"),
-           8: "Step 8 · Your room" + (" — hot tub" if s.extras.hot_tub else "")}
+           8: ("Step 8 · Roof covers — 6x6 Douglas fir posts, " + covers_of(s)[0].get("beam", "(2)2x10") + " beam, 2x8 rafters, OSB, underlayment, standing seam, Hardie soffit / fascia / rakes"
+               if covers_of(s) and s.extras.cover_post_species.upper().startswith("DF") else "Step 8 · Your room" + (" — hot tub" if s.extras.hot_tub else ""))}
     return out
 
 
@@ -1226,7 +1232,9 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
     from .takeoff import cover_posts_x
     x0, x1, y0, y1 = float(c["x0"]), float(c["x1"]), float(c["y0"]), float(c["y1"])
     ov = float(c.get("overhang_ft", 1.0))
-    bd = 9.25 / 12                                    # (2)2x10 beam / 2x10 ledger depth
+    from .catalog import actual as _act
+    cbeam, cledg = c.get("beam", "(2)2x10"), c.get("ledger", "2x10")
+    bd = _act(cbeam.split(")")[-1])[1] / 12             # beam / ledger depth (the ledger matches the beam line)
     rd = 7.25 / 12                                    # 2x8 rafter
     hi_b = zt + float(c.get("clear_high_in") or 100.0) / 12     # bottom of the ledger at the house
     lo_b = zt + float(c.get("clear_low_in") or 88.0) / 12       # bottom of the beam at the posts
@@ -1235,8 +1243,8 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
     on_piers = c.get("footing", "deck") in ("diamond_pier", "deck_pier")
     nm = c.get("name", "cover")
     # ledger, beam, posts
-    add("cledger", x0 - 0.4, x1 + 0.4, y0, y0 + 0.13, hi_b, hi_b + bd, "ctimber", 8, tag=f"{nm} ledger 2x10")
-    add("cbeam", x0 - 0.4, x1 + 0.4, y1 - 0.25, y1 + 0.25, lo_b, lo_b + bd, "ctimber", 8, tag=f"{nm} beam (2)2x10")
+    add("cledger", x0 - 0.4, x1 + 0.4, y0, y0 + 0.13, hi_b, hi_b + bd, "ctimber", 8, tag=f"{nm} ledger {cledg}", xg=2.0)
+    add("cbeam", x0 - 0.4, x1 + 0.4, y1 - 0.25, y1 + 0.25, lo_b, lo_b + bd, "ctimber", 8, tag=f"{nm} beam {cbeam}", xg=2.0)
     for px in cover_posts_x(c):
         zb = 0.45 if on_piers else zt
         add("cpost", px - 0.23, px + 0.23, y1 - 0.23, y1 + 0.23, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 " + ("Douglas fir" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar"))
@@ -1252,25 +1260,27 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
     n = max(2, int(round((x1 - x0 + 0.8) / (16 / 12))))
     for k in range(n + 1):
         rx = x0 - 0.4 + 0.06 + k * (x1 - x0 + 0.8 - 0.12) / n
-        add("rafter", rx - 0.0625, rx + 0.0625, yc - L_r / 2, yc + L_r / 2, zc - rd / 2, zc + rd / 2, "ctimber", 8, tag=f"{nm} rafter 2x8", rot=theta, rot_axis="x")
+        add("rafter", rx - 0.0625, rx + 0.0625, yc - L_r / 2, yc + L_r / 2, zc - rd / 2, zc + rd / 2, "ctimber", 8, tag=f"{nm} rafter 2x8", rot=theta, rot_axis="x", xg=4.5)
     ss = spec.extras.cover_roof.lower().startswith("standing")
     z_top_c = z_bot_c + rd / math.cos(theta)
     add("ssroof" if ss else "roof", x0 - 0.4, x1 + 0.4, yc - L_r / 2 - 0.05, yc + L_r / 2 + 0.05, z_top_c + 0.02, z_top_c + 0.12, "ssroof" if ss else "roof", 8,
-        tag="standing seam steel roof" if ss else "roof", rot=theta, rot_axis="x")
+        tag="standing seam steel roof" if ss else "roof", rot=theta, rot_axis="x", xg=9.0)
+    add("sheath", x0 - 0.4, x1 + 0.4, yc - L_r / 2 - 0.05, yc + L_r / 2 + 0.05, z_top_c - 0.04, z_top_c, "osb", 8, tag="7/16\" OSB sheathing", rot=theta, rot_axis="x", xg=6.0)
+    add("underlay", x0 - 0.4, x1 + 0.4, yc - L_r / 2 - 0.05, yc + L_r / 2 + 0.05, z_top_c, z_top_c + 0.02, "underlay", 8, tag="high-temp ice & water underlayment", rot=theta, rot_axis="x", xg=7.5)
     z_eave_top = (hi_b + bd) - math.tan(theta) * (y_end - y0) + rd / math.cos(theta)
     if ss:   # snow retention bar 15" up the slope from the eave
         yb = y_end - 1.25
         zb = (hi_b + bd) - math.tan(theta) * (yb - y0) + rd / math.cos(theta) + 0.12
-        add("trim", x0 - 0.4, x1 + 0.4, yb - 0.06, yb + 0.06, zb, zb + 0.16, "steel", 8, tag="snow retention bar")
+        add("trim", x0 - 0.4, x1 + 0.4, yb - 0.06, yb + 0.06, zb, zb + 0.16, "steel", 8, tag="snow retention bar", xg=10.5)
     if spec.extras.cover_soffit:
-        add("soffit", x0 - 0.4, x1 + 0.4, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.05, z_bot_c, "soffit", 8, tag="HardieSoffit ceiling", rot=theta, rot_axis="x")
+        add("soffit", x0 - 0.4, x1 + 0.4, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.05, z_bot_c, "soffit", 8, tag="HardieSoffit ceiling", rot=theta, rot_axis="x", xg=3.2)
     if spec.extras.cover_fascia:
         z_eave_bot = (hi_b + bd) - math.tan(theta) * (y_end - y0)
-        add("hardie", x0 - 0.45, x1 + 0.45, y_end, y_end + 0.08, z_eave_bot - 0.12, z_eave_top + 0.12, "hardie", 8, tag="HardieTrim fascia")
+        add("hardie", x0 - 0.45, x1 + 0.45, y_end, y_end + 0.08, z_eave_bot - 0.12, z_eave_top + 0.12, "hardie", 8, tag="HardieTrim fascia", xg=5.5)
         for xe in (x0 - 0.45, x1 + 0.37):
-            add("hardie", xe, xe + 0.08, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.12, z_bot_c + rd / math.cos(theta) + 0.12, "hardie", 8, tag="HardieTrim rake", rot=theta, rot_axis="x")
+            add("hardie", xe, xe + 0.08, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.12, z_bot_c + rd / math.cos(theta) + 0.12, "hardie", 8, tag="HardieTrim rake", rot=theta, rot_axis="x", xg=5.5)
     if spec.extras.cover_gutters:
-        add("gutter", x0 - 0.45, x1 + 0.45, y_end + 0.08, y_end + 0.5, z_eave_top - 0.42, z_eave_top, "gutter", 8, tag="5\" K gutter")
+        add("gutter", x0 - 0.45, x1 + 0.45, y_end + 0.08, y_end + 0.5, z_eave_top - 0.42, z_eave_top, "gutter", 8, tag="5\" K gutter", xg=5.5)
     # the owner's roll-down blinds: a roll under the beam's outer face; some bays lowered
     for bl in c.get("blinds") or []:
         a, b = float(bl.get("from_ft", x0)), float(bl.get("to_ft", x1))

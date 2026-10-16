@@ -12,7 +12,7 @@ from decktakeoff.spec import DeckSpec
 from decktakeoff.viewer import viewer_html
 
 EX = Path(__file__).parent.parent / "examples"
-SHEET_NUMBERS = ["G-001", "S-100", "S-101", "A-101", "A-201", "A-301", "D-501"]   # the drawn sheets (A-001 = renders, T-* = generated pages)
+SHEET_NUMBERS = ["G-001", "A-002", "A-003", "S-100", "S-101", "S-102", "A-101", "A-201", "A-202", "A-301", "D-501"]   # the drawn sheets (A-001 = renders, T-* = generated pages)
 
 
 @pytest.fixture(scope="module", params=["eagles_nest.json", "jason_ct.json"])

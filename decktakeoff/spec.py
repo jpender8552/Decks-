@@ -396,7 +396,7 @@ def _build(cls, d: dict):
     return cls(**kwargs)
 
 
-COVER_DEFAULTS = dict(name="Porch cover", slope="+y", clear_high_in=None, clear_low_in=None, posts_x_ft=None, footing="deck",
+COVER_DEFAULTS = dict(name="Porch cover", slope="+y", beam="(2)2x10", ledger="2x10", clear_high_in=None, clear_low_in=None, posts_x_ft=None, footing="deck",
                       overhang_ft=1.0, blinds=[])
 
 

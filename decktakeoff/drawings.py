@@ -66,7 +66,14 @@ def elev_xform(x0, x1, z0, z1, px0, py0, pw, ph):
 _MAT_COLORS: Dict[str, str] = {}
 
 
+_STEEL = {"on": False}
+
+
 def fill_for(b: Box) -> str:
+    if _STEEL["on"] and b.kind in ("joist", "rim", "ledger", "block", "beam", "post", "doubler", "stringer"):
+        return "#a7adb2" if b.kind != "beam" else "#8d949a"           # CEMCO galvanized steel
+    if b.kind in ("cpost", "cbeam", "cledger", "rafter"):
+        return FILL["timber"] if b.kind != "cbeam" else FILL["timber_dk"]
     if b.kind in ("joist", "rim", "ledger", "block", "beam", "post", "doubler"):
         return FILL["timber"] if b.kind != "beam" else FILL["timber_dk"]
     if b.mat in ("deck", "border", "drink", "fascia") and b.mat in _MAT_COLORS:
@@ -193,11 +200,12 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
     o.append(T(x2, 24, "SHEET INDEX", 9, 800, fill=GOLD))
     yy = 40
     from .spec import covers_of
-    idx = [(n_, t_) for n_, t_ in SHEET_INDEX if not (n_ == "A-201" and not L.rail)]
-    if s.site.plan and s.site.plan.get("parcel"):
-        idx.insert(1, SHEET_INDEX_EXTRA[0])
-    if covers_of(s):
-        idx.insert([n_ for n_, _ in idx].index("A-301") + 1, SHEET_INDEX_EXTRA[1])
+    idx = [("G-001", "General notes · design criteria")] + ([SHEET_INDEX_EXTRA[0]] if (s.site.plan and s.site.plan.get("parcel")) else []) + [
+        ("A-001", "Isometric · renders"), ("A-002", "Isometric — assembled, labeled"), ("A-003", "Isometric — exploded, labeled"), ("S-100", "Foundation plan"),
+        ("S-101", "Framing plan"), ("S-102", "Structure isometric, labeled"), ("A-101", "Decking plan")] + ([("A-201", "Railing plan + elevation")] if L.rail else []) + [
+        ("A-202", "Elevations"), ("A-301", "Section + front elevation")] + ([SHEET_INDEX_EXTRA[1], ("A-402", "Roof covers — exploded isometric")] if covers_of(s) else []) + [
+        ("D-501", "Details")] + ([("D-502", "Connection details — steel frame")] if s.framing.system == "steel" else []) + (
+        [("D-503", "Connection details — roof covers")] if s.geometry.covers else []) + [("T-400", "Build steps (build set)"), ("T-700", "Order + schedules (takeoff)")]
     for num, title in idx:
         o.append(T(x2, yy, num, 8.5, 800, fill=GOLD)); o.append(T(x2 + 52, yy, title, 8.5, 500)); yy += 13
     o.append(T(x2, yy + 12, "SITE", 9, 800, fill=GOLD)); yy += 28
@@ -221,6 +229,8 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
 
 
 def sheet_foundation(L: Layout, S: Scene, meta) -> str:
+    from .spec import covers_of
+    from .takeoff import cover_posts_x
     o = []
     x0, x1, y0, y1 = plan_bounds(S)
     X, Y, sc = plan_xform(x0, x1, y0 - 2, y1, 40, 24, 640, 560)
@@ -238,7 +248,8 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
             n += 1
             x, y = px * IN, bl.y * IN
             o.append(T(X(x), Y(y) - 12 * (1 if bl.kind == "drop" else -1) - (0 if bl.kind == "drop" else 4), f"P{n}", 8, 800, "middle"))
-            rows.append((f"P{n}", ftin(px), ftin(bl.y), zn, f"{ld:,.0f} lb"))
+            shared = [c for c in covers_of(L.spec) if c.get("footing") == "deck_pier" and any(abs(cx - px / 12.0) < 1.0 for cx in cover_posts_x(c))]
+            rows.append((f"P{n}", ftin(px), ftin(bl.y), zn + (" +cover" if shared else ""), f"{ld:,.0f} lb" + (" +roof" if shared else "")))
     if any(st.mid_support for st in L.stairs):
         for b in [q for q in S.boxes if q.tag == "stair footing"]:
             n += 1
@@ -283,6 +294,13 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
         yy += 11.5
     o.append(T(sx, yy + 10, "x from the left frame face facing the house; y from the reference wall.", 7.2, 400, fill=MUTE))
     o.append(T(sx, yy + 21, f"Frost {ftin(L.spec.site.frost_depth_in)} · soil {L.spec.site.soil_bearing_psf:,.0f} psf · worst post {max(z.frame.footing_load_lb for z in L.zones):,.0f} lb", 7.2, 400, fill=MUTE))
+    if L.spec.framing.system == "steel":
+        for k_, ln_ in enumerate(["Deck-only piers: 3x3 galvanized HSS stub on a pier-head bracket (D-502 / 3).",
+                                  "+cover: the 6x6 Douglas fir roof-cover post stands on this pier",
+                                  "(ABA66Z) and carries the deck beam on a steel side bracket (D-502 / 4);",
+                                  "roof load adds — the engineer sizes the pier.",
+                                  "Beams: boxed CEMCO 7-1/4\" steel C, flush (D-502 / 2)."]):
+            o.append(T(sx, yy + 36 + k_ * 11, ln_, 7.2, 500))
     return sheet("S-100", "Foundation plan", "Footings, posts and beam lines with the footing schedule; beams dashed (below the joists)", o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
 
@@ -786,10 +804,12 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         x0, x1, y0, y1 = c["x0"], c["x1"], c["y0"], c["y1"]
         hi, lo = float(c.get("clear_high_in") or 100), float(c.get("clear_low_in") or 88)
         pitch = (hi - lo) / max(0.1, (y1 - y0))
+        from .catalog import actual as _act
+        bdi = _act(c.get("beam", "(2)2x10").split(")")[-1])[1]
         o.append(T(ox, 18, f"{c['name'].upper()} — PLAN", 10, 900, fill=GOLD))
         Xp, Yp, scp = plan_xform(x0 - 1.5, x1 + 1.5, y0 - 1.0, y1 + ov + 1.5, ox, 38, colw - 40, 215)
         o.append(R(Xp(x0 - 1.5), Yp(y0 - 1.0), (x1 - x0 + 3) * scp, 1.0 * scp, FILL["house"], INK, 1.0))
-        o.append(T(Xp((x0 + x1) / 2), Yp(y0 - 1.0) - 4, "HOUSE WALL — 2x10 ledger, LedgerLOK 6\" 2 rows @ 16\"", 7, 800, "middle", MUTE))
+        o.append(T(Xp((x0 + x1) / 2), Yp(y0 - 1.0) - 4, f"HOUSE WALL — {c.get('ledger', '2x10')} ledger, LedgerLOK 6\" 2 rows @ 16\"", 7, 800, "middle", MUTE))
         o.append(R(Xp(x0 - 0.4), Yp(y0), (x1 - x0 + 0.8) * scp, (y1 - y0 + ov) * scp, "#2b2b2e", INK, 1.0, 'fill-opacity="0.12"'))
         k = 0.0
         while x0 - 0.4 + k <= x1 + 0.4 + 0.01:
@@ -805,12 +825,12 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
             dim_h(o, Xp, Yp(y0) + 12, a, b, ftin((b - a) * 12) + " posts", 7.5)
         dim_v(o, Yp, Xp(x1 + 0.4) + 16, y0, y1, ftin((y1 - y0) * 12), left=False)
         dim_v(o, Yp, Xp(x1 + 0.4) + 16, y1, y1 + ov, ftin(ov * 12) + " ovh", 7, left=False)
-        o.append(T(Xp((x0 + x1) / 2), Yp((y0 + y1) / 2), f"2x8 rafters @ 16\" OC · slope {pitch:.2f}:12 to the yard", 7.5, 800, "middle"))
+        o.append(T(Xp((x0 + x1) / 2), Yp((y0 + y1) / 2), f"2x8 wood rafters @ 16\" OC · slope {pitch:.2f}:12 to the yard · {c.get('beam', '(2)2x10')} wood beam", 7.5, 800, "middle"))
         o.append(T(Xp((x0 + x1) / 2), Yp((y0 + y1) / 2) + 11, f"{s.extras.cover_roof_color or ''} standing seam, mechanically seamed".strip(), 7.5, 600, "middle"))
         # section
         sy0 = 300
         o.append(T(ox, sy0, f"{c['name'].upper()} — SECTION", 10, 900, fill=GOLD))
-        top_z = zt + (hi + 9.25 + 7.25) / 12 + 0.6
+        top_z = zt + (hi + bdi + 7.25) / 12 + 0.6
         Xs, Zs, scs = elev_xform(y0 - 2.0, y1 + ov + 3.0, -1.8, top_z, ox, sy0 + 8, colw - 40, 205)
         o.append(R(Xs(y0 - 2.0), Zs(0), (y1 + ov + 5) * scs, 1.8 * scs, "#cdbf9f", "none", 0))
         o.append(LN(Xs(y0 - 2.0), Zs(0), Xs(y1 + ov + 3), Zs(0), INK, 1.2))
@@ -819,14 +839,14 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(R(Xs(y0), Zs(zt), (y1 - y0 + 0.4) * scs, (1.0 / 12 + 7.25 / 12) * scs, FILL["deck"], INK, 0.8))
         o.append(T(Xs(y0) + 4, Zs(zt) + 10, f"DECK {ftin(s.geometry.height_in)} above grade", 6.5, 800, fill="#f3ead9"))
         zb_hi, zb_lo = zt + hi / 12, zt + lo / 12
-        o.append(R(Xs(y0), Zs(zb_hi + 9.25 / 12), 0.13 * scs, 9.25 / 12 * scs, FILL["timber_dk"], INK, 0.6))
-        o.append(R(Xs(y1 - 0.25), Zs(zb_lo + 9.25 / 12), 0.5 * scs, 9.25 / 12 * scs, FILL["timber_dk"], INK, 0.6))
+        o.append(R(Xs(y0), Zs(zb_hi + bdi / 12), 0.13 * scs, bdi / 12 * scs, FILL["timber_dk"], INK, 0.6))
+        o.append(R(Xs(y1 - 0.25), Zs(zb_lo + bdi / 12), 0.5 * scs, bdi / 12 * scs, FILL["timber_dk"], INK, 0.6))
         o.append(R(Xs(y1 - 0.23), Zs(zb_lo), 0.46 * scs, (zb_lo - 0.45) * scs, FILL["timber"], INK, 0.6))
         o.append(R(Xs(y1 - 0.45), Zs(0.45), 0.9 * scs, (0.45 + 0.4) * scs, FILL["concrete"], INK, 0.6))
         o.append(T(Xs(y1) + 26, Zs(0.1) + 4, "Diamond Pier (shared with the deck beam)" if c.get("footing") == "deck_pier" else "Diamond Pier", 7, 700))
         for k_ in (-1, 1):
             o.append(LN(Xs(y1), Zs(0), Xs(y1 + k_ * 1.6), Zs(-1.7), INK, 0.7))
-        zr0, zr1 = zb_hi + 9.25 / 12, zb_lo + 9.25 / 12 - pitch / 12 * ov
+        zr0, zr1 = zb_hi + bdi / 12, zb_lo + bdi / 12 - pitch / 12 * ov
         o.append(PG([(Xs(y0), Zs(zr0)), (Xs(y1 + ov), Zs(zr1)), (Xs(y1 + ov), Zs(zr1 + 7.25 / 12)), (Xs(y0), Zs(zr0 + 7.25 / 12))], FILL["timber"], INK, 0.7))
         o.append(LN(Xs(y0), Zs(zr0 + 8.5 / 12), Xs(y1 + ov + 0.1), Zs(zr1 + 8.5 / 12), "#1c1c1e", 2.6))
         o.append(LN(Xs(y0), Zs(zr0 - 0.03), Xs(y1 + ov), Zs(zr1 - 0.03), "#efe9dc", 2.0))
@@ -842,7 +862,7 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         notes = [f"Standing seam 24 ga, 16\" panels, 1-1/2\" mechanical (double-lock) seam — rated for {pitch:.2f}:12 · high-temp ice & water underlayment over 7/16\" OSB",
                  "Headwall flashing counterflashed into the siding · color-matched eave / rake trim · snow bar across the low eave",
                  f"HardieSoffit cedarmill ceiling · HardieTrim fascia + rakes ({s.extras.hardie_color or 'color TBD'}) · H2.5AZ at every rafter · AC6Z caps",
-                 "6x6 posts on ABA66Z bases on the Diamond Pier bolt · the engineer's uplift hold-down governs"]
+                 f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts on ABA66Z bases on the Diamond Pier bolt · AC6Z cap to the {c.get('beam', '(2)2x10')} beam · the engineer's uplift hold-down governs"]
         yy = sy0 + 236
         for ln in notes:
             for w in textwrap.wrap(ln, int(colw / 5.0)):
@@ -877,18 +897,439 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
             _MAT_COLORS[k] = S.materials[k]["color"]
     FILL["deck"] = _MAT_COLORS.get("deck", FILL["deck"]); FILL["border"] = _MAT_COLORS.get("border", FILL["border"])
     meta = sheet_meta(L, customer=customer)
+    _STEEL["on"] = L.spec.framing.system == "steel"
     out = [("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta))]
     site = sheet_site(L, S, t, meta)
     if site:
         out.append(("C-100", "Site plan", site))
-    out += [("S-100", "Foundation plan", sheet_foundation(L, S, meta)),
+    out += [("A-002", "Isometric — assembled, labeled", sheet_iso_assembled(L, S, t, meta)),
+            ("A-003", "Isometric — exploded, labeled", sheet_iso_exploded(L, S, t, meta)),
+            ("S-100", "Foundation plan", sheet_foundation(L, S, meta)),
             ("S-101", "Framing plan", sheet_framing(L, S, t, meta)),
+            ("S-102", "Structure isometric, labeled", sheet_iso_structure(L, S, t, meta)),
             ("A-101", "Decking plan", sheet_decking(L, S, t, meta))]
     if L.rail:
         out.append(("A-201", "Railing plan + elevation", sheet_rail(L, S, t, meta)))
+    out.append(("A-202", "Elevations", sheet_elevations(L, S, t, meta)))
     out.append(("A-301", "Section + front elevation", sheet_section(L, S, t, meta)))
     cov = sheet_covers(L, S, t, meta)
     if cov:
         out.append(("A-401", "Roof covers — plan + section", cov))
+    cx = sheet_iso_covers(L, S, t, meta)
+    if cx:
+        out.append(("A-402", "Roof covers — exploded isometric, labeled", cx))
     out.append(("D-501", "Details", sheet_details_steel(L, S, t, meta) if L.spec.framing.system == "steel" else sheet_details(L, S, t, meta)))
+    if L.spec.framing.system == "steel":
+        out.append(("D-502", "Connection details — steel frame", sheet_details_steel_connections(L, S, t, meta)))
+    if L.spec.geometry.covers:
+        dc = sheet_details_cover_connections(L, S, t, meta)
+        if dc:
+            out.append(("D-503", "Connection details — roof covers", dc))
     return out
+
+
+# ------------------------------------------------------------------ labeled axonometrics (permit set)
+def _axo_colors(S: Scene) -> Dict[str, str]:
+    cols = {k: v.get("color", "#b8b2a6") for k, v in S.materials.items()}
+    cols.update(house="#ece6da", roof="#4a4440", trim="#f4f1ea", concrete="#c9c4ba", steel="#3a3c40", galv="#a7adb2")
+    return cols
+
+
+def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool], Tuple[float, float, float], str]]:
+    """(label, which boxes, where on the box, pick) for every member the job has, in build order — the callout key."""
+    s = L.spec
+    steel = s.framing.system == "steel"
+    dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    hc = s.extras.hardie_color or ""
+    post_sp = "Douglas fir #1" if s.extras.cover_post_species.upper().startswith("DF") else "cedar"
+    from .spec import covers_of
+    _cv0 = (covers_of(s) or [{}])[0]
+    ks = [
+        (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "first"),
+        ("3x3 galvanized HSS post stub on a pier-head bracket" if steel else f"{s.framing.post_size} post on a standoff base", lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
+        (("Boxed CEMCO 7-1/4\" steel C beam (2 C toe-to-toe), flush" if steel else "Beam"), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
+        (("CEMCO 7-1/4\" steel C-joist, 16 ga G90, @ 12\" OC — clip angles each end" if steel else f"{s.framing.joist_size} joist"), lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
+        (("CEMCO 7-1/4\" steel track rim (caps the joist ends)" if steel else "Rim"), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
+        (("Steel ledger track + 3x3 ledger angle on the house rim, flashed" if steel else "Ledger"), lambda b: b.kind == "ledger", (0.4, 0.5, 1.0), "last"),
+        (("Steel blocking at the breaker / picture-frame joists" if steel else "Blocking"), lambda b: b.kind == "block", (0.5, 0.5, 1.0), "mid"),
+        (f"{dk} field decking, hidden fasteners", lambda b: b.kind == "board", (0.5, 0.5, 1.0), "mid"),
+        (f"Picture frame + breaker boards — {dk}", lambda b: b.kind == "border", (0.5, 0.5, 1.0), "last"),
+        ((f"HardieTrim skirt {hc}".strip() if s.extras.hardie_skirt else "Fascia"), lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
+        ("Stair — steel stringers, Landmark treads, closed risers, lands on grade" if steel else "Stair", lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
+        ("Gravel over 6-mil poly under the decks", lambda b: b.kind == "gravel", (0.3, 0.6, 1.0), "first"),
+        (f"6x6 {post_sp} cover post on ABA66Z (shared Diamond Pier)", lambda b: b.kind == "cpost", (0.5, 0.5, 0.45), "last"),
+        (f"{_cv0.get('beam', '(2)2x10')} cover beam, wood, AC6Z cap", lambda b: b.kind == "cbeam", (0.7, 0.5, 0.5), "last"),
+        (f"{_cv0.get('ledger', '2x10')} cover ledger, wood, LedgerLOK 6\" 2 rows, headwall flashed", lambda b: b.kind == "cledger", (0.5, 0.5, 0.5), "last"),
+        ("2x8 rafters @ 16\" OC, wood, H2.5AZ at the beam", lambda b: b.kind == "rafter", (0.5, 0.5, 0.5), "mid"),
+        ("7/16\" OSB roof sheathing", lambda b: b.kind == "sheath", (0.2, 0.5, 1.0), "last"),
+        ("High-temp self-adhered underlayment", lambda b: b.kind == "underlay", (0.4, 0.5, 1.0), "last"),
+        (f"{s.extras.cover_roof_color} standing seam, 24 ga, mechanically seamed".strip(), lambda b: b.kind == "ssroof", (0.7, 0.4, 1.0), "last"),
+        ("Snow retention bar, clamped to the seams", lambda b: (b.tag or "") == "snow retention bar", (0.8, 0.5, 1.0), "last"),
+        (f"HardieTrim fascia + rakes {hc}".strip(), lambda b: b.kind == "hardie", (0.5, 0.5, 0.5), "mid"),
+        (f"HardieSoffit cedarmill ceiling {hc}".strip(), lambda b: b.kind == "soffit", (0.5, 0.5, 0.0), "last"),
+        ("Existing roll-down blinds (stay)", lambda b: b.kind == "blind", (0.5, 0.5, 0.3), "last"),
+    ]
+    return [k for k in ks if any(k[1](b) for b in S.boxes)]
+
+
+def _axo_sheet(num, title, sub, L, S, t, meta, boxes, explode=False, gaps=None, az=35.0, el=28.0, key=None, fit=None, note=""):
+    from .axo import View, draw, anchor, callouts
+    cols = _axo_colors(S)
+    frame = (20, 6, 700, 600)
+    o = [f'<defs><clipPath id="ax{num.replace("-", "")}"><rect x="{frame[0]}" y="{frame[1]}" width="{frame[2]}" height="{frame[3]}"/></clipPath></defs>']
+    polys, to_sheet, sc = draw(boxes, cols, View(az, el), (frame[0] + 70, frame[1], frame[2] - 140, frame[3]), explode=explode, gaps=gaps, fit_boxes=fit)
+    o.append(f'<g clip-path="url(#ax{num.replace("-", "")})">' + "".join(polys) + "</g>")
+    key = key if key is not None else member_key(L, S, t)
+    items = []
+    for i, (lab, pred, where, pick) in enumerate(key, 1):
+        q = anchor(boxes, pred, explode, gaps, pick, where)
+        if q is not None:
+            items.append((i, q, lab))
+    o += callouts(items, to_sheet, frame)
+    # the key
+    kx = 735
+    o.append(T(kx, 22, "KEY", 9, 800, fill=GOLD))
+    yy = 38
+    for i, q, lab in items:
+        o.append(C(kx + 6, yy - 3, 6, GOLD, INK, 0.5)); o.append(T(kx + 6, yy, str(i), 6.8, 900, "middle"))
+        for j, ln in enumerate(textwrap.wrap(lab, 40)[:3]):
+            o.append(T(kx + 18, yy + j * 9.5, ln, 7.4, 600 if j == 0 else 400)); 
+        yy += 9.5 * min(3, len(textwrap.wrap(lab, 40))) + 5
+    if note:
+        yy += 6
+        for ln in textwrap.wrap(note, 46):
+            o.append(T(kx, yy, ln, 7.2, 400, fill=MUTE)); yy += 9.5
+    return sheet(num, title, sub, o, "Axonometric · not to scale · the model the plans are drawn from", meta)
+
+
+def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind not in ("ground", "glass", "stringer")]     # closed risers hide the stringers
+    fit = [b for b in bx if b.kind not in ("house", "roof", "trim") or (b.tag or "") in ("snow retention bar",)]
+    hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "sheath", "underlay")
+    key = [k for k in member_key(L, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
+    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Everything you see called out: piers, decking, picture frame, skirt, stair, roof covers, finishes", L, S, t, meta, bx, fit=fit, key=key,
+                      note="House shown for context only (no work). The CEMCO steel deck frame under the decking is called out on S-102 and A-003; cover framing is wood (2x8 rafters, (2)2x8 beams, 6x6 Douglas fir posts).")
+
+
+def sheet_iso_exploded(L: Layout, S: Scene, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind not in ("ground", "glass", "house", "roof", "trim") or (b.tag or "").startswith("blind") or (b.tag or "") == "snow retention bar"]
+    return _axo_sheet("A-003", "Isometric — exploded, labeled", "Each build layer lifted in order: piers · posts · beams · frame · decking · stair · roof covers layer by layer", L, S, t, meta, bx, explode=True, az=35, el=24,
+                      note="Layers lifted in build order. Roof covers pulled apart: posts, beam + ledger, rafters, soffit, sheathing, underlayment, standing seam, snow bar, Hardie trim.")
+
+
+def sheet_iso_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
+    ck = ("cpost", "cbeam", "cledger", "rafter", "sheath", "underlay", "ssroof", "soffit", "hardie", "blind")
+    bx = [b for b in S.boxes if b.kind in ck or (b.tag or "") == "snow retention bar" or (b.tag or "") == "blind bottom bar"]
+    if not bx:
+        return None
+    key = [k for k in member_key(L, S, t) if any(k[1](b) for b in bx)]
+    return _axo_sheet("A-402", "Roof covers — exploded isometric, labeled", "Both lean-to covers pulled apart layer by layer", L, S, t, meta, bx, explode=True, gaps={8: 0.0}, az=-38, el=26, key=key,
+                      note="Lifts are for clarity only. Order of work: posts on ABA66Z bases, beam on AC6Z caps, ledger on LedgerLOK, rafters with H2.5AZ, soffit, OSB, underlayment, panels, trims, snow bar.")
+
+
+def sheet_iso_structure(L: Layout, S: Scene, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind in ("footing", "base", "post", "cap", "beam", "joist", "rim", "ledger", "block", "cpost", "stringer", "gravel")]
+    key = [k for k in member_key(L, S, t) if any(k[1](b) for b in bx)]
+    return _axo_sheet("S-102", "Structure isometric — steel frame, labeled", "Piers, stubs, cover posts at the shared piers, boxed beams, C-joists, track rims, ledger track, blocking", L, S, t, meta, bx, az=-32, el=32, key=key,
+                      note="Decking, covers and house removed to show the frame. Every joist end clips to the track, ledger track or boxed beam; the engineer's clip schedule governs.")
+
+
+def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
+    """A-201: front elevation (from the yard) and both end elevations, drawn from the model, with the heights called out."""
+    from .axo import View, draw
+    s = L.spec
+    cols = _axo_colors(S)
+    bx = [b for b in S.boxes if b.kind not in ("ground", "glass")]
+    fit = [b for b in bx if b.kind not in ("house", "roof", "trim")]
+    o = []
+    zt = s.geometry.height_in / 12.0
+    views = [("FRONT ELEVATION — from the yard", 0.0, (20, 14, 600, 300)), ("RIGHT END ELEVATION", 90.0, (640, 14, 340, 300)), ("LEFT END ELEVATION", -90.0, (640, 330, 340, 270))]
+    for ttl, az, fr in views:
+        polys, to_sheet, sc = draw(bx, cols, View(az, 0.0), (fr[0], fr[1] + 16, fr[2], fr[3] - 30), fit_boxes=fit)
+        cid = f"el{int(az + 180)}"
+        o.append(f'<defs><clipPath id="{cid}"><rect x="{fr[0]}" y="{fr[1] + 14}" width="{fr[2]}" height="{fr[3] - 20}"/></clipPath></defs>')
+        o.append(T(fr[0], fr[1] + 8, ttl, 9, 800, fill=GOLD))
+        o.append(f'<g clip-path="url(#{cid})">' + "".join(polys) + "</g>")
+        gx0 = to_sheet((min(b.x0 for b in fit) - 2, max(b.y1 for b in fit) + 2, 0))[0] if az == 0 else fr[0]
+        gy = to_sheet((0, 0, 0))[1]
+        o.append(LN(fr[0], gy, fr[0] + fr[2], gy, INK, 1.2)); o.append(T(fr[0] + 4, gy + 10, "GRADE", 6.5, 800, fill=MUTE))
+        # heights at the right of each view
+        hx = fr[0] + fr[2] - 8
+        marks = [("DECK", zt)]
+        from .spec import covers_of
+        for c in covers_of(s):
+            marks.append((f"{c['name'].split()[0].upper()} CLEAR @ BEAM {c['clear_low_in']:g}\"", zt + float(c["clear_low_in"]) / 12))
+            marks.append((f"{c['name'].split()[0].upper()} CLEAR @ HOUSE {c['clear_high_in']:g}\"", zt + float(c["clear_high_in"]) / 12))
+        if az == 0:
+            y = to_sheet((0, 0, zt))[1]
+            o.append(LN(hx - 40, y, hx, y, "#b3261e", 0.9, "3 2")); o.append(R(hx - 96, y - 11, 54, 10, CREAM, "#b3261e", 0.5)); o.append(T(hx - 44, y - 3, f"DECK · {ftin(zt * 12)} AFG", 6.4, 800, "end", "#b3261e"))
+            for c in covers_of(s):
+                xa = to_sheet((float(c["x0"]), float(c["y1"]), 0))[0]
+                for k_, (lab_, inch) in enumerate((("CLEAR @ BEAM", c["clear_low_in"]),)):
+                    z = zt + float(inch) / 12
+                    yv = to_sheet((0, 0, z))[1]
+                    o.append(LN(xa - 4, yv, xa + 30, yv, "#b3261e", 0.9, "3 2"))
+                    lab_txt = f"{c['name'].split()[0].upper()} {lab_} {float(inch):g}\" · {ftin(z * 12)} AFG"
+                    o.append(R(xa + 1, yv + 2, len(lab_txt) * 3.5 + 4, 10, CREAM, "#b3261e", 0.5)); o.append(T(xa + 3, yv + 9.5, lab_txt, 6.2, 800, "start", "#b3261e"))
+    o.append(T(20, 330 + 12, "NOTES", 9, 800, fill=GOLD))
+    notes = [f"Deck surface {ftin(s.geometry.height_in)} above grade (walkway low point {ftin(s.geometry.height_min_in)})" if s.geometry.height_min_in else f"Deck surface {ftin(s.geometry.height_in)} above grade",
+             "Heights AFG = above finished grade at the beam line; field-verify grade before setting the piers",
+             "Clear heights are to the underside of the beam / ledger above the deck surface",
+             "Roof covers: black standing seam on 2x8 rafters, Hardie fascia / rakes / soffit; slope to the yard",
+             "Deck frame: CEMCO cold-formed steel; HardieTrim skirt covers the track rims",
+             "No guard required: every walking surface is under 30\" above grade (IRC R312.1)"]
+    yy = 358
+    for n_ in notes:
+        o.append(T(20, yy, "· " + n_, 7.6, 500)); yy += 12
+    return sheet("A-202", "Elevations", "Front from the yard and both ends, drawn from the model — deck and roof-cover heights", o, "Elevations · orthographic · not to scale · heights govern", meta)
+
+
+# ------------------------------------------------------------------ connection details (permit set)
+_PANEL = {"r": 10000.0}
+
+
+def _lead(o, ax, ay, tx, ty, txt, size=6.6, anchor_="start", w_=600):
+    """A leader from (ax, ay) to a label at (tx, ty); the label wraps to stay inside the current detail panel."""
+    o.append(LN(ax, ay, tx, ty - 2, INK, 0.5)); o.append(C(ax, ay, 1.3, INK, "none", 0))
+    room = max(14, min(34, int((_PANEL["r"] - 6 - tx) / (size * 0.52))))
+    for j, ln in enumerate(textwrap.wrap(txt, room)):
+        o.append(T(tx + (2 if anchor_ == "start" else -2), ty + j * 8, ln, size, w_, anchor_))
+
+
+def _panel(o, x, y, w, h, num, title):
+    _PANEL["r"] = x + w
+    o.append(R(x, y, w, h, "#fff", INK, 0.8)); o.append(R(x, y, w, 17, INK, "none", 0))
+    o.append(T(x + 8, y + 12.5, f"{num}  {title}", 8.6, 800, fill=GOLD))
+
+
+def _cee(o, x, y, w, h, lip=5, open_right=True, fill="#a7adb2"):
+    """A C-section in section view: web + two flanges + lips (cold-formed steel)."""
+    t_ = 2.2
+    o.append(R(x, y, t_, h, fill, INK, 0.6) if open_right else R(x + w - t_, y, t_, h, fill, INK, 0.6))
+    o.append(R(x, y, w, t_, fill, INK, 0.6)); o.append(R(x, y + h - t_, w, t_, fill, INK, 0.6))
+    lx = x + w - t_ if open_right else x
+    o.append(R(lx, y, t_, lip, fill, INK, 0.6)); o.append(R(lx, y + h - lip, t_, lip, fill, INK, 0.6))
+
+
+def _screw(o, x, y, horiz=True):
+    o.append(C(x, y, 1.6, INK, "none", 0))
+    o.append(LN(x - 4, y, x + 4, y, INK, 0.6) if horiz else LN(x, y - 4, x, y + 4, INK, 0.6))
+
+
+def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
+    """D-502: every steel-frame connection drawn and labeled."""
+    s = L.spec
+    G = "#a7adb2"
+    dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    o = []
+    W3, H2 = 316, 296
+    P = [(14 + i * (W3 + 8), 8 + j * (H2 + 8)) for j in range(2) for i in range(3)]
+    # 1 ledger track at the house
+    x, y = P[0]; _panel(o, x, y, W3, H2, "1", "LEDGER TRACK AT THE HOUSE — SECTION")
+    o.append(R(x + 20, y + 40, 46, 220, FILL["house"], INK, 1.0)); o.append(T(x + 43, y + 250, "house rim", 6.4, 700, "middle", MUTE))
+    o.append(R(x + 66, y + 40, 4, 220, "#3f5d8a", "none", 0))
+    o.append(R(x + 70, y + 92, 5, 66, G, INK, 0.6))
+    _cee(o, x + 80, y + 96, 150, 58, open_right=False)
+    o.append(R(x + 75, y + 152, 32, 4, "#7b8186", INK, 0.6)); o.append(R(x + 75, y + 152, 4, 18, "#7b8186", INK, 0.6))
+    o.append(R(x + 70, y + 86, 190, 7, FILL["deck"], INK, 0.5))
+    o.append(f'<polyline points="{x + 40},{y + 70} {x + 70},{y + 80} {x + 70},{y + 88} {x + 84},{y + 88}" fill="none" stroke="{GOLD}" stroke-width="2"/>')
+    for yy in (108, 136):
+        o.append(LN(x + 30, y + yy, x + 75, y + yy, INK, 1.2)); o.append(C(x + 75, y + yy, 2, INK))
+    o.append(R(x + 84, y + 104, 14, 40, "#7b8186", INK, 0.6))
+    for yy in (112, 124, 136):
+        _screw(o, x + 91, y + yy)
+    _lead(o, x + 60, y + 70, x + 150, y + 36, "Z-flashing over the track, under the siding (lapped over the membrane)")
+    _lead(o, x + 68, y + 200, x + 120, y + 210, "Self-adhered membrane, 12\" up the wall behind the track")
+    _lead(o, x + 72, y + 120, x + 120, y + 178, "7-1/4\" ledger track, 16 ga — 1/4\" x 3-1/2\" structural screws, 2 rows staggered 16\" OC into the rim (engineer)")
+    _lead(o, x + 100, y + 154, x + 170, y + 240, "3x3 x 14 ga ledger angle — joist seat")
+    _lead(o, x + 91, y + 124, x + 236, y + 130, "Clip angle, #12 screws, 4 per leg")
+    _lead(o, x + 200, y + 120, x + 236, y + 160, "7-1/4\" C-joist, 16 ga G90 @ 12\" OC")
+    _lead(o, x + 210, y + 89, x + 236, y + 60, f"{dk} decking, hidden fasteners")
+    # 2 joist to boxed beam
+    x, y = P[1]; _panel(o, x, y, W3, H2, "2", "JOIST TO BOXED BEAM — SECTION")
+    _cee(o, x + 136, y + 100, 22, 70, open_right=True); _cee(o, x + 158, y + 100, 22, 70, open_right=False)
+    _cee(o, x + 30, y + 100, 104, 70, open_right=False); _cee(o, x + 182, y + 100, 104, 70, open_right=True)
+    for xx in (124, 186):
+        o.append(R(x + xx, y + 112, 12, 44, "#7b8186", INK, 0.6))
+        for yy in (120, 132, 144):
+            _screw(o, x + xx + 6, y + yy)
+    for yy in (108, 162):
+        _screw(o, x + 158, y + yy, horiz=False)
+    o.append(R(x + 20, y + 93, 276, 7, FILL["deck"], INK, 0.5))
+    _lead(o, x + 158, y + 170, x + 120, y + 214, "Boxed beam: two 7-1/4\" C, 14 ga, toe-to-toe, #12 screws @ 12\" OC top and bottom (engineer)")
+    _lead(o, x + 130, y + 132, x + 24, y + 40, "Clip angle 1-1/2 x 1-1/2 x 7\" 16 ga each joist end")
+    _lead(o, x + 192, y + 120, x + 200, y + 40, "#12-14 self-drilling hex-washer screws, 4 per leg")
+    _lead(o, x + 250, y + 140, x + 220, y + 250, "C-joists @ 12\" OC both sides, flush with the beam top")
+    # 3 boxed beam on HSS stub / pier
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "BEAM ON HSS STUB + DIAMOND PIER")
+    o.append(LN(x + 20, y + 200, x + W3 - 20, y + 200, INK, 1.0)); o.append(T(x + W3 - 24, y + 196, "grade", 6.4, 700, "end", MUTE))
+    o.append(R(x + 128, y + 190, 60, 18, FILL["concrete"], INK, 0.9))
+    for dx in (-60, -24, 24, 60):
+        o.append(LN(x + 158, y + 208, x + 158 + dx, y + 285, INK, 1.1))
+    o.append(R(x + 140, y + 178, 36, 12, FILL["steel"], INK, 0.6))
+    o.append(R(x + 150, y + 112, 16, 66, G, INK, 0.8))
+    o.append(R(x + 140, y + 106, 36, 6, FILL["steel"], INK, 0.6))
+    o.append(R(x + 60, y + 50, 196, 56, G, INK, 0.9)); o.append(LN(x + 158, y + 50, x + 158, y + 106, INK, 0.6))
+    o.append(R(x + 50, y + 43, 216, 7, FILL["deck"], INK, 0.5))
+    _lead(o, x + 158, y + 196, x + 196, y + 238, f"Diamond Pier {L.frame.footing_model}: head + 4 pins driven, no excavation")
+    _lead(o, x + 176, y + 184, x + 214, y + 160, "Pier-head post bracket on the pier bolt")
+    _lead(o, x + 156, y + 140, x + 24, y + 150, "3x3 x 11 ga HSS stub, hot-dip galvanized")
+    _lead(o, x + 176, y + 108, x + 214, y + 124, "Welded cap plate, (4) #12 screws up into the beam (engineer)")
+    _lead(o, x + 90, y + 78, x + 24, y + 30, "Boxed 7-1/4\" steel C beam, flush with the joists")
+    # 4 shared pier: cover post carries the deck beam
+    x, y = P[3]; _panel(o, x, y, W3, H2, "4", "SHARED PIER — COVER POST + DECK BEAM")
+    o.append(LN(x + 20, y + 230, x + W3 - 20, y + 230, INK, 1.0))
+    o.append(R(x + 128, y + 220, 60, 18, FILL["concrete"], INK, 0.9))
+    for dx in (-50, -20, 20, 50):
+        o.append(LN(x + 158, y + 238, x + 158 + dx, y + 290, INK, 1.1))
+    o.append(R(x + 138, y + 210, 40, 10, FILL["steel"], INK, 0.6))
+    o.append(R(x + 144, y + 30, 28, 180, FILL["timber"], INK, 0.9))
+    o.append(R(x + 60, y + 120, 84, 52, G, INK, 0.9)); o.append(R(x + 172, y + 120, 84, 52, G, INK, 0.9))
+    o.append(R(x + 132, y + 114, 52, 64, "none", "#3f5d8a", 1.3))
+    for yy in (132, 158):
+        o.append(LN(x + 128, y + yy, x + 188, y + yy, INK, 1.4))
+    o.append(R(x + 50, y + 113, 94, 7, FILL["deck"], INK, 0.5)); o.append(R(x + 172, y + 113, 94, 7, FILL["deck"], INK, 0.5))
+    _lead(o, x + 158, y + 60, x + 190, y + 40, f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} cover post — runs up to the roof-cover beam")
+    _lead(o, x + 132, y + 140, x + 24, y + 40, "Steel side bracket, 11 ga galvanized, (2) 1/2\" thru-bolts")
+    _lead(o, x + 100, y + 150, x + 24, y + 196, "Boxed steel deck beam bears on the bracket")
+    _lead(o, x + 178, y + 214, x + 200, y + 256, "Simpson ABA66Z on the Diamond Pier bolt (pier upsized to DP-75/63 where roof + deck exceed the DP-50)")
+    _lead(o, x + 240, y + 116, x + 210, y + 90, "Picture-frame board notched around the post, 1/4\" gap")
+    # 5 deck edge
+    x, y = P[4]; _panel(o, x, y, W3, H2, "5", "DECK EDGE — TRACK RIM, BORDER, HARDIE SKIRT")
+    o.append(R(x + 196, y + 90, 6, 70, G, INK, 0.7)); _cee(o, x + 60, y + 92, 136, 66, open_right=True)
+    o.append(R(x + 150, y + 82, 56, 9, FILL["border"], INK, 0.5)); o.append(R(x + 50, y + 82, 98, 9, FILL["deck"], INK, 0.5))
+    o.append(R(x + 202, y + 98, 5, 52, "#8d949a", INK, 0.5)); o.append(R(x + 207, y + 88, 7, 92, "#f2efe8", INK, 0.6))
+    o.append(LN(x + 30, y + 240, x + W3 - 20, y + 240, INK, 1.0)); o.append(R(x + 30, y + 232, W3 - 50, 8, FILL["gravel"], "none", 0)); o.append(LN(x + 30, y + 240, x + W3 - 20, y + 240, "#3f5d8a", 1.2, "3 2"))
+    o.append(LN(x + 230, y + 180, x + 230, y + 232, "#b3261e", 0.8)); o.append(T(x + 234, y + 210, "2\" min. to gravel", 6.4, 800, fill="#b3261e"))
+    _lead(o, x + 176, y + 86, x + 170, y + 40, f"Picture-frame border, {dk}, face-fastened, color-matched plugs")
+    _lead(o, x + 100, y + 86, x + 24, y + 40, "Field boards, CONCEALoc clips on the steel-frame screw")
+    _lead(o, x + 199, y + 130, x + 236, y + 70, "7-1/4\" track rim caps the joist ends, #12 screws each flange")
+    _lead(o, x + 204, y + 140, x + 236, y + 120, "Galvanized hat-channel furring, screwed to the track")
+    _lead(o, x + 211, y + 168, x + 236, y + 168, f"HardieTrim skirt {s.extras.hardie_color}".strip())
+    _lead(o, x + 120, y + 236, x + 24, y + 270, "2\" gravel over 6-mil poly, sloped away from the house")
+    # 6 stair at the step edge
+    x, y = P[5]; _panel(o, x, y, W3, H2, "6", "STAIR OFF THE MAIN DECK — SECTION")
+    st_ = L.stairs[0] if L.stairs else None
+    rz = st_.geo.riser_in if st_ else 7.5
+    o.append(LN(x + 20, y + 230, x + W3 - 20, y + 230, INK, 1.0))
+    o.append(R(x + 196, y + 140, 100, 8, FILL["deck"], INK, 0.5)); o.append(R(x + 190, y + 148, 6, 50, G, INK, 0.7))
+    o.append(PG([(x + 190, y + 148), (x + 106, y + 230), (x + 120, y + 230), (x + 190, y + 162)], G, INK, 0.7))
+    o.append(R(x + 140, y + 182, 52, 8, FILL["deck"], INK, 0.5)); o.append(R(x + 186, y + 148, 4, 34, "#f2efe8", INK, 0.5)); o.append(R(x + 136, y + 190, 4, 40, "#f2efe8", INK, 0.5))
+    o.append(R(x + 188, y + 156, 10, 18, "#7b8186", INK, 0.6))
+    dim_v(o, lambda v: v, x + 300, y + 140, y + 230, f"{ftin(rz * 2)} total rise", 6.6, left=False)
+    _lead(o, x + 165, y + 186, x + 40, y + 60, f"Treads: {dk}, 2 boards, color-matched plugs")
+    _lead(o, x + 138, y + 210, x + 40, y + 110, f"Closed risers: {dk} riser board")
+    _lead(o, x + 150, y + 210, x + 210, y + 260, "Galvanized steel stringers @ 12\" OC, clipped to the track rim")
+    _lead(o, x + 193, y + 165, x + 230, y + 100, "Clip angle stringer-to-rim, #12 screws")
+    _lead(o, x + 110, y + 230, x + 24, y + 270, f"Lands on compacted grade, no pad · {st_.geo.risers if st_ else 2} risers @ {rz:.2f}\" · tread {st_.geo.tread_in if st_ else 11:.2f}\"")
+    return sheet("D-502", "Connection details — CEMCO steel deck frame", "Ledger track · joist clips · boxed beam · HSS stub on the pier · shared pier · deck edge · stair", o,
+                 "Schematic details, not to scale · the engineer of record's details and screw schedule govern", meta)
+
+
+def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[str]:
+    """D-503: every roof-cover connection drawn and labeled."""
+    s = L.spec
+    from .spec import covers_of
+    cvs = covers_of(s)
+    if not cvs:
+        return None
+    c0 = cvs[0]
+    cb, cl = c0.get("beam", "(2)2x10"), c0.get("ledger", "2x10")
+    post = f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'}"
+    hc = s.extras.hardie_color or ""
+    roof = f"{s.extras.cover_roof_color} 24 ga standing seam".strip()
+    WD, WD2 = FILL["timber"], FILL["timber_dk"]
+    o = []
+    W3, H2 = 316, 296
+    P = [(14 + i * (W3 + 8), 8 + j * (H2 + 8)) for j in range(2) for i in range(3)]
+    # 1 ledger at the house (headwall)
+    x, y = P[0]; _panel(o, x, y, W3, H2, "1", "COVER LEDGER + HEADWALL — SECTION")
+    o.append(R(x + 20, y + 30, 50, 250, FILL["house"], INK, 1.0)); o.append(T(x + 45, y + 270, "house wall", 6.4, 700, "middle", MUTE))
+    o.append(R(x + 70, y + 30, 4, 200, "#3f5d8a", "none", 0))
+    o.append(R(x + 74, y + 130, 16, 56, WD2, INK, 0.7))
+    o.append(PG([(x + 90, y + 126), (x + 290, y + 140), (x + 290, y + 182), (x + 90, y + 168)], WD, INK, 0.7))
+    o.append(PG([(x + 90, y + 120), (x + 290, y + 134), (x + 290, y + 140), (x + 90, y + 126)], "#c9a46a", INK, 0.5))
+    o.append(LN(x + 90, y + 117, x + 290, y + 131, "#1c1c1e", 3))
+    o.append(f'<polyline points="{x + 50},{y + 80} {x + 74},{y + 92} {x + 74},{y + 116} {x + 104},{y + 118}" fill="none" stroke="{GOLD}" stroke-width="2"/>')
+    o.append(PG([(x + 90, y + 168), (x + 290, y + 182), (x + 290, y + 186), (x + 90, y + 172)], "#f2efe8", INK, 0.5))
+    for yy in (142, 172):
+        o.append(LN(x + 34, y + yy, x + 88, y + yy, INK, 1.2)); o.append(C(x + 88, y + yy, 2, INK))
+    _lead(o, x + 82, y + 160, x + 120, y + 230, f"{cl} ledger — FastenMaster LedgerLOK 6\", 2 rows staggered 16\" OC into the house framing")
+    _lead(o, x + 72, y + 210, x + 24, y + 286, "Membrane behind the ledger")
+    _lead(o, x + 74, y + 100, x + 110, y + 40, "Headwall flashing with Z-closure, counterflashed under the siding")
+    _lead(o, x + 200, y + 125, x + 200, y + 60, f"{roof}, 1-1/2\" mechanical seam")
+    _lead(o, x + 240, y + 135, x + 236, y + 96, "High-temp underlayment over 7/16\" OSB")
+    _lead(o, x + 200, y + 160, x + 214, y + 200, "2x8 rafter @ 16\" OC bears on the ledger, H2.5AZ / LS70 each")
+    _lead(o, x + 250, y + 182, x + 236, y + 250, f"HardieSoffit cedarmill ceiling {hc}".strip())
+    # 2 eave at the beam
+    x, y = P[1]; _panel(o, x, y, W3, H2, "2", "EAVE AT THE BEAM — SECTION")
+    o.append(R(x + 120, y + 150, 30, 130, WD, INK, 0.9)); o.append(R(x + 112, y + 110, 46, 40, WD2, INK, 0.8)); o.append(LN(x + 135, y + 110, x + 135, y + 150, INK, 0.6))
+    o.append(R(x + 112, y + 146, 46, 8, FILL["steel"], INK, 0.6))
+    o.append(PG([(x + 20, y + 90), (x + 250, y + 102), (x + 250, y + 132), (x + 20, y + 120)], WD, INK, 0.7))
+    o.append(R(x + 250, y + 98, 8, 38, WD2, INK, 0.6)); o.append(R(x + 258, y + 92, 6, 50, "#f2efe8", INK, 0.6))
+    o.append(LN(x + 20, y + 85, x + 268, y + 98, "#1c1c1e", 3)); o.append(f'<polyline points="{x + 268},{y + 98} {x + 270},{y + 108}" fill="none" stroke="#1c1c1e" stroke-width="2"/>')
+    o.append(R(x + 200, y + 84, 10, 8, FILL["steel"], INK, 0.6))
+    o.append(PG([(x + 20, y + 120), (x + 250, y + 132), (x + 250, y + 136), (x + 20, y + 124)], "#f2efe8", INK, 0.5))
+    o.append(C(x + 140, y + 116, 2.4, INK))
+    _lead(o, x + 135, y + 130, x + 24, y + 160, f"{cb} beam on the posts")
+    _lead(o, x + 150, y + 150, x + 180, y + 180, "Simpson AC6Z post cap")
+    _lead(o, x + 135, y + 220, x + 180, y + 230, f"{post} post")
+    _lead(o, x + 140, y + 116, x + 24, y + 40, "H2.5AZ hurricane tie each rafter to the beam")
+    _lead(o, x + 205, y + 88, x + 170, y + 40, "Snow retention bar clamped to the seams, 12–18\" up from the eave")
+    _lead(o, x + 254, y + 118, x + 236, y + 60, "2x8 sub-fascia")
+    _lead(o, x + 262, y + 140, x + 236, y + 270, f"HardieTrim fascia {hc}, color-matched trim screws".strip())
+    _lead(o, x + 268, y + 104, x + 286, y + 70, "Eave drip trim, hemmed panel")
+    _lead(o, x + 60, y + 124, x + 24, y + 260, "HardieSoffit ceiling on the rafter undersides, 12\" overhang")
+    # 3 post base
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "COVER POST BASE + DECK PENETRATION")
+    o.append(LN(x + 20, y + 230, x + W3 - 20, y + 230, INK, 1.0))
+    o.append(R(x + 128, y + 220, 60, 18, FILL["concrete"], INK, 0.9))
+    for dx in (-50, -20, 20, 50):
+        o.append(LN(x + 158, y + 238, x + 158 + dx, y + 290, INK, 1.1))
+    o.append(R(x + 138, y + 208, 40, 12, FILL["steel"], INK, 0.6)); o.append(R(x + 144, y + 30, 28, 178, WD, INK, 0.9))
+    o.append(R(x + 40, y + 160, 100, 8, FILL["border"], INK, 0.5)); o.append(R(x + 176, y + 160, 100, 8, FILL["border"], INK, 0.5))
+    o.append(R(x + 40, y + 168, 104, 40, "#a7adb2", INK, 0.6)); o.append(R(x + 172, y + 168, 104, 40, "#a7adb2", INK, 0.6))
+    _lead(o, x + 158, y + 214, x + 200, y + 258, "Simpson ABA66Z standoff base on the Diamond Pier bolt")
+    _lead(o, x + 158, y + 236, x + 24, y + 270, "Diamond Pier — shared with the deck beam where they line up")
+    _lead(o, x + 158, y + 80, x + 190, y + 50, f"{post} post through the deck, plumb both ways")
+    _lead(o, x + 150, y + 164, x + 24, y + 120, "Picture-frame border boxes the post, 1/4\" gap all round")
+    _lead(o, x + 200, y + 190, x + 236, y + 150, "Steel blocking at the post opening (see D-502 / 4)")
+    # 4 rake
+    x, y = P[3]; _panel(o, x, y, W3, H2, "4", "RAKE EDGE — SECTION ACROSS THE SLOPE")
+    o.append(R(x + 60, y + 110, 14, 70, WD, INK, 0.7)); o.append(R(x + 100, y + 110, 14, 70, WD, INK, 0.7)); o.append(R(x + 140, y + 110, 14, 70, WD, INK, 0.7))
+    o.append(R(x + 40, y + 102, 200, 8, "#c9a46a", INK, 0.6)); o.append(LN(x + 40, y + 98, x + 240, y + 98, "#1c1c1e", 3))
+    o.append(R(x + 160, y + 106, 12, 76, WD2, INK, 0.6)); o.append(R(x + 172, y + 96, 7, 92, "#f2efe8", INK, 0.6))
+    o.append(f'<polyline points="{x + 150},{y + 94} {x + 186},{y + 94} {x + 186},{y + 112}" fill="none" stroke="#1c1c1e" stroke-width="2"/>')
+    o.append(R(x + 40, y + 180, 140, 4, "#f2efe8", INK, 0.5))
+    _lead(o, x + 120, y + 98, x + 40, y + 40, f"{roof} panel, last seam at the rake")
+    _lead(o, x + 186, y + 100, x + 210, y + 50, "Rake / gable trim, color-matched, cleated")
+    _lead(o, x + 166, y + 150, x + 210, y + 140, "2x8 rake sub-fascia on the end rafter")
+    _lead(o, x + 176, y + 170, x + 210, y + 200, f"HardieTrim rake {hc}".strip())
+    _lead(o, x + 107, y + 150, x + 40, y + 230, "2x8 rafters @ 16\" OC")
+    _lead(o, x + 80, y + 182, x + 40, y + 268, "HardieSoffit ceiling")
+    # 5 standing seam panel
+    x, y = P[4]; _panel(o, x, y, W3, H2, "5", "STANDING SEAM PANEL + CLIP")
+    o.append(R(x + 20, y + 170, 276, 10, "#c9a46a", INK, 0.6)); o.append(R(x + 20, y + 166, 276, 4, "#3d4651", INK, 0.4))
+    for xx in (40, 190):
+        o.append(f'<polyline points="{x + xx},{y + 166} {x + xx + 100},{y + 166} {x + xx + 106},{y + 120} {x + xx + 112},{y + 120} {x + xx + 112},{y + 166}" fill="none" stroke="#1c1c1e" stroke-width="2"/>')
+    o.append(R(x + 144, y + 124, 6, 46, FILL["steel"], INK, 0.6)); o.append(C(x + 147, y + 168, 2, INK))
+    o.append(R(x + 20, y + 180, 14, 60, WD, INK, 0.6)); o.append(R(x + 130, y + 180, 14, 60, WD, INK, 0.6)); o.append(R(x + 240, y + 180, 14, 60, WD, INK, 0.6))
+    dim_h(o, lambda v: v, y + 108, x + 40, x + 150, "16\" panel", 6.6)
+    _lead(o, x + 150, y + 120, x + 200, y + 50, "1-1/2\" seam, mechanically double-locked (rated to 1/2:12)")
+    _lead(o, x + 147, y + 150, x + 200, y + 90, "Concealed clip @ 18\" OC each seam, pancake-head screws")
+    _lead(o, x + 60, y + 168, x + 24, y + 70, "High-temp self-adhered underlayment, full coverage")
+    _lead(o, x + 80, y + 176, x + 24, y + 260, "7/16\" OSB on the rafters")
+    _lead(o, x + 247, y + 210, x + 236, y + 270, "2x8 rafters @ 16\" OC")
+    # 6 blinds + beam face
+    x, y = P[5]; _panel(o, x, y, W3, H2, "6", "EXISTING BLINDS AT THE BEAM")
+    o.append(R(x + 110, y + 70, 50, 44, WD2, INK, 0.8)); o.append(R(x + 160, y + 64, 7, 56, "#f2efe8", INK, 0.6)); o.append(R(x + 118, y + 114, 34, 160, WD, INK, 0.8))
+    o.append(C(x + 186, y + 128, 9, "#7a5c45", INK, 0.6)); o.append(R(x + 168, y + 116, 10, 8, FILL["steel"], INK, 0.5))
+    o.append(R(x + 184, y + 137, 4, 120, "#7a5c45", "none", 0, 'fill-opacity="0.55"')); o.append(R(x + 180, y + 255, 12, 4, FILL["steel"], INK, 0.4))
+    o.append(R(x + 20, y + 274, 276, 8, FILL["deck"], INK, 0.5))
+    _lead(o, x + 186, y + 128, x + 214, y + 80, "Existing roll-down blind — taken down and rehung on the new beam (stays, no new blinds)")
+    _lead(o, x + 172, y + 120, x + 214, y + 150, "Owner's brackets into the beam face through the HardieTrim, sealed")
+    _lead(o, x + 135, y + 90, x + 24, y + 40, f"{cb} beam")
+    _lead(o, x + 163, y + 80, x + 24, y + 140, f"HardieTrim beam wrap {hc}".strip())
+    _lead(o, x + 135, y + 200, x + 24, y + 210, f"{post} post")
+    return sheet("D-503", "Connection details — roof covers (wood framing)", "Ledger + headwall · eave at the beam · post base · rake · standing seam + clip · blinds", o,
+                 "Schematic details, not to scale · the engineer of record's details govern", meta)

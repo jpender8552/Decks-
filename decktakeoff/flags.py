@@ -124,12 +124,13 @@ def run_flags(L: Layout) -> List[Flag]:
             add("ENGINEER", "ledger", "house floor cantilevers past the foundation — ledger attachment to a cantilevered floor needs an engineered detail or a freestanding deck", "IRC R507.9.1")
         add("CHECK", "ledger", "verify the rim board behind the ledger is solid 2x/LVL/engineered rim (not I-joist web or a hollow band) before the ledger fasteners go in", "IRC R507.9.1.1")
         if not s.is_timber:
-            add("INFO", "ledger", f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing", "IRC R507.9.2")
+            add("INFO", "ledger", (f"lateral: {s.framing.lateral_ties} tension ties per ledger, steel-joist kit / engineer's detail, into the house floor framing" if s.framing.system == "steel"
+                                   else f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing"), "IRC R507.9.2")
 
     # ---------------- wind
     v = site.wind_speed_mph
     if v >= 140:
-        add("ENGINEER", "wind", f"basic wind speed {v:g} mph — uplift on the frame and rail loads; engineered connections (H2.5A at every joist, post-to-beam uplift caps)", "ASCE 7")
+        add("ENGINEER", "wind", f"basic wind speed {v:g} mph — uplift on the frame and rail loads; engineered connections (" + ("clip angles at every joist end, beam-to-post brackets, H2.5AZ at every cover rafter" if s.framing.system == "steel" else "H2.5A at every joist, post-to-beam uplift caps") + ")", "ASCE 7")
     elif v >= 120:
         add("CODE", "wind", f"basic wind speed {v:g} mph — H2.5AZ at every joist to the beam and uplift-rated post caps are required, not optional", "ASCE 7 / IRC R301.2")
     else:

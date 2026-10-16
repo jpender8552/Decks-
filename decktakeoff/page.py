@@ -502,7 +502,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w(_stack(p))
             w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
-        w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · timbers shown ' + ("with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "as specified") + "</span></h2>")
+        w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
         w(_gallery(key, ["yard", "corner", "ondeck", "under"], have))
         w(sun_html)
         w('<h2 class="kicker">Isometrics</h2>')

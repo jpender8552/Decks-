@@ -52,8 +52,15 @@ def steel_frame(t) -> None:
     jsize = s.framing.joist_size
     dep = DEPTH.get(jsize, f"{actual(jsize)[1]:g}\"")
     beam_noms = set()
+    ren = {}
     for bl in L.beam_lines:
         beam_noms.add(bl.size)
+        ren[f"{bl.size} {bl.species}"] = f"boxed {dep} steel C"
+        bl.label = bl.label.replace(f"{bl.size} {bl.species}", f"boxed {dep} steel C")
+    def steelify(txt: str) -> str:
+        for a_, b_ in ren.items():
+            txt = txt.replace(a_, b_)
+        return txt.replace(f"{jsize} @", f"{dep} steel C @").replace(f"{jsize} joists", f"{dep} steel C-joists").replace(f"{jsize} SYP", f"{dep} steel C")
     # LF by role from the layout
     track_lf = L.outer_edge_lf if L.multi else 2 * (L.finished_w + L.finished_d) / 12.0
     ledger_lf = L.wall_lf / 12.0
@@ -152,10 +159,18 @@ def steel_frame(t) -> None:
         t.schedule["Ledger"] = f"{dep} steel ledger track + 3x3 ledger angle, 1/4\" structural screws 2 rows staggered 16\" OC into the rim board (engineer confirms) · flashing and membrane as for wood"
     t.schedule["Steel frame"] = (f"{dep} C-joists 16 ga @ {L.frame.spacing:g}\" OC · single-ply track rims · boxed C beams · clip angles with #12 self-drilling screws "
                                  "(4 per leg) · cut ends cold-galvanized · no joist tape needed")
-    for bl in L.beam_lines:
-        bl.label = bl.label.replace(f"{bl.size} {bl.species}", f"boxed {dep} steel C")
-    t.summary["beams"] = [b_.replace(f"{bl.size} {bl.species}", f"boxed {dep} steel C") for b_, bl in zip(t.summary["beams"], L.beam_lines)] \
-        if len(t.summary["beams"]) == len(L.beam_lines) else t.summary["beams"]
+    t.summary["beams"] = [steelify(b_) for b_ in t.summary["beams"]]
+    t.notes = [steelify(n_) for n_ in t.notes]
+    L.notes[:] = [steelify(n_) for n_ in L.notes]
+    for z in L.zones:
+        z.frame.notes[:] = [steelify(n_) for n_ in z.frame.notes]
+    for c in t.cut_list:
+        c.member, c.note = steelify(c.member), steelify(c.note)
+        if c.member.startswith("Posts under"):
+            c.member = c.member.replace("Posts under", "Steel post stubs / cover posts under")
+    for ln in t.lines:
+        if ln.category in ("Lumber", "Hardware", "Footings"):
+            ln.why = steelify(ln.why)
     sm = t.summary
     sm["joists"] = f"{dep} CEMCO cold-formed steel C-joists, 16 ga G90, @ {L.frame.spacing:g}\" OC"
     sm["rims"] = f"single-ply {dep} steel track rims" + (" and ledger track on a steel angle" if ledger_lf else "")

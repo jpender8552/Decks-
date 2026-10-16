@@ -142,14 +142,19 @@ for (const b of D.boxes) {
   mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
   if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
-  mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag};
+  mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }
   scene.add(mesh); if (b.phase > 0) phased.push(mesh);
   if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass') ctx.push(mesh);
 }
 const GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23};
 function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; }
-function explode(on) { for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) : 0); }
+function explode(on) {
+  for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) + o.userData.xg : 0);
+  explodeCtx(on);
+}
+function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof') o.visible = !on; else { o.material = o.material.clone(); o.material.transparent = on; o.material.opacity = on ? 0.3 : 1; o.material.depthWrite = !on; } } }
+function explodedTop() { let t = 0; for (const o of phased) if (o.visible) { o.geometry.computeBoundingBox(); t = Math.max(t, o.position.y + o.geometry.boundingBox.max.y); } return t; }
 // camera + orbit
 const persp = new THREE.PerspectiveCamera(40, W / H, 0.5, 2000);
 const cx = X0 + D.W / 2, cy = (D.y_min + D.y_front) / 2, zt = D.deck_top, span = Math.max(D.W, D.y_front - D.y_min, 24);
@@ -173,10 +178,18 @@ function planMode(on) {
   for (const o of ctx) { o.castShadow = !on; if (o.userData.kind === 'roof') o.visible = !on; else { o.material = o.material.clone(); o.material.transparent = on; o.material.opacity = on ? 0.28 : 1; o.material.depthWrite = !on; } }
 }
 let target = new THREE.Vector3(), sph = new THREE.Spherical();
+let curView = VIEW0;
 function setView(name) {
+  curView = name;
   const v = VIEWS[name] || VIEWS.yard; cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
   cam.up.set(...(v.up || [0, 1, 0]));
-  cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target)); update();
+  cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target));
+  if (typeof exploded !== 'undefined' && exploded && !v.ortho) {      // frame the whole lifted stack, the roof covers included; the house goes see-through
+    explodeCtx(true);
+    const lift = Math.max(0, explodedTop() - zt);
+    target.y += lift * 0.45; sph.radius *= 1 + lift / (span * 1.7);
+  }
+  update();
   root.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
 }
 function update() { cam.position.setFromSpherical(sph).add(target); cam.lookAt(target); }
@@ -196,7 +209,7 @@ function setPhase(n) { phase = n; applyPhase(n); if (cap) cap.textContent = (D.m
   root.querySelectorAll('[data-step]').forEach(b => b.classList.toggle('on', parseInt(b.dataset.step, 10) === n)); }
 root.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 root.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => setPhase(parseInt(b.dataset.step, 10))));
-const ex = root.querySelector('.v3d-explode'); if (ex) ex.addEventListener('click', () => { exploded = !exploded; explode(exploded); ex.classList.toggle('on', exploded); setPhase(phase); });
+const ex = root.querySelector('.v3d-explode'); if (ex) ex.addEventListener('click', () => { exploded = !exploded; explode(exploded); ex.classList.toggle('on', exploded); setPhase(phase); setView(curView); });
 if (STILL) { root.querySelectorAll('.v3d-ui').forEach(u => u.style.display = 'none'); }
 explode(exploded); if (ex) ex.classList.toggle('on', exploded);
 setPhase(phase); setView(VIEW0);
