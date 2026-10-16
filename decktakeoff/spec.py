@@ -147,6 +147,7 @@ class Framing:
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
+    footing_price: Optional[float] = None    # owner's price per Diamond Pier (material, each) — overrides the pricebook
     blocking_rows: Optional[int] = None  # None -> 1 row over each beam (composite), 2 for PVC
     joist_tape: bool = True
     lateral_ties: int = 4                # DTT1Z count (IRC R507.9.2 alternative: 4 x 750 lb)
@@ -260,6 +261,7 @@ class Extras:
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
     cover_post_species: str = "WRC"      # roof-cover posts: "WRC" (western red cedar) | "DF" (Douglas fir #1)
+    labor_total: Optional[float] = None         # owner-set total labor for the job: owner-set lots stay, the rest scale to make it up
     cover_labor_total: Optional[float] = None   # owner-set labor for ALL roof covers together, roofing included (replaces the per-SF cover lines)
     demo_covers: bool = False            # tear off and haul the existing roof covers being replaced
     blinds_reinstall: bool = False       # take down, store and rehang the owner's roll-down blinds on the new cover beams

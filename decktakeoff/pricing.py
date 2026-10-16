@@ -185,6 +185,12 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     mat_f = mat * factor
     tax = float(s.quoted_tax) if (s.quoted_order and s.quoted_tax is not None) else mat_f * rate
     lab = labor_lines_for(t)
+    if s.extras.labor_total is not None:      # owner-set total labor: owner-set lots stay, every other line scales to make up the rest
+        fixed = sum(q * r for i, q, u, r, n in lab if str(n).startswith("owner-set"))
+        others = sum(q * r for i, q, u, r, n in lab if not str(n).startswith("owner-set"))
+        k = max(0.0, float(s.extras.labor_total) - fixed) / others if others else 1.0
+        lab = [(i, q, u, r if str(n).startswith("owner-set") else round(r * k, 4), n if str(n).startswith("owner-set") else f"{n} · scaled to the owner's ${s.extras.labor_total:,.0f} total")
+               for i, q, u, r, n in lab]
     labor_lines = [(i, q, u, r, round(q * r, 2)) for i, q, u, r, n in lab]
     labor = sum(x[4] for x in labor_lines)
     gc_lines, gc_base, gc_extras = gc_lines_for(t)

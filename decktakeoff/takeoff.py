@@ -1026,12 +1026,27 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 for s_, ss in zip(stairs, spec.stairs)],
         material_cost=round(sum(l.ext for l in lines), 2),
     )
+    if spec.framing.footing_price and spec.framing.footing_type == "diamond_pier":
+        for ln in lines:
+            if ln.item.startswith("Diamond Pier") and ln.category in ("Footings", "Porch cover", "Stairs"):
+                ln.unit_cost, ln.source = float(spec.framing.footing_price), f"owner ${spec.framing.footing_price:g} each"
     if spec.decking.price_per_lf:
         for ln in lines:
             m_ = re.search(r"\b1x6x(\d+)\b", ln.item)
             if ln.category in ("Decking", "Stairs", "Rail") and m_ and coll in ln.item:
                 ln.unit_cost, ln.source = round(spec.decking.price_per_lf * int(m_.group(1)), 2), f"owner ${spec.decking.price_per_lf:g}/LF"
         summary["material_cost"] = round(sum(l.ext for l in lines), 2)
+    # a stair off the step between two zones reads by name, not by the edge code
+    for st_ in spec.stairs:
+        if st_.side.startswith("step:"):
+            na, nb = st_.side.split(":")[1].split("-")
+            zl = {z.name: (z.label.split(" — ")[0] if z.label else z.name) for z in spec.geometry.zones}
+            pretty = f"{zl.get(nb, nb).lower()} side, toward the {zl.get(na, na).lower()}"
+            for ln in lines:
+                ln.item, ln.why = ln.item.replace(st_.side, pretty), ln.why.replace(st_.side, pretty)
+            for c_ in cuts:
+                c_.member = c_.member.replace(st_.side, pretty)
+            summary["stairs"] = [x.replace(st_.side + ":", pretty + ":") for x in summary["stairs"]]
     t = Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
     if spec.framing.system == "steel":
         from .steel import steel_frame

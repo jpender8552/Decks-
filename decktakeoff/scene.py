@@ -747,7 +747,7 @@ def build_scene(L) -> Scene:
                 # the bottom: a lower deck or a pad in the last flight's frame
                 if st.landing == "deck":
                     sbf(cur_dir, cur_u0, "board", trun - 0.4, trun + 4.0, cur_va - 0.5, cur_vb + 0.5, z_next - bt, z_next, "deck", 6, tag=f"lower deck at the {st.side} stair")
-                else:
+                elif st.landing != "grade":       # a new or existing pad; "grade" lands on the ground
                     sbf(cur_dir, cur_u0, "footing", trun - 0.4, trun + 3.6, cur_va - 0.5, cur_vb + 0.5, z_next - 0.3, z_next + 0.02, "concrete", 1, tag=f"landing pad {st.side}")
                 break
             # a landing at the foot of this flight

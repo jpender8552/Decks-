@@ -371,11 +371,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     from datetime import date
     proposal = mode == "proposal"
     cost_only = mode == "cost"
+    supplier = mode == "supplier"           # the take-off + build set for the supplier: quantities, drawings, steps — no prices
     customer = mode == "customer" or proposal
     out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     t, flags, p = run(spec)
     L, sm = t.layout, t.summary
-    r = build_set(t, flags, str(out / "buildset"), render=render, customer=customer)
+    r = build_set(t, flags, str(out / "buildset"), render=render, customer=customer or supplier)
     S = r["scene"]
     rd = Path(renders_dir) if renders_dir else (out / "buildset" / "renders")
     files = {f"r/{key}-{q.stem}.jpg": str(q) for q in rd.glob("*.jpg")}
@@ -388,13 +389,39 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     cap = dict(CAP); cap.update({f"step{n}": S.meta["step_text"][n] for n in range(1, 9)})
     name = name or spec.job
     addr = ", ".join(x for x in (spec.site.address, spec.site.city, f"{spec.site.state} {spec.site.zip}".strip()) if x)
-    n_piers = int(sum(l.order for l in t.lines if "diamond pier" in l.item.lower())) or L.n_footings
+    n_piers = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or L.n_footings
     today = date_line or date.today().strftime("%B %d, %Y")
     qmd = quote_markdown(t, p)
     o = []
     w = o.append
     w(f'<section class="job" id="job-{key}" data-job="{key}">')
-    if proposal:
+    if supplier:
+        w('<h2 class="kicker" id="g-reads">The job</h2>')
+        st_txt = "; ".join(sm["stairs"]) if sm["stairs"] else "none"
+        w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in [
+            ("Deck", f"{L.deck_sf:g} SF · {ftin(spec.geometry.height_in)} above grade · {sm['finished_frame']}"), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
+            ("Beams", "; ".join(sm["beams"]) or "—"), ("Footings / posts", sm["posts"]), ("Decking", sm["decking"]), ("Rail", sm["rail"]), ("Stairs", st_txt)]) + "</dl>")
+        w(_gallery(key, ["iso", "iso2"], have))
+        w('<h2 class="kicker">Material take-off <span class="tag">NET = counted off the drawings · ORDER = what to pull and ship</span></h2>')
+        for cat, lines in t.by_category().items():
+            if cat == "Site":
+                continue
+            w(f"<h3>{E(cat)}</h3>")
+            w(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in lines], "order", ["r", "r", "l", "l", "l"]))
+        w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
+        w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
+        w('<h2 class="kicker">Cut list</h2>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]))
+        w('<h2 class="kicker pb">Drawing set <span class="tag">G · C · S · A · D sheets</span></h2><div class="sheets">')
+        for num, ttl, svg in r["sheets"]:
+            w(f'<details class="sheet" open><summary><b>{num}</b> {E(ttl)}</summary>{svg}</details>')
+        w("</div>")
+        w('<h2 class="kicker pb">Exploded views</h2>')
+        w(_gallery(key, ["exploded", "exploded2", "structure-underiso", "frame-iso2"], have))
+        w('<h2 class="kicker pb">Build set <span class="tag">T-400 series · goes in · how · check</span></h2>')
+        w(_steps(key, r["steps"], cap, False))
+        w('<h2 class="kicker">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
+        w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
+    elif proposal:
         opts = [(lab, run(sp_)[2]) for lab, sp_ in (options or [])]
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
@@ -505,6 +532,14 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                 + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
         body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
         title = f"{name} — Proposal"
+    elif supplier:
+        strip = ('<div class="strip"><div><span class="sl">Square feet</span><span class="sv">%g</span></div><div><span class="sl">Footings</span><span class="sv">%d</span></div>'
+                 '<div><span class="sl">Order lines</span><span class="sv">%d</span></div><div><span class="sl">Height</span><span class="sv">%s</span></div></div>'
+                 % (L.deck_sf, n_piers, sum(1 for l in t.lines if l.category != "Site"), ftin(spec.geometry.height_in)))
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · material take-off + build set · for Decks &amp; Docks</div><h1>{E(name)}</h1>'
+                f'<p>{E(sub or addr)} · {E(today)}</p><p>Account GSEXT1 · ship to {E(addr)} · please quote every line; call Jade Pender 303-550-9558 with substitutions.</p></div></header>')
+        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings; the stamped engineering set governs structure. Quote requested — no pricing on this sheet.</span></footer></main>'
+        title = f"{name} — Take-off + Build Set"
     elif cost_only:
         tax_raw = round(p.materials * p.tax_rate, 2)
         cost_total = round(p.materials + tax_raw + p.labor + p.gc, 2)
@@ -530,6 +565,10 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     for sc in scripts:
         page = page.replace(sc, "", 1)
     page = page.replace(CDN, CDN + "\n" + "\n".join(scripts) + "\n", 1)
+    if supplier:
+        txt = re.sub(r"<(script|style)\b.*?</\1>", "", page, flags=re.S)
+        for bad in ("$", "margin", "Margin", "Check or ACH", "Financed", "rate card"):
+            assert bad not in txt, f"supplier sheet carries pricing wording: {bad}"
     if customer:
         txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
         for bad in ("internal", "INTERNAL", "owner-directed", "rate card", "cost stack", "GM"):

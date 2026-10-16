@@ -757,7 +757,7 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
             o.append(T(x2, yy, w, 8, 500)); yy += 11.5
     o.append(T(x2, yy + 10, "SITE WORK", 9, 800, fill=GOLD)); yy += 26
     work = ["Remove the two decks, the two roof covers and the box step; haul off", "Diamond Pier foundations (no excavation spoils), 6-mil poly + 2\" gravel under the decks",
-            "New concrete landing pad at the stair", "Roof drainage: covers shed to grade at the low eave, away from the house", "Call 811 before the piers; protect the lawn and the owner's blinds"]
+            ("New concrete landing pad at the stair" if any(st_.landing == "concrete pad" for st_ in s.stairs) else "Stair lands on grade (no pad)"), "Roof drainage: covers shed to grade at the low eave, away from the house", "Call 811 before the piers; protect the lawn and the owner's blinds"]
     for ln in work:
         o.append(T(x2, yy, "· " + ln, 8, 500)); yy += 11.5
     if sp.get("source"):
