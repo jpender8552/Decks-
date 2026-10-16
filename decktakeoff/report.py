@@ -187,7 +187,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     pre = " · PRE-ENGINEERING" if s.extras.engineered else ""
     w(f"# QUOTE{pre}")
     w(f"## {s.job}")
-    fr_txt = ("CEMCO cold-formed galvanized steel frame — 7-1/4\" C-joists at " + f"{fr.spacing:g}\" OC, boxed steel beams" if s.framing.system == "steel" else None) or (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
+    fr_txt = (f"CEMCO cold-formed steel frame, all G90 — {s.framing.steel_joist} C-joists at {fr.spacing:g}\" OC, {s.framing.steel_track} track rims, boxed {s.framing.steel_joist} beams" if s.framing.system == "steel" else None) or (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
               f"{s.framing.joist_size} joists at {fr.spacing:g}\"" if s.is_timber else
               f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", {s.framing.beams[0].size if s.framing.beams else ''} beam, {s.framing.post_size} posts")
     n_posts = L.n_footings

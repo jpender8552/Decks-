@@ -906,7 +906,7 @@ def step_captions(L: Layout) -> Dict[int, str]:
                if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
            4: f"Step 4 · Beams — {beams}",
-           5: (f"Step 5 · Frame — CEMCO 7-1/4\" steel C-joists at {L.frame.spacing:g}\" OC, steel track rims, ledger track on a steel angle, clip angles" if s.framing.system == "steel" else
+           5: (f"Step 5 · Frame — CEMCO {__import__('decktakeoff.steel', fromlist=['names']).names(s)['joist']} C-joists at {L.frame.spacing:g}\" OC, {s.framing.steel_track} track rims, ledger track on a steel angle, clip angles, all G90" if s.framing.system == "steel" else
                f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if L.frame.blocking_rows_y else "")),
            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}" + (f", {s.decking.border_color} border" if s.decking.border_color else "") + (", hidden fasteners" if (s.decking.fastener_system or '') != 'Cap-Tor xd face screw' else ""),
            7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else ("Step 7 · Rail — existing stucco parapet stays" if s.railing.existing_parapet else "Step 7 · (no rail)"),

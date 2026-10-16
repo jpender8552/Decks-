@@ -86,7 +86,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             goes_in=items(lambda l: l.category == "Lumber" and ("C-joist" in l.item or "track" in l.item or "ledger angle" in l.item))
                     + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("clip angle", "self-drilling", "Structural screw", "tension tie", "Vycor", "flashing", "poly", "gravel")), 8),
             how=[t.schedule.get("Ledger", "Ledger per the schedule."),
-                 "; ".join(f"{z.name}: {len(z.frame.joist_x) + len(z.frame.pf_x)} CEMCO 7-1/4\" C-joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones)
+                 "; ".join(f"{z.name}: {len(z.frame.joist_x) + len(z.frame.pf_x)} CEMCO {__import__('decktakeoff.steel', fromlist=['names']).names(s)['joist']} C-joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones)
                  + ". Joists seat on the ledger angle and clip to the ledger track and the boxed beams with clip angles, 4 #12 screws per leg.",
                  "Track caps every joist end at the rims; picture-frame and breaker joists doubled where the borders land.",
                  "Gravel over 6-mil poly under the frame before the decking (2\" min. clear at the walkway low end).",

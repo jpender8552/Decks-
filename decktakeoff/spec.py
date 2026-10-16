@@ -147,6 +147,8 @@ class Framing:
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
+    steel_joist: str = "600S162-54"          # steel frame jobs: SSMA joist designation (depth S flange - mils), G90
+    steel_track: str = "600T"                # track for the rims and the ledger (54 mil)
     footing_price: Optional[float] = None    # owner's price per Diamond Pier (material, each) — overrides the pricebook
     blocking_rows: Optional[int] = None  # None -> 1 row over each beam (composite), 2 for PVC
     joist_tape: bool = True

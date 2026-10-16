@@ -1,9 +1,9 @@
 """Cold-formed steel deck framing (CEMCO light-gauge members) — the order rewritten from the dimensional takeoff.
 
-The layout engine sizes the frame as if it were lumber at the same depth (a 7-1/4" C-joist stands in for a 2x8). This
+The layout engine sizes the frame as if it were lumber at the same depth (a 600S162-54 C-joist reads as the "600S" size). This
 module then swaps the wood items for steel ones:
-  * joist-size lumber            -> 7-1/4" C-joists, 16 ga, G90 (joists, picture-frame joists, blocking)
-  * rims / ledgers               -> 7-1/4" track (one ply; the track caps the joist ends), ledger track on a steel ledger angle
+  * joist-size lumber            -> the job's C-joists (600S162-54 by default), G90 (joists, picture-frame joists, blocking)
+  * rims / ledgers               -> 600T track (one ply; the track caps the joist ends), ledger track on a steel ledger angle
   * beams                        -> boxed pairs of C-joists (C + C toe-to-toe, screwed), engineer sizes the gauge
   * posts on the piers           -> 3" x 3" galvanized steel post stubs on the Diamond Pier bracket
   * hangers / nails / SDS / tape -> clip angles, #12 self-drilling hex-washer screws; no joist tape (steel does not rot)
@@ -22,9 +22,9 @@ from .catalog import actual
 
 # estimated supply prices, per LF unless noted
 PRICE = dict(
-    joist=3.40,          # 7-1/4" C-joist 16 ga G90
-    track=2.95,          # 7-1/4" track 16 ga G90
-    beam=3.90,           # 7-1/4" C 14 ga, used in boxed pairs
+    joist=2.40,          # 600S162-54 C-joist, 16 ga, G90
+    track=2.05,          # 600T track, 54 mil, G90
+    beam=2.40,           # 600S162-54, used in boxed pairs (the engineer may heavier the gauge)
     angle=2.60,          # 2x2 / 3x3 ledger angle 14 ga
     post=14.0,           # 3x3 HSS 11 ga galvanized stub, each (cut to height)
     pier_bracket=38.0,   # pier-head bracket / post base, each
@@ -35,9 +35,22 @@ PRICE = dict(
     touchup=24.0,        # cold-galv spray, each
 )
 SRC = "est. — CFS supply (Front Range), confirm with the CEMCO dealer"
-DEPTH = {"2x6": '6"', "2x8": '7-1/4"', "2x10": '9-1/4"', "2x12": '11-1/4"'}
+DEPTH = {"2x6": '6"', "2x8": '7-1/4"', "2x10": '9-1/4"', "2x12": '11-1/4"', "600S": '6"', "800S": '8"', "1000S": '10"'}
+MILS_GA = {"33": "20 ga", "43": "18 ga", "54": "16 ga", "68": "14 ga", "97": "12 ga"}
 
-_LUMBER = re.compile(r"^(\d+x\d+)x(\d+)\b")
+_LUMBER = re.compile(r"^(\d+x\d+|\d+S)x(\d+)\b")
+
+
+def names(s) -> dict:
+    """How the steel members read on every page: depth, joist / track designations, gauge."""
+    j = s.framing.steel_joist or "600S162-54"
+    mils = j.split("-")[-1] if "-" in j else "54"
+    ga = MILS_GA.get(mils, f"{mils} mil")
+    depth = DEPTH.get(s.framing.joist_size, f'{int(j[:len(j) - len(j.lstrip("0123456789"))]) / 100:g}"' if j[0].isdigit() else '6"')
+    trk = s.framing.steel_track or "600T"
+    return dict(depth=depth, joist=j, track=trk, ga=ga, mils=mils,
+                joist_txt=f"CEMCO {j} C-joist ({depth}, {mils} mil / {ga}, G90)", track_txt=f"CEMCO {trk} track ({mils} mil / {ga}, G90)",
+                beam_txt=f"boxed CEMCO {j} (2 C toe-to-toe, G90)")
 
 
 def _lf(line) -> float:
@@ -50,17 +63,18 @@ def steel_frame(t) -> None:
     from .takeoff import Line, CutPiece  # noqa: F401  (Line used below)
     s, L = t.spec, t.layout
     jsize = s.framing.joist_size
-    dep = DEPTH.get(jsize, f"{actual(jsize)[1]:g}\"")
+    N = names(s)
+    dep = N["depth"]
     beam_noms = set()
     ren = {}
     for bl in L.beam_lines:
         beam_noms.add(bl.size)
-        ren[f"{bl.size} {bl.species}"] = f"boxed {dep} steel C"
-        bl.label = bl.label.replace(f"{bl.size} {bl.species}", f"boxed {dep} steel C")
+        ren[f"{bl.size} {bl.species}"] = f"boxed {N['joist']}"
+        bl.label = bl.label.replace(f"{bl.size} {bl.species}", f"boxed {N['joist']}")
     def steelify(txt: str) -> str:
         for a_, b_ in ren.items():
             txt = txt.replace(a_, b_)
-        return txt.replace(f"{jsize} @", f"{dep} steel C @").replace(f"{jsize} joists", f"{dep} steel C-joists").replace(f"{jsize} SYP", f"{dep} steel C")
+        return txt.replace(f"{jsize} @", f"{N['joist']} @").replace(f"{jsize} joists", f"{N['joist']} C-joists").replace(f"{jsize} SYP", N["joist"]).replace(f"PF {jsize}", f"PF {N['joist']}")
     # LF by role from the layout
     track_lf = L.outer_edge_lf if L.multi else 2 * (L.finished_w + L.finished_d) / 12.0
     ledger_lf = L.wall_lf / 12.0
@@ -102,17 +116,17 @@ def steel_frame(t) -> None:
 
     out: List = []
     jl = int(math.ceil(joist_lf * 1.05))
-    ad(f"CEMCO {dep} steel C-joist, 16 ga (54 mil) G90 — joists, PF joists, blocking", round(joist_lf), jl, "LF",
+    ad(f"{N['joist_txt']} — joists, PF joists, blocking", round(joist_lf), jl, "LF",
        f"+5%  (cut to length by the supplier where possible) — {L.frame.spacing:g}\" OC", PRICE["joist"], "member gauge per the engineer")
     tl = int(math.ceil((track_lf + ledger_lf) * 1.05))
-    ad(f"CEMCO {dep} steel track, 16 ga G90 — rims (single ply, caps the joist ends) + ledger track", round(track_lf + ledger_lf), tl, "LF",
+    ad(f"{N['track_txt']} — rims (single ply, caps the joist ends) + ledger track", round(track_lf + ledger_lf), tl, "LF",
        f"+5%  ({track_lf:.0f} LF rim + {ledger_lf:.0f} LF ledger)", PRICE["track"])
     if ledger_lf:
         al = int(math.ceil(ledger_lf * 1.1))
         ad("Steel ledger angle 3\" x 3\" 14 ga G90 — joist seats on the ledger track", round(ledger_lf), al, "LF", "+10%", PRICE["angle"])
     if beam_lf:
         bl_ = int(math.ceil(beam_lf * 2 * 1.05))
-        ad(f"CEMCO {dep} steel C, 14 ga (68 mil) G90 — boxed beams (2 C toe-to-toe)", round(beam_lf * 2), bl_, "LF",
+        ad(f"CEMCO {N['joist']} C, G90 — boxed beams (2 C toe-to-toe)", round(beam_lf * 2), bl_, "LF",
            "+5%  (" + " · ".join(f"{b.label} {b.length / 12:.1f}'" for b in L.beam_lines) + ")", PRICE["beam"], "engineer sizes the beam gauge / depth")
     from .spec import covers_of
     from .takeoff import cover_posts_x
@@ -148,7 +162,7 @@ def steel_frame(t) -> None:
     t.lines[hw_at:hw_at] = out_hw
     for c in t.cut_list:
         if c.nominal == jsize:
-            c.nominal = f"{dep} C"
+            c.nominal = N["joist"]
         elif c.nominal in (s.framing.post_size,):
             c.nominal = "3x3 HSS"
         elif c.nominal == "2x12":
@@ -156,14 +170,18 @@ def steel_frame(t) -> None:
     t.schedule.pop("Joist tape", None)
     t.schedule.pop("Blocking", None)
     if "Ledger" in t.schedule:
-        t.schedule["Ledger"] = f"{dep} steel ledger track + 3x3 ledger angle, 1/4\" structural screws 2 rows staggered 16\" OC into the rim board (engineer confirms) · flashing and membrane as for wood"
-    t.schedule["Steel frame"] = (f"{dep} C-joists 16 ga @ {L.frame.spacing:g}\" OC · single-ply track rims · boxed C beams · clip angles with #12 self-drilling screws "
+        t.schedule["Ledger"] = f"{N['track']} ledger track + 3x3 ledger angle, 1/4\" structural screws 2 rows staggered 16\" OC into the rim board (engineer confirms) · flashing and membrane as for wood"
+    t.schedule["Steel frame"] = (f"{N['joist']} C-joists @ {L.frame.spacing:g}\" OC · single-ply {N['track']} track rims · boxed {N['joist']} beams · all G90 · clip angles with #12 self-drilling screws "
                                  "(4 per leg) · cut ends cold-galvanized · no joist tape needed")
     t.summary["beams"] = [steelify(b_) for b_ in t.summary["beams"]]
     t.notes = [steelify(n_) for n_ in t.notes]
     L.notes[:] = [steelify(n_) for n_ in L.notes]
     for z in L.zones:
         z.frame.notes[:] = [steelify(n_) for n_ in z.frame.notes]
+        for b in z.frame.beams:
+            b.label = steelify(b.label)
+            if getattr(b, "check", None) is not None and b.check.note:
+                b.check.note = b.check.note.replace(f"{b.size} not in IRC R507.5 — treated as", f"boxed {N['joist']}: no IRC beam table for steel — laid out as")
     for c in t.cut_list:
         c.member, c.note = steelify(c.member), steelify(c.note)
         if c.member.startswith("Posts under"):
@@ -172,8 +190,8 @@ def steel_frame(t) -> None:
         if ln.category in ("Lumber", "Hardware", "Footings"):
             ln.why = steelify(ln.why)
     sm = t.summary
-    sm["joists"] = f"{dep} CEMCO cold-formed steel C-joists, 16 ga G90, @ {L.frame.spacing:g}\" OC"
-    sm["rims"] = f"single-ply {dep} steel track rims" + (" and ledger track on a steel angle" if ledger_lf else "")
+    sm["joists"] = f"{N['joist_txt']} @ {L.frame.spacing:g}\" OC"
+    sm["rims"] = f"single-ply {N['track']} track rims (G90)" + (f" and {N['track']} ledger track on a steel angle" if ledger_lf else "")
     sm["posts"] = sm["posts"].replace(f"{L.n_footings} x {s.framing.post_size}", f"{n_posts} x 3x3 galvanized steel post stubs" + (f" + {n_shared} cover posts carrying the deck beam" if n_shared else ""))
     sm["material_cost"] = round(sum(l.ext for l in t.lines), 2)
     t.notes.append("Frame is CEMCO cold-formed steel: the layout is sized as the equivalent-depth lumber, then the engineer of record "

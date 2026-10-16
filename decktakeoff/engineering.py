@@ -26,6 +26,10 @@ JOIST_SPAN = {
     "HF":  {"2x6": _J(114, 104, 86), "2x8": _J(150, 133, 109), "2x10": _J(188, 163, 133), "2x12": _J(216, 189, 154)},
     "CEDAR": {"2x6": _J(106, 96, 84), "2x8": _J(140, 127, 104), "2x10": _J(179, 156, 127), "2x12": _J(209, 181, 148)},
 }
+# cold-formed steel C-joists (SSMA 54 mil / 16 ga, G90) — conservative layout spans at 12 / 16 / 24" OC for a 50 psf deck; the
+# engineer of record designs the members (AISI S240), these only keep the layout from adding beams a steel frame does not need
+for _sp in JOIST_SPAN:
+    JOIST_SPAN[_sp].update({"600S": _J(150, 132, 108), "800S": _J(186, 164, 134), "1000S": _J(216, 192, 158)})
 # max cantilever past a drop beam: 1/4 of the back-span (R507.5 / R507.6 footnote), and never more than the
 # joist can carry as a full-load overhang; DCA6 also caps at nominal depth in feet
 CANTILEVER_RATIO = 0.25
@@ -56,7 +60,8 @@ BEAM_SPAN["SPF"] = BEAM_SPAN["DF"]
 BEAM_SPAN["HF"] = BEAM_SPAN["DF"]
 BEAM_SPAN["CEDAR"] = BEAM_SPAN["DF"]
 # 6x beams are not in R507.5 — treat 6x10 ≈ (3)2x10, 6x12 ≈ (3)2x12 (same section modulus class); flagged as engineered.
-BEAM_ALIAS = {"6x10": "(3)2x10", "6x12": "(3)2x12", "6x8": "(3)2x8", "3x10": "(2)2x10", "3x12": "(2)2x12"}
+BEAM_ALIAS = {"6x10": "(3)2x10", "6x12": "(3)2x12", "6x8": "(3)2x8", "3x10": "(2)2x10", "3x12": "(2)2x12",
+              "(2)600S": "(2)2x8", "(2)800S": "(2)2x10", "(2)1000S": "(2)2x12"}   # boxed CFS beams: lumber-equivalent placeholder, the engineer sizes them
 
 # ------------------------------------------------------------- posts: Table R507.4 (max height, in)
 POST_MAX_HEIGHT = {"4x4": 81, "4x6": 96, "6x6": 168, "8x8": 168}

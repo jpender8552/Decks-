@@ -10,7 +10,7 @@ import textwrap
 from datetime import date
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .catalog import RAIL_SYSTEMS, decking_facts
+from .catalog import RAIL_SYSTEMS, decking_facts, actual
 from .layout import Layout
 from .scene import Scene, Box, build_scene
 from .units import ftin
@@ -299,7 +299,7 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
                                   "+cover: the 6x6 Douglas fir roof-cover post stands on this pier",
                                   "(ABA66Z) and carries the deck beam on a steel side bracket (D-502 / 4);",
                                   "roof load adds — the engineer sizes the pier.",
-                                  "Beams: boxed CEMCO 7-1/4\" steel C, flush (D-502 / 2)."]):
+                                  f"Beams: boxed CEMCO {L.spec.framing.steel_joist}, flush (D-502 / 2)."]):
             o.append(T(sx, yy + 36 + k_ * 11, ln_, 7.2, 500))
     return sheet("S-100", "Foundation plan", "Footings, posts and beam lines with the footing schedule; beams dashed (below the joists)", o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
@@ -321,7 +321,7 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
     for bl in L.beam_lines:
         o.append(T(X(bl.x0) + 6, Y(bl.y * IN) + 3, bl.label + (" (below)" if bl.kind == "drop" else " (flush)"), 7.5, 800, fill="#3f5d8a"))
     zs = S.meta["zones"]
-    jlab = '7-1/4" steel C' if L.spec.framing.system == "steel" else L.frame.joist_size
+    jlab = L.spec.framing.steel_joist if L.spec.framing.system == "steel" else L.frame.joist_size
     for zl, z in zip(L.zones, zs):
         fr = zl.frame
         o.append(T(X(z["x0"] + z["W"] / 2), Y(z["front"]) - 10, f"{z['name']}: {len(fr.joist_x)} field + {len(fr.pf_x)} PF {jlab} @ {fr.spacing:g}\" OC · {ftin(fr.joist_len)}", 7.5, 800, "middle"))
@@ -590,7 +590,7 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     o.append(R(85, 100, 8, 60, G, INK, 0.8)); o.append(T(89, 176, "ledger track", 6.5, 700, "middle"))
     o.append(R(93, 150, 26, 6, "#7b8186", INK, 0.6)); o.append(T(122, 172, "3x3 ledger angle (seat)", 6.5, 600))
     chan(93, 100, 130, 50)
-    o.append(T(160, 128, "7-1/4\" C-joist, 16 ga", 7, 700, "middle"))
+    o.append(T(160, 128, f"{s.framing.steel_joist} C-joist", 7, 700, "middle"))
     o.append(R(93, 92, 150, 7, FILL["deck"], INK, 0.5)); o.append(T(170, 89, "decking", 6.5, 600, "middle"))
     o.append(LN(80, 100, 100, 100, GOLD, 2)); o.append(T(104, 84, "flashing over the track", 6.5, 600))
     for yy in (112, 140):
@@ -600,7 +600,7 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     frame_(340, 20, 300, 290, "2", "JOIST TO TRACK / BEAM")
     o.append(R(380, 70, 14, 160, G, INK, 0.8)); o.append(T(387, 245, "track or boxed beam", 6.5, 700, "middle"))
     chan(394, 110, 200, 70)
-    o.append(T(494, 150, "7-1/4\" C-joist", 7.5, 700, "middle"))
+    o.append(T(494, 150, f"{s.framing.steel_joist} C-joist", 7.5, 700, "middle"))
     o.append(R(394, 118, 26, 54, "#7b8186", INK, 0.7)); o.append(T(430, 196, "clip angle 1-1/2 x 1-1/2 x 7\", 16 ga", 6.5, 600))
     for yy in (126, 142, 158):
         o.append(C(400, yy, 1.8, INK)); o.append(C(414, yy, 1.8, INK))
@@ -638,7 +638,7 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     chan(700, 470, 240, 30)
     o.append(R(700, 456, 240, 14, FILL["deck"], INK, 0.5))
     hmin = s.geometry.height_min_in
-    clear = (hmin - 1.0 - 7.25) if hmin is not None else None
+    clear = (hmin - 1.0 - actual(s.framing.joist_size)[1]) if hmin is not None else None
     o.append(LN(950, 500, 950, 512, "#b3261e", 1.2)); o.append(T(955, 510, "2\" min.", 6.5, 800, fill="#b3261e"))
     note(680, 565, 290, (f"Walkway low point: {hmin:g}\" surface to grade leaves {clear:.2f}\" under the frame — dig out / regrade to 2\" min. under that run before the poly." if clear is not None and clear < 2 else "Keep 2\" min. between the frame and the gravel."))
     return sheet("D-501", "Details — steel frame", "Steel ledger · joist clips · boxed beam on the shared pier · Diamond Pier · deck edge · under the deck", o, "Schematic details, not to scale · the engineer's details govern", meta)
@@ -836,7 +836,7 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(LN(Xs(y0 - 2.0), Zs(0), Xs(y1 + ov + 3), Zs(0), INK, 1.2))
         o.append(R(Xs(y0 - 2.0), Zs(top_z - 0.1), 2.0 * scs, (top_z - 0.1) * scs, FILL["house"], INK, 1.2))
         o.append(T(Xs(y0 - 1.0), Zs(top_z / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
-        o.append(R(Xs(y0), Zs(zt), (y1 - y0 + 0.4) * scs, (1.0 / 12 + 7.25 / 12) * scs, FILL["deck"], INK, 0.8))
+        o.append(R(Xs(y0), Zs(zt), (y1 - y0 + 0.4) * scs, (1.0 / 12 + actual(s.framing.joist_size)[1] / 12) * scs, FILL["deck"], INK, 0.8))
         o.append(T(Xs(y0) + 4, Zs(zt) + 10, f"DECK {ftin(s.geometry.height_in)} above grade", 6.5, 800, fill="#f3ead9"))
         zb_hi, zb_lo = zt + hi / 12, zt + lo / 12
         o.append(R(Xs(y0), Zs(zb_hi + bdi / 12), 0.13 * scs, bdi / 12 * scs, FILL["timber_dk"], INK, 0.6))
@@ -947,9 +947,9 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
     ks = [
         (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "first"),
         ("3x3 galvanized HSS post stub on a pier-head bracket" if steel else f"{s.framing.post_size} post on a standoff base", lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
-        (("Boxed CEMCO 7-1/4\" steel C beam (2 C toe-to-toe), flush" if steel else "Beam"), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
-        (("CEMCO 7-1/4\" steel C-joist, 16 ga G90, @ 12\" OC — clip angles each end" if steel else f"{s.framing.joist_size} joist"), lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
-        (("CEMCO 7-1/4\" steel track rim (caps the joist ends)" if steel else "Rim"), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
+        ((f"Boxed CEMCO {s.framing.steel_joist} beam (2 C toe-to-toe, G90), flush" if steel else "Beam"), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
+        ((f"CEMCO {s.framing.steel_joist} C-joist, G90, @ {L.frame.spacing:g}\" OC — clip angles each end" if steel else f"{s.framing.joist_size} joist"), lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
+        ((f"CEMCO {s.framing.steel_track} track rim, G90 (caps the joist ends)" if steel else "Rim"), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
         (("Steel ledger track + 3x3 ledger angle on the house rim, flashed" if steel else "Ledger"), lambda b: b.kind == "ledger", (0.4, 0.5, 1.0), "last"),
         (("Steel blocking at the breaker / picture-frame joists" if steel else "Blocking"), lambda b: b.kind == "block", (0.5, 0.5, 1.0), "mid"),
         (f"{dk} field decking, hidden fasteners", lambda b: b.kind == "board", (0.5, 0.5, 1.0), "mid"),
@@ -1140,10 +1140,10 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
         _screw(o, x + 91, y + yy)
     _lead(o, x + 60, y + 70, x + 150, y + 36, "Z-flashing over the track, under the siding (lapped over the membrane)")
     _lead(o, x + 68, y + 200, x + 120, y + 210, "Self-adhered membrane, 12\" up the wall behind the track")
-    _lead(o, x + 72, y + 120, x + 120, y + 178, "7-1/4\" ledger track, 16 ga — 1/4\" x 3-1/2\" structural screws, 2 rows staggered 16\" OC into the rim (engineer)")
+    _lead(o, x + 72, y + 120, x + 120, y + 178, f"{s.framing.steel_track} ledger track, G90 — 1/4\" x 3-1/2\" structural screws, 2 rows staggered 16\" OC into the rim (engineer)")
     _lead(o, x + 100, y + 154, x + 170, y + 240, "3x3 x 14 ga ledger angle — joist seat")
     _lead(o, x + 91, y + 124, x + 236, y + 130, "Clip angle, #12 screws, 4 per leg")
-    _lead(o, x + 200, y + 120, x + 236, y + 160, "7-1/4\" C-joist, 16 ga G90 @ 12\" OC")
+    _lead(o, x + 200, y + 120, x + 236, y + 160, f"{s.framing.steel_joist} C-joist, G90 @ {L.frame.spacing:g}\" OC")
     _lead(o, x + 210, y + 89, x + 236, y + 60, f"{dk} decking, hidden fasteners")
     # 2 joist to boxed beam
     x, y = P[1]; _panel(o, x, y, W3, H2, "2", "JOIST TO BOXED BEAM — SECTION")
@@ -1156,7 +1156,7 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     for yy in (108, 162):
         _screw(o, x + 158, y + yy, horiz=False)
     o.append(R(x + 20, y + 93, 276, 7, FILL["deck"], INK, 0.5))
-    _lead(o, x + 158, y + 170, x + 120, y + 214, "Boxed beam: two 7-1/4\" C, 14 ga, toe-to-toe, #12 screws @ 12\" OC top and bottom (engineer)")
+    _lead(o, x + 158, y + 170, x + 120, y + 214, f"Boxed beam: two {s.framing.steel_joist} C, toe-to-toe, #12 screws @ 12\" OC top and bottom (engineer)")
     _lead(o, x + 130, y + 132, x + 24, y + 40, "Clip angle 1-1/2 x 1-1/2 x 7\" 16 ga each joist end")
     _lead(o, x + 192, y + 120, x + 200, y + 40, "#12-14 self-drilling hex-washer screws, 4 per leg")
     _lead(o, x + 250, y + 140, x + 220, y + 250, "C-joists @ 12\" OC both sides, flush with the beam top")
@@ -1175,7 +1175,7 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     _lead(o, x + 176, y + 184, x + 214, y + 160, "Pier-head post bracket on the pier bolt")
     _lead(o, x + 156, y + 140, x + 24, y + 150, "3x3 x 11 ga HSS stub, hot-dip galvanized")
     _lead(o, x + 176, y + 108, x + 214, y + 124, "Welded cap plate, (4) #12 screws up into the beam (engineer)")
-    _lead(o, x + 90, y + 78, x + 24, y + 30, "Boxed 7-1/4\" steel C beam, flush with the joists")
+    _lead(o, x + 90, y + 78, x + 24, y + 30, f"Boxed {s.framing.steel_joist} beam, flush with the joists")
     # 4 shared pier: cover post carries the deck beam
     x, y = P[3]; _panel(o, x, y, W3, H2, "4", "SHARED PIER — COVER POST + DECK BEAM")
     o.append(LN(x + 20, y + 230, x + W3 - 20, y + 230, INK, 1.0))
@@ -1203,7 +1203,7 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     o.append(LN(x + 230, y + 180, x + 230, y + 232, "#b3261e", 0.8)); o.append(T(x + 234, y + 210, "2\" min. to gravel", 6.4, 800, fill="#b3261e"))
     _lead(o, x + 176, y + 86, x + 170, y + 40, f"Picture-frame border, {dk}, face-fastened, color-matched plugs")
     _lead(o, x + 100, y + 86, x + 24, y + 40, "Field boards, CONCEALoc clips on the steel-frame screw")
-    _lead(o, x + 199, y + 130, x + 236, y + 70, "7-1/4\" track rim caps the joist ends, #12 screws each flange")
+    _lead(o, x + 199, y + 130, x + 236, y + 70, f"{s.framing.steel_track} track rim caps the joist ends, #12 screws each flange")
     _lead(o, x + 204, y + 140, x + 236, y + 120, "Galvanized hat-channel furring, screwed to the track")
     _lead(o, x + 211, y + 168, x + 236, y + 168, f"HardieTrim skirt {s.extras.hardie_color}".strip())
     _lead(o, x + 120, y + 236, x + 24, y + 270, "2\" gravel over 6-mil poly, sloped away from the house")

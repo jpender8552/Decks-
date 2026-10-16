@@ -342,7 +342,7 @@ def _reads_lite(t, L, sm):
         stairs.append(txt)
     fr = L.zones[0].frame
     beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
-    structure = (f"CEMCO cold-formed steel frame, 7-1/4\" C-joists at {fr.spacing:g}\" on centre, boxed steel beams; {sm['posts']}" if s.framing.system == "steel" else
+    structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on centre, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
                  f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {' / '.join(beams)} Douglas fir beams" if beams else "") + f"; {sm['posts']}")
     reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
