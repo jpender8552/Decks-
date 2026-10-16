@@ -1,7 +1,7 @@
 {
   "job": "281 S Jefferson Ave — two decks + two lean-to covers (CEMCO steel, TimberTech Landmark American Walnut)",
   "client": "",
-  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg). OWNER 16 Oct (pricing): posts Douglas fir, no extra beam set, no steel up-charge, both covers' labor $4,000 total incl. roofing, decking $5.50/LF, roll-down blinds existing (no work). OWNER 16 Oct: the stair leaves the main deck's left side toward the walkway (into the yard in front of the walkway), not the front. No landing pad — the stair lands on grade. Diamond Piers $150 each (material). Total labor $7,750 (covers $4,000 of it). Margin 33.33% (owner-set, under the 40% floor). Cover framing wood: 2x8 rafters, (2)2x8 beams (2x8 ledger to match), 6x6 Douglas fir posts. Deck frame: CEMCO 600S162-54 C-joists, 600T track, all G90 (6\" deep).",
+  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg). OWNER 16 Oct (pricing): posts Douglas fir, no extra beam set, no steel up-charge, both covers' labor $4,000 total incl. roofing, decking $5.50/LF, roll-down blinds existing (no work). OWNER 16 Oct: the stair leaves the main deck's left side toward the walkway (into the yard in front of the walkway), not the front. No landing pad — the stair lands on grade. Diamond Piers $150 each (material). Total labor $7,750 (covers $4,000 of it). Margin 33.33% (owner-set, under the 40% floor). Cover framing wood: 2x8 rafters, (2)2x8 beams (2x8 ledger to match), 6x6 Douglas fir posts. Deck frame: CEMCO 600S162-54 C-joists, 600T track, all G90 (6\" deep). Main cover: (2) posts across the front, not (3) — the deck beam keeps its middle pier on a steel stub. Main cover beam upgraded to a 4x10 Douglas fir (11' span between the two posts). SOLD at $36,300 (check / ACH) — margin is what that price carries.",
   "site": {
     "address": "281 S Jefferson Ave",
     "city": "Louisville",
@@ -413,10 +413,9 @@
         ],
         "posts_x_ft": [
           15.167,
-          20.667,
           26.167
         ],
-        "beam": "(2)2x8",
+        "beam": "4x10",
         "ledger": "2x8"
       },
       {
@@ -538,6 +537,7 @@
     "cover_labor_total": 4000,
     "labor_total": 7750,
     "gm": 0.3333,
-    "gm_below_floor": true
+    "gm_below_floor": true,
+    "sell_override": 36300
   }
 }

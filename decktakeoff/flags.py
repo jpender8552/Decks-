@@ -217,6 +217,24 @@ def run_flags(L: Layout) -> List[Flag]:
             add("ENGINEER" if deck + w > 0.9 * cap else "CHECK", "footing",
                 f"{c['name']}: cover post + deck beam share a Diamond Pier — worst ~{w:,.0f} lb roof (ground snow {site.ground_snow_psf:g} + 15 psf dead) + {deck:,.0f} lb deck = ~{w + deck:,.0f} lb "
                 f"vs {cap:,.0f} lb DP-50/50" + (" — priced as DP-75/63 (6,000 lb) at those posts" if deck + w > cap else "") + f"; uplift at {site.wind_speed_mph:g} mph — engineer confirms the pier and the post-to-pier hold-down", "IBC App. I / ASCE 7")
+        # the cover beam in bending between its posts: roof snow + 15 psf dead on half the rafter run plus the overhang
+        from .takeoff import cover_posts_x as _cpx
+        from .catalog import parse_beam as _pb, actual as _act
+        _px = sorted(_cpx(c))
+        if len(_px) >= 2:
+            span_ft = max(b_ - a_ for a_, b_ in zip(_px, _px[1:]))
+            trib = (c["y1"] - c["y0"]) / 2 + float(c.get("overhang_ft", 1.0))
+            w_plf = trib * (site.ground_snow_psf + 15.0)
+            plies, nom, _, _ = _pb(c.get("beam", "(2)2x10"))
+            b_in, d_in = _act(nom)
+            S_in3 = plies * b_in * d_in ** 2 / 6
+            fb = w_plf * span_ft ** 2 / 8 * 12 / S_in3
+            fb_allow = 1200.0       # SYP #2 2x, snow duration + repetitive member, rounded down
+            if fb > fb_allow:
+                add("ENGINEER", "engineering", f"{c['name']}: {c.get('beam', '(2)2x10')} beam spans {ftin(span_ft * 12)} between posts — about {fb:,.0f} psi bending "
+                    f"(~{w_plf:,.0f} plf roof) vs ~{fb_allow:,.0f} psi allowable: upsize to (2)2x12, (3)2x10 or a 3-1/2\" x 9-1/4\" LVL, or add a post — engineer sizes it", "NDS / IRC R802")
+            else:
+                add("INFO", "engineering", f"{c['name']}: {c.get('beam', '(2)2x10')} beam spans {ftin(span_ft * 12)} — about {fb:,.0f} psi bending vs ~{fb_allow:,.0f} psi allowable")
         add("ENGINEER", "snow", f"{c['name']}: a lean-to under the house eave takes sliding snow off the house roof and drift against the wall — ASCE 7 sliding + drift surcharge on the cover", "ASCE 7-22 7.7 / 7.9")
     # ---------------- steel frame
     if s.framing.system == "steel":

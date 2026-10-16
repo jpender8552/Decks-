@@ -1137,7 +1137,12 @@ def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
     cb = c.get("beam", "(2)2x10"); cb_pl = int(cb[1]) if cb.startswith("(") else 1; cb_nom = cb.split(")")[-1]
     cl = c.get("ledger", "2x10")
     beam_pcs = int(_m.ceil(along / 16)) * cb_pl
-    L_(f"{cb_nom}x16 #1 SYP — cover beam ({cb_pl} ply)", beam_pcs, beam_pcs, "ea", f"+0  ({cb} x {along:.1f}' at the posts)", per=PRICEBOOK["lumber"][cb_nom]["per_lf"] * 16)
+    if cb_nom.startswith(("4x", "6x")):        # a solid sawn beam: Douglas fir, one piece where the stock allows
+        stk = next((v for v in (8, 10, 12, 14, 16, 20) if v >= along + 0.8), 20)
+        n_b = int(_m.ceil((along + 0.8) / stk)) * cb_pl
+        L_(f"{cb_nom}x{stk} Douglas fir — cover beam", n_b, n_b, "ea", f"+0  ({cb} x {along + 0.8:.1f}' at the posts, one piece)", per=PRICEBOOK["lumber"][cb_nom]["per_lf"] * stk)
+    else:
+        L_(f"{cb_nom}x16 #1 SYP — cover beam ({cb_pl} ply)", beam_pcs, beam_pcs, "ea", f"+0  ({cb} x {along:.1f}' at the posts)", per=PRICEBOOK["lumber"][cb_nom]["per_lf"] * 16)
     ledger_pcs = int(_m.ceil(along / 16))
     L_(f"{cl}x16 #1 SYP — cover ledger on the house", ledger_pcs, ledger_pcs, "ea", "exact", per=PRICEBOOK["lumber"][cl]["per_lf"] * 16)
     n_r = int(along / (16 / 12)) + 1
@@ -1208,7 +1213,10 @@ def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
         out_lines.append(Line("Porch cover", "Simpson ABA66Z post base on the pier bolt — cover post", n_posts, n_posts, "ea", "exact", ucb, srcb))
     else:
         L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
-    L_(f"Simpson AC6Z post cap, 6x6 to the {c.get('beam', '(2)2x10')} beam", n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
+    if cb_nom.startswith("4x"):
+        L_("Simpson BC46Z post cap, 6x6 post to the 4x beam", n_posts, n_posts, "ea", "exact", key="BC46Z", section="hardware")
+    else:
+        L_(f"Simpson AC6Z post cap, 6x6 to the {c.get('beam', '(2)2x10')} beam", n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
     L_(None, n_r, n_r, "ea", "one per rafter at the beam", key="rafter_tie")
     lok = int(_m.ceil(along / 16 * 2)) * 16 // 16 * 2
     L_("FastenMaster LedgerLOK 6\" — cover ledger, 2 rows staggered 16\" OC", int(_m.ceil(along / 16 * 12 * 2)), int(_m.ceil(along / 16 * 12 * 2)), "ea", f"{along:.0f} LF x 2 rows @ 16\"", per=PRICEBOOK["hardware"]["LedgerLOK6_50"]["each"] / 50 if "each" in PRICEBOOK["hardware"]["LedgerLOK6_50"] else 1.2)

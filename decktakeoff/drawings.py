@@ -861,8 +861,8 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
             o.append(T(Xs(y1) + 6, Zs(zt + 2.5) + 9, "rehung on the new beam", 7, 700))
         notes = [f"Standing seam 24 ga, 16\" panels, 1-1/2\" mechanical (double-lock) seam — rated for {pitch:.2f}:12 · high-temp ice & water underlayment over 7/16\" OSB",
                  "Headwall flashing counterflashed into the siding · color-matched eave / rake trim · snow bar across the low eave",
-                 f"HardieSoffit cedarmill ceiling · HardieTrim fascia + rakes ({s.extras.hardie_color or 'color TBD'}) · H2.5AZ at every rafter · AC6Z caps",
-                 f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts on ABA66Z bases on the Diamond Pier bolt · AC6Z cap to the {c.get('beam', '(2)2x10')} beam · the engineer's uplift hold-down governs"]
+                 f"HardieSoffit cedarmill ceiling · HardieTrim fascia + rakes ({s.extras.hardie_color or 'color TBD'}) · H2.5AZ at every rafter · post caps per D-503",
+                 f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts on ABA66Z bases on the Diamond Pier bolt · {'BC46Z' if c.get('beam', '').startswith('4x') else 'AC6Z'} cap to the {c.get('beam', '(2)2x10')} {'Douglas fir ' if c.get('beam', '').startswith('4x') else ''}beam · the engineer's uplift hold-down governs"]
         yy = sy0 + 236
         for ln in notes:
             for w in textwrap.wrap(ln, int(colw / 5.0)):
@@ -958,7 +958,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
         ("Stair — steel stringers, Landmark treads, closed risers, lands on grade" if steel else "Stair", lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
         ("Gravel over 6-mil poly under the decks", lambda b: b.kind == "gravel", (0.3, 0.6, 1.0), "first"),
         (f"6x6 {post_sp} cover post on ABA66Z (shared Diamond Pier)", lambda b: b.kind == "cpost", (0.5, 0.5, 0.45), "last"),
-        (f"{_cv0.get('beam', '(2)2x10')} cover beam, wood, AC6Z cap", lambda b: b.kind == "cbeam", (0.7, 0.5, 0.5), "last"),
+        (f"{_cv0.get('beam', '(2)2x10')} cover beam, " + ("Douglas fir, BC46Z cap" if _cv0.get('beam', '').startswith('4x') else "wood, AC6Z cap"), lambda b: b.kind == "cbeam", (0.7, 0.5, 0.5), "last"),
         (f"{_cv0.get('ledger', '2x10')} cover ledger, wood, LedgerLOK 6\" 2 rows, headwall flashed", lambda b: b.kind == "cledger", (0.5, 0.5, 0.5), "last"),
         ("2x8 rafters @ 16\" OC, wood, H2.5AZ at the beam", lambda b: b.kind == "rafter", (0.5, 0.5, 0.5), "mid"),
         ("7/16\" OSB roof sheathing", lambda b: b.kind == "sheath", (0.2, 0.5, 1.0), "last"),
@@ -1008,7 +1008,8 @@ def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
     hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "sheath", "underlay")
     key = [k for k in member_key(L, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
     return _axo_sheet("A-002", "Isometric — assembled, labeled", "Everything you see called out: piers, decking, picture frame, skirt, stair, roof covers, finishes", L, S, t, meta, bx, fit=fit, key=key,
-                      note="House shown for context only (no work). The CEMCO steel deck frame under the decking is called out on S-102 and A-003; cover framing is wood (2x8 rafters, (2)2x8 beams, 6x6 Douglas fir posts).")
+                      note="House shown for context only (no work). The CEMCO steel deck frame under the decking is called out on S-102 and A-003; cover framing is wood: 2x8 rafters, "
+                      + ", ".join(f"{c_['name'].lower()} {c_.get('beam', '(2)2x10')} beam" for c_ in __import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(L.spec)) + ", 6x6 Douglas fir posts.")
 
 
 def sheet_iso_exploded(L: Layout, S: Scene, t, meta) -> str:
@@ -1272,7 +1273,7 @@ def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[st
     o.append(PG([(x + 20, y + 120), (x + 250, y + 132), (x + 250, y + 136), (x + 20, y + 124)], "#f2efe8", INK, 0.5))
     o.append(C(x + 140, y + 116, 2.4, INK))
     _lead(o, x + 135, y + 130, x + 24, y + 160, f"{cb} beam on the posts")
-    _lead(o, x + 150, y + 150, x + 180, y + 180, "Simpson AC6Z post cap")
+    _lead(o, x + 150, y + 150, x + 180, y + 180, "Simpson BC46Z post cap" if cb.startswith("4x") else "Simpson AC6Z post cap")
     _lead(o, x + 135, y + 220, x + 180, y + 230, f"{post} post")
     _lead(o, x + 140, y + 116, x + 24, y + 40, "H2.5AZ hurricane tie each rafter to the beam")
     _lead(o, x + 205, y + 88, x + 170, y + 40, "Snow retention bar clamped to the seams, 12–18\" up from the eave")

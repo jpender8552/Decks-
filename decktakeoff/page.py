@@ -252,13 +252,19 @@ def _order_customer(t):
     return "".join(out)
 
 
-def _stack(p):
-    out = ['<h2 class="kicker">The stack <span class="tag">internal</span></h2>']
+def _stack(p, sold: float = None):
+    out = ['<h2 class="kicker" id="g-stack">' + (f"The stack — cost + margin <span class=\"tag\">sold at {money(sold)} · internal</span>" if sold else 'The stack <span class="tag">internal</span>') + '</h2>']
     stack = [("Materials (raw)", money(p.materials, True)), (f"Materials × {p.material_factor:g}", money(p.materials_factored, True)),
              (f"Sales tax {p.tax_rate:.2%}" + (" on factored materials" if p.material_factor != 1 else ""), money(p.tax, True)), ("Labor (rate card)", money(p.labor, True)),
              ("Work — carries the margin", money(p.work, True)), ("General conditions at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
              (f"Sell — check or ACH at {p.gm:.1%} GM", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor", money(p.sell_floor)),
              ("Financed", f"<b>{money(p.retail)}</b> · {money(p.monthly)}/mo at 6.99% × 10 yr"), ("Gross profit", money(p.gp))]
+    if sold:
+        stack[7] = ("SOLD — check or ACH", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF")
+        stack += [("Margin on the sold price (gross profit ÷ sell, GC at cost)", f"<b>{p.gp / p.sell:.1%}</b>"),
+                  ("Margin on the work (the GM the engine prices with)", f"{p.gm:.1%}"),
+                  ("Markup on cost", f"{p.gp / p.cost:.1%}"),
+                  ("Commission 10% of sell", money(p.commission)), ("Gross profit after commission", f"<b>{money(p.gp - p.commission)}</b> · {(p.gp - p.commission) / p.sell:.1%} of sell")]
     if p.engineering:
         stack.append(("Engineering — outside the price, at cost", f"{money(p.engineering[0])}–{money(p.engineering[1])}"))
     out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in stack) + "</tbody></table></div>")
@@ -499,7 +505,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             cost_html, cost_total, tax_raw = _cost_stack(p, t)
             w(cost_html)
         else:
-            w(_stack(p))
+            w(_stack(p, spec.extras.sell_override))
             w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
@@ -523,6 +529,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
              '<div><span class="sl">Monthly</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div>'
              '<div><span class="sl">Footings</span><span class="sv">%d</span></div><div><span class="sl">Rail</span><span class="sv">%g LF</span></div></div>'
              % (money(p.sell), money(p.retail), money(p.monthly), L.deck_sf, n_piers, (L.rail.rail_lf if L.rail else 0)))
+    if spec.extras.sell_override:
+        strip = ('<div class="strip"><div><span class="sl">Sold · check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Cost</span><span class="sv">%s</span></div>'
+                 '<div><span class="sl">Gross profit</span><span class="sv">%s</span></div><div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div>'
+                 '<div><span class="sl">Financed</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
+                 % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gp / p.sell, money(p.retail), L.deck_sf))
     if customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "") + f" · {today}"
         head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name)}</h1><p class="who">{E(who)}</p>'
@@ -554,7 +565,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     else:
         head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div><h1>{E(name)}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')
-        gm_note = f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else "")
+        gm_note = (f"sold at {money(p.sell)} · {p.gp / p.sell:.1%} margin on the sold price ({p.gm:.1%} on the work)" if spec.extras.sell_override else
+                   f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else ""))
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · GC at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}</head><body>"
