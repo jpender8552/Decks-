@@ -34,8 +34,10 @@ def three_source() -> Optional[str]:
     return None
 
 
-def render_stills(scene: Scene, out_dir: str, which: Optional[List[str]] = None, size: Tuple[int, int] = (1400, 900), quality: int = 82) -> Dict[str, str]:
-    """Returns {name: path}. Skips stills that already exist. Needs playwright + three.min.js on disk (data/ or $THREE_MIN_JS)."""
+def render_stills(scene: Scene, out_dir: str, which: Optional[List[str]] = None, size: Tuple[int, int] = (1400, 900), quality: int = 82,
+                  extra: Optional[List[Tuple[str, dict]]] = None) -> Dict[str, str]:
+    """Returns {name: path}. Skips stills that already exist. Needs playwright + three.min.js on disk (data/ or $THREE_MIN_JS).
+    extra: more (name, params) stills, e.g. a sun study [("sun-0900", {"view": "corner", "sun": "dx,dy,dz"}), ...]."""
     from playwright.sync_api import sync_playwright
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     src = three_source()
@@ -45,7 +47,7 @@ def render_stills(scene: Scene, out_dir: str, which: Optional[List[str]] = None,
     page_path = out / "_viewer_local.html"
     page_path.write_text(html)
     done: Dict[str, str] = {}
-    todo = [(n, p) for n, p in STILLS if (which is None or n in which)]
+    todo = [(n, p) for n, p in STILLS if (which is None or n in which)] + list(extra or [])
     exe = _chromium()
     with sync_playwright() as pw:
         b = pw.chromium.launch(executable_path=exe, args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--no-sandbox"])

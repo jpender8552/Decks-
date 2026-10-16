@@ -187,6 +187,50 @@ def run_flags(L: Layout) -> List[Flag]:
         if st.geo.guard_required and st.stair_rail_sides == 0:
             add("STOP", "stairs", f"{st.side} stair: open side over 30\" — stair guard required", "IRC R312.1")
 
+    # ---------------- roof covers
+    from .spec import covers_of
+    for c in covers_of(s):
+        hi, lo = c.get("clear_high_in"), c.get("clear_low_in")
+        run_ft = (c["x1"] - c["x0"]) if c.get("slope", "+y") in ("+x", "-x") else (c["y1"] - c["y0"])
+        run_ft += float(c.get("overhang_ft", 1.0))
+        if hi is not None and lo is not None and run_ft > 0:
+            pitch = (float(hi) - float(lo)) / (run_ft - float(c.get("overhang_ft", 1.0)))     # in per ft
+            if ex.cover_roof.lower().startswith("standing"):
+                mech = ex.cover_roof_panel.lower().startswith("mech")
+                need = 0.5 if mech else 3.0
+                if pitch < need - 0.01:
+                    add("STOP" if not mech else "ENGINEER", "roof", f"{c['name']}: {pitch:.2f}:12 pitch ({hi:g}\" to {lo:g}\" clear over {ftin((run_ft - float(c.get('overhang_ft', 1.0))) * 12)}) is under the "
+                        f"{need:g}:12 minimum for {'mechanically seamed' if mech else 'snap-lock'} panels — raise the house end or switch panels", "panel manufacturer")
+                else:
+                    add("INFO", "roof", f"{c['name']}: {pitch:.2f}:12 pitch — {'mechanically seamed (double-lock) panels, rated to 1/2:12 by most makers' if mech else 'snap-lock'}; "
+                        "high-temp self-adhered underlayment over the whole deck, panels one piece eave to headwall")
+                    if mech and pitch < 1.0:
+                        add("CHECK", "roof", f"{c['name']}: low-slope metal ({pitch:.2f}:12) — the panel maker's low-slope details (seam sealant, field seaming, no end laps) and warranty; confirm with the metal supplier")
+            if float(lo) < 80:
+                add("CODE", "roof", f"{c['name']}: {lo:g}\" clear at the beam — under 6'-8\" headroom where people walk out from under it", "IRC R305 (by analogy)")
+        if c.get("footing") == "deck_pier":
+            from .takeoff import shared_pier_loads
+            loads = shared_pier_loads(s, L, c)
+            x, w, deck = max(loads, key=lambda t: t[1] + t[2])
+            cap = fr.footing_capacity_lb
+            add("ENGINEER" if deck + w > 0.9 * cap else "CHECK", "footing",
+                f"{c['name']}: cover post + deck beam share a Diamond Pier — worst ~{w:,.0f} lb roof (ground snow {site.ground_snow_psf:g} + 15 psf dead) + {deck:,.0f} lb deck = ~{w + deck:,.0f} lb "
+                f"vs {cap:,.0f} lb DP-50/50" + (" — priced as DP-75/63 (6,000 lb) at those posts" if deck + w > cap else "") + f"; uplift at {site.wind_speed_mph:g} mph — engineer confirms the pier and the post-to-pier hold-down", "IBC App. I / ASCE 7")
+        add("ENGINEER", "snow", f"{c['name']}: a lean-to under the house eave takes sliding snow off the house roof and drift against the wall — ASCE 7 sliding + drift surcharge on the cover", "ASCE 7-22 7.7 / 7.9")
+    # ---------------- steel frame
+    if s.framing.system == "steel":
+        add("ENGINEER", "engineering", "CEMCO cold-formed steel frame: no prescriptive deck span table in the IRC for CFS — the engineer of record designs joists, beams, clips and the ledger connection (AISI S240 / S100); member sizes here are the same-depth lumber layout", "IRC R507 / AISI S240")
+        add("CHECK", "product", f"{s.decking.brand} {s.decking.collection} hidden fasteners and picture-frame screws into steel: use the maker's steel-frame screw (self-drilling, for 14–18 ga) — confirm the fastener and that the decking warranty covers steel framing")
+        add("CHECK", "product", "steel frame prices are estimates (no CEMCO dealer quote yet) — get the take-off quoted by the CEMCO dealer before the contract is signed")
+    if g.height_min_in is not None:
+        dk_t = f["thick"] if "thick" in f else 1.0
+        clear = g.height_min_in - dk_t - actual(fr.joist_size)[1]
+        if clear < 2.0:
+            add("CHECK", "geometry", f"lowest point: {g.height_min_in:g}\" surface to grade leaves {clear:.2f}\" under the {actual(fr.joist_size)[1]:g}\" frame — dig out / regrade to 2\" min. clear (and away from the house) "
+                "under that section, or drop to 6\" joists there", "TimberTech / ventilation")
+    for af in site.ahj_flags:
+        add(*(list(af) + [""] * (4 - len(af)))[:4])
+
     # ---------------- product / fastening sanity
     if f["material"] == "PVC" and fr.spacing > 12:
         add("CODE", "product", f"PVC decking at {fr.spacing:g}\" OC — TimberTech Advanced PVC at GSX is 12\" OC", "TimberTech install guide")

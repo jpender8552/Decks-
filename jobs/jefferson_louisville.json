@@ -1,0 +1,528 @@
+{
+  "job": "281 S Jefferson Ave — two decks + two lean-to covers (CEMCO steel, TimberTech Landmark American Walnut)",
+  "client": "",
+  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg).",
+  "site": {
+    "address": "281 S Jefferson Ave",
+    "city": "Louisville",
+    "state": "CO",
+    "zip": "80027",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 145,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false,
+    "seismic_design_category": "B",
+    "rear_setback_required_ft": null,
+    "deck_to_rear_line_ft": 12.0,
+    "deck_to_side_line_ft": 9.8,
+    "lat": 39.96748,
+    "lon": -105.13618,
+    "rear_azimuth_deg": 299.5,
+    "utc_offset_h": -6.0,
+    "sun_when": "2026-07-15T17:30",
+    "ahj_flags": [
+      [
+        "CHECK",
+        "setback",
+        "Dutch Creek PUD (approved 12/15/1981, underlying R-L): the PUD final plan governs setbacks and coverage (LMC 17.28.230) and was not retrievable online. Plain R-L would need 25' rear — the existing house itself sits ~24' from the rear line, and the new main cover's roof edge ~11'-10\". Confirm the PUD setbacks with Planning (303-335-4592, Planning@louisvilleco.gov) before submitting; a variance or PUD amendment is outside this scope",
+        "LMC 17.12.040 / 17.28.230 / Louisville deck handout"
+      ],
+      [
+        "INFO",
+        "setback",
+        "decks 30\" or less above grade are not held to the principal-structure setbacks (Louisville deck handout); both decks are ~15\"",
+        "Louisville deck handout (7/7/2025)"
+      ],
+      [
+        "CHECK",
+        "setback",
+        "lot coverage: covered decks count to the support posts. Lot 4,678 SF; house + garage 1,320 SF (assessor). The 2024 aerial puts the existing main cover's roof edge ~11'-4\" off the wall; the new cover (posts at 11'-9\", 1' overhang) reaches ~12'-9\" — about +17 SF of coverage (31.3% to 31.6%; R-L max 30%, the PUD governs). If Planning holds coverage to the existing, set the new posts on the existing post line (field-measure) and let the deck run past the cover",
+        "Louisville deck handout / LMC 17.12.040"
+      ],
+      [
+        "CHECK",
+        "setback",
+        "work within 3' of a setback may need an Improvement Location Certificate (ILC) — budget a surveyor if Planning asks",
+        "Louisville deck handout"
+      ],
+      [
+        "CODE",
+        "engineering",
+        "Louisville amends IRC R507.1: decks supported from the house are engineered unless 30\" or less above grade — the decks are under 30\", but the covers (IBC App. I patio covers) and the steel frame need the stamped set; the handout asks for every sheet scaled and stamped",
+        "LMC 15.05.140 / IRC R507.1 amd."
+      ],
+      [
+        "CODE",
+        "fire",
+        "Louisville submittal: decking spec sheet showing ASTM E84 Class A (flame spread 25 or less) — TimberTech Landmark is listed Class A; include the TimberTech Class A data sheet",
+        "Louisville deck handout / Fire Hardening Code"
+      ],
+      [
+        "CODE",
+        "site",
+        "under-deck ground: gravel over 6-mil poly (or concrete) where the deck is 6' or less above grade — included under both decks",
+        "Louisville deck handout"
+      ],
+      [
+        "INFO",
+        "snow",
+        "design criteria (Louisville 2024 codes): 145 mph Vult, Exposure C, SDC B (SDS 0.17), frost 36\", elev. 5,337', CZ 5B; snow per the ASCE hazard tool (city's Marshall Fire sheet: 30 psf non-reducible; Boulder County layer shows 40 psf) — engineer to confirm the site value",
+        "2024 IRC/IBC as adopted, Ord. 1907-2025"
+      ],
+      [
+        "CHECK",
+        "site",
+        "811 locate before the piers; flood zone X (minimal)",
+        "Colorado 811 / FEMA"
+      ],
+      [
+        "CHECK",
+        "footing",
+        "Diamond Piers under the cover posts: the city's patio-cover guide asks for footings below the 36\" frost line and 8\" min. piers — submit the Diamond Pier evaluation report as the frost-protected alternate and get it accepted at plan review",
+        "Louisville patio-cover guide / IRC R403.1.4 alternate"
+      ]
+    ],
+    "code_basis": "2024 IRC / IBC as adopted and amended by the City of Louisville (Ord. 1907, Series 2025); IRC R507 decks with LMC 15.05.140; IBC Appendix I patio covers; ASCE 7-22 loads; Louisville Fire Hardening provisions",
+    "wind_note": "145 mph Vult (3-second gust), Exposure C (Louisville 2024 design criteria), Risk Cat. II",
+    "snow_note": "ground snow per the ASCE hazard tool (Louisville criteria) — 30 psf used here (city sheet, non-reducible); Boulder County layer shows 40 psf: engineer confirms",
+    "plan": {
+      "parcel": [
+        [
+          -13.6,
+          23.88
+        ],
+        [
+          1.17,
+          -69.77
+        ],
+        [
+          2.86,
+          -69.58
+        ],
+        [
+          6.84,
+          -69.17
+        ],
+        [
+          10.82,
+          -68.81
+        ],
+        [
+          14.8,
+          -68.5
+        ],
+        [
+          18.79,
+          -68.24
+        ],
+        [
+          22.78,
+          -68.02
+        ],
+        [
+          26.78,
+          -67.86
+        ],
+        [
+          30.78,
+          -67.74
+        ],
+        [
+          34.79,
+          -67.66
+        ],
+        [
+          38.8,
+          -67.64
+        ],
+        [
+          42.8,
+          -67.66
+        ],
+        [
+          42.13,
+          23.7
+        ],
+        [
+          -5.53,
+          25.69
+        ],
+        [
+          -13.6,
+          23.88
+        ]
+      ],
+      "footprint": [
+        [
+          -6.4,
+          -1.6
+        ],
+        [
+          -6.38,
+          -9.23
+        ],
+        [
+          -0.62,
+          -9.23
+        ],
+        [
+          -0.36,
+          -41.16
+        ],
+        [
+          11.4,
+          -40.79
+        ],
+        [
+          11.5,
+          -44.45
+        ],
+        [
+          15.68,
+          -44.45
+        ],
+        [
+          15.7,
+          -48.44
+        ],
+        [
+          38.4,
+          -48.45
+        ],
+        [
+          38.34,
+          -26.08
+        ],
+        [
+          28.94,
+          -26.07
+        ],
+        [
+          28.83,
+          0.0
+        ],
+        [
+          14.64,
+          0.0
+        ],
+        [
+          14.67,
+          0.0
+        ],
+        [
+          8.81,
+          0.0
+        ],
+        [
+          8.8,
+          0.0
+        ],
+        [
+          3.14,
+          0.0
+        ],
+        [
+          2.89,
+          0.0
+        ],
+        [
+          -0.84,
+          0.0
+        ],
+        [
+          -0.84,
+          -1.61
+        ],
+        [
+          -6.4,
+          -1.6
+        ]
+      ],
+      "street": "S JEFFERSON AVE",
+      "street_side": "top",
+      "lot_lines": {
+        "rear": "REAR LOT LINE (adjoins 288 S Grant Ct)",
+        "left": "SIDE LOT LINE (NE)",
+        "right": "SIDE LOT LINE (SW)"
+      },
+      "info": [
+        "Parcel 157517119033 · Account R0092293",
+        "Lot 33, Block 10, Dutch Creek (plat rec. 00492001, 1982)",
+        "Section 17, T1S, R69W",
+        "Zoning: R-L within the Dutch Creek PUD (approved 12/15/1981)",
+        "Lot 4,678 SF · flood zone X",
+        "House 1982 one-storey ranch: 920 SF main floor + 400 SF garage (assessor)"
+      ],
+      "coverage": [
+        [
+          "Lot area",
+          "4,678 SF"
+        ],
+        [
+          "House + garage (assessor footprint)",
+          "1,320 SF"
+        ],
+        [
+          "Existing covers to the posts (2024 aerial, est.)",
+          "~142 SF (main ~12' x 10'-4\", walkway ~5'-4\" x 3'-5\")"
+        ],
+        [
+          "Existing coverage",
+          "~1,462 SF · 31.3%"
+        ],
+        [
+          "Main cover, new (to the posts) 12'-0\" x 11'-9\"",
+          "141 SF"
+        ],
+        [
+          "Walkway cover, new (to the posts) 5'-4\" x 3'-5\"",
+          "18 SF"
+        ],
+        [
+          "Proposed coverage",
+          "~1,479 SF · 31.6% (+~17 SF)"
+        ],
+        [
+          "Uncovered decks",
+          "not counted (under 30\" above grade)"
+        ]
+      ],
+      "setback_ref": {
+        "rear": 25,
+        "side": 7,
+        "label": "R-L reference setbacks (LMC 17.12.040) — the Dutch Creek PUD plan governs; Planning to confirm"
+      },
+      "source": "Boulder County GIS parcel + 2024 Pictometry roof outline, Louisville GIS zoning / PUD layers. GIS lines are not a survey — an ILC governs if Planning requires one."
+    }
+  },
+  "geometry": {
+    "height_in": 15,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true,
+    "house_color": "#c9bfae",
+    "zones": [
+      {
+        "name": "W",
+        "width_in": 176,
+        "depth_in": 44,
+        "wall_offset_in": 0,
+        "label": "Walkway — 14'8\" x 3'8\" under the small cover"
+      },
+      {
+        "name": "M",
+        "width_in": 144,
+        "depth_in": 144,
+        "wall_offset_in": 0,
+        "label": "Main deck — 12' x 12' under the main cover"
+      }
+    ],
+    "outline": [
+      [
+        0,
+        0
+      ],
+      [
+        26.667,
+        0
+      ],
+      [
+        26.667,
+        12
+      ],
+      [
+        14.667,
+        12
+      ],
+      [
+        14.667,
+        3.667
+      ],
+      [
+        0,
+        3.667
+      ]
+    ],
+    "house_blocks": [
+      [
+        -0.6,
+        28.9,
+        -41.2,
+        0
+      ],
+      [
+        -6.4,
+        -0.6,
+        -9.2,
+        -1.6
+      ],
+      [
+        11.4,
+        38.4,
+        -48.5,
+        -26.1
+      ]
+    ],
+    "house_openings": [
+      [
+        17.0,
+        23.0,
+        0,
+        0.1,
+        6.8
+      ],
+      [
+        4.5,
+        7.5,
+        0,
+        0.1,
+        6.8
+      ],
+      [
+        10.0,
+        13.0,
+        0,
+        3.0,
+        7.0
+      ]
+    ],
+    "covers": [
+      {
+        "name": "Main cover",
+        "x0": 14.667,
+        "x1": 26.667,
+        "y0": 0,
+        "y1": 11.75,
+        "slope": "+y",
+        "clear_high_in": 91,
+        "clear_low_in": 82.5,
+        "footing": "deck_pier",
+        "overhang_ft": 1.0,
+        "blinds": [
+          {
+            "from_ft": 15.2,
+            "to_ft": 20.6,
+            "lowered": true
+          },
+          {
+            "from_ft": 20.7,
+            "to_ft": 26.1,
+            "lowered": false
+          }
+        ],
+        "posts_x_ft": [
+          15.167,
+          20.667,
+          26.167
+        ]
+      },
+      {
+        "name": "Walkway cover",
+        "x0": 2.5,
+        "x1": 8.833,
+        "y0": 0,
+        "y1": 3.42,
+        "slope": "+y",
+        "clear_high_in": 93,
+        "clear_low_in": 88,
+        "posts_x_ft": [
+          3.0,
+          8.333
+        ],
+        "footing": "deck_pier",
+        "overhang_ft": 1.0
+      }
+    ],
+    "height_min_in": 9
+  },
+  "framing": {
+    "system": "steel",
+    "joist_size": "2x8",
+    "joist_species": "SYP",
+    "joist_spacing_in": 12,
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "beams": [
+      {
+        "kind": "flush",
+        "size": "(2)2x8",
+        "species": "SYP",
+        "setback_in": 0,
+        "zones": [
+          "W"
+        ],
+        "posts_x_ft": [
+          0.6,
+          3.0,
+          8.333,
+          14.1
+        ]
+      },
+      {
+        "kind": "flush",
+        "size": "(2)2x8",
+        "species": "SYP",
+        "setback_in": 0,
+        "zones": [
+          "M"
+        ],
+        "posts_x_ft": [
+          15.167,
+          20.667,
+          26.167
+        ]
+      }
+    ],
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50",
+    "joist_tape": false
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Landmark",
+    "color": "American Walnut",
+    "profile": "grooved",
+    "fascia": true,
+    "border_collection": "Landmark",
+    "border_color": "American Walnut",
+    "dividers": true
+  },
+  "railing": {
+    "system": "none",
+    "sides": []
+  },
+  "stairs": [
+    {
+      "side": "front:M",
+      "width_in": 60,
+      "landing": "concrete pad",
+      "rails": 0,
+      "closed_risers": true
+    }
+  ],
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 198,
+    "demo_covers": true,
+    "blinds_reinstall": true,
+    "engineered": true,
+    "engineering_note": "Louisville requires a Colorado-licensed engineer's stamp on the framing plan (LMC 15.05.140 / the city deck handout); the covers are designed to 145 mph Exp C wind and the city's snow load.",
+    "hardie_skirt": "4/4 x 10 Arctic White",
+    "hardie_color": "Arctic White",
+    "cover_soffit": "HardieSoffit 4x10 cedarmill Arctic White",
+    "cover_fascia": "HardieTrim 4/4 x 7.25 smooth Arctic White",
+    "cover_roof": "standing seam",
+    "cover_roof_color": "Black",
+    "cover_roof_panel": "mechanical",
+    "cover_gutters": false,
+    "exclusions": [
+      "Electrical — no lighting, fans or outlets (owner's existing circuits are made safe and left as found)",
+      "The owner's roll-down blinds themselves (taken down, stored and rehung only)",
+      "Grading beyond the under-deck prep",
+      "Variance or PUD amendment, if Planning requires one"
+    ],
+    "under_deck_gravel": true
+  }
+}

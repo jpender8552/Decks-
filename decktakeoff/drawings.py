@@ -158,20 +158,23 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
     for ln in [x for x in lines if x]:
         o.append(T(24, y, ln, 10, 600)); y += 14
     o.append(T(24, y + 12, "DESIGN CRITERIA", 9, 800, fill=GOLD)); y += 28
-    cover = bool(s.geometry.cover)
+    cover = bool(s.geometry.cover or s.geometry.covers)
     crit = [("Deck live load", "40 psf uniform (IRC Table R301.5); guards 200 lb concentrated / 50 plf"),
-            ("Ground snow", f"{s.site.ground_snow_psf:g} psf (ground; deck design uses the larger of snow and live)" + (" — snow governs" if s.site.ground_snow_psf > 40 else " — 40 psf live governs")),
+            ("Ground snow", f"{s.site.ground_snow_psf:g} psf (ground; deck design uses the larger of snow and live)" + (" — snow governs" if s.site.ground_snow_psf > 40 else " — 40 psf live governs") + (f"; {s.site.snow_note}" if s.site.snow_note else "")),
             ("Dead load", "10 psf deck" + ((" · 15 psf porch cover (standing seam steel on sheathing, Hardie soffit; 12 psf actual, 15 used) carried on the deck posts" if s.extras.cover_roof.lower().startswith("standing") else " · 15 psf porch cover (shingles, sheathing, Hardie soffit) carried on the deck posts") if cover else "")),
-            ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow (PPRBD minimum 30 psf), drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
+            ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow" + (" (PPRBD minimum 30 psf)" if "colorado springs" in (s.site.city or "").lower() else "") + ", sliding snow off the house roof + drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
             ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf on the deck" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "") + (" · cover posts add roof snow + dead to the deck frame and footings (engineered)" if cover else "")),
-            ("Wind", f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + " (footings bear below)"),
+            ("Wind", s.site.wind_note or f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + " (footings bear below)"),
             ("Soil bearing", f"{s.site.soil_bearing_psf:,.0f} psf presumptive (IRC R401.4.1) — no soils report"), ("Seismic", s.site.seismic_design_category),
             ("Wildfire (WUI)", ("Ignition-resistant construction: Class A / WUI-listed decking (TimberTech Advanced PVC), noncombustible rail (steel), fiber-cement skirt, soffit and fascia, "
                                 "26 ga flashing at every wall, " + ("Class A noncombustible standing seam steel roof on the cover with metal eave / rake / headwall trims" if (cover and s.extras.cover_roof.lower().startswith("standing")) else "Class A roof on the cover") + "; under-deck kept clear of combustibles (Colorado Springs WUI Code / IWUIC 504)") if s.site.wui_fire_zone else "not in a WUI zone"),
-            ("Codes", (("2021 IRC as amended by Pikes Peak Regional Building Dept; IRC R507 decks; ASCE 7-16 loads; IWUIC / Colorado Springs Wildland-Urban Interface Code; "
-                        if "colorado springs" in (s.site.city or "").lower() else
-                        f"2021 IRC as adopted by {s.site.city or 'the jurisdiction'}; IRC R507 decks; ASCE 7-16 loads; " + ("IWUIC where mapped; " if s.site.wui_fire_zone else ""))
-                       + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9"))),
+            ("Codes", (s.site.code_basis + "; " + ("Tables R507.5 / R507.6 / R507.4 / R507.9" if s.framing.system == "dimensional" else
+                                                    "timber members outside the tables: stamped design" if s.is_timber else "cold-formed steel frame per AISI S240, engineered"))
+                       if s.site.code_basis else
+                       ((("2021 IRC as amended by Pikes Peak Regional Building Dept; IRC R507 decks; ASCE 7-16 loads; IWUIC / Colorado Springs Wildland-Urban Interface Code; "
+                          if "colorado springs" in (s.site.city or "").lower() else
+                          f"2021 IRC as adopted by {s.site.city or 'the jurisdiction'}; IRC R507 decks; ASCE 7-16 loads; " + ("IWUIC where mapped; " if s.site.wui_fire_zone else ""))
+                         + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9")))),
             ("Engineering", ("Stamped structural set by a Colorado PE required — the stamped set governs" if s.extras.engineered
                              else ("Stamped structural set by a Colorado PE, provided by GSX and billed at cost with the permit" if s.extras.engineering_note else "Prescriptive; no engineering required by this design")))]
     for k, v in crit:
@@ -189,14 +192,20 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
     x2 = 600
     o.append(T(x2, 24, "SHEET INDEX", 9, 800, fill=GOLD))
     yy = 40
-    for num, title in SHEET_INDEX:
+    from .spec import covers_of
+    idx = [(n_, t_) for n_, t_ in SHEET_INDEX if not (n_ == "A-201" and not L.rail)]
+    if s.site.plan and s.site.plan.get("parcel"):
+        idx.insert(1, SHEET_INDEX_EXTRA[0])
+    if covers_of(s):
+        idx.insert([n_ for n_, _ in idx].index("A-301") + 1, SHEET_INDEX_EXTRA[1])
+    for num, title in idx:
         o.append(T(x2, yy, num, 8.5, 800, fill=GOLD)); o.append(T(x2 + 52, yy, title, 8.5, 500)); yy += 13
     o.append(T(x2, yy + 12, "SITE", 9, 800, fill=GOLD)); yy += 28
     site = []
     if s.site.rear_setback_required_ft is not None or s.site.deck_to_rear_line_ft is not None:
-        site.append(f"Rear / front lot line: deck edge {s.site.deck_to_rear_line_ft if s.site.deck_to_rear_line_ft is not None else '?'}' from the line, {s.site.rear_setback_required_ft if s.site.rear_setback_required_ft is not None else '?'}' required")
+        site.append(f"Rear / front lot line: deck edge {s.site.deck_to_rear_line_ft if s.site.deck_to_rear_line_ft is not None else '?'}' from the line, " + (f"{s.site.rear_setback_required_ft:g}' required" if s.site.rear_setback_required_ft is not None else "setback per the PUD — Planning to confirm (C-100)"))
     if s.site.side_setback_required_ft is not None or s.site.deck_to_side_line_ft is not None:
-        site.append(f"Side lot line: deck edge {s.site.deck_to_side_line_ft if s.site.deck_to_side_line_ft is not None else '?'}' from the line, {s.site.side_setback_required_ft if s.site.side_setback_required_ft is not None else '?'}' required")
+        site.append(f"Side lot line: deck edge {s.site.deck_to_side_line_ft if s.site.deck_to_side_line_ft is not None else '?'}' from the line, " + (f"{s.site.side_setback_required_ft:g}' required" if s.site.side_setback_required_ft is not None else "setback per the PUD — Planning to confirm (C-100)"))
     site += [f"Easement: {e}" for e in s.site.easements]
     if s.site.notes:
         site += textwrap.wrap(s.site.notes, 70)
@@ -221,6 +230,7 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("stone",), "#7a7267", 0.6)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("footing",), INK, 0.9)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("post",), INK, 0.7)
+    draw_plan_boxes(o, X, Y, sc, S.boxes, ("cpost",), INK, 0.7)
     n = 0
     rows = []
     for bl in L.beam_lines:
@@ -293,9 +303,10 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
     for bl in L.beam_lines:
         o.append(T(X(bl.x0) + 6, Y(bl.y * IN) + 3, bl.label + (" (below)" if bl.kind == "drop" else " (flush)"), 7.5, 800, fill="#3f5d8a"))
     zs = S.meta["zones"]
+    jlab = '7-1/4" steel C' if L.spec.framing.system == "steel" else L.frame.joist_size
     for zl, z in zip(L.zones, zs):
         fr = zl.frame
-        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["front"]) - 10, f"{z['name']}: {len(fr.joist_x)} field + {len(fr.pf_x)} PF {fr.joist_size} @ {fr.spacing:g}\" OC · {ftin(fr.joist_len)}", 7.5, 800, "middle"))
+        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["front"]) - 10, f"{z['name']}: {len(fr.joist_x)} field + {len(fr.pf_x)} PF {jlab} @ {fr.spacing:g}\" OC · {ftin(fr.joist_len)}", 7.5, 800, "middle"))
     for dx, Ld, lab in L.divider_x:
         o.append(T(X(dx * IN), Y(S.y_front) + 8, f"doubled joist · {lab}", 6.5, 700, "middle", MUTE))
     dim_h(o, X, Y(S.y_front) + 22, zs[0]["x0"], zs[-1]["x0"] + zs[-1]["W"], ftin(S.W * 12), up=False)
@@ -429,7 +440,7 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
     Xe, Ze, sce = elev_xform(-4.0, S.W + 4.0, -1.0, S.deck_top + 12.0, 620, 60, 370, 300)
     o.append(T(620, 44, "FRONT ELEVATION — from the yard", 8.5, 800))
     draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("house", "wall", "privacy", "roof", "glass"), INK, 0.5)
-    draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("footing", "stone", "stonecap", "base", "post", "cap", "beam", "rim", "fascia", "joist", "ledger"), INK, 0.35)
+    draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("footing", "stone", "stonecap", "base", "post", "cap", "beam", "rim", "fascia", "joist", "ledger", "cpost", "cbeam", "hardie", "ssroof"), INK, 0.35)
     draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("board", "border", "railpost", "toprail", "cable", "baluster", "botrail", "drink", "railcap"), "none", 0)
     o.append(LN(Xe(-4), Ze(0), Xe(S.W + 4), Ze(0), INK, 1.0))
     dim_h(o, Xe, Ze(0) + 16, 0, S.W, ftin(S.W * 12), 7.5, up=False)
@@ -538,9 +549,312 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     return sheet("D-501", "Details", "Ledger · post / beam / cap · footing · rail post · deck edge · the job's special condition", o, "Schematic details, not to scale", meta)
 
 
+def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
+    """D-501 for a cold-formed steel frame: ledger track, joist clips, boxed beam on the shared pier, the pier, the deck edge
+    with the Hardie skirt, and the under-deck / low-clearance condition. Schematic — the engineer's details govern."""
+    o = []
+    s = L.spec
+    G = "#a7adb2"
+    def frame_(x, y, w, h, num, title):
+        o.append(R(x, y, w, h, "#fff", INK, 0.8)); o.append(R(x, y, w, 18, INK, "none", 0)); o.append(T(x + 8, y + 13, f"{num}  {title}", 9, 800, fill=GOLD))
+    def note(x, y, w, txt):
+        yy = y
+        for ln in textwrap.wrap(txt, int(w / 4.6)):
+            o.append(T(x, yy, ln, 7.2, 400)); yy += 9.5
+        return yy
+    def chan(x, y, w, h, lip=6, face="right"):     # a C section in elevation: web + flanges
+        o.append(R(x, y, w, h, G, INK, 0.8))
+        o.append(LN(x + (w - lip if face == "right" else lip), y + 3, x + (w - lip if face == "right" else lip), y + h - 3, "#6f757a", 0.6))
+    # 1 ledger
+    frame_(20, 20, 300, 290, "1", "STEEL LEDGER AT THE HOUSE")
+    o.append(R(40, 60, 40, 200, FILL["house"], INK, 1.0)); o.append(T(60, 165, "house rim board", 7, 700, "middle", MUTE, rot=-90))
+    o.append(R(80, 80, 5, 160, "#3f5d8a", "none", 0)); o.append(T(83, 76, "membrane 12\" up the wall", 6.5, 600, "middle"))
+    o.append(R(85, 100, 8, 60, G, INK, 0.8)); o.append(T(89, 176, "ledger track", 6.5, 700, "middle"))
+    o.append(R(93, 150, 26, 6, "#7b8186", INK, 0.6)); o.append(T(122, 172, "3x3 ledger angle (seat)", 6.5, 600))
+    chan(93, 100, 130, 50)
+    o.append(T(160, 128, "7-1/4\" C-joist, 16 ga", 7, 700, "middle"))
+    o.append(R(93, 92, 150, 7, FILL["deck"], INK, 0.5)); o.append(T(170, 89, "decking", 6.5, 600, "middle"))
+    o.append(LN(80, 100, 100, 100, GOLD, 2)); o.append(T(104, 84, "flashing over the track", 6.5, 600))
+    for yy in (112, 140):
+        o.append(LN(58, yy, 93, yy, INK, 1.4)); o.append(C(93, yy, 2.2, INK))
+    note(40, 275, 270, t.schedule.get("Ledger", ""))
+    # 2 joist clip
+    frame_(340, 20, 300, 290, "2", "JOIST TO TRACK / BEAM")
+    o.append(R(380, 70, 14, 160, G, INK, 0.8)); o.append(T(387, 245, "track or boxed beam", 6.5, 700, "middle"))
+    chan(394, 110, 200, 70)
+    o.append(T(494, 150, "7-1/4\" C-joist", 7.5, 700, "middle"))
+    o.append(R(394, 118, 26, 54, "#7b8186", INK, 0.7)); o.append(T(430, 196, "clip angle 1-1/2 x 1-1/2 x 7\", 16 ga", 6.5, 600))
+    for yy in (126, 142, 158):
+        o.append(C(400, yy, 1.8, INK)); o.append(C(414, yy, 1.8, INK))
+    note(360, 275, 270, "#12-14 self-drilling hex-washer screws, 4 per leg minimum (clip to joist web, clip to track / beam web) — the engineer's clip schedule governs. Cut ends and field holes cold-galvanized.")
+    # 3 boxed beam on the shared pier
+    frame_(660, 20, 320, 290, "3", "BOXED BEAM · SHARED PIER")
+    o.append(R(790, 90, 40, 190, FILL["timber"], INK, 0.9)); o.append(T(810, 200, "6x6 cover post (to the roof beam)", 6.5, 700, "middle", INK, rot=-90))
+    o.append(R(700, 120, 90, 50, G, INK, 0.9)); o.append(R(830, 120, 90, 50, G, INK, 0.9))
+    o.append(T(745, 148, "boxed C beam", 6.5, 700, "middle")); o.append(T(875, 148, "boxed C beam", 6.5, 700, "middle"))
+    o.append(R(776, 112, 68, 66, "none", "#3f5d8a", 1.2)); o.append(T(810, 108, "steel side bracket, (2) 1/2\" thru-bolts", 6.5, 600, "middle", "#3f5d8a"))
+    o.append(R(786, 280, 48, 10, FILL["steel"], INK, 0.6))
+    note(680, 275 - 10, 290, "Where a cover post lands on the deck beam line it stands on the deck's Diamond Pier (ABA66Z on the pier bolt) and carries the deck beam on a steel side bracket; elsewhere a 3x3 HSS stub on a pier-head bracket. Engineer sizes the pier for roof + deck and the uplift hold-down.")
+    # 4 footing
+    frame_(20, 330, 300, 270, "4", "DIAMOND PIER")
+    o.append(LN(40, 470, 300, 470, INK, 1.0)); o.append(T(296, 466, "grade", 6.5, 600, "end", MUTE))
+    o.append(R(150, 458, 40, 14, FILL["concrete"], INK, 0.9)); o.append(T(196, 456, "pier head", 6.5, 600))
+    for dx in (-1, -0.5, 0.5, 1):
+        o.append(LN(170, 472, 170 + dx * 60, 560, INK, 1.2))
+    o.append(R(160, 448, 20, 10, FILL["steel"], INK, 0.6)); o.append(R(164, 380, 12, 68, G, INK, 0.7)); o.append(T(160, 414, "post / stub", 6.5, 700, "end"))
+    note(40, 575, 270, f"{L.frame.footing_model} (4 pins) — no excavation; frost-protected by the pins (submit the evaluation report). 811 locate first.")
+    # 5 deck edge
+    frame_(340, 330, 300, 270, "5", "DECK EDGE · HARDIE SKIRT")
+    o.append(R(400, 470, 10, 40, G, INK, 0.7)); o.append(T(405, 525, "track", 6.5, 700, "middle"))
+    chan(410, 470, 180, 40)
+    o.append(R(392, 456, 60, 14, FILL["border"], INK, 0.5)); o.append(T(422, 452, "picture frame", 6.5, 600, "middle"))
+    for k in range(2):
+        o.append(R(456 + k * 62, 456, 58, 14, FILL["deck"], INK, 0.4))
+    o.append(R(384, 470, 8, 46, "#f2efe8", INK, 0.6)); o.append(T(380, 494, "HardieTrim skirt", 6.5, 600, "end"))
+    note(360, 545, 270, f"{s.decking.brand} {s.decking.collection} {s.decking.color}: hidden fasteners in the field, the picture frame face-fastened with color-matched plugs — every screw the maker's steel-frame screw for 14–18 ga. HardieTrim skirt on furring screwed to the track.")
+    # 6 under the deck / low clearance
+    frame_(660, 330, 320, 270, "6", "UNDER THE DECK · LOW END")
+    o.append(LN(680, 520, 960, 520, INK, 1.0))
+    o.append(R(680, 512, 280, 8, FILL["gravel"], "none", 0)); o.append(LN(680, 520, 960, 520, "#3f5d8a", 1.2, "3 2"))
+    o.append(T(690, 540, "2\" gravel over 6-mil poly, sloped away from the house", 6.5, 600))
+    chan(700, 470, 240, 30)
+    o.append(R(700, 456, 240, 14, FILL["deck"], INK, 0.5))
+    hmin = s.geometry.height_min_in
+    clear = (hmin - 1.0 - 7.25) if hmin is not None else None
+    o.append(LN(950, 500, 950, 512, "#b3261e", 1.2)); o.append(T(955, 510, "2\" min.", 6.5, 800, fill="#b3261e"))
+    note(680, 565, 290, (f"Walkway low point: {hmin:g}\" surface to grade leaves {clear:.2f}\" under the frame — dig out / regrade to 2\" min. under that run before the poly." if clear is not None and clear < 2 else "Keep 2\" min. between the frame and the gravel."))
+    return sheet("D-501", "Details — steel frame", "Steel ledger · joist clips · boxed beam on the shared pier · Diamond Pier · deck edge · under the deck", o, "Schematic details, not to scale · the engineer's details govern", meta)
+
+
+def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
+    """C-100 site plan: the parcel and the house from the county GIS (plan frame, feet), the new decks, roof covers and
+    stairs, distances to the lot lines, the reference setbacks, north arrow, street, lot coverage and the parcel facts."""
+    s = L.spec
+    sp = s.site.plan or {}
+    if not sp.get("parcel"):
+        return None
+    from .spec import covers_of
+    par = [tuple(p) for p in sp["parcel"]]
+    xs, ys = [p[0] for p in par], [p[1] for p in par]
+    X, Y, sc = plan_xform(min(xs) - 6, max(xs) + 6, min(ys) - 8, max(ys) + 6, 30, 14, 470, 580)
+    o = []
+    o.append(R(X(min(xs) - 6), Y(min(ys) - 8), (max(xs) - min(xs) + 12) * sc, (max(ys) - min(ys) + 14) * sc, "#e3e8d6", "none", 0))
+    o.append(PG([(X(x), Y(y)) for x, y in par], "#dfe6cc", INK, 1.6))
+    # the street side
+    if sp.get("street"):
+        top = min(ys)
+        o.append(T(X((min(xs) + max(xs)) / 2), Y(top) - 10, sp["street"], 10, 900, "middle", MUTE))
+    # reference setbacks (dashed), offset inward from the rear / side lines
+    ref = sp.get("setback_ref") or {}
+    rear_y = min(p[1] for p in par if p[1] > 0)
+    if ref.get("rear"):
+        o.append(LN(X(min(xs)), Y(rear_y - ref["rear"]), X(max(xs)), Y(rear_y - ref["rear"]), "#8a6d2a", 0.9, "6 4"))
+        o.append(T(X(max(xs)) - 4, Y(rear_y - ref["rear"]) - 4, f"{ref['rear']}' R-L rear setback (reference)", 7.5, 700, "end", "#8a6d2a"))
+    # house footprint (existing, hatched)
+    fp = sp.get("footprint") or []
+    if fp:
+        o.append('<defs><pattern id="hatchC" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#b9ad97" stroke-width="1.2"/></pattern></defs>')
+        o.append(PG([(X(x), Y(y)) for x, y in fp], "url(#hatchC)", INK, 1.3))
+        cx = sum(p[0] for p in fp) / len(fp); cy = sum(p[1] for p in fp) / len(fp)
+        o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE)); o.append(T(X(cx), Y(cy) + 12, "one storey + garage (no work)", 7.5, 600, "middle", MUTE))
+    # decks
+    out = deck_outline(S)
+    o.append(PG([(X(x), Y(y)) for x, y in out], FILL["deck"], INK, 1.2))
+    for z in S.meta["zones"]:
+        deep = z["front"] - z["wall_y"] > 6
+        o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
+    # stairs / landings
+    for b in S.boxes:
+        if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
+            o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
+    # roof covers: roof edge dashed, posts
+    from .takeoff import cover_posts_x
+    for c in covers_of(s):
+        ov = float(c.get("overhang_ft", 1.0))
+        o.append(R(X(c["x0"] - 0.4), Y(c["y0"]), (c["x1"] - c["x0"] + 0.8) * sc, (c["y1"] - c["y0"] + ov) * sc, "none", "#1c1c1e", 1.2, 'stroke-dasharray="5 3"'))
+        for px in cover_posts_x(c):
+            o.append(R(X(px - 0.25), Y(c["y1"] - 0.25), 0.5 * sc, 0.5 * sc, INK, INK, 0.5))
+    # distances to the lot lines
+    def seg_dist(px, py, a, b):
+        ax, ay = a; bx, by = b; dx, dy = bx - ax, by - ay
+        tt = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(ax + tt * dx - px, ay + tt * dy - py), (ax + tt * dx, ay + tt * dy)
+    edges = [(a, b) for a, b in zip(par, par[1:] + par[:1]) if math.hypot(b[0] - a[0], b[1] - a[1]) > 0.01]
+    def nearest(px, py, pred):
+        best = None
+        for a, b in edges:
+            if pred(a, b):
+                d, q = seg_dist(px, py, a, b)
+                if best is None or d < best[0]:
+                    best = (d, q)
+        return best
+    rear_pred = lambda a, b: a[1] > 0 and b[1] > 0
+    side_pred = lambda a, b: abs(a[0] - b[0]) < abs(a[1] - b[1]) * 0.5
+    probes = []
+    for c in covers_of(s):
+        ov = float(c.get("overhang_ft", 1.0))
+        probes.append((("cover roof edge", (c["x0"] + c["x1"]) / 2, c["y1"] + ov), rear_pred))
+    deck_front = max(p[1] for p in out)
+    xf = [p[0] for p in out if abs(p[1] - deck_front) < 0.01]
+    if not covers_of(s):
+        probes.append((("deck edge", (min(xf) + max(xf)) / 2 + 2.0, deck_front), rear_pred))
+    probes.append((("deck edge", min(p[0] for p in out), max(p[1] for p in out if abs(p[0] - min(q[0] for q in out)) < 0.01) / 2), side_pred))
+    probes.append((("deck edge", max(p[0] for p in out), max(p[1] for p in out if abs(p[0] - max(q[0] for q in out)) < 0.01) / 2), side_pred))
+    for (lab, px, py), pred in probes:
+        nb = nearest(px, py, pred)
+        if not nb:
+            continue
+        d, (qx, qy) = nb
+        o.append(LN(X(px), Y(py), X(qx), Y(qy), "#b3261e", 0.9))
+        o.append(C(X(px), Y(py), 1.8, "#b3261e", "none", 0))
+        mx, my = (X(px) + X(qx)) / 2, (Y(py) + Y(qy)) / 2
+        o.append(R(mx - 30, my - 8, 60, 11, CREAM, "none", 0)); o.append(T(mx, my + 1, f"{ftin(round(d * 12))}", 8, 900, "middle", "#b3261e"))
+    # lot line labels
+    ll = sp.get("lot_lines") or {}
+    if ll.get("rear"):
+        o.append(T(X((min(xs) + max(xs)) / 2), Y(rear_y) + 13, ll["rear"], 7.5, 800, "middle", MUTE))
+    if ll.get("left"):
+        o.append(T(X(min(xs)) - 6, Y((min(ys) + max(ys)) / 2), ll["left"], 7.5, 800, "middle", MUTE, rot=-90))
+    if ll.get("right"):
+        o.append(T(X(max(xs)) + 12, Y((min(ys) + max(ys)) / 2), ll["right"], 7.5, 800, "middle", MUTE, rot=90))
+    # north arrow: bearing 0 in the plan frame
+    if s.site.rear_azimuth_deg is not None:
+        r_ = math.radians(s.site.rear_azimuth_deg)
+        nx, ny = math.sin(r_), math.cos(r_)
+        ax0, ay0 = 470, 60
+        o.append(C(ax0, ay0, 22, CREAM, INK, 0.8))
+        o.append(f'<polygon points="{ax0 + nx * 20:.1f},{ay0 + ny * 20:.1f} {ax0 - ny * 6:.1f},{ay0 + nx * 6:.1f} {ax0 + nx * -8:.1f},{ay0 + ny * -8:.1f} {ax0 + ny * 6:.1f},{ay0 - nx * 6:.1f}" fill="{INK}"/>')
+        o.append(T(ax0 + nx * 31, ay0 + ny * 31 + 4, "N", 11, 900, "middle"))
+    lg = [("#1c1c1e", "dash", "new roof cover — roof edge incl. overhang"), (FILL["deck"], "fill", "new deck (TimberTech, steel frame)"), ("#b3261e", "line", "distance to the lot line (GIS)")]
+    for k_, (col, kind, lab) in enumerate(lg):
+        lx, ly = 250, 588 + k_ * 12
+        if kind == "fill":
+            o.append(R(lx, ly - 7, 14, 8, col, INK, 0.5))
+        elif kind == "dash":
+            o.append(R(lx, ly - 7, 14, 8, "none", col, 1.0, 'stroke-dasharray="3 2"'))
+        else:
+            o.append(LN(lx, ly - 3, lx + 14, ly - 3, col, 1.2))
+        o.append(T(lx + 20, ly, lab, 7.5, 600))
+    # scale bar (20')
+    o.append(R(40, 590, 20 * sc, 5, INK, INK, 0.5)); o.append(R(40 + 10 * sc, 590, 10 * sc, 5, CREAM, INK, 0.5))
+    o.append(T(40, 606, "0", 7, 700)); o.append(T(40 + 20 * sc, 606, "20'", 7, 700, "middle"))
+    # right column
+    x2 = 540
+    yy = 24
+    o.append(T(x2, yy, "PARCEL", 9, 800, fill=GOLD)); yy += 16
+    for ln in [f"{s.site.address}, {s.site.city} {s.site.state} {s.site.zip}"] + list(sp.get("info") or []):
+        o.append(T(x2, yy, ln, 8.5, 500)); yy += 12
+    o.append(T(x2, yy + 10, "LOT COVERAGE", 9, 800, fill=GOLD)); yy += 26
+    for k, v in sp.get("coverage") or []:
+        o.append(T(x2, yy, k, 8, 700)); o.append(T(x2 + 445, yy, textwrap.shorten(v, 54, placeholder="…"), 8, 500, "end")); yy += 12
+    o.append(T(x2, yy + 10, "SETBACKS", 9, 800, fill=GOLD)); yy += 26
+    sb = [f"Decks are 30\" or less above grade — not held to the principal setbacks (city deck handout)",
+          f"Roof covers: part of the principal structure — they replace the two existing covers in place; the 2024 aerial shows the existing main roof ~1'-5\" shallower: field-verify the existing post line",
+          (ref.get("label") or "")]
+    sb += [f"Measured (red): to the nearest lot line from the new work — GIS, not survey"]
+    for ln in [x for x in sb if x]:
+        for w in textwrap.wrap(ln, 80):
+            o.append(T(x2, yy, w, 8, 500)); yy += 11.5
+    o.append(T(x2, yy + 10, "SITE WORK", 9, 800, fill=GOLD)); yy += 26
+    work = ["Remove the two decks, the two roof covers and the box step; haul off", "Diamond Pier foundations (no excavation spoils), 6-mil poly + 2\" gravel under the decks",
+            "New concrete landing pad at the stair", "Roof drainage: covers shed to grade at the low eave, away from the house", "Call 811 before the piers; protect the lawn and the owner's blinds"]
+    for ln in work:
+        o.append(T(x2, yy, "· " + ln, 8, 500)); yy += 11.5
+    if sp.get("source"):
+        yy += 6
+        for w in textwrap.wrap(sp["source"], 86):
+            o.append(T(x2, yy, w, 7.2, 500, fill=MUTE)); yy += 10
+    return sheet("C-100", "Site plan", "Parcel, existing house, new decks and roof covers, distances to the lot lines, coverage", o, "Plan · approx. 1\" = 20' at full size · GIS lines, not a survey", meta)
+
+
+def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
+    """A-401 roof covers: a framing plan of each cover (ledger, rafters, beam, posts, panels) and a section through each
+    (deck, clear heights at the house and the beam, pitch, overhang, Hardie soffit / fascia, blinds, posts on the piers)."""
+    s = L.spec
+    from .spec import covers_of
+    from .takeoff import cover_posts_x
+    cs = covers_of(s)
+    if not cs:
+        return None
+    o = []
+    n = len(cs)
+    colw = 940 / n
+    zt = s.geometry.height_in / 12.0
+    for i, c in enumerate(cs):
+        ox = 30 + i * colw
+        ov = float(c.get("overhang_ft", 1.0))
+        x0, x1, y0, y1 = c["x0"], c["x1"], c["y0"], c["y1"]
+        hi, lo = float(c.get("clear_high_in") or 100), float(c.get("clear_low_in") or 88)
+        pitch = (hi - lo) / max(0.1, (y1 - y0))
+        o.append(T(ox, 18, f"{c['name'].upper()} — PLAN", 10, 900, fill=GOLD))
+        Xp, Yp, scp = plan_xform(x0 - 1.5, x1 + 1.5, y0 - 1.0, y1 + ov + 1.5, ox, 38, colw - 40, 215)
+        o.append(R(Xp(x0 - 1.5), Yp(y0 - 1.0), (x1 - x0 + 3) * scp, 1.0 * scp, FILL["house"], INK, 1.0))
+        o.append(T(Xp((x0 + x1) / 2), Yp(y0 - 1.0) - 4, "HOUSE WALL — 2x10 ledger, LedgerLOK 6\" 2 rows @ 16\"", 7, 800, "middle", MUTE))
+        o.append(R(Xp(x0 - 0.4), Yp(y0), (x1 - x0 + 0.8) * scp, (y1 - y0 + ov) * scp, "#2b2b2e", INK, 1.0, 'fill-opacity="0.12"'))
+        k = 0.0
+        while x0 - 0.4 + k <= x1 + 0.4 + 0.01:
+            xr = min(x0 - 0.4 + k, x1 + 0.4)
+            o.append(LN(Xp(xr), Yp(y0), Xp(xr), Yp(y1 + ov), "#8a6d2a", 0.8))
+            k += 16 / 12
+        o.append(R(Xp(x0 - 0.4), Yp(y1 - 0.25), (x1 - x0 + 0.8) * scp, 0.5 * scp, FILL["timber_dk"], INK, 0.8))
+        for px in cover_posts_x(c):
+            o.append(R(Xp(px - 0.23), Yp(y1 - 0.23), 0.46 * scp, 0.46 * scp, INK, INK, 0.5))
+        dim_h(o, Xp, Yp(y1 + ov) + 18, x0 - 0.4, x1 + 0.4, ftin((x1 - x0 + 0.8) * 12) + " roof", up=False)
+        posts = cover_posts_x(c)
+        for a, b in zip(posts, posts[1:]):
+            dim_h(o, Xp, Yp(y0) + 12, a, b, ftin((b - a) * 12) + " posts", 7.5)
+        dim_v(o, Yp, Xp(x1 + 0.4) + 16, y0, y1, ftin((y1 - y0) * 12), left=False)
+        dim_v(o, Yp, Xp(x1 + 0.4) + 16, y1, y1 + ov, ftin(ov * 12) + " ovh", 7, left=False)
+        o.append(T(Xp((x0 + x1) / 2), Yp((y0 + y1) / 2), f"2x8 rafters @ 16\" OC · slope {pitch:.2f}:12 to the yard", 7.5, 800, "middle"))
+        o.append(T(Xp((x0 + x1) / 2), Yp((y0 + y1) / 2) + 11, f"{s.extras.cover_roof_color or ''} standing seam, mechanically seamed".strip(), 7.5, 600, "middle"))
+        # section
+        sy0 = 300
+        o.append(T(ox, sy0, f"{c['name'].upper()} — SECTION", 10, 900, fill=GOLD))
+        top_z = zt + (hi + 9.25 + 7.25) / 12 + 0.6
+        Xs, Zs, scs = elev_xform(y0 - 2.0, y1 + ov + 3.0, -1.8, top_z, ox, sy0 + 8, colw - 40, 205)
+        o.append(R(Xs(y0 - 2.0), Zs(0), (y1 + ov + 5) * scs, 1.8 * scs, "#cdbf9f", "none", 0))
+        o.append(LN(Xs(y0 - 2.0), Zs(0), Xs(y1 + ov + 3), Zs(0), INK, 1.2))
+        o.append(R(Xs(y0 - 2.0), Zs(top_z - 0.1), 2.0 * scs, (top_z - 0.1) * scs, FILL["house"], INK, 1.2))
+        o.append(T(Xs(y0 - 1.0), Zs(top_z / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
+        o.append(R(Xs(y0), Zs(zt), (y1 - y0 + 0.4) * scs, (1.0 / 12 + 7.25 / 12) * scs, FILL["deck"], INK, 0.8))
+        o.append(T(Xs(y0) + 4, Zs(zt) + 10, f"DECK {ftin(s.geometry.height_in)} above grade", 6.5, 800, fill="#f3ead9"))
+        zb_hi, zb_lo = zt + hi / 12, zt + lo / 12
+        o.append(R(Xs(y0), Zs(zb_hi + 9.25 / 12), 0.13 * scs, 9.25 / 12 * scs, FILL["timber_dk"], INK, 0.6))
+        o.append(R(Xs(y1 - 0.25), Zs(zb_lo + 9.25 / 12), 0.5 * scs, 9.25 / 12 * scs, FILL["timber_dk"], INK, 0.6))
+        o.append(R(Xs(y1 - 0.23), Zs(zb_lo), 0.46 * scs, (zb_lo - 0.45) * scs, FILL["timber"], INK, 0.6))
+        o.append(R(Xs(y1 - 0.45), Zs(0.45), 0.9 * scs, (0.45 + 0.4) * scs, FILL["concrete"], INK, 0.6))
+        o.append(T(Xs(y1) + 26, Zs(0.1) + 4, "Diamond Pier (shared with the deck beam)" if c.get("footing") == "deck_pier" else "Diamond Pier", 7, 700))
+        for k_ in (-1, 1):
+            o.append(LN(Xs(y1), Zs(0), Xs(y1 + k_ * 1.6), Zs(-1.7), INK, 0.7))
+        zr0, zr1 = zb_hi + 9.25 / 12, zb_lo + 9.25 / 12 - pitch / 12 * ov
+        o.append(PG([(Xs(y0), Zs(zr0)), (Xs(y1 + ov), Zs(zr1)), (Xs(y1 + ov), Zs(zr1 + 7.25 / 12)), (Xs(y0), Zs(zr0 + 7.25 / 12))], FILL["timber"], INK, 0.7))
+        o.append(LN(Xs(y0), Zs(zr0 + 8.5 / 12), Xs(y1 + ov + 0.1), Zs(zr1 + 8.5 / 12), "#1c1c1e", 2.6))
+        o.append(LN(Xs(y0), Zs(zr0 - 0.03), Xs(y1 + ov), Zs(zr1 - 0.03), "#efe9dc", 2.0))
+        o.append(R(Xs(y1 + ov), Zs(zr1 + 8.5 / 12), 0.1 * scs, 8.5 / 12 * scs, "#f2efe8", INK, 0.6))
+        dim_v(o, Zs, Xs(y0) + 14, zt, zb_hi, f"{hi:g}\" clear", 7.5, left=False)
+        dim_v(o, Zs, Xs(y1) - 12, zt, zb_lo, f"{lo:g}\" clear", 7.5)
+        dim_h(o, Xs, Zs(-1.4), y0, y1, ftin((y1 - y0) * 12) + " to the post line", 7.5, up=False)
+        if c.get("blinds"):
+            o.append(C(Xs(y1 + 0.05), Zs(zb_lo - 0.15), 2.6, "#7a5c45", INK, 0.5))
+            o.append(R(Xs(y1 + 0.02), Zs(zb_lo - 0.2), 2.0, (zb_lo - 0.2 - zt) * scs, "#7a5c45", "none", 0, 'fill-opacity="0.55"'))
+            o.append(T(Xs(y1) + 6, Zs(zt + 2.5), "owner's roll-down blinds,", 7, 700))
+            o.append(T(Xs(y1) + 6, Zs(zt + 2.5) + 9, "rehung on the new beam", 7, 700))
+        notes = [f"Standing seam 24 ga, 16\" panels, 1-1/2\" mechanical (double-lock) seam — rated for {pitch:.2f}:12 · high-temp ice & water underlayment over 7/16\" OSB",
+                 "Headwall flashing counterflashed into the siding · color-matched eave / rake trim · snow bar across the low eave",
+                 f"HardieSoffit cedarmill ceiling · HardieTrim fascia + rakes ({s.extras.hardie_color or 'color TBD'}) · H2.5AZ at every rafter · AC6Z caps",
+                 "6x6 posts on ABA66Z bases on the Diamond Pier bolt · the engineer's uplift hold-down governs"]
+        yy = sy0 + 236
+        for ln in notes:
+            for w in textwrap.wrap(ln, int(colw / 5.0)):
+                o.append(T(ox, yy, w, 7.4, 500)); yy += 10
+    return sheet("A-401", "Roof covers — plan + section", "Lean-to covers: ledger, rafters, beam, posts on the piers, clear heights, pitch, standing seam, Hardie, blinds", o,
+                 "Plans and sections not to a common scale · dimensions govern · the stamped set governs", meta)
+
+
 SHEET_INDEX = [("G-001", "General notes · design criteria"), ("A-001", "Isometric · renders"), ("S-100", "Foundation plan"), ("S-101", "Framing plan"),
                ("A-101", "Decking plan"), ("A-201", "Railing plan + elevation"), ("A-301", "Section + front elevation"), ("D-501", "Details"),
                ("T-400", "Build steps (build set)"), ("T-700", "Order + schedules (takeoff)")]
+SHEET_INDEX_EXTRA = [("C-100", "Site plan"), ("A-401", "Roof covers — plan + section")]
 
 
 def sheet_meta(L: Layout, customer: bool = False) -> dict:
@@ -563,10 +877,18 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
             _MAT_COLORS[k] = S.materials[k]["color"]
     FILL["deck"] = _MAT_COLORS.get("deck", FILL["deck"]); FILL["border"] = _MAT_COLORS.get("border", FILL["border"])
     meta = sheet_meta(L, customer=customer)
-    return [("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta)),
-            ("S-100", "Foundation plan", sheet_foundation(L, S, meta)),
+    out = [("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta))]
+    site = sheet_site(L, S, t, meta)
+    if site:
+        out.append(("C-100", "Site plan", site))
+    out += [("S-100", "Foundation plan", sheet_foundation(L, S, meta)),
             ("S-101", "Framing plan", sheet_framing(L, S, t, meta)),
-            ("A-101", "Decking plan", sheet_decking(L, S, t, meta)),
-            ("A-201", "Railing plan + elevation", sheet_rail(L, S, t, meta)),
-            ("A-301", "Section + front elevation", sheet_section(L, S, t, meta)),
-            ("D-501", "Details", sheet_details(L, S, t, meta))]
+            ("A-101", "Decking plan", sheet_decking(L, S, t, meta))]
+    if L.rail:
+        out.append(("A-201", "Railing plan + elevation", sheet_rail(L, S, t, meta)))
+    out.append(("A-301", "Section + front elevation", sheet_section(L, S, t, meta)))
+    cov = sheet_covers(L, S, t, meta)
+    if cov:
+        out.append(("A-401", "Roof covers — plan + section", cov))
+    out.append(("D-501", "Details", sheet_details_steel(L, S, t, meta) if L.spec.framing.system == "steel" else sheet_details(L, S, t, meta)))
+    return out

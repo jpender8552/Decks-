@@ -41,7 +41,14 @@ const sun = new THREE.DirectionalLight(0xfff1dc, 1.35);
 const X0 = D.x_min || 0;
 const ext = Math.max(D.W, D.y_front - D.y_min, 30);
 sun.position.set(X0 + D.W * 0.5 - ext * 0.9, ext * 1.15, D.y_front + ext * 1.0);
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+// the real sun when the site carries a position: plan (x, y-to-yard, z-up) -> three (x, up, z); ?sun=dx,dy,dz overrides
+{ let sv = (D.meta && D.meta.sun) ? D.meta.sun : null;
+  if (q.get('sun')) sv = q.get('sun').split(',').map(Number);
+  if (sv) { const R_ = ext * 2.2, cx = X0 + D.W / 2, cz = (D.y_min + D.y_front) / 2;
+    sun.position.set(cx + sv[0] * R_, D.deck_top + sv[2] * R_, cz + sv[1] * R_);
+    const low = Math.max(0, Math.min(1, (0.35 - sv[2]) / 0.3));       // warmer, dimmer light near the horizon
+    sun.color.setRGB(1.0, 0.95 - 0.12 * low, 0.86 - 0.25 * low); sun.intensity = 1.55 - 0.45 * low; } }
+sun.castShadow = true; sun.shadow.mapSize.set(STILL ? 4096 : 2048, STILL ? 4096 : 2048); sun.shadow.radius = 3;
 sun.shadow.camera.left = -ext * 1.4; sun.shadow.camera.right = ext * 1.4; sun.shadow.camera.top = ext * 1.4; sun.shadow.camera.bottom = -ext * 1.4;
 sun.shadow.camera.near = 1; sun.shadow.camera.far = ext * 6; sun.shadow.bias = -0.0008;
 sun.target.position.set(X0 + D.W / 2, D.deck_top, (D.y_min + D.y_front) / 2); scene.add(sun); scene.add(sun.target);
@@ -119,6 +126,7 @@ function material(b) {
     t.repeat.set(Math.max(1, long / per), Math.max(1, Math.max(b.z1 - b.z0, Math.min(b.x1 - b.x0, b.y1 - b.y0)) / per)); opts.map = t; opts.color = new THREE.Color(0xffffff); }
   else { opts.color = new THREE.Color(m.color).convertSRGBToLinear(); }
   if (b.mat === 'glass') { opts.envMapIntensity = 1; }
+  if (m.opacity != null && m.opacity < 1) { opts.transparent = true; opts.opacity = m.opacity; opts.side = THREE.DoubleSide; }
   const mm = new THREE.MeshStandardMaterial(opts); MATC[key] = mm; return mm;
 }
 const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser']);

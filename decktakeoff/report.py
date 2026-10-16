@@ -187,7 +187,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     pre = " · PRE-ENGINEERING" if s.extras.engineered else ""
     w(f"# QUOTE{pre}")
     w(f"## {s.job}")
-    fr_txt = (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
+    fr_txt = ("CEMCO cold-formed galvanized steel frame — 7-1/4\" C-joists at " + f"{fr.spacing:g}\" OC, boxed steel beams" if s.framing.system == "steel" else None) or (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
               f"{s.framing.joist_size} joists at {fr.spacing:g}\"" if s.is_timber else
               f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", {s.framing.beams[0].size if s.framing.beams else ''} beam, {s.framing.post_size} posts")
     n_posts = L.n_footings
@@ -197,7 +197,8 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
       + (f", {rl.system} {'cable ' if rl.system == 'IRX' else ''}rail" + (f" with a {s.railing.drink_rail_color} drink rail" if s.railing.drink_rail else "") if rl else "")
-      + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "") + ".")
+      + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
+      + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
     w(f"**{L.deck_sf} SF** · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''} · **{ftin(s.geometry.height_in)}** above grade"
       + (", engineered" if s.extras.engineered else "") + f" · **{s.site.ground_snow_psf:g} psf** snow design")
@@ -235,7 +236,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     f = decking_facts(s.decking.collection)
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
-      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else 'matching fascia'}. {f['fire']}; {f['warranty']}. |")
+      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('a HardieTrim skirt around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('a HardieTrim skirt around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {f['fire']}; {f['warranty']}. |")
     if s.railing.existing_parapet and s.railing.parapet_note:
         w(f"| Railing | {s.railing.parapet_note} |")
     elif rl and s.railing.existing_parapet:
@@ -253,11 +254,41 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     if s.extras.stone_bases:
         w(f"| Column bases | Stone veneer 2'x2' x 3' with a 24\" stone cap at all {n_posts} posts. |")
     _fd = sm['posts'] if s.framing.footing_type == "existing" else sm['posts'].split(' on ')[-1]
+    if s.framing.footing_type == "diamond_pier":
+        _np = int(sum(l.order for l in t.lines if l.category == "Footings" and l.item.startswith("Diamond Pier")))
+        _fd = f"{_np or L.n_footings} Diamond Pier foundations ({s.framing.footing_model}" + ("; upsized where a cover post and the deck share a pier" if any(l.item.startswith("Upgrade to Diamond Pier") for l in t.lines) else "") + ") — no excavation"
     w(f"| Foundation | {(_fd[0].upper() + _fd[1:]) if _fd else ''}" + (f" (frost depth {ftin(s.site.frost_depth_in)})" if s.framing.footing_type in ('caisson', 'concrete') else "") + ". |")
     w(f"| Design load | {s.site.ground_snow_psf:g} psf snow" + (", stamped by a Colorado engineer" if s.extras.engineered else "")
       + (". Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall" if s.site.wui_fire_zone else "") + ". |")
-    w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"
-      + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}. |")
+    if s.framing.system == "steel":
+        w(f"| Hardware | Galvanized steel clip angles and self-drilling screws throughout the frame; {s.decking.brand} {s.decking.fastener_system or 'CONCEALoc'} hidden fasteners in the field "
+          "and color-matched plugs on the picture frame, every screw the steel-frame type. |")
+    else:
+        w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"
+          + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}. |")
+    from .spec import covers_of
+    _cv = covers_of(s)
+    if _cv:
+        ss_ = s.extras.cover_roof.lower().startswith("standing")
+        roof_ = ((f"{s.extras.cover_roof_color + ' ' if s.extras.cover_roof_color else ''}standing seam steel roof, 24 ga, "
+                  + ("mechanically seamed for the low pitch" if s.extras.cover_roof_panel.lower().startswith("mech") else "snap-lock")
+                  + ", over high-temp underlayment, with a snow bar across the low eave") if ss_ else "architectural shingles")
+        fin_ = ", ".join(x for x in (("James Hardie soffit ceiling" if s.extras.cover_soffit else ""), ("HardieTrim fascia and rakes" if s.extras.cover_fascia else "")) if x)
+        heights = "; ".join(f"{c['name']}: {c['clear_high_in']:g}\" clear at the house to {c['clear_low_in']:g}\" at the beam" for c in _cv if c.get("clear_high_in") and c.get("clear_low_in"))
+        w(f"| Roof covers | {len(_cv)} lean-to cover{'s' if len(_cv) > 1 else ''} replaced: 6x6 posts on the Diamond Pier foundations, a new ledger on the house, 2x8 rafters at 16\", {roof_}"
+          + (f"; {fin_}" + (f" in {s.extras.hardie_color}" if s.extras.hardie_color else "") if fin_ else "")
+          + (f". {heights}" if heights else "") + (". The roll-down blinds are taken down, stored and rehung on the new beams" if s.extras.blinds_reinstall else "") + ". |")
+    site_ = []
+    if s.extras.demo_existing:
+        site_.append("the existing deck" + ("s" if L.multi else "") + (" and roof covers" if s.extras.demo_covers else "") + " removed and hauled off")
+    if s.extras.under_deck_gravel:
+        site_.append("6-mil poly and 2\" of gravel under the decks")
+    if any(st.landing == "concrete pad" for st in s.stairs):
+        site_.append("a concrete landing pad at the stair")
+    if site_:
+        w(f"| Site | {'; '.join(site_)[0].upper() + '; '.join(site_)[1:]}. |")
+    if s.extras.exclusions:
+        w(f"| Not included | {'; '.join(s.extras.exclusions)}. |")
     w("")
     w("## PLAN")
     if L.multi:

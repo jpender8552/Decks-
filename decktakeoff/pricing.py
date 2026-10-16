@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .catalog import PRICEBOOK, RAIL_SYSTEMS, tax_rate_for
-from .spec import DeckSpec
+from .spec import covers_of, DeckSpec
 from .takeoff import Takeoff
 
 
@@ -115,15 +115,30 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144
             lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck, 4 footings", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"] + 40.0, "EST — frame + decking rate + footings"))
-    if s.geometry.cover:
-        from .takeoff import cover_size
-        along, out, area = cover_size(s)
-        lab.append(("Porch cover — frame, sheath, roof, ceiling", round(area), "SF", lr["cover_per_sf"], "ESTIMATE — no cover rate on the card; confirm"))
-        lab.append(("Porch cover — post blocking in the deck frame", 1, "lot", lr["cover_post_blocking_lot"], "est."))
+    _covs = covers_of(s)
+    for _c in _covs:
+        from .takeoff import cover_size, cover_posts_x
+        along, out, area = cover_size(s, _c)
+        nm = "Porch cover" + (f" ({_c['name']})" if len(_covs) > 1 else "")
+        lab.append((f"{nm} — frame, sheath, roof, ceiling", round(area), "SF", lr["cover_per_sf"], "ESTIMATE — no cover rate on the card; confirm"))
+        if _c.get("footing", "deck") == "diamond_pier":
+            lab.append((f"{nm} — Diamond Pier install at the cover posts", len(cover_posts_x(_c)), "pier", lr["diamond_pier_each"], "rate card"))
+        elif _c.get("footing") == "deck_pier":
+            lab.append((f"{nm} — set the cover posts on the shared deck piers, bracket the deck beam to them", len(cover_posts_x(_c)), "post", 45.0, "EST"))
+        else:
+            lab.append((f"{nm} — post blocking in the deck frame", 1, "lot", lr["cover_post_blocking_lot"], "est."))
         if s.extras.cover_roof.lower().startswith("standing"):
-            lab.append(("Porch cover — standing seam steel in place of shingles (panels, trims, headwall, snow bar)", round(area), "SF", lr["cover_standing_seam_adder_per_sf"], "ESTIMATE — metal roofer's install rate; confirm"))
+            lab.append((f"{nm} — standing seam steel in place of shingles (panels, trims, headwall, snow bar)", round(area), "SF", lr["cover_standing_seam_adder_per_sf"], "ESTIMATE — metal roofer's install rate; confirm"))
         if s.extras.cover_gutters:
-            lab.append(("Porch cover — 5\" gutter + downspouts hung", round(along), "LF", lr["gutters_per_lf"], "ESTIMATE — gutter sub; confirm"))
+            lab.append((f"{nm} — 5\" gutter + downspouts hung", round(along), "LF", lr["gutters_per_lf"], "ESTIMATE — gutter sub; confirm"))
+        if s.extras.demo_covers:
+            lab.append((f"{nm} — tear off the existing roof cover and haul", round(area), "SF", lr.get("cover_demo_per_sf", 3.0), "ESTIMATE — no cover demo rate on the card; confirm"))
+    if s.extras.under_deck_gravel:
+        lab.append(("Under-deck prep — 6-mil poly + 2\" gravel", round(t.layout.deck_sf), "SF", lr.get("under_deck_gravel_per_sf", 1.5), "ESTIMATE — confirm"))
+    if s.framing.system == "steel":
+        lab.append(("Steel frame premium — cut, clip and screw cold-formed members", round(t.layout.deck_sf), "SF", lr.get("steel_frame_premium_per_sf", 4.0), "ESTIMATE — no steel rate on the card; confirm with the framer"))
+    if s.extras.blinds_reinstall and _covs:
+        lab.append(("Take down, store and rehang the owner's roll-down blinds on the new beams", 1, "lot", lr.get("blinds_reinstall_lot", 250.0), "ESTIMATE — confirm"))
     return lab
 
 
@@ -202,11 +217,14 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
         parts.append((f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip(), round(comp(drink_m, labsum("Drink rail")))))
-    if s.geometry.cover:
+    if covers_of(s):
         cover_m = mats(lambda l: l.category == "Porch cover")
+        n_cv = len(covers_of(s))
         finish = ("Hardie soffit, fascia and rakes" if (s.extras.cover_soffit or s.extras.cover_fascia) else "T&G ceiling")
         roof = ("standing seam steel roof with snow retention" if s.extras.cover_roof.lower().startswith("standing") else "shingles") + (", gutter and downspouts" if s.extras.cover_gutters else "")
-        parts.append((f"Porch cover — shed roof on 6x6 cedar posts, {roof}, {finish}", round(comp(cover_m, labsum("Porch cover")))))
+        lead = "Porch cover — shed roof" if n_cv == 1 else f"{n_cv} roof covers — lean-to roofs"
+        parts.append((f"{lead} on 6x6 cedar posts, {roof}, {finish}" + (", existing covers torn off" if s.extras.demo_covers else "") + (", blinds rehung" if s.extras.blinds_reinstall else ""),
+                      round(comp(cover_m, labsum("Porch cover") + labsum("Take down, store")))))
     main = rest - sum(v for _, v in parts)
     if s.is_timber:
         label = ("Timber-frame deck: caissons, Douglas fir frame (end grain sealed), " + f"{s.decking.color} decking, "
@@ -219,7 +237,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         deck_m = mats(lambda l: l.category in ("Decking", "Fasteners", "Fascia"))
         rail_m = mats(lambda l: l.category == "Rail") - drink_m
         stair_m = mats(lambda l: l.category == "Stairs")
-        alloc.append(("Foundation & structure", round(comp(frame_m, labsum("Frame", "Diamond Pier", "Caissons", "Large footings", "Concrete piers", "Extra beam", "Hot-tub")))))
+        alloc.append(("Foundation & structure", round(comp(frame_m, labsum("Frame", "Diamond Pier", "Caissons", "Large footings", "Concrete piers", "Extra beam", "Hot-tub", "Steel frame", "Under-deck")))))
         alloc.append(("Decking & fascia", round(comp(deck_m, labsum("Decking")))))
         rail_c = round(comp(rail_m, labsum("Railing", "Cable rail"))) if L.rail else 0
         stair_c = round(comp(stair_m, labsum("Stairs"))) if L.stairs else 0

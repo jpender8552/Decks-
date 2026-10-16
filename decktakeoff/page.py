@@ -342,7 +342,8 @@ def _reads_lite(t, L, sm):
         stairs.append(txt)
     fr = L.zones[0].frame
     beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
-    structure = f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {' / '.join(beams)} Douglas fir beams" if beams else "") + f"; {sm['posts']}"
+    structure = (f"CEMCO cold-formed steel frame, 7-1/4\" C-joists at {fr.spacing:g}\" on centre, boxed steel beams; {sm['posts']}" if s.framing.system == "steel" else
+                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {' / '.join(beams)} Douglas fir beams" if beams else "") + f"; {sm['posts']}")
     reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
@@ -379,6 +380,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     rd = Path(renders_dir) if renders_dir else (out / "buildset" / "renders")
     files = {f"r/{key}-{q.stem}.jpg": str(q) for q in rd.glob("*.jpg")}
     have = {q.stem for q in rd.glob("*.jpg")}
+    sun_names = sorted(n_ for n_ in have if n_.startswith("sun-"))
+    if (rd / "sun.json").exists():
+        CAP.update(json.load(open(rd / "sun.json")))
+    sun_html = ('<h2 class="kicker pb" id="g-sun">Sun and shade <span class="tag">the real sun at this address · the covers and the blinds through the day</span></h2>'
+                + _gallery(key, sun_names, have)) if sun_names else ""
     cap = dict(CAP); cap.update({f"step{n}": S.meta["step_text"][n] for n in range(1, 9)})
     name = name or spec.job
     addr = ", ".join(x for x in (spec.site.address, spec.site.city, f"{spec.site.state} {spec.site.zip}".strip()) if x)
@@ -396,11 +402,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker" id="g-what">What it is <span class="tag">included in the price</span></h2>')
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
-        frame_lite = f"{sm['joists']}; {sm['rims']}" + (f"; {' / '.join(beams)} Douglas fir beams" if beams else "") + "."
+        frame_lite = f"{sm['joists']}; {sm['rims']}" + ((f"; {' / '.join(beams)} Douglas fir beams" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams") + "."
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
         w(_gallery(key, ["corner", "ondeck", "isolow", "under"], have))
+        w(sun_html)
         w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
         w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
         w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
@@ -423,6 +430,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w(f'<p><b>Engineering and permit.</b> {E(spec.extras.engineering_note)}</p>')
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
         w(_gallery(key, ["corner", "ondeck", "under", "isolow"], have))
+        w(sun_html)
         w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso"], have))
         w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
@@ -469,6 +477,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · timbers shown ' + ("with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "as specified") + "</span></h2>")
         w(_gallery(key, ["yard", "corner", "ondeck", "under"], have))
+        w(sun_html)
         w('<h2 class="kicker">Isometrics</h2>')
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso", "plan"], have))
         w('<h2 class="kicker">Exploded</h2>')

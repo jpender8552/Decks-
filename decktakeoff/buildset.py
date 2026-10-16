@@ -75,7 +75,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         goes_in=items(lambda l: l.category == "Rail"),
         how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else []),
         check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—", "Cables tensioned / balusters under 4\" clear", "End of construction"]))
-    if s.geometry.cover:
+    if s.geometry.cover or s.geometry.covers:
         from .takeoff import cover_size
         along, out, area = cover_size(s)
         ss = s.extras.cover_roof.lower().startswith("standing")
@@ -141,7 +141,11 @@ def build_set(t: Takeoff, flags, out_dir: str, render: bool = True, customer: bo
     if render:
         try:
             from .render import render_stills
-            stills = render_stills(S, str(out / "renders"))
+            from .scene import sun_study_stills
+            sun = sun_study_stills(L.spec.site)
+            stills = render_stills(S, str(out / "renders"), extra=[(n_, q_) for n_, q_, _ in sun])
+            if sun:
+                json.dump({n_: c_ for n_, _, c_ in sun}, open(out / "renders" / "sun.json", "w"), indent=1)
         except Exception as e:  # no browser / no three.js on this machine: the set still builds without stills
             stills = {}
             (out / "renders_error.txt").write_text(str(e))

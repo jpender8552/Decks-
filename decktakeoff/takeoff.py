@@ -16,7 +16,7 @@ from .catalog import (rail_system_for, STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, 
                       POST_CAP_SCREWS, PRICEBOOK, SPECIES_NAMES, TIMBER_BASE, actual, decking_facts, default_fastener_system, parse_beam,
                       RAIL_SYSTEMS)
 from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
-from .spec import DeckSpec
+from .spec import covers_of, DeckSpec
 from .units import ftin
 
 CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Porch cover", "Finish", "Site"]
@@ -794,6 +794,19 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if st.riser_pieces:
             cuts.append(CutPiece(f"Stair risers ({st.side})", "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness"))
 
+    # ================= ROOF COVERS (with or without a rail)
+    _covs = covers_of(spec)
+    for _c in _covs:
+        lines += cover_lines(spec, _c, tag=_c["name"] if len(_covs) > 1 else "")
+        if _c.get("footing") == "deck_pier" and spec.framing.footing_type == "diamond_pier":
+            loads = shared_pier_loads(spec, L, _c)
+            cap = PRICEBOOK["footings"].get(spec.framing.footing_model, {}).get("capacity_lb", 3300)
+            over = [ld for ld in loads if ld[1] + ld[2] > cap]
+            if over and spec.framing.footing_model != "DP-75/63":
+                up = PRICEBOOK["footings"]["DP-75/63"]["each"] - PRICEBOOK["footings"].get(spec.framing.footing_model, {}).get("each", 0.0)
+                lines.append(Line("Footings", f"Upgrade to Diamond Pier DP-75/63 at the shared {_c['name'].lower()} posts (roof + deck on one pier)", len(over), len(over), "ea",
+                                  "exact  (" + " · ".join(f"{ftin(x * 12)}: {r + d:,.0f} lb" for x, r, d in over) + f" vs {cap:,.0f} lb)", round(up, 2), "est.", "DP-75/63"))
+
     # ================= FASCIA
     if spec.decking.fascia and Qz.fascia_pieces:
         packed_f = pack_lumber([("fascia", Lf, name) for name, Lf in Qz.fascia_pieces], kerf=0.125)
@@ -948,8 +961,6 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 if l.category in ("Rail", "Stairs") and " post " in l.item and '2"' in l.item:
                     l.item = l.item.replace('2"', f'{ps:g}"')
                     l.note = (l.note + " · " if l.note else "") + f"{ps:g}\" post — confirm the SKU and price with {sysn} (priced at the stock post rate)"
-        if spec.geometry.cover:
-            lines += cover_lines(spec)
         if not timber:
             uc, src = _price("rail", "touchup_paint")
             lines.append(Line("Rail", "Rust-Oleum flat black touch-up (cut ends)", 1, 1, "ea", "exact", uc, src))
@@ -976,6 +987,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             notes.append("timbers unfinished — weather to gray; dark walnut oil is an option")
 
     # ================= SITE
+    if spec.extras.under_deck_gravel:
+        sf_g = L.deck_sf * 1.1
+        rolls = int(math.ceil(sf_g / 1000))
+        lines.append(Line("Flashing & waterproofing", "6-mil poly sheeting 10' x 100' — under the decks", rolls, rolls, "roll", f"{sf_g:.0f} SF with laps", 45.0, "est."))
+        cy = sf_g * (2.0 / 12) / 27
+        lines.append(Line("Flashing & waterproofing", "3/4\" washed gravel, 2\" over the poly — under the decks (delivered)", round(cy, 1), max(1.0, math.ceil(cy * 2) / 2), "CY", f"{sf_g:.0f} SF x 2\"", 85.0, "est."))
     if spec.extras.demo_existing:
         sf_demo = spec.extras.demo_sf or L.deck_sf
         lines.append(Line("Site", "Demo existing deck + haul-off", sf_demo, sf_demo, "SF", "labor line — field verify the existing deck", 0.0, "labor"))
@@ -1008,27 +1025,69 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 for s_, ss in zip(stairs, spec.stairs)],
         material_cost=round(sum(l.ext for l in lines), 2),
     )
-    return Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
+    t = Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
+    if spec.framing.system == "steel":
+        from .steel import steel_frame
+        steel_frame(t)
+    return t
 
 
 
-def cover_size(spec) -> Tuple[float, float, float]:
-    """(along the house ft, out from the house ft, roof area SF) of the porch cover rectangle [x0, x1, y0, y1, slope]."""
-    c = spec.geometry.cover
-    x0, x1, y0, y1 = c[:4]
-    slope = c[4] if len(c) > 4 else "+y"
+def cover_size(spec, c: Optional[dict] = None) -> Tuple[float, float, float]:
+    """(along the house ft, out from the house ft, roof area SF) of a roof cover (the first one when c is None)."""
+    c = c or covers_of(spec)[0]
+    x0, x1, y0, y1 = c["x0"], c["x1"], c["y0"], c["y1"]
+    slope = c.get("slope", "+y")
     along = (y1 - y0) if slope in ("+x", "-x") else (x1 - x0)
     out = (x1 - x0) if slope in ("+x", "-x") else (y1 - y0)
-    return along, out, along * (out + 1.5)
+    ov = float(c.get("overhang_ft", 1.0))
+    if c.get("legacy"):             # the single `cover` list keeps its original take-off (published jobs price the same)
+        return along, out, along * (out + 1.5)
+    return along, out, (along + 2 * 0.4) * (out + ov + 0.5)
 
 
-def cover_lines(spec) -> List[Line]:
+def shared_pier_loads(spec, L, c: dict) -> List[Tuple[float, float, float]]:
+    """(x ft, roof lb, deck lb) at each cover post that stands on a deck beam's pier: roof = ground snow + 15 psf dead on the
+    post's tributary roof; deck = the load of the deck-beam post at that x (the nearest within 1')."""
+    xs = cover_posts_x(c)
+    ov = float(c.get("overhang_ft", 1.0))
+    depth = (c["y1"] - c["y0"]) / 2 + ov
+    out = []
+    for i, x in enumerate(xs):
+        left = (x - xs[i - 1]) / 2 if i else (x - c["x0"]) + 0.4
+        right = (xs[i + 1] - x) / 2 if i < len(xs) - 1 else (c["x1"] - x) + 0.4
+        roof = (left + right) * depth * (spec.site.ground_snow_psf + 15.0)
+        deck = 0.0
+        for bl in L.beam_lines:
+            for px, ld in zip(bl.posts_x, bl.post_loads):
+                if abs(px / 12.0 - x) < 1.0:
+                    deck = max(deck, ld)
+        out.append((x, roof, deck))
+    return out
+
+
+def cover_posts_x(c: dict) -> List[float]:
+    """Post centres along the low beam (ft, plan x), ≤ 8'-6" OC, 6" in from each end — or the owner's positions."""
+    import math as _m
+    if c.get("posts_x_ft"):
+        return [float(v) for v in c["posts_x_ft"]]
+    x0, x1 = (c["y0"], c["y1"]) if c.get("slope", "+y") in ("+x", "-x") else (c["x0"], c["x1"])
+    if c.get("legacy"):
+        n = max(2, int(_m.ceil((x1 - x0) / 8.5)) + 1)
+        return [x0 + 0.5 + k * (x1 - x0 - 1.0) / (n - 1) for k in range(n)]
+    n = max(2, int(_m.ceil((x1 - x0 - 1.0) / 8.5 - 1e-9)) + 1)
+    return [x0 + 0.5 + k * (x1 - x0 - 1.0) / (n - 1) for k in range(n)]
+
+
+def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
     """Porch cover over the deck: shed roof, ledger on the house, 2x8 rafters @ 16", (2)2x10 beam on 6x6 cedar posts at the rail line,
     OSB, underlayment, then architectural shingles + drip edge OR a standing seam steel roof (24 ga snap-lock panels on high-temp
     underlayment, eave / rake / headwall trims, snow retention bar), 5" K gutter + downspouts when asked, T&G or Hardie ceiling.
     Every price is an estimate until D&D / the metal supplier quotes it."""
     import math as _m
-    along, out, area = cover_size(spec)
+    c = c or covers_of(spec)[0]
+    along, out, area = cover_size(spec, c)
+    ov = float(c.get("overhang_ft", 1.0))
     out_lines: List[Line] = []
     def L_(item, net, order, unit, why, key=None, section="cover", per=None):
         if key:
@@ -1037,17 +1096,25 @@ def cover_lines(spec) -> List[Line]:
         else:
             uc, src = per, "est."
         out_lines.append(Line("Porch cover", item, net, order, unit, why, uc, src))
-    n_posts = max(2, int(_m.ceil(along / 8.5)) + 1)
-    post_len = 10
-    L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea", f"exact  ({n_posts} posts at the rail line, ≤ 8'-6\" OC)", per=PRICEBOOK["cover"]["cedar_6x6_lf"]["each"] * post_len)
+    posts_x = cover_posts_x(c)
+    n_posts = len(posts_x)
+    on_piers = c.get("footing", "deck") in ("diamond_pier", "deck_pier")
+    if c.get("clear_low_in"):
+        need = float(c["clear_low_in"]) + (spec.geometry.height_in if on_piers else 0.0) + 2.0    # deck (or grade) to the beam bottom
+        post_len = next(v for v in (8, 10, 12, 14, 16) if v * 12 >= need)
+    else:
+        need, post_len = 0.0, 10
+    L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea",
+       f"exact  ({n_posts} posts on the low beam at " + " / ".join(ftin(p * 12) for p in posts_x) + (f"; {ftin(need)} cut length" if need else "") + ")",
+       per=PRICEBOOK["cover"]["cedar_6x6_lf"]["each"] * post_len)
     beam_pcs = int(_m.ceil(along / 16)) * 2
     L_(f"2x10x16 #1 SYP — cover beam (2 ply)", beam_pcs, beam_pcs, "ea", f"+0  ((2)2x10 x {along:.1f}' at the posts)", per=PRICEBOOK["lumber"]["2x10"]["per_lf"] * 16)
     ledger_pcs = int(_m.ceil(along / 16))
     L_(f"2x10x16 #1 SYP — cover ledger on the house", ledger_pcs, ledger_pcs, "ea", "exact", per=PRICEBOOK["lumber"]["2x10"]["per_lf"] * 16)
     n_r = int(along / (16 / 12)) + 1
-    r_len = 12 if out + 1.5 <= 12 else 14
-    L_(f"2x8x{r_len} #1 SYP — cover rafters @ 16\" OC", n_r, n_r + 1, "ea", f"+1 cull  ({n_r} rafters, {out + 1.5:.1f}' with the overhang)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * r_len)
-    fascia_lf = along + 2 * (out + 1.5)
+    r_len = next(v for v in (8, 10, 12, 14, 16) if v >= out + ov + 0.5)
+    L_(f"2x8x{r_len} #1 SYP — cover rafters @ 16\" OC", n_r, n_r + 1, "ea", f"+1 cull  ({n_r} rafters, {out + ov + 0.5:.1f}' with the overhang)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * r_len)
+    fascia_lf = along + 2 * (out + ov + 0.5)
     fpcs = int(_m.ceil(fascia_lf / 16))
     L_(f"2x8x16 #1 SYP — cover fascia / sub-fascia", fpcs, fpcs + 1, "ea", f"+1  ({fascia_lf:.0f} LF)", per=PRICEBOOK["lumber"]["2x8"]["per_lf"] * 16)
     sheets = int(_m.ceil(area / 32 * 1.1))
@@ -1057,9 +1124,12 @@ def cover_lines(spec) -> List[Line]:
         L_(None, 1, 1, "roll", f"{area:.0f} SF", key="underlayment_roll")
     if ss:
         color = spec.extras.cover_roof_color or "color TBD"
-        panel_len = out + 1.5
+        panel_len = out + ov + 0.5
         n_panels = int(_m.ceil(along / (16 / 12)))
-        L_(f"Standing seam roof — 24 ga steel 16\" snap-lock panels x {panel_len:.1f}' ({color}, PVDF), {n_panels} panels", round(area), round(area * 1.05), "SF", f"{n_panels} panels x {panel_len:.1f}' + 5% (one-piece eave to headwall, no end laps)", key="ss_panel_sf")
+        mech = spec.extras.cover_roof_panel.lower().startswith("mech")
+        ptype = '1-1/2" mechanically seamed (double-lock, low-slope rated)' if mech else "snap-lock"
+        L_(f"Standing seam roof — 24 ga steel 16\" {ptype} panels x {panel_len:.1f}' ({color}, PVDF), {n_panels} panels",
+           round(area), round(area * 1.05), "SF", f"{n_panels} panels x {panel_len:.1f}' + 5% (one-piece eave to headwall, no end laps)" + (" — mechanical seam priced at the snap-lock rate; confirm with the metal supplier" if mech else ""), key="ss_panel_sf")
         L_(None, int(_m.ceil(area / 200)), int(_m.ceil(area / 200)), "roll", f"{area:.0f} SF — full coverage under metal (high-temp)", key="ht_underlayment_roll")
         L_(None, int(_m.ceil(along / 10)), int(_m.ceil(along / 10)) + 1, "ea", f"{along:.0f} LF low eave + 1", key="ss_eave_trim_10ft")
         L_(None, int(_m.ceil(2 * panel_len / 10)), int(_m.ceil(2 * panel_len / 10)) + 1, "ea", f"two rakes x {panel_len:.1f}' + 1", key="ss_rake_trim_10ft")
@@ -1097,13 +1167,25 @@ def cover_lines(spec) -> List[Line]:
         L_(None, round(area), round(area * 1.08), "SF", "+8% waste", key="tg_ceiling_sf")
     if spec.extras.cover_fascia:
         nfb = int(_m.ceil(fascia_lf / 12 * 1.05))
-        L_(f"Cover fascia + rakes — HardieTrim 4/4 x 7-1/4 x 12' rustic ColorPlus {spec.extras.cover_fascia.split()[-2]} {spec.extras.cover_fascia.split()[-1]} over the 2x8 sub-fascia", nfb, nfb + 1, "ea", f"+1  ({fascia_lf:.0f} LF: front {along:.0f}' + two rakes {out + 1.5:.1f}')", key="hardie_trim_4_4x7_25_rustic_12ft")
+        L_(f"Cover fascia + rakes — HardieTrim 4/4 x 7-1/4 x 12' rustic ColorPlus {spec.extras.cover_fascia.split()[-2]} {spec.extras.cover_fascia.split()[-1]} over the 2x8 sub-fascia", nfb, nfb + 1, "ea", f"+1  ({fascia_lf:.0f} LF: front {along:.0f}' + two rakes {out + ov + 0.5:.1f}')", key="hardie_trim_4_4x7_25_rustic_12ft")
         L_(None, 1, 1, "box", "color-matched trim screws", key="hardie_trim_screws_100")
-    L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
+    if c.get("footing") == "deck_pier":   # the cover post stands on the deck beam's Diamond Pier and carries the deck beam beside it
+        ucb, srcb = _price("footings", "ABA66Z")
+        out_lines.append(Line("Porch cover", "Simpson ABA66Z post base on the shared Diamond Pier bolt — cover post (pier counted with the deck)", n_posts, n_posts, "ea", "exact", ucb, srcb))
+    elif on_piers:     # the cover posts run past the deck to their own footing: roof snow and uplift do not ride on the deck frame
+        ucp, srcp = _price("footings", spec.framing.footing_model if spec.framing.footing_type == "diamond_pier" else "DP-50/50")
+        out_lines.append(Line("Porch cover", f"Diamond Pier {spec.framing.footing_model if spec.framing.footing_type == 'diamond_pier' else 'DP-50/50'} — cover post footing (through the deck)", n_posts, n_posts, "ea", "exact  (one per cover post)", ucp, srcp))
+        ucb, srcb = _price("footings", "ABA66Z")
+        out_lines.append(Line("Porch cover", "Simpson ABA66Z post base on the pier bolt — cover post", n_posts, n_posts, "ea", "exact", ucb, srcb))
+    else:
+        L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
     L_(None, n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
     L_(None, n_r, n_r, "ea", "one per rafter at the beam", key="rafter_tie")
     lok = int(_m.ceil(along / 16 * 2)) * 16 // 16 * 2
     L_("FastenMaster LedgerLOK 6\" — cover ledger, 2 rows staggered 16\" OC", int(_m.ceil(along / 16 * 12 * 2)), int(_m.ceil(along / 16 * 12 * 2)), "ea", f"{along:.0f} LF x 2 rows @ 16\"", per=PRICEBOOK["hardware"]["LedgerLOK6_50"]["each"] / 50 if "each" in PRICEBOOK["hardware"]["LedgerLOK6_50"] else 1.2)
+    if tag:
+        for l in out_lines:
+            l.item = f"{l.item} — {tag}"
     return out_lines
 
 

@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .catalog import rail_system_for, BOARDS_PALETTE, RAIL_SYSTEMS, actual, decking_facts, parse_beam
 from .layout import Layout, NOSE, OVERHANG_NO_FASCIA, RAIL_POST_INSET
-from .spec import DeckSpec
+from .spec import COVER_DEFAULTS, DeckSpec, covers_of
 
 PHASES = {1: "Footings", 2: "Posts", 3: "Stone bases", 4: "Beams", 5: "Frame", 6: "Decking", 7: "Rail", 8: "Furnishings"}
 IN = 1 / 12.0
@@ -50,6 +50,77 @@ def _palette(collection: str, color: str) -> List[str]:
     return BOARDS_PALETTE.get((collection, color), ["#8f6a42", "#a07a4d", "#b58a58", "#c49a68", "#d2ad7b"])
 
 
+HARDIE_HEX = {"timber bark": "#4b3f34", "arctic white": "#ecebe4", "cobble stone": "#a9a296", "navajo beige": "#cdbd9f", "khaki brown": "#8a7558",
+              "monterey taupe": "#8d8578", "iron gray": "#4c5154", "aged pewter": "#6e6c66", "mountain sage": "#8d9581", "light mist": "#dcdcd3",
+              "sail cloth": "#e6e1d2", "evening blue": "#3d4a5c", "night gray": "#3b3d3f", "deep ocean": "#2f4a5a"}
+
+
+def _hardie_hex(name: str) -> str:
+    return HARDIE_HEX.get((name or "timber bark").lower().replace("(color tbd)", "").strip() or "timber bark", "#4b3f34")
+
+
+def sun_vector(site) -> Optional[Tuple[float, float, float]]:
+    """Unit vector toward the sun in the plan frame (x along the house, y out to the yard, z up) at site.sun_when, from the
+    site's latitude / longitude (NOAA solar-position approximation, good to ~0.5 deg) and the bearing the deck faces."""
+    if site.lat is None or site.lon is None or site.rear_azimuth_deg is None:
+        return None
+    from datetime import datetime
+    when = datetime.fromisoformat(site.sun_when)
+    n = when.timetuple().tm_yday
+    hour = when.hour + when.minute / 60.0
+    g = 2 * math.pi / 365.0 * (n - 1 + (hour - 12) / 24.0)
+    eqt = 229.18 * (0.000075 + 0.001868 * math.cos(g) - 0.032077 * math.sin(g) - 0.014615 * math.cos(2 * g) - 0.040849 * math.sin(2 * g))
+    decl = (0.006918 - 0.399912 * math.cos(g) + 0.070257 * math.sin(g) - 0.006758 * math.cos(2 * g) + 0.000907 * math.sin(2 * g)
+            - 0.002697 * math.cos(3 * g) + 0.00148 * math.sin(3 * g))
+    tst = hour * 60 + eqt + 4 * site.lon - 60 * site.utc_offset_h           # true solar time, minutes
+    ha = math.radians(tst / 4 - 180)
+    lat = math.radians(site.lat)
+    cos_z = math.sin(lat) * math.sin(decl) + math.cos(lat) * math.cos(decl) * math.cos(ha)
+    zen = math.acos(max(-1.0, min(1.0, cos_z)))
+    el = math.pi / 2 - zen
+    az = math.degrees(math.atan2(math.sin(ha), math.cos(ha) * math.sin(lat) - math.tan(decl) * math.cos(lat))) + 180.0   # from north, clockwise
+    rel = math.radians(az - site.rear_azimuth_deg)
+    return (-math.sin(rel) * math.cos(el), math.cos(rel) * math.cos(el), math.sin(el))
+
+
+def sun_study_stills(site, view: str = "corner") -> List[Tuple[str, dict, str]]:
+    """(still name, viewer params, caption) for the sun study: the hero date at 9, 12, 3 and 6, plus a winter afternoon.
+    Empty when the site has no position. The caption names the clock time and the sun's compass bearing / height."""
+    import dataclasses
+    from datetime import datetime
+    if site.lat is None or site.lon is None or site.rear_azimuth_deg is None:
+        return []
+    date_ = site.sun_when.split("T")[0]
+    year = date_.split("-")[0]
+    out = []
+    for d_, t_, off in [(date_, "09:00", site.utc_offset_h), (date_, "12:00", site.utc_offset_h), (date_, "15:00", site.utc_offset_h), (date_, "18:00", site.utc_offset_h),
+                        (f"{year}-12-21", "15:00", -7.0)]:
+        v = sun_vector(dataclasses.replace(site, sun_when=f"{d_}T{t_}", utc_offset_h=off))
+        if not v or v[2] <= 0.03:
+            continue
+        rel = math.degrees(math.atan2(-v[0], v[1]))
+        az = (site.rear_azimuth_deg + rel) % 360
+        el = math.degrees(math.asin(max(-1.0, min(1.0, v[2]))))
+        pts = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+        dt = datetime.fromisoformat(f"{d_}T{t_}")
+        lab = dt.strftime("%b %-d · %-I:%M %p").replace(":00", "")
+        nm = f"sun-{dt.strftime('%m%d')}-{t_.replace(':', '')}"
+        out.append((nm, dict(view=view, sun=",".join(f"{c:.4f}" for c in v)), f"{lab} — sun {pts[int((az + 11.25) // 22.5) % 16]}, {el:.0f}° up"))
+    return out
+
+
+def sun_study(site, times=("09:00", "12:00", "15:00", "18:00")) -> List[Tuple[str, Tuple[float, float, float]]]:
+    """(label, vector) for the hero date at several clock times — the sun stills."""
+    import dataclasses
+    date_ = site.sun_when.split("T")[0]
+    out = []
+    for t in times:
+        v = sun_vector(dataclasses.replace(site, sun_when=f"{date_}T{t}"))
+        if v and v[2] > 0.05:
+            out.append((t, v))
+    return out
+
+
 def materials_for(spec: DeckSpec) -> Dict[str, dict]:
     timber = spec.is_timber
     oiled = spec.framing.finish == "oil"
@@ -60,14 +131,18 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
                     spec.railing.drink_rail_color or spec.decking.border_color or spec.decking.color)
     wood = "#6a4225" if (timber and oiled) else ("#a88a5e" if timber else "#b9a479")     # oiled dark walnut · unfinished DF · PT SYP
     return dict(
-        timber=dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated"),
+        timber=(dict(color="#a7adb2", metal=0.6, rough=0.42, label="CEMCO cold-formed steel, G90 galvanized") if spec.framing.system == "steel" else
+                dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated")),
+        ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 cedar posts, SYP beam / rafters"),
+        galv=dict(color="#9aa0a6", metal=0.6, rough=0.45, label="galvanized steel"),
         deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
         border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
         drink=dict(color=dpal[len(dpal) // 2], palette=dpal, grain=True, rough=0.7),
-        fascia=(dict(color="#4b3f34", pattern="lap", rough=0.8, label=f"HardieTrim {spec.extras.hardie_skirt}") if spec.extras.hardie_skirt
+        fascia=(dict(color=_hardie_hex(spec.extras.hardie_color), pattern="lap", rough=0.8, label=f"HardieTrim {spec.extras.hardie_skirt}") if spec.extras.hardie_skirt
                 else dict(color=pal[max(0, len(pal) // 2 - 1)], palette=pal, grain=True, rough=0.7)),
-        hardie=dict(color="#4b3f34", pattern="lap", rough=0.8, label="James Hardie ColorPlus Timber Bark"),
-        soffit=dict(color="#4b3f34", pattern="batten", rough=0.85, label="HardieSoffit cedarmill Timber Bark"),
+        hardie=dict(color=_hardie_hex(spec.extras.hardie_color), pattern="lap", rough=0.8, label=f"James Hardie ColorPlus {spec.extras.hardie_color or 'Timber Bark'}"),
+        soffit=dict(color=_hardie_hex(spec.extras.hardie_color), pattern="batten", rough=0.85, label=f"HardieSoffit cedarmill {spec.extras.hardie_color or 'Timber Bark'}"),
+        shade=dict(color="#7a5c45", rough=0.9, opacity=0.82, label="the owner's roll-down blinds (kept)"),
         steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
@@ -122,6 +197,8 @@ def build_scene(L) -> Scene:
     door_h = 6.75
     if spec.geometry.house_blocks:
         draw_house_from_spec(add, spec, zt, H_house)
+    for _c in (spec.geometry.covers or []):
+        draw_cover(add, spec, dict(COVER_DEFAULTS, **_c), zt)
     # a deck or roof above this one (existing, drawn for context) and the columns that carry it through this deck
     for ov in (spec.geometry.overhead or []):
         ox0, ox1, oy0, oy1, zu, zo = [float(v) for v in ov[:6]]
@@ -183,6 +260,8 @@ def build_scene(L) -> Scene:
     # ---------------- beams, posts, footings (from the beam lines)
     ft = spec.framing.footing_type
     pb_ = actual(spec.framing.post_size)[0] * IN
+    from .takeoff import cover_posts_x
+    shared_xy = [(px, float(c["y1"])) for c in covers_of(spec) if c.get("footing") == "deck_pier" for px in cover_posts_x(c)]
     for li, ln in enumerate(L.beam_lines):
         bw_, bd_ = ln.width * IN, ln.depth * IN
         y = ln.y * IN
@@ -202,6 +281,12 @@ def build_scene(L) -> Scene:
                 base_top = 0.15
             if spec.framing.existing_posts:   # the existing stucco column stays: 16" square, no base
                 add("post", x - 0.67, x + 0.67, y - 0.67, y + 0.67, base_top, top - bd_, "house", 2, tag=f"existing column P{pi + 1}")
+            elif any(abs(x - cx) < 1.0 and abs(y - cy) < 1.0 for cx, cy in shared_xy):
+                add("base", x - 0.27, x + 0.27, y - 0.27, y + 0.27, base_top, base_top + 0.12, "steel", 2)
+                continue                      # the 6x6 cover post stands on this pier and carries the beam (drawn with the cover)
+            elif spec.framing.system == "steel":
+                add("base", x - 0.2, x + 0.2, y - 0.2, y + 0.2, base_top, base_top + 0.1, "galv", 2)
+                add("post", x - 0.125, x + 0.125, y - 0.125, y + 0.125, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1} 3x3 HSS")
             else:
                 add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
                 add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1}")
@@ -766,6 +851,8 @@ def build_scene(L) -> Scene:
                 edge=edge, timber=timber, oiled=spec.framing.finish == "oil",
                 outline=[list(p) for p in spec.geometry.outline] if spec.geometry.outline else None,
                 step_text=step_captions(L))
+    if sun_vector(spec.site):
+        meta["sun"] = list(sun_vector(spec.site))
     return Scene(fixed, zt, W, y_min, y_front, materials_for(spec), meta)
 
 
@@ -863,6 +950,8 @@ def build_composite_scene(L) -> Scene:
                             W=abs((p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[1]) - (p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0])),
                             wall_y=0, D=0, front=0) for p in L.parts for z in p.layout.zones],
                 edge=0.0, timber=spec.is_timber, oiled=spec.framing.finish == "oil", step_text=step_captions(L), composite=True, bbox=list(L.bbox))
+    if sun_vector(spec.site):
+        meta["sun"] = list(sun_vector(spec.site))
     S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
     S.x_min = x0
     return S
@@ -1126,3 +1215,71 @@ def angled_wall(x0, y0, x1, y1, z0=0.0, z1=18.0, thick=0.5) -> Box:
     L_w = math.hypot(x1 - x0, y1 - y0); phi = math.atan2(y1 - y0, x1 - x0)
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     return Box("wall", cx - L_w / 2, cx + L_w / 2, cy - thick / 2, cy + thick / 2, z0, z1, "house", tag="angled house wall", rot=phi, rot_axis="z")
+
+
+
+def draw_cover(add, spec, c: dict, zt: float) -> None:
+    """A lean-to roof cover (slope +y: high at the house, low at the posts): ledger on the house, (2)2x10 beam on 6x6 posts,
+    2x8 rafters at 16" OC with the overhang, sheathing and the roof (standing seam with a snow bar, or shingles), Hardie
+    soffit / fascia / rakes when specified, and the owner's roll-down blinds hung under the low beam.
+    c: x0, x1 (post line extents), y0 (house wall), y1 (post line), clear_high_in / clear_low_in above the deck."""
+    from .takeoff import cover_posts_x
+    x0, x1, y0, y1 = float(c["x0"]), float(c["x1"]), float(c["y0"]), float(c["y1"])
+    ov = float(c.get("overhang_ft", 1.0))
+    bd = 9.25 / 12                                    # (2)2x10 beam / 2x10 ledger depth
+    rd = 7.25 / 12                                    # 2x8 rafter
+    hi_b = zt + float(c.get("clear_high_in") or 100.0) / 12     # bottom of the ledger at the house
+    lo_b = zt + float(c.get("clear_low_in") or 88.0) / 12       # bottom of the beam at the posts
+    run = (y1 - y0)
+    theta = math.atan2((hi_b + bd) - (lo_b + bd), run)
+    on_piers = c.get("footing", "deck") in ("diamond_pier", "deck_pier")
+    nm = c.get("name", "cover")
+    # ledger, beam, posts
+    add("cledger", x0 - 0.4, x1 + 0.4, y0, y0 + 0.13, hi_b, hi_b + bd, "ctimber", 8, tag=f"{nm} ledger 2x10")
+    add("cbeam", x0 - 0.4, x1 + 0.4, y1 - 0.25, y1 + 0.25, lo_b, lo_b + bd, "ctimber", 8, tag=f"{nm} beam (2)2x10")
+    for px in cover_posts_x(c):
+        zb = 0.45 if on_piers else zt
+        add("cpost", px - 0.23, px + 0.23, y1 - 0.23, y1 + 0.23, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 cedar")
+        if on_piers and c.get("footing") != "deck_pier":     # a shared pier is drawn with the deck
+            add("base", px - 0.27, px + 0.27, y1 - 0.27, y1 + 0.27, 0.33, 0.47, "steel", 1)
+            add("footing", px - 0.55, px + 0.55, y1 - 0.55, y1 + 0.55, -0.15, 0.35, "concrete", 1, tag=f"{nm} Diamond Pier")
+    # rafters: bottom edge on the ledger top at the house and the beam top at the posts, running past the beam by the overhang
+    y_end = y1 + ov
+    L_r = (y_end - y0) / math.cos(theta)
+    yc = (y0 + y_end) / 2
+    z_bot_c = (hi_b + bd) - math.tan(theta) * (yc - y0)      # rafter bottom line at the middle
+    zc = z_bot_c + (rd / 2) / math.cos(theta)
+    n = max(2, int(round((x1 - x0 + 0.8) / (16 / 12))))
+    for k in range(n + 1):
+        rx = x0 - 0.4 + 0.06 + k * (x1 - x0 + 0.8 - 0.12) / n
+        add("rafter", rx - 0.0625, rx + 0.0625, yc - L_r / 2, yc + L_r / 2, zc - rd / 2, zc + rd / 2, "ctimber", 8, tag=f"{nm} rafter 2x8", rot=theta, rot_axis="x")
+    ss = spec.extras.cover_roof.lower().startswith("standing")
+    z_top_c = z_bot_c + rd / math.cos(theta)
+    add("ssroof" if ss else "roof", x0 - 0.4, x1 + 0.4, yc - L_r / 2 - 0.05, yc + L_r / 2 + 0.05, z_top_c + 0.02, z_top_c + 0.12, "ssroof" if ss else "roof", 8,
+        tag="standing seam steel roof" if ss else "roof", rot=theta, rot_axis="x")
+    z_eave_top = (hi_b + bd) - math.tan(theta) * (y_end - y0) + rd / math.cos(theta)
+    if ss:   # snow retention bar 15" up the slope from the eave
+        yb = y_end - 1.25
+        zb = (hi_b + bd) - math.tan(theta) * (yb - y0) + rd / math.cos(theta) + 0.12
+        add("trim", x0 - 0.4, x1 + 0.4, yb - 0.06, yb + 0.06, zb, zb + 0.16, "steel", 8, tag="snow retention bar")
+    if spec.extras.cover_soffit:
+        add("soffit", x0 - 0.4, x1 + 0.4, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.05, z_bot_c, "soffit", 8, tag="HardieSoffit ceiling", rot=theta, rot_axis="x")
+    if spec.extras.cover_fascia:
+        z_eave_bot = (hi_b + bd) - math.tan(theta) * (y_end - y0)
+        add("hardie", x0 - 0.45, x1 + 0.45, y_end, y_end + 0.08, z_eave_bot - 0.12, z_eave_top + 0.12, "hardie", 8, tag="HardieTrim fascia")
+        for xe in (x0 - 0.45, x1 + 0.37):
+            add("hardie", xe, xe + 0.08, yc - L_r / 2, yc + L_r / 2, z_bot_c - 0.12, z_bot_c + rd / math.cos(theta) + 0.12, "hardie", 8, tag="HardieTrim rake", rot=theta, rot_axis="x")
+    if spec.extras.cover_gutters:
+        add("gutter", x0 - 0.45, x1 + 0.45, y_end + 0.08, y_end + 0.5, z_eave_top - 0.42, z_eave_top, "gutter", 8, tag="5\" K gutter")
+    # the owner's roll-down blinds: a roll under the beam's outer face; some bays lowered
+    for bl in c.get("blinds") or []:
+        a, b = float(bl.get("from_ft", x0)), float(bl.get("to_ft", x1))
+        yb = y1 + 0.32
+        zr = lo_b - 0.17
+        Lb = b - a
+        add("blind", (a + b) / 2 - 0.15, (a + b) / 2 + 0.15, yb - 0.15, yb + 0.15, zr - Lb / 2, zr + Lb / 2, "shade", 8, tag="roll-down blind (kept)", shape="cyl", rot=math.pi / 2)
+        low = float(bl.get("lowered", 0.0))
+        if low > 0:
+            z_bot = zr - low * (zr - zt)
+            add("blind", a + 0.05, b - 0.05, yb - 0.02, yb + 0.02, z_bot, zr, "shade", 8, tag="roll-down blind, lowered")
+            add("trim", a + 0.05, b - 0.05, yb - 0.04, yb + 0.04, z_bot - 0.05, z_bot, "steel", 8, tag="blind bottom bar")

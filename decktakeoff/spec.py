@@ -43,6 +43,17 @@ class Site:
     hoa: bool = False
     tax_rate: Optional[float] = None     # None -> pricebook standing rate (4% on factored materials); set for a destination rate
     notes: str = ""
+    # the sun in the renders: the site's position and which way the deck faces
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    rear_azimuth_deg: Optional[float] = None   # compass bearing of the outward normal of the wall the deck is on (the plan's +y)
+    utc_offset_h: float = -6.0                 # local clock offset from UTC (Colorado summer -6, winter -7)
+    sun_when: str = "2026-06-21T16:00"         # local date-time of the hero render's sun
+    ahj_flags: List[List[str]] = field(default_factory=list)   # jurisdiction findings from the site research: [severity, topic, text, ref]
+    code_basis: str = ""                 # the adopted codes line on G-001 ("" -> 2021 IRC as adopted by the city)
+    wind_note: str = ""                  # the wind line on G-001 ("" -> Vult, Exposure C, ASCE 7-16)
+    snow_note: str = ""                  # the ground-snow source note on G-001
+    plan: dict = field(default_factory=dict)   # site plan (C-100), plan frame feet: {parcel, footprint, street, street_side, lot_lines, info, coverage, setback_ref, source}
 
 
 @dataclass
@@ -77,6 +88,7 @@ class Geometry:
     size_mode: str = "nominal"           # "nominal" (GSX: the engine sizes the frame DOWN to full boards inside the nominal size) | "frame"
     height_in: float = 30.0              # finished deck surface above grade at the LOWEST grade point
     height_high_in: Optional[float] = None   # surface above grade at the highest point (sloped lots), if different
+    height_min_in: Optional[float] = None    # the lowest surface-to-grade point when height_in is an average (a walkway over uneven grade)
     attachment: str = "ledger"           # "ledger" | "freestanding"
     board_direction: str = "parallel"    # "parallel" (to the house) | "perpendicular"
     picture_frame: bool = True
@@ -92,6 +104,10 @@ class Geometry:
     house_blocks: List[List[float]] = field(default_factory=list)     # global frame, feet: [x0, x1, y0, y1] blocks of the house footprint (drawn, not counted)
     house_openings: List[List[float]] = field(default_factory=list)   # [x0, x1, y_face, z0, z1] doors / windows on a wall facing the deck
     cover: Optional[List[float]] = None                                 # porch cover: [x0, x1, y0, y1, slope] (feet), drawn as a shed roof on posts
+    covers: List[dict] = field(default_factory=list)   # one or more lean-to roof covers: {name, x0, x1, y0, y1 (ft, post/beam rectangle),
+                                                       #  slope "+y", clear_high_in / clear_low_in (bottom of the ledger at the house /
+                                                       #  bottom of the beam at the posts, above the deck), posts_x_ft, footing
+                                                       #  "deck" | "diamond_pier", overhang_ft, blinds [{"from_ft","to_ft","lowered"}]}
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
                                                                         # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
@@ -118,6 +134,7 @@ class Beam:
 @dataclass
 class Framing:
     system: str = "dimensional"          # "dimensional" (2x SYP, hangers, double rims) | "timber" (DF #1 4x joists, 6x beams, 8x8 posts)
+                                         # | "steel" (CEMCO cold-formed steel, sized as the same-depth lumber, then swapped — see steel.py)
     joist_size: str = "2x10"
     joist_species: str = "SYP"           # "SYP" | "DF" | "SPF" | "HF" | "CEDAR"
     joist_grade: str = "#1 True Frame GC"
@@ -239,6 +256,12 @@ class Extras:
     cover_roof_color: str = ""           # roof panel color ("Charcoal", "Matte Black", "Burnished Slate"); "" -> to be selected
     cover_gutters: bool = False          # 5" K-style seamless aluminum gutter on the low eave + 2x3 downspouts on the cover posts
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
+    cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
+    under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
+    demo_covers: bool = False            # tear off and haul the existing roof covers being replaced
+    blinds_reinstall: bool = False       # take down, store and rehang the owner's roll-down blinds on the new cover beams
+    exclusions: List[str] = field(default_factory=list)   # what the price does not include, printed on the quote ("Electrical")
+    hardie_color: str = ""               # James Hardie ColorPlus color for the skirt, cover fascia, rakes and soffit ("Arctic White"); "" -> Timber Bark
 
 
 @dataclass
@@ -366,3 +389,20 @@ def _build(cls, d: dict):
         else:
             kwargs[k] = v
     return cls(**kwargs)
+
+
+COVER_DEFAULTS = dict(name="Porch cover", slope="+y", clear_high_in=None, clear_low_in=None, posts_x_ft=None, footing="deck",
+                      overhang_ft=1.0, blinds=[])
+
+
+def covers_of(spec) -> List[dict]:
+    """Every roof cover on the job as a dict (the legacy single `cover` list first, then `covers`)."""
+    out = []
+    c = spec.geometry.cover
+    if c:
+        d = dict(COVER_DEFAULTS); d.update(x0=c[0], x1=c[1], y0=c[2], y1=c[3], slope=c[4] if len(c) > 4 else "+y", legacy=True)
+        out.append(d)
+    for c in spec.geometry.covers or []:
+        d = dict(COVER_DEFAULTS); d.update(c)
+        out.append(d)
+    return out
