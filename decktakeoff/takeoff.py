@@ -7,6 +7,7 @@ both ends, EdgeClips, Fulton) and timber (Eagle's Nest: 4x10 DF#1 on 6x12 / 8x8,
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple
@@ -1025,6 +1026,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 for s_, ss in zip(stairs, spec.stairs)],
         material_cost=round(sum(l.ext for l in lines), 2),
     )
+    if spec.decking.price_per_lf:
+        for ln in lines:
+            m_ = re.search(r"\b1x6x(\d+)\b", ln.item)
+            if ln.category in ("Decking", "Stairs", "Rail") and m_ and coll in ln.item:
+                ln.unit_cost, ln.source = round(spec.decking.price_per_lf * int(m_.group(1)), 2), f"owner ${spec.decking.price_per_lf:g}/LF"
+        summary["material_cost"] = round(sum(l.ext for l in lines), 2)
     t = Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
     if spec.framing.system == "steel":
         from .steel import steel_frame
@@ -1104,9 +1111,14 @@ def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
         post_len = next(v for v in (8, 10, 12, 14, 16) if v * 12 >= need)
     else:
         need, post_len = 0.0, 10
-    L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea",
-       f"exact  ({n_posts} posts on the low beam at " + " / ".join(ftin(p * 12) for p in posts_x) + (f"; {ftin(need)} cut length" if need else "") + ")",
-       per=PRICEBOOK["cover"]["cedar_6x6_lf"]["each"] * post_len)
+    if spec.extras.cover_post_species.upper().startswith("DF"):
+        stock = min(st_ for st_ in (8, 10, 12, 14, 16) if st_ >= post_len)
+        ucd, srcd = _lumber_price("6x6", stock, False)
+        out_lines.append(Line("Porch cover", f"6x6x{stock} Douglas fir #1 post (cover)", n_posts, n_posts, "ea", f"exact  ({n_posts} posts on the beam line, field-cut)", ucd, srcd))
+    else:
+        L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea",
+           f"exact  ({n_posts} posts on the low beam at " + " / ".join(ftin(p * 12) for p in posts_x) + (f"; {ftin(need)} cut length" if need else "") + ")",
+           per=PRICEBOOK["cover"]["cedar_6x6_lf"]["each"] * post_len)
     beam_pcs = int(_m.ceil(along / 16)) * 2
     L_(f"2x10x16 #1 SYP — cover beam (2 ply)", beam_pcs, beam_pcs, "ea", f"+0  ((2)2x10 x {along:.1f}' at the posts)", per=PRICEBOOK["lumber"]["2x10"]["per_lf"] * 16)
     ledger_pcs = int(_m.ceil(along / 16))

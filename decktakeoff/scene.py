@@ -133,7 +133,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
     return dict(
         timber=(dict(color="#a7adb2", metal=0.6, rough=0.42, label="CEMCO cold-formed steel, G90 galvanized") if spec.framing.system == "steel" else
                 dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated")),
-        ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 cedar posts, SYP beam / rafters"),
+        ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 " + ("Douglas fir" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar") + " posts, SYP beam / rafters"),
         galv=dict(color="#9aa0a6", metal=0.6, rough=0.45, label="galvanized steel"),
         deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
         border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
@@ -1239,7 +1239,7 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
     add("cbeam", x0 - 0.4, x1 + 0.4, y1 - 0.25, y1 + 0.25, lo_b, lo_b + bd, "ctimber", 8, tag=f"{nm} beam (2)2x10")
     for px in cover_posts_x(c):
         zb = 0.45 if on_piers else zt
-        add("cpost", px - 0.23, px + 0.23, y1 - 0.23, y1 + 0.23, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 cedar")
+        add("cpost", px - 0.23, px + 0.23, y1 - 0.23, y1 + 0.23, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 " + ("Douglas fir" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar"))
         if on_piers and c.get("footing") != "deck_pier":     # a shared pier is drawn with the deck
             add("base", px - 0.27, px + 0.27, y1 - 0.27, y1 + 0.27, 0.33, 0.47, "steel", 1)
             add("footing", px - 0.55, px + 0.55, y1 - 0.55, y1 + 0.55, -0.15, 0.35, "concrete", 1, tag=f"{nm} Diamond Pier")

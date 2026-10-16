@@ -13,6 +13,7 @@ from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, M
 from .layout import Layout
 from .scene import build_scene, Scene, PHASES
 from .takeoff import Takeoff
+from .spec import covers_of
 from .units import ftin
 from .viewer import viewer_html
 
@@ -81,7 +82,9 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         ss = s.extras.cover_roof.lower().startswith("standing")
         steps.append(dict(n=8, code="T-407", title="Porch cover", still="step8",
             goes_in=items(lambda l: l.category == "Porch cover", 14),
-            how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 cedar posts on the deck over blocked joists, (2)2x10 beam at the rail line; 2x8 rafters @ 16\" OC with hurricane ties, {out + 1.5:.1f}' with the 18\" overhang; 2x8 sub-fascia and OSB.",
+            how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 {'Douglas fir' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts "
+                 + ("on ABA66Z bases on the Diamond Piers (shared with the deck beam where they line up)" if any(c_.get("footing") in ("diamond_pier", "deck_pier") for c_ in covers_of(s)) else "on the deck over blocked joists")
+                 + f", (2)2x10 beam on the posts; 2x8 rafters @ 16\" OC with hurricane ties and the overhang; 2x8 sub-fascia and OSB.",
                  ("High-temp self-adhered underlayment over every sheet, headwall flashing counterflashed into the house wall, eave trim, then the 24 ga snap-lock panels one piece eave to headwall — clips 18\" OC on each seam, no face screws in the field; rake trim and closures last; snow retention bar clamped to the seams 12-18\" above the low eave, the full width."
                   if ss else "Synthetic underlayment, drip edge, starter, architectural shingles 6 nails each, step flashing at the house wall.")]
                 + ([f"5\" K gutter on the low eave, hangers 24\" OC, 1/16\" per foot toward the outlets; 2x3 downspouts strapped to the cover posts, offset past the deck edge, down the deck post to a splash block 3'+ from the footing."] if s.extras.cover_gutters else [])

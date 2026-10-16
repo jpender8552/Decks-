@@ -116,10 +116,17 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
             sf_l = float(lw) * float(ld) / 144
             lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck, 4 footings", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"] + 40.0, "EST — frame + decking rate + footings"))
     _covs = covers_of(s)
+    if _covs and s.extras.cover_labor_total is not None:
+        lab.append((f"Porch cover — {'both roof covers' if len(_covs) > 1 else 'roof cover'}: posts, ledger, beam, rafters, sheathing, roofing, Hardie, set on the piers",
+                    1, "lot", float(s.extras.cover_labor_total), "owner-set total, roofing included"))
     for _c in _covs:
         from .takeoff import cover_size, cover_posts_x
         along, out, area = cover_size(s, _c)
         nm = "Porch cover" + (f" ({_c['name']})" if len(_covs) > 1 else "")
+        if s.extras.cover_labor_total is not None:
+            if s.extras.demo_covers:
+                lab.append((f"{nm} — tear off the existing roof cover and haul", round(area), "SF", lr.get("cover_demo_per_sf", 3.0), "ESTIMATE — no cover demo rate on the card; confirm"))
+            continue
         lab.append((f"{nm} — frame, sheath, roof, ceiling", round(area), "SF", lr["cover_per_sf"], "ESTIMATE — no cover rate on the card; confirm"))
         if _c.get("footing", "deck") == "diamond_pier":
             lab.append((f"{nm} — Diamond Pier install at the cover posts", len(cover_posts_x(_c)), "pier", lr["diamond_pier_each"], "rate card"))
@@ -135,8 +142,8 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
             lab.append((f"{nm} — tear off the existing roof cover and haul", round(area), "SF", lr.get("cover_demo_per_sf", 3.0), "ESTIMATE — no cover demo rate on the card; confirm"))
     if s.extras.under_deck_gravel:
         lab.append(("Under-deck prep — 6-mil poly + 2\" gravel", round(t.layout.deck_sf), "SF", lr.get("under_deck_gravel_per_sf", 1.5), "ESTIMATE — confirm"))
-    if s.framing.system == "steel":
-        lab.append(("Steel frame premium — cut, clip and screw cold-formed members", round(t.layout.deck_sf), "SF", lr.get("steel_frame_premium_per_sf", 4.0), "ESTIMATE — no steel rate on the card; confirm with the framer"))
+    if s.framing.system == "steel" and lr.get("steel_frame_premium_per_sf"):     # rate card: no steel up-charge unless the job sets one
+        lab.append(("Steel frame premium — cut, clip and screw cold-formed members", round(t.layout.deck_sf), "SF", lr["steel_frame_premium_per_sf"], "ESTIMATE — no steel rate on the card; confirm with the framer"))
     if s.extras.blinds_reinstall and _covs:
         lab.append(("Take down, store and rehang the owner's roll-down blinds on the new beams", 1, "lot", lr.get("blinds_reinstall_lot", 250.0), "ESTIMATE — confirm"))
     return lab
@@ -223,7 +230,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         finish = ("Hardie soffit, fascia and rakes" if (s.extras.cover_soffit or s.extras.cover_fascia) else "T&G ceiling")
         roof = ("standing seam steel roof with snow retention" if s.extras.cover_roof.lower().startswith("standing") else "shingles") + (", gutter and downspouts" if s.extras.cover_gutters else "")
         lead = "Porch cover — shed roof" if n_cv == 1 else f"{n_cv} roof covers — lean-to roofs"
-        parts.append((f"{lead} on 6x6 cedar posts, {roof}, {finish}" + (", existing covers torn off" if s.extras.demo_covers else "") + (", blinds rehung" if s.extras.blinds_reinstall else ""),
+        parts.append((f"{lead} on 6x6 {'Douglas fir' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts, {roof}, {finish}" + (", existing covers torn off" if s.extras.demo_covers else "") + (", blinds rehung" if s.extras.blinds_reinstall else ""),
                       round(comp(cover_m, labsum("Porch cover") + labsum("Take down, store")))))
     main = rest - sum(v for _, v in parts)
     if s.is_timber:

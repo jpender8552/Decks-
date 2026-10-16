@@ -6,8 +6,8 @@ Current as of October 16, 2026. Prices are cash / financed / monthly.
 
 | Job | Package | Folder | Live | Cash | Financed | Monthly |
 |---|---|---|---|---|---|---|
-| 281 S Jefferson Ave, Louisville | Proposal — two decks + two lean-to covers | `jefferson-louisville-proposal/` | [V1](https://claude.ai/artifact/BiFu8Toei2ChHcvW2qBm8W) | $56,589 | $60,848 | $706 |
-| | Takeoff + bid / build set | `jefferson-louisville/` | [V1](https://claude.ai/artifact/UPoBoxpkeC9jGSrUwZePLt) | $56,589 | $60,848 | $706 |
+| 281 S Jefferson Ave, Louisville | Proposal — two decks + two lean-to covers | `jefferson-louisville-proposal/` | [V1](https://claude.ai/artifact/BiFu8Toei2ChHcvW2qBm8W) | $46,197 | $49,674 | $576 |
+| | Takeoff + bid / build set | `jefferson-louisville/` | [V1](https://claude.ai/artifact/UPoBoxpkeC9jGSrUwZePLt) | $46,197 | $49,674 | $576 |
 | | Permit set (site plan C-100, covers A-401, steel details) | `jefferson-louisville-permit-set/` | [V1](https://claude.ai/artifact/7xUDGhJjpnjuEKjajqZAVm) | | | |
 | Glengarry Pl, Castle Rock | 1 · Fulton rail · existing columns and caissons | `glengarry-1-fulton-existing/` | [V6](https://claude.ai/artifact/9MKSuUHXTxWqYcCtVLsT2E) | $128,893 | $138,595 | $1,608 |
 | | 2 · Fulton rail · new caissons and 8x8 DF posts | `glengarry-2-fulton-new/` | [V6](https://claude.ai/artifact/X3cCKDXYSK6zos4kSP8zCx) | $140,327 | $150,889 | $1,751 |

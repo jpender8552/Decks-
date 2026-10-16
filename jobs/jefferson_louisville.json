@@ -1,7 +1,7 @@
 {
   "job": "281 S Jefferson Ave — two decks + two lean-to covers (CEMCO steel, TimberTech Landmark American Walnut)",
   "client": "",
-  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg).",
+  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg). OWNER 16 Oct (pricing): posts Douglas fir, no extra beam set, no steel up-charge, both covers' labor $4,000 total incl. roofing, decking $5.50/LF, roll-down blinds existing (no work).",
   "site": {
     "address": "281 S Jefferson Ave",
     "city": "Louisville",
@@ -487,7 +487,8 @@
     "fascia": true,
     "border_collection": "Landmark",
     "border_color": "American Walnut",
-    "dividers": true
+    "dividers": true,
+    "price_per_lf": 5.5
   },
   "railing": {
     "system": "none",
@@ -506,7 +507,7 @@
     "demo_existing": true,
     "demo_sf": 198,
     "demo_covers": true,
-    "blinds_reinstall": true,
+    "blinds_reinstall": false,
     "engineered": true,
     "engineering_note": "Louisville requires a Colorado-licensed engineer's stamp on the framing plan (LMC 15.05.140 / the city deck handout); the covers are designed to 145 mph Exp C wind and the city's snow load.",
     "hardie_skirt": "4/4 x 10 Arctic White",
@@ -518,11 +519,14 @@
     "cover_roof_panel": "mechanical",
     "cover_gutters": false,
     "exclusions": [
-      "Electrical — no lighting, fans or outlets (owner's existing circuits are made safe and left as found)",
-      "The owner's roll-down blinds themselves (taken down, stored and rehung only)",
+      "Electrical — no lighting, fans or outlets",
+      "Roll-down blinds — existing, they stay",
       "Grading beyond the under-deck prep",
       "Variance or PUD amendment, if Planning requires one"
     ],
-    "under_deck_gravel": true
+    "under_deck_gravel": true,
+    "extra_beam_sets": 0,
+    "cover_post_species": "DF",
+    "cover_labor_total": 4000
   }
 }

@@ -173,6 +173,7 @@ class Decking:
     border_collection: Optional[str] = None    # contrast picture frame / dividers (None -> field collection)
     border_color: Optional[str] = None
     dividers: bool = False               # breaker boards: with an outline, only where a run would exceed the longest stock (on zone lines); else one on every zone boundary
+    price_per_lf: Optional[float] = None       # owner's decking price per LF (every 1x6 field / border / tread board): overrides the pricebook
     divider_x_ft: List[float] = field(default_factory=list)   # explicit breaker lines, feet from the left frame face (overrides the rule)
 
 
@@ -258,6 +259,8 @@ class Extras:
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
+    cover_post_species: str = "WRC"      # roof-cover posts: "WRC" (western red cedar) | "DF" (Douglas fir #1)
+    cover_labor_total: Optional[float] = None   # owner-set labor for ALL roof covers together, roofing included (replaces the per-SF cover lines)
     demo_covers: bool = False            # tear off and haul the existing roof covers being replaced
     blinds_reinstall: bool = False       # take down, store and rehang the owner's roll-down blinds on the new cover beams
     exclusions: List[str] = field(default_factory=list)   # what the price does not include, printed on the quote ("Electrical")
