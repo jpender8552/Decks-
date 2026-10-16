@@ -12,6 +12,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from .catalog import RAIL_SYSTEMS, decking_facts, actual
 from .layout import Layout
+from .spec import post_words, post_base_sku
 from .scene import Scene, Box, build_scene
 from .units import ftin
 
@@ -295,9 +296,10 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     o.append(T(sx, yy + 10, "x from the left frame face facing the house; y from the reference wall.", 7.2, 400, fill=MUTE))
     o.append(T(sx, yy + 21, f"Frost {ftin(L.spec.site.frost_depth_in)} · soil {L.spec.site.soil_bearing_psf:,.0f} psf · worst post {max(z.frame.footing_load_lb for z in L.zones):,.0f} lb", 7.2, 400, fill=MUTE))
     if L.spec.framing.system == "steel":
-        for k_, ln_ in enumerate(["Deck-only piers: 3x3 galvanized HSS stub on a pier-head bracket (D-502 / 3).",
-                                  "+cover: the 6x6 Douglas fir roof-cover post stands on this pier",
-                                  "(ABA66Z) and carries the deck beam on a steel side bracket (D-502 / 4);",
+        for k_, ln_ in enumerate([(f"Deck-only piers: 6x6 {post_words(L.spec)} post on {post_base_sku(L.spec)}, steel saddle to the beam (D-502 / 3)."
+                                   if L.spec.framing.steel_deck_post == "wood" else "Deck-only piers: 3x3 galvanized HSS stub on a pier-head bracket (D-502 / 3)."),
+                                  f"+cover: the 6x6 {post_words(L.spec)} roof-cover post stands on this pier",
+                                  f"({post_base_sku(L.spec)}) and carries the deck beam on a steel side bracket (D-502 / 4);",
                                   "roof load adds — the engineer sizes the pier.",
                                   f"Beams: boxed CEMCO {L.spec.framing.steel_joist}, flush (D-502 / 2)."]):
             o.append(T(sx, yy + 36 + k_ * 11, ln_, 7.2, 500))
@@ -612,7 +614,7 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     o.append(T(745, 148, "boxed C beam", 6.5, 700, "middle")); o.append(T(875, 148, "boxed C beam", 6.5, 700, "middle"))
     o.append(R(776, 112, 68, 66, "none", "#3f5d8a", 1.2)); o.append(T(810, 108, "steel side bracket, (2) 1/2\" thru-bolts", 6.5, 600, "middle", "#3f5d8a"))
     o.append(R(786, 280, 48, 10, FILL["steel"], INK, 0.6))
-    note(680, 275 - 10, 290, "Where a cover post lands on the deck beam line it stands on the deck's Diamond Pier (ABA66Z on the pier bolt) and carries the deck beam on a steel side bracket; elsewhere a 3x3 HSS stub on a pier-head bracket. Engineer sizes the pier for roof + deck and the uplift hold-down.")
+    note(680, 275 - 10, 290, f"Where a cover post lands on the deck beam line it stands on the deck's Diamond Pier ({post_base_sku(s)} on the pier bolt) and carries the deck beam on a steel side bracket; elsewhere {('a 6x6 ' + post_words(s) + ' post on ' + post_base_sku(s) + ' with a steel saddle') if s.framing.steel_deck_post == 'wood' else 'a 3x3 HSS stub on a pier-head bracket'}. Engineer sizes the pier for roof + deck and the uplift hold-down.")
     # 4 footing
     frame_(20, 330, 300, 270, "4", "DIAMOND PIER")
     o.append(LN(40, 470, 300, 470, INK, 1.0)); o.append(T(296, 466, "grade", 6.5, 600, "end", MUTE))
@@ -862,7 +864,7 @@ def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         notes = [f"Standing seam 24 ga, 16\" panels, 1-1/2\" mechanical (double-lock) seam — rated for {pitch:.2f}:12 · high-temp ice & water underlayment over 7/16\" OSB",
                  "Headwall flashing counterflashed into the siding · color-matched eave / rake trim · snow bar across the low eave",
                  f"HardieSoffit cedarmill ceiling · HardieTrim fascia + rakes ({s.extras.hardie_color or 'color TBD'}) · H2.5AZ at every rafter · post caps per D-503",
-                 f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts on ABA66Z bases on the Diamond Pier bolt · {'BC46Z' if c.get('beam', '').startswith('4x') else 'AC6Z'} cap to the {c.get('beam', '(2)2x10')} {'Douglas fir ' if c.get('beam', '').startswith('4x') else ''}beam · the engineer's uplift hold-down governs"]
+                 f"6x6 {post_words(s)} posts on {post_base_sku(s)} bases on the Diamond Pier bolt · {'BC46Z' if c.get('beam', '').startswith('4x') else 'AC6Z'} cap to the {c.get('beam', '(2)2x10')} {'Douglas fir ' if c.get('beam', '').startswith('4x') else ''}beam · the engineer's uplift hold-down governs"]
         yy = sy0 + 236
         for ln in notes:
             for w in textwrap.wrap(ln, int(colw / 5.0)):
@@ -941,12 +943,12 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
     steel = s.framing.system == "steel"
     dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
     hc = s.extras.hardie_color or ""
-    post_sp = "Douglas fir #1" if s.extras.cover_post_species.upper().startswith("DF") else "cedar"
+    post_sp = post_words(s)
     from .spec import covers_of
     _cv0 = (covers_of(s) or [{}])[0]
     ks = [
         (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "first"),
-        ("3x3 galvanized HSS post stub on a pier-head bracket" if steel else f"{s.framing.post_size} post on a standoff base", lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
+        ((f"6x6 {post_words(s)} deck post on {post_base_sku(s)}, steel saddle to the boxed beam" if s.framing.steel_deck_post == "wood" else "3x3 galvanized HSS post stub on a pier-head bracket") if steel else f"{s.framing.post_size} post on a standoff base", lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
         ((f"Boxed CEMCO {s.framing.steel_joist} beam (2 C toe-to-toe, G90), flush" if steel else "Beam"), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
         ((f"CEMCO {s.framing.steel_joist} C-joist, G90, @ {L.frame.spacing:g}\" OC — clip angles each end" if steel else f"{s.framing.joist_size} joist"), lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
         ((f"CEMCO {s.framing.steel_track} track rim, G90 (caps the joist ends)" if steel else "Rim"), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
@@ -957,7 +959,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
         ((f"HardieTrim skirt {hc}".strip() if s.extras.hardie_skirt else "Fascia"), lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
         ("Stair — steel stringers, Landmark treads, closed risers, lands on grade" if steel else "Stair", lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
         ("Gravel over 6-mil poly under the decks", lambda b: b.kind == "gravel", (0.3, 0.6, 1.0), "first"),
-        (f"6x6 {post_sp} cover post on ABA66Z (shared Diamond Pier)", lambda b: b.kind == "cpost", (0.5, 0.5, 0.45), "last"),
+        (f"6x6 {post_sp} cover post on {post_base_sku(s)} (shared Diamond Pier)", lambda b: b.kind == "cpost", (0.5, 0.5, 0.45), "last"),
         (f"{_cv0.get('beam', '(2)2x10')} cover beam, " + ("Douglas fir, BC46Z cap" if _cv0.get('beam', '').startswith('4x') else "wood, AC6Z cap"), lambda b: b.kind == "cbeam", (0.7, 0.5, 0.5), "last"),
         (f"{_cv0.get('ledger', '2x10')} cover ledger, wood, LedgerLOK 6\" 2 rows, headwall flashed", lambda b: b.kind == "cledger", (0.5, 0.5, 0.5), "last"),
         ("2x8 rafters @ 16\" OC, wood, H2.5AZ at the beam", lambda b: b.kind == "rafter", (0.5, 0.5, 0.5), "mid"),
@@ -1025,7 +1027,7 @@ def sheet_iso_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
         return None
     key = [k for k in member_key(L, S, t) if any(k[1](b) for b in bx)]
     return _axo_sheet("A-402", "Roof covers — exploded isometric, labeled", "Both lean-to covers pulled apart layer by layer", L, S, t, meta, bx, explode=True, gaps={8: 0.0}, az=-38, el=26, key=key,
-                      note="Lifts are for clarity only. Order of work: posts on ABA66Z bases, beam on AC6Z caps, ledger on LedgerLOK, rafters with H2.5AZ, soffit, OSB, underlayment, panels, trims, snow bar.")
+                      note="Lifts are for clarity only. Order of work: posts on " + post_base_sku(L.spec) + " bases, beams on their post caps, ledger on LedgerLOK, rafters with H2.5AZ, soffit, OSB, underlayment, panels, trims, snow bar.")
 
 
 def sheet_iso_structure(L: Layout, S: Scene, t, meta) -> str:
@@ -1162,20 +1164,21 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     _lead(o, x + 192, y + 120, x + 200, y + 40, "#12-14 self-drilling hex-washer screws, 4 per leg")
     _lead(o, x + 250, y + 140, x + 220, y + 250, "C-joists @ 12\" OC both sides, flush with the beam top")
     # 3 boxed beam on HSS stub / pier
-    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "BEAM ON HSS STUB + DIAMOND PIER")
+    wood_post = s.framing.steel_deck_post == "wood"
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "BEAM ON 6x6 POST + DIAMOND PIER" if wood_post else "BEAM ON HSS STUB + DIAMOND PIER")
     o.append(LN(x + 20, y + 200, x + W3 - 20, y + 200, INK, 1.0)); o.append(T(x + W3 - 24, y + 196, "grade", 6.4, 700, "end", MUTE))
     o.append(R(x + 128, y + 190, 60, 18, FILL["concrete"], INK, 0.9))
     for dx in (-60, -24, 24, 60):
         o.append(LN(x + 158, y + 208, x + 158 + dx, y + 285, INK, 1.1))
     o.append(R(x + 140, y + 178, 36, 12, FILL["steel"], INK, 0.6))
-    o.append(R(x + 150, y + 112, 16, 66, G, INK, 0.8))
+    o.append(R(x + 144, y + 112, 28, 66, FILL["timber"], INK, 0.8) if wood_post else R(x + 150, y + 112, 16, 66, G, INK, 0.8))
     o.append(R(x + 140, y + 106, 36, 6, FILL["steel"], INK, 0.6))
     o.append(R(x + 60, y + 50, 196, 56, G, INK, 0.9)); o.append(LN(x + 158, y + 50, x + 158, y + 106, INK, 0.6))
     o.append(R(x + 50, y + 43, 216, 7, FILL["deck"], INK, 0.5))
     _lead(o, x + 158, y + 196, x + 196, y + 238, f"Diamond Pier {L.frame.footing_model}: head + 4 pins driven, no excavation")
-    _lead(o, x + 176, y + 184, x + 214, y + 160, "Pier-head post bracket on the pier bolt")
-    _lead(o, x + 156, y + 140, x + 24, y + 150, "3x3 x 11 ga HSS stub, hot-dip galvanized")
-    _lead(o, x + 176, y + 108, x + 214, y + 124, "Welded cap plate, (4) #12 screws up into the beam (engineer)")
+    _lead(o, x + 176, y + 184, x + 214, y + 160, f"Simpson {post_base_sku(s)} on the pier bolt" if wood_post else "Pier-head post bracket on the pier bolt")
+    _lead(o, x + 156, y + 140, x + 24, y + 150, f"6x6 {post_words(s)} deck post" if wood_post else "3x3 x 11 ga HSS stub, hot-dip galvanized")
+    _lead(o, x + 176, y + 108, x + 214, y + 124, "Galvanized steel beam saddle, thru-bolted to the post, #12 screws into the beam (engineer)" if wood_post else "Welded cap plate, (4) #12 screws up into the beam (engineer)")
     _lead(o, x + 90, y + 78, x + 24, y + 30, f"Boxed {s.framing.steel_joist} beam, flush with the joists")
     # 4 shared pier: cover post carries the deck beam
     x, y = P[3]; _panel(o, x, y, W3, H2, "4", "SHARED PIER — COVER POST + DECK BEAM")
@@ -1190,10 +1193,10 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     for yy in (132, 158):
         o.append(LN(x + 128, y + yy, x + 188, y + yy, INK, 1.4))
     o.append(R(x + 50, y + 113, 94, 7, FILL["deck"], INK, 0.5)); o.append(R(x + 172, y + 113, 94, 7, FILL["deck"], INK, 0.5))
-    _lead(o, x + 158, y + 60, x + 190, y + 40, f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} cover post — runs up to the roof-cover beam")
+    _lead(o, x + 158, y + 60, x + 190, y + 40, f"6x6 {post_words(s)} cover post — runs up to the roof-cover beam")
     _lead(o, x + 132, y + 140, x + 24, y + 40, "Steel side bracket, 11 ga galvanized, (2) 1/2\" thru-bolts")
     _lead(o, x + 100, y + 150, x + 24, y + 196, "Boxed steel deck beam bears on the bracket")
-    _lead(o, x + 178, y + 214, x + 200, y + 256, "Simpson ABA66Z on the Diamond Pier bolt (pier upsized to DP-75/63 where roof + deck exceed the DP-50)")
+    _lead(o, x + 178, y + 214, x + 200, y + 256, f"Simpson {post_base_sku(s)} on the Diamond Pier bolt (pier upsized to DP-75/63 where roof + deck exceed the DP-50)")
     _lead(o, x + 240, y + 116, x + 210, y + 90, "Picture-frame board notched around the post, 1/4\" gap")
     # 5 deck edge
     x, y = P[4]; _panel(o, x, y, W3, H2, "5", "DECK EDGE — TRACK RIM, BORDER, HARDIE SKIRT")
@@ -1223,7 +1226,7 @@ def sheet_details_steel_connections(L: Layout, S: Scene, t, meta) -> str:
     _lead(o, x + 150, y + 210, x + 210, y + 260, "Galvanized steel stringers @ 12\" OC, clipped to the track rim")
     _lead(o, x + 193, y + 165, x + 230, y + 100, "Clip angle stringer-to-rim, #12 screws")
     _lead(o, x + 110, y + 230, x + 24, y + 270, f"Lands on compacted grade, no pad · {st_.geo.risers if st_ else 2} risers @ {rz:.2f}\" · tread {st_.geo.tread_in if st_ else 11:.2f}\"")
-    return sheet("D-502", "Connection details — CEMCO steel deck frame", "Ledger track · joist clips · boxed beam · HSS stub on the pier · shared pier · deck edge · stair", o,
+    return sheet("D-502", "Connection details — CEMCO steel deck frame", "Ledger track · joist clips · boxed beam · post on the pier · shared pier · deck edge · stair", o,
                  "Schematic details, not to scale · the engineer of record's details and screw schedule govern", meta)
 
 
@@ -1236,7 +1239,7 @@ def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[st
         return None
     c0 = cvs[0]
     cb, cl = c0.get("beam", "(2)2x10"), c0.get("ledger", "2x10")
-    post = f"6x6 {'Douglas fir #1' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'}"
+    post = f"6x6 {post_words(s)}"
     hc = s.extras.hardie_color or ""
     roof = f"{s.extras.cover_roof_color} 24 ga standing seam".strip()
     WD, WD2 = FILL["timber"], FILL["timber_dk"]
@@ -1273,7 +1276,7 @@ def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[st
     o.append(PG([(x + 20, y + 120), (x + 250, y + 132), (x + 250, y + 136), (x + 20, y + 124)], "#f2efe8", INK, 0.5))
     o.append(C(x + 140, y + 116, 2.4, INK))
     _lead(o, x + 135, y + 130, x + 24, y + 160, f"{cb} beam on the posts")
-    _lead(o, x + 150, y + 150, x + 180, y + 180, "Simpson BC46Z post cap" if cb.startswith("4x") else "Simpson AC6Z post cap")
+    _lead(o, x + 150, y + 150, x + 180, y + 180, ("Simpson BC46Z post cap" if cb.startswith("4x") else "Simpson AC6Z post cap") + (" (rough-6x6 R-series)" if s.framing.post_rough else ""))
     _lead(o, x + 135, y + 220, x + 180, y + 230, f"{post} post")
     _lead(o, x + 140, y + 116, x + 24, y + 40, "H2.5AZ hurricane tie each rafter to the beam")
     _lead(o, x + 205, y + 88, x + 170, y + 40, "Snow retention bar clamped to the seams, 12–18\" up from the eave")
@@ -1290,7 +1293,7 @@ def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[st
     o.append(R(x + 138, y + 208, 40, 12, FILL["steel"], INK, 0.6)); o.append(R(x + 144, y + 30, 28, 178, WD, INK, 0.9))
     o.append(R(x + 40, y + 160, 100, 8, FILL["border"], INK, 0.5)); o.append(R(x + 176, y + 160, 100, 8, FILL["border"], INK, 0.5))
     o.append(R(x + 40, y + 168, 104, 40, "#a7adb2", INK, 0.6)); o.append(R(x + 172, y + 168, 104, 40, "#a7adb2", INK, 0.6))
-    _lead(o, x + 158, y + 214, x + 200, y + 258, "Simpson ABA66Z standoff base on the Diamond Pier bolt")
+    _lead(o, x + 158, y + 214, x + 200, y + 258, f"Simpson {post_base_sku(s)} standoff base on the Diamond Pier bolt")
     _lead(o, x + 158, y + 236, x + 24, y + 270, "Diamond Pier — shared with the deck beam where they line up")
     _lead(o, x + 158, y + 80, x + 190, y + 50, f"{post} post through the deck, plumb both ways")
     _lead(o, x + 150, y + 164, x + 24, y + 120, "Picture-frame border boxes the post, 1/4\" gap all round")

@@ -147,6 +147,8 @@ class Framing:
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
+    post_rough: bool = False                 # 6x6 posts are rough-sawn full dimension (Douglas fir rough): R-series bases and caps
+    steel_deck_post: str = "hss"             # steel frame: what stands on a deck-only pier — "hss" (3x3 stub) | "wood" (6x6 post, steel saddle to the beam)
     steel_joist: str = "600S162-54"          # steel frame jobs: SSMA joist designation (depth S flange - mils), G90
     steel_track: str = "600T"                # track for the rims and the ledger (54 mil)
     footing_price: Optional[float] = None    # owner's price per Diamond Pier (material, each) — overrides the pricebook
@@ -400,6 +402,17 @@ def _build(cls, d: dict):
 
 COVER_DEFAULTS = dict(name="Porch cover", slope="+y", beam="(2)2x10", ledger="2x10", clear_high_in=None, clear_low_in=None, posts_x_ft=None, footing="deck",
                       overhang_ft=1.0, blinds=[])
+
+
+def post_words(spec) -> str:
+    """How a 6x6 post reads: 'Douglas fir rough' / 'Douglas fir #1' / 'cedar' (cover posts) — the deck posts follow the same wood."""
+    if spec.framing.post_rough:
+        return "Douglas fir rough"
+    return "Douglas fir #1" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar"
+
+
+def post_base_sku(spec) -> str:
+    return "ABA66RZ" if spec.framing.post_rough else "ABA66Z"
 
 
 def covers_of(spec) -> List[dict]:

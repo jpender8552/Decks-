@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .catalog import rail_system_for, BOARDS_PALETTE, RAIL_SYSTEMS, actual, decking_facts, parse_beam
 from .layout import Layout, NOSE, OVERHANG_NO_FASCIA, RAIL_POST_INSET
-from .spec import COVER_DEFAULTS, DeckSpec, covers_of
+from .spec import COVER_DEFAULTS, DeckSpec, covers_of, post_words, post_base_sku
 
 PHASES = {1: "Footings", 2: "Posts", 3: "Stone bases", 4: "Beams", 5: "Frame", 6: "Decking", 7: "Rail", 8: "Furnishings"}
 IN = 1 / 12.0
@@ -134,7 +134,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
     return dict(
         timber=(dict(color="#a7adb2", metal=0.6, rough=0.42, label="CEMCO cold-formed steel, G90 galvanized") if spec.framing.system == "steel" else
                 dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated")),
-        ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 " + ("Douglas fir" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar") + " posts, SYP beam / rafters"),
+        ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 " + post_words(spec) + " posts, beams, SYP rafters"),
         galv=dict(color="#9aa0a6", metal=0.6, rough=0.45, label="galvanized steel"),
         deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
         border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
@@ -287,6 +287,10 @@ def build_scene(L) -> Scene:
             elif any(abs(x - cx) < 1.0 and abs(y - cy) < 1.0 for cx, cy in shared_xy):
                 add("base", x - 0.27, x + 0.27, y - 0.27, y + 0.27, base_top, base_top + 0.12, "steel", 2)
                 continue                      # the 6x6 cover post stands on this pier and carries the beam (drawn with the cover)
+            elif spec.framing.system == "steel" and spec.framing.steel_deck_post == "wood":
+                hw_ = 0.25 if spec.framing.post_rough else 0.23
+                add("base", x - hw_ - 0.02, x + hw_ + 0.02, y - hw_ - 0.02, y + hw_ + 0.02, base_top, base_top + 0.12, "steel", 2)
+                add("post", x - hw_, x + hw_, y - hw_, y + hw_, base_top + 0.1, top - bd_, "ctimber", 2, tag=f"P{pi + 1} 6x6 Douglas fir" + (" rough" if spec.framing.post_rough else ""))
             elif spec.framing.system == "steel":
                 add("base", x - 0.2, x + 0.2, y - 0.2, y + 0.2, base_top, base_top + 0.1, "galv", 2)
                 add("post", x - 0.125, x + 0.125, y - 0.125, y + 0.125, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1} 3x3 HSS")
@@ -902,7 +906,8 @@ def step_captions(L: Layout) -> Dict[int, str]:
           "existing": f"{n_posts} existing caissons stay" + (" with the existing columns" if s.framing.existing_posts else ", new standoff bases")}[s.framing.footing_type]
     beams = " · ".join(f"{bl.label} ({bl.n_posts} posts)" for bl in L.beam_lines)
     out = {1: f"Step 1 · Footings — {ft}",
-           2: (("Step 2 · Posts — 3x3 galvanized steel stubs on pier-head brackets" + ("; 6x6 Douglas fir cover posts carry the deck beams where they line up" if any(c.get("footing") == "deck_pier" for c in covers_of(s)) else ""))
+           2: ((("Step 2 · Posts — 6x6 " + post_words(s) + " deck posts on " + post_base_sku(s) + " bases, steel saddles to the beams" if s.framing.steel_deck_post == "wood" else "Step 2 · Posts — 3x3 galvanized steel stubs on pier-head brackets")
+                + ("; 6x6 " + post_words(s) + " cover posts carry the deck beams where they line up" if any(c.get("footing") == "deck_pier" for c in covers_of(s)) else ""))
                if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
            4: f"Step 4 · Beams — {beams}",
@@ -1247,7 +1252,8 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
     add("cbeam", x0 - 0.4, x1 + 0.4, y1 - 0.25, y1 + 0.25, lo_b, lo_b + bd, "ctimber", 8, tag=f"{nm} beam {cbeam}", xg=2.0)
     for px in cover_posts_x(c):
         zb = 0.45 if on_piers else zt
-        add("cpost", px - 0.23, px + 0.23, y1 - 0.23, y1 + 0.23, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 " + ("Douglas fir" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar"))
+        hw_ = 0.25 if spec.framing.post_rough else 0.23
+        add("cpost", px - hw_, px + hw_, y1 - hw_, y1 + hw_, zb, lo_b, "ctimber", 8, tag=f"{nm} post 6x6 " + post_words(spec))
         if on_piers and c.get("footing") != "deck_pier":     # a shared pier is drawn with the deck
             add("base", px - 0.27, px + 0.27, y1 - 0.27, y1 + 0.27, 0.33, 0.47, "steel", 1)
             add("footing", px - 0.55, px + 0.55, y1 - 0.55, y1 + 0.55, -0.15, 0.35, "concrete", 1, tag=f"{nm} Diamond Pier")

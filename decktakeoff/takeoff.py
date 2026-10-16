@@ -17,7 +17,7 @@ from .catalog import (rail_system_for, STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, 
                       POST_CAP_SCREWS, PRICEBOOK, SPECIES_NAMES, TIMBER_BASE, actual, decking_facts, default_fastener_system, parse_beam,
                       RAIL_SYSTEMS)
 from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
-from .spec import covers_of, DeckSpec
+from .spec import post_words, post_base_sku, covers_of, DeckSpec
 from .units import ftin
 
 CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Porch cover", "Finish", "Site"]
@@ -1129,7 +1129,7 @@ def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
     if spec.extras.cover_post_species.upper().startswith("DF"):
         stock = min(st_ for st_ in (8, 10, 12, 14, 16) if st_ >= post_len)
         ucd, srcd = _lumber_price("6x6", stock, False)
-        out_lines.append(Line("Porch cover", f"6x6x{stock} Douglas fir #1 post (cover)", n_posts, n_posts, "ea", f"exact  ({n_posts} posts on the beam line, field-cut)", ucd, srcd))
+        out_lines.append(Line("Porch cover", f"6x6x{stock} {post_words(spec)} post (cover)", n_posts, n_posts, "ea", f"exact  ({n_posts} posts on the beam line, field-cut)", ucd, srcd))
     else:
         L_(f"6x6 x {post_len}' Western red cedar post (cover)", n_posts, n_posts, "ea",
            f"exact  ({n_posts} posts on the low beam at " + " / ".join(ftin(p * 12) for p in posts_x) + (f"; {ftin(need)} cut length" if need else "") + ")",
@@ -1205,18 +1205,18 @@ def cover_lines(spec, c: Optional[dict] = None, tag: str = "") -> List[Line]:
         L_(None, 1, 1, "box", "color-matched trim screws", key="hardie_trim_screws_100")
     if c.get("footing") == "deck_pier":   # the cover post stands on the deck beam's Diamond Pier and carries the deck beam beside it
         ucb, srcb = _price("footings", "ABA66Z")
-        out_lines.append(Line("Porch cover", "Simpson ABA66Z post base on the shared Diamond Pier bolt — cover post (pier counted with the deck)", n_posts, n_posts, "ea", "exact", ucb, srcb))
+        out_lines.append(Line("Porch cover", f"Simpson {post_base_sku(spec)} post base on the shared Diamond Pier bolt — cover post (pier counted with the deck)", n_posts, n_posts, "ea", "exact", ucb, srcb))
     elif on_piers:     # the cover posts run past the deck to their own footing: roof snow and uplift do not ride on the deck frame
         ucp, srcp = _price("footings", spec.framing.footing_model if spec.framing.footing_type == "diamond_pier" else "DP-50/50")
         out_lines.append(Line("Porch cover", f"Diamond Pier {spec.framing.footing_model if spec.framing.footing_type == 'diamond_pier' else 'DP-50/50'} — cover post footing (through the deck)", n_posts, n_posts, "ea", "exact  (one per cover post)", ucp, srcp))
         ucb, srcb = _price("footings", "ABA66Z")
-        out_lines.append(Line("Porch cover", "Simpson ABA66Z post base on the pier bolt — cover post", n_posts, n_posts, "ea", "exact", ucb, srcb))
+        out_lines.append(Line("Porch cover", f"Simpson {post_base_sku(spec)} post base on the pier bolt — cover post", n_posts, n_posts, "ea", "exact", ucb, srcb))
     else:
         L_(None, n_posts, n_posts, "ea", "exact", key="post_base_6x6")
     if cb_nom.startswith("4x"):
-        L_("Simpson BC46Z post cap, 6x6 post to the 4x beam", n_posts, n_posts, "ea", "exact", key="BC46Z", section="hardware")
+        L_("Simpson BC46Z post cap, 6x6 post to the 4x beam" + (" — sized for a rough 6x6 (R-series), confirm SKU" if spec.framing.post_rough else ""), n_posts, n_posts, "ea", "exact", key="BC46Z", section="hardware")
     else:
-        L_(f"Simpson AC6Z post cap, 6x6 to the {c.get('beam', '(2)2x10')} beam", n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
+        L_(f"Simpson {'AC6RZ' if spec.framing.post_rough else 'AC6Z'} post cap, {'rough ' if spec.framing.post_rough else ''}6x6 to the {c.get('beam', '(2)2x10')} beam", n_posts, n_posts, "ea", "exact", key="post_cap_6x6")
     L_(None, n_r, n_r, "ea", "one per rafter at the beam", key="rafter_tie")
     lok = int(_m.ceil(along / 16 * 2)) * 16 // 16 * 2
     L_("FastenMaster LedgerLOK 6\" — cover ledger, 2 rows staggered 16\" OC", int(_m.ceil(along / 16 * 12 * 2)), int(_m.ceil(along / 16 * 12 * 2)), "ea", f"{along:.0f} LF x 2 rows @ 16\"", per=PRICEBOOK["hardware"]["LedgerLOK6_50"]["each"] / 50 if "each" in PRICEBOOK["hardware"]["LedgerLOK6_50"] else 1.2)

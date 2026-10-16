@@ -135,7 +135,17 @@ def steel_frame(t) -> None:
         ad("Steel side bracket, 11 ga galvanized — deck beam bolted to the 6x6 cover post (shared pier)", n_shared, n_shared, "ea",
            "exact  (one per shared post, (2) 1/2\" thru-bolts + #12 screws into the beam)", 32.0)
         n_posts = max(0, n_posts - n_shared)
-    if n_posts and not s.framing.existing_posts:
+    if n_posts and not s.framing.existing_posts and s.framing.steel_deck_post == "wood":
+        from .spec import post_words, post_base_sku
+        from .takeoff import _lumber_price
+        lens = [b.post_len for b in L.beam_lines]
+        per8 = max(1, int(96 // (max(lens) + 6.0)))
+        n8 = int(math.ceil(n_posts / per8))
+        uc8, _ = _lumber_price("6x6", 8, False)
+        ad(f"6x6x8 {post_words(s)} — deck posts on the deck-only piers", n8, n8, "ea", f"exact  ({n_posts} posts, about {max(lens):.0f}\" each, {per8} per 8')", uc8)
+        ad(f"Simpson {post_base_sku(s)} post base on the Diamond Pier bolt — deck post", n_posts, n_posts, "ea", "exact", 16.0)
+        ad("Galvanized steel beam saddle, 11 ga — boxed steel beam to the 6x6 post top", n_posts, n_posts, "ea", "exact  (one per deck post, thru-bolted to the post, #12 screws into the beam)", 32.0)
+    elif n_posts and not s.framing.existing_posts:
         ad("Steel post stub 3\" x 3\" x 11 ga HSS, hot-dip galvanized, cap plate welded — cut to height", n_posts, n_posts, "ea",
            "exact  (one per deck-only pier; " + " / ".join(sorted(set(f'{b.post_len:.0f}"' for b in L.beam_lines))) + " clear)", PRICE["post"])
         ad("Pier-head post bracket for the Diamond Pier bolt (steel post)", n_posts, n_posts, "ea", "exact", PRICE["pier_bracket"])
@@ -164,7 +174,7 @@ def steel_frame(t) -> None:
         if c.nominal == jsize:
             c.nominal = N["joist"]
         elif c.nominal in (s.framing.post_size,):
-            c.nominal = "3x3 HSS"
+            c.nominal = "6x6 DF rough" if (s.framing.steel_deck_post == "wood" and s.framing.post_rough) else ("6x6 DF" if s.framing.steel_deck_post == "wood" else "3x3 HSS")
         elif c.nominal == "2x12":
             c.nominal = "steel stringer"
     t.schedule.pop("Joist tape", None)
@@ -185,14 +195,16 @@ def steel_frame(t) -> None:
     for c in t.cut_list:
         c.member, c.note = steelify(c.member), steelify(c.note)
         if c.member.startswith("Posts under"):
-            c.member = c.member.replace("Posts under", "Steel post stubs / cover posts under")
+            c.member = c.member.replace("Posts under", ("6x6 deck posts / cover posts under" if s.framing.steel_deck_post == "wood" else "Steel post stubs / cover posts under"))
     for ln in t.lines:
         if ln.category in ("Lumber", "Hardware", "Footings"):
             ln.why = steelify(ln.why)
     sm = t.summary
     sm["joists"] = f"{N['joist_txt']} @ {L.frame.spacing:g}\" OC"
     sm["rims"] = f"single-ply {N['track']} track rims (G90)" + (f" and {N['track']} ledger track on a steel angle" if ledger_lf else "")
-    sm["posts"] = sm["posts"].replace(f"{L.n_footings} x {s.framing.post_size}", f"{n_posts} x 3x3 galvanized steel post stubs" + (f" + {n_shared} cover posts carrying the deck beam" if n_shared else ""))
+    from .spec import post_words as _pw
+    deck_posts = f"{n_posts} x 6x6 {_pw(s)} deck posts on steel beam saddles" if s.framing.steel_deck_post == "wood" else f"{n_posts} x 3x3 galvanized steel post stubs"
+    sm["posts"] = sm["posts"].replace(f"{L.n_footings} x {s.framing.post_size}", deck_posts + (f" + {n_shared} 6x6 {_pw(s)} cover posts carrying the deck beam" if n_shared else ""))
     sm["material_cost"] = round(sum(l.ext for l in t.lines), 2)
     t.notes.append("Frame is CEMCO cold-formed steel: the layout is sized as the equivalent-depth lumber, then the engineer of record "
                    "designs the members (gauge, beam build-up, clip schedule). Steel prices are estimates until the CEMCO dealer quotes.")

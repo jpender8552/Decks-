@@ -13,7 +13,7 @@ from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, M
 from .layout import Layout
 from .scene import build_scene, Scene, PHASES
 from .takeoff import Takeoff
-from .spec import covers_of
+from .spec import covers_of, post_words, post_base_sku
 from .units import ftin
 from .viewer import viewer_html
 
@@ -58,12 +58,13 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             check=["Stone plumb and square to the deck; caps level", "Sample color approved by the homeowner"]))
     if s.framing.system == "steel":
         steps[-1] = dict(n=2, code="T-401", title="Posts", still="step2",
-            goes_in=items(lambda l: "HSS" in l.item or "pier-head" in l.item.lower() or "side bracket" in l.item.lower() or "ABA66Z" in l.item),
-            how=["Deck-only piers: 3x3 galvanized HSS stubs on the pier-head brackets, cut so the boxed steel beam top lands at the joist top (flush beams): "
+            goes_in=items(lambda l: "HSS" in l.item or "pier-head" in l.item.lower() or "side bracket" in l.item.lower() or "ABA66" in l.item or "deck posts" in l.item or "saddle" in l.item),
+            how=[(f"Deck-only piers: 6x6 {post_words(s)} posts on {post_base_sku(s)} bases, galvanized steel saddles on top carrying the boxed beams, cut so the beam top lands at the joist top (flush beams): "
+                  if s.framing.steel_deck_post == "wood" else "Deck-only piers: 3x3 galvanized HSS stubs on the pier-head brackets, cut so the boxed steel beam top lands at the joist top (flush beams): ")
                  + " / ".join(f"{bl.label} {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
-                 "Where a roof-cover post lands on the deck beam line it stands on the same Diamond Pier on an ABA66Z base; the 6x6 Douglas fir post runs up to the cover beam and the deck beam bolts to it with the steel side bracket.",
+                 f"Where a roof-cover post lands on the deck beam line it stands on the same Diamond Pier on an {post_base_sku(s)} base; the 6x6 {post_words(s)} post runs up to the cover beam and the deck beam bolts to it with the steel side bracket.",
                  "Plumb both ways and brace until the beams are on."],
-            check=["Stubs and cover posts plumb to a string; tops on the beam line", "Every bracket fastened: thru-bolts and #12 screws per the engineer"])
+            check=["Posts plumb to a string; tops on the beam line", "Every bracket and saddle fastened: thru-bolts and #12 screws per the engineer"])
     steps.append(dict(n=4, code="T-403", title="Beams", still="step4",
         goes_in=items(lambda l: l.category == "Lumber" and ("6x" in l.item or "4x10x" in l.item and not timber or "4x12" in l.item)) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware"),
         how=[f"{bl.label}: {ftin(bl.length)} " + (f"in {len(bl.pieces)} pieces spliced over posts" if len(bl.pieces) > 1 else "one piece") + f", {bl.n_posts} posts @ {ftin(max((b - a) for a, b in zip(bl.posts_x, bl.posts_x[1:])) if bl.n_posts > 1 else bl.length)} max" for bl in L.beam_lines]
@@ -107,8 +108,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         ss = s.extras.cover_roof.lower().startswith("standing")
         steps.append(dict(n=8, code="T-407", title="Porch cover", still="step8",
             goes_in=items(lambda l: l.category == "Porch cover", 14),
-            how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 {'Douglas fir' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts "
-                 + ("on ABA66Z bases on the Diamond Piers (shared with the deck beam where they line up)" if any(c_.get("footing") in ("diamond_pier", "deck_pier") for c_ in covers_of(s)) else "on the deck over blocked joists")
+            how=[f"Cover ledger on the house at the top of the pitch, LedgerLOK 2 rows; 6x6 {post_words(s)} posts "
+                 + (f"on {post_base_sku(s)} bases on the Diamond Piers (shared with the deck beam where they line up)" if any(c_.get("footing") in ("diamond_pier", "deck_pier") for c_ in covers_of(s)) else "on the deck over blocked joists")
                  + f", " + " / ".join(f"{c_['name'].lower()}: {c_.get('beam', '(2)2x10')} beam on {'BC46Z' if c_.get('beam', '').startswith('4x') else 'AC6Z'} caps" for c_ in covers_of(s)) + "; 2x8 rafters @ 16\" OC with H2.5AZ ties and the overhang; 2x8 sub-fascia and OSB. Cover framing is wood (SYP 2x8 rafters, Douglas fir posts" + ("; Douglas fir 4x beam" if any(c_.get("beam", "").startswith("4x") for c_ in covers_of(s)) else "") + ").",
                  ("High-temp self-adhered underlayment over every sheet, headwall flashing counterflashed into the house wall, eave trim, then the 24 ga snap-lock panels one piece eave to headwall — clips 18\" OC on each seam, no face screws in the field; rake trim and closures last; snow retention bar clamped to the seams 12-18\" above the low eave, the full width."
                   if ss else "Synthetic underlayment, drip edge, starter, architectural shingles 6 nails each, step flashing at the house wall.")]
