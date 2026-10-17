@@ -829,7 +829,7 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
         yy += 6
         for w in textwrap.wrap(sp["source"], 86):
             o.append(T(x2, yy, w, 7.2, 500, fill=MUTE)); yy += 10
-    return sheet("C-100", "Site plan", "Parcel, existing house, new decks and roof covers, distances to the lot lines, coverage", o, "Plan · approx. 1\" = 20' at full size · GIS lines, not a survey", meta)
+    return sheet("C-100", "Site plan", "Parcel, existing house, " + ("new decks and roof covers" if covers_of(s) else "the new deck") + ", distances to the lot lines, setbacks", o, "Plan · approx. 1\" = 20' at full size · GIS lines, not a survey", meta)
 
 
 def sheet_covers(L: Layout, S: Scene, t, meta) -> Optional[str]:
