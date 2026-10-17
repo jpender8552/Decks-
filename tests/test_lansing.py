@@ -19,8 +19,8 @@ def result():
 
 def test_rail_sells_at_the_owner_rate(result):
     t, f, p = result
-    # $120/LF is the 40% price: at the job's 35% it scales to 120 x 0.60 / 0.65
-    assert dict(p.allocation)["Railing"] == round(120 * 0.60 / 0.65 * t.layout.rail.rail_lf)
+    # $120/LF is the 40% price: at the job's GM it scales by 0.60 / (1 - GM)
+    assert dict(p.allocation)["Railing"] == round(120 * 0.60 / (1 - SPEC['extras']['gm']) * t.layout.rail.rail_lf)
 
 
 def test_front_bay_spans_the_corners(result):
