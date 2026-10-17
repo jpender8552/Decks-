@@ -1,0 +1,20 @@
+{
+ "address": "5549 S Lansing Ct, Englewood CO 80111-4110",
+ "geocode_county_address_point": {"lat": 39.6152173, "lon": -104.8560293, "src": "https://gis.arapahoegov.com/arcgis/rest/services/ArapaMAP/MapServer/2 (OBJECTID 159431)"},
+ "geocode_census_interpolated": {"lat": 39.6147926, "lon": -104.8559199, "note": "~48 m S of county point; do not use"},
+ "jurisdiction": "Unincorporated Arapahoe County (Building Division + Zoning Division)",
+ "parcel": {"AIN": "2075-14-4-05-001", "PIN": "031772427", "legal": "Lot 41 Blk 9 Cherry Creek Vista 6th Flg Amend Resub",
+   "subdivision_plat_reception": "R1535678", "lot_area_sf_gis": 6401, "acreage_assessor": 0.149, "year_built": 1977,
+   "style": "2 Story", "above_grade_sf": 1704, "first_floor_sf": 660, "second_floor_sf": 1044, "basement_sf": 660,
+   "attached_garage_sf": 441, "existing_deck_sf": 48, "existing_deck_dims_from_sketch": "8 x 6 ft", "patio_slab_sf": 96, "owner": "Chiu Li-Shin"},
+ "zoning": {"district": "R-P (PUD) Cherry Creek Vista", "zoning_case": "Z75-030", "PDP": "P75-027 (2nd amended, 1975)", "FDP": "P75-028",
+   "PDP_SFD_setbacks_ft": {"front": 20, "rear": 20, "side": 5, "side_street_corner": 10, "min_bldg_separation": 10, "max_height": 35},
+   "PDP_units6_13_setbacks_ft": {"front": "10 side-entry / 20 front-entry garage", "rear": 10, "side": "0 (5 open side)", "side_street_corner": 10},
+   "hoa": "Cherry Creek Vista II HOA, PO Box 3361 Englewood 80155, 303-770-1469 (county GIS)"},
+ "rear_wall_outward_normal_deg_true": 277.7,
+ "rear_wall_line_bearing_deg": 7.7,
+ "aerial_bbox_epsg4326": [-104.85645, 39.6148783, -104.85555, 39.6155717],
+ "aerial_bbox_epsg3857": [-11672566.620, 4810134.265, -11672466.433, 4810234.453],
+ "aerial_source": "Arapahoe County ArapaMAP layer 437 (2024 ortho, 3-in, captured Mar 2024)",
+ "aerial_ft_per_px": 0.211
+}

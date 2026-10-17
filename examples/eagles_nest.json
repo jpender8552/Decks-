@@ -227,6 +227,7 @@
         "amount": 400,
         "why": ""
       }
-    ]
+    ],
+    "rail_sell_per_lf": 0
   }
 }

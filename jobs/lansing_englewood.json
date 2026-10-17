@@ -1,0 +1,454 @@
+{
+  "job": "5549 S Lansing Ct — elevated deck, 8' x 12' at 10' (TimberTech Reserve Driftwood, IRX bronze)",
+  "client": "Rachel Chiu",
+  "notes": "Owner plan (Oct 2026): a new second-story deck off the existing door, 8' along the house x 12' out, surface 10' above the backyard. Replaces the smaller existing deck in the photos (two posts on concrete pads), which is demo'd. The ledger lands on a cantilevered floor (the floor framing overhangs the foundation wall), so the attachment and the lateral load path are engineered: GSX provides the engineer. Frame: TrueFrame by ProWood #1 SYP 2x10 joists at 16\" OC, double rims hung in HUCQ210-2, one row of blocking over the beam. One drop beam, (2)4x10 Douglas fir #1 (two 4x10 plies, through-bolted), 2' back from the front rim face, on only (2) 6x6 DF #1 posts on Diamond Piers. Decking TimberTech Reserve Driftwood, CONCEALoc hidden fasteners, single picture frame on the 3 open sides (none against the house), Driftwood fascia; G-Tape on the joists, rims and beam. Rail: TimberTech Impression Rail Express (IRX), vertical square aluminum balusters, modern top rail, Bronze, 36\", on the left, right and front. No stairs (none in the photos or the plan).",
+  "site": {
+    "address": "5549 S Lansing Ct",
+    "city": "Englewood",
+    "state": "CO",
+    "zip": "80111",
+    "ground_snow_psf": 30,
+    "wind_speed_mph": 115,
+    "frost_depth_in": 36,
+    "soil_bearing_psf": 1500,
+    "wui_fire_zone": false,
+    "seismic_design_category": "B",
+    "utc_offset_h": -6.0,
+    "sun_when": "2026-07-15T17:30",
+    "rear_setback_required_ft": null,
+    "side_setback_required_ft": 5,
+    "deck_to_rear_line_ft": 13.0,
+    "deck_to_side_line_ft": 23.7,
+    "easements": [
+      "Check plat R1535678 for rear / side utility and drainage easements"
+    ],
+    "hoa": true,
+    "tax_rate": 0.0425,
+    "lat": 39.6152173,
+    "lon": -104.8560293,
+    "rear_azimuth_deg": 277.7,
+    "notes": "Unincorporated Arapahoe County (Cherry Creek CDP; Englewood mailing address). Parcel 2075-14-4-05-001 / PIN 031772427, Lot 41 Blk 9 Cherry Creek Vista 6th Flg Amend Resub (plat R1535678), 6,401 SF corner lot (front S Lansing Ct east, street side E Berry Ave north). R-P PUD Cherry Creek Vista (Z75-030 / P75-027 / P75-028). Deck on the WEST (rear) wall, north end, hung on the 2' second-floor cantilever that runs the full 33' wall (assessor sketch). Tax: CO 2.9 + RTD 1.0 + CD 0.1 + Arapahoe 0.25 = 4.25% (no city).",
+    "code_basis": "2021 IRC / IBC as adopted by Arapahoe County (Res. 21-394, eff. 4/1/2022); IRC R507 decks with the county-amended Colorado ICC Deck Building Guide; ASCE 7-16 loads",
+    "wind_note": "115 mph Vult (3-second gust), Exposure B (suburban), Risk Cat. II — county design-criteria table (2015 cycle; confirm the 2021 table)",
+    "snow_note": "30 psf ground snow, roof 30 psf non-reducible (Arapahoe County design criteria); deck tables at 40 psf live + 10 psf dead",
+    "ahj_flags": [
+      [
+        "ENGINEER",
+        "ledger",
+        "Arapahoe County deck guide: a ledger 'shall not be attached to a cantilevered floor' — attachment to a cantilever requires engineer approval. The 2' second-floor cantilever runs the full rear wall (assessor sketch): the stamped design either details the ledger into the cantilevered joists / blocking with the lateral ties back to the floor system, or makes the deck freestanding (a second beam on two posts at the house)",
+        "AC-amended ICC Deck Guide (2021 IRC) / IRC R507.9.1"
+      ],
+      [
+        "CHECK",
+        "setback",
+        "R-P PUD Cherry Creek Vista: rear setback 20' for single-family detached, 10' under the Units 6 & 13 standard (the lot is 6,401 SF, under the 7,000 SF SFD minimum). GIS puts the new deck ~13' off the west line — passes at 10', fails at 20'. Decks get no projection allowance (LDC). Zoning Division to confirm the column and which line is the rear (corner lot) before submittal; pull P75-028 and plat R1535678",
+        "2nd Amended PDP P75-027 (1975) / Arapahoe LDC"
+      ],
+      [
+        "CHECK",
+        "setback",
+        "corner lot: E Berry Ave street side needs 10' — deck ~23'-8\" clear; south interior side 5' — deck ~33' clear",
+        "PDP P75-027"
+      ],
+      [
+        "CODE",
+        "footing",
+        "county guide: pier footings 12\" x 36\" minimum unless engineered — submit the Diamond Pier DP-50 evaluation report as the engineered alternate (frost 36\") and have the engineer list it on the stamped set",
+        "Arapahoe deck permit guide (rev. 8/20/2024) / IRC R403.1.4"
+      ],
+      [
+        "CODE",
+        "rail",
+        "guards above 30\": 36\" min., openings under 4\", 200 lb point load + 50 psf infill — submit the TimberTech Impression Rail Express code report / ESR",
+        "IRC R312 / Table R301.5"
+      ],
+      [
+        "CODE",
+        "submittal",
+        "county submittal: site plan with lot / block and distances to every line, scaled drawings with every span, member, hanger, beam build-up and post anchorage, ledger fastener type / size / spacing, the completed county-amended ICC deck guide (page 3), and the engineer's stamp (outside the IRC tables: cantilever attachment, 2-post (2)4x10)",
+        "Arapahoe Residential Deck Permit guide (rev. 8/20/2024)"
+      ],
+      [
+        "CHECK",
+        "site",
+        "HOA: Cherry Creek Vista II HOA (PO Box 3361, Englewood 80155, 303-770-1469) — confirm whether architectural approval is needed",
+        "county GIS"
+      ],
+      [
+        "CHECK",
+        "site",
+        "811 locate before the piers · FEMA zone X · not in the county's draft wildfire-resiliency area (no WUI requirements) · South Metro Fire Rescue",
+        "Colorado 811 / FEMA / Arapahoe GIS"
+      ],
+      [
+        "INFO",
+        "site",
+        "keep any basement egress window under or near the deck clear (county guide)",
+        "Arapahoe deck permit guide"
+      ]
+    ],
+    "plan": {
+      "parcel": [
+        [
+          -19.34,
+          28.09
+        ],
+        [
+          28.56,
+          21.33
+        ],
+        [
+          40.92,
+          24.07
+        ],
+        [
+          40.99,
+          15.0
+        ],
+        [
+          41.57,
+          -58.51
+        ],
+        [
+          41.66,
+          -70.68
+        ],
+        [
+          41.41,
+          -70.68
+        ],
+        [
+          27.96,
+          -71.01
+        ],
+        [
+          -16.07,
+          -68.31
+        ],
+        [
+          -17.7,
+          -67.95
+        ],
+        [
+          -19.3,
+          -67.44
+        ],
+        [
+          -20.84,
+          -66.78
+        ],
+        [
+          -22.32,
+          -66.0
+        ],
+        [
+          -23.72,
+          -65.09
+        ],
+        [
+          -25.03,
+          -64.05
+        ],
+        [
+          -26.25,
+          -62.9
+        ],
+        [
+          -27.36,
+          -61.65
+        ],
+        [
+          -28.35,
+          -60.3
+        ],
+        [
+          -29.22,
+          -58.88
+        ],
+        [
+          -29.96,
+          -57.37
+        ],
+        [
+          -30.2,
+          -56.76
+        ],
+        [
+          -30.57,
+          -55.81
+        ],
+        [
+          -31.03,
+          -54.2
+        ],
+        [
+          -31.34,
+          -52.56
+        ],
+        [
+          -31.51,
+          -50.9
+        ],
+        [
+          -31.53,
+          -49.22
+        ],
+        [
+          -31.39,
+          -47.56
+        ],
+        [
+          -20.69,
+          28.28
+        ],
+        [
+          -19.34,
+          28.09
+        ]
+      ],
+      "footprint": [
+        [
+          33.78,
+          -27.51
+        ],
+        [
+          22.67,
+          -27.5
+        ],
+        [
+          22.65,
+          -49.47
+        ],
+        [
+          18.67,
+          -49.47
+        ],
+        [
+          2.23,
+          -49.46
+        ],
+        [
+          -3.14,
+          -49.45
+        ],
+        [
+          -3.13,
+          -23.2
+        ],
+        [
+          -1.52,
+          -23.2
+        ],
+        [
+          -1.5,
+          1.26
+        ],
+        [
+          -0.17,
+          1.26
+        ],
+        [
+          -0.16,
+          4.97
+        ],
+        [
+          7.56,
+          4.97
+        ],
+        [
+          7.56,
+          1.49
+        ],
+        [
+          33.8,
+          1.47
+        ],
+        [
+          33.78,
+          -27.51
+        ]
+      ],
+      "street": "S LANSING CT (front)",
+      "street_side": "top",
+      "lot_lines": {
+        "rear": "REAR (WEST) LOT LINE",
+        "left": "E BERRY AVE — STREET SIDE (N)",
+        "right": "SIDE LOT LINE (S)"
+      },
+      "house_label": "two storey (1977), 2' cantilevered second floor on the west wall (no work)",
+      "info": [
+        "Parcel 2075-14-4-05-001 · PIN 031772427",
+        "Lot 41, Block 9, Cherry Creek Vista 6th Filing Amended Resub (plat R1535678)",
+        "Unincorporated Arapahoe County · zoning R-P PUD (Z75-030 / P75-027 / P75-028)",
+        "Lot 6,401 SF (GIS) · corner lot · flood zone X",
+        "House 1977, 2 storey, 1,704 SF + 660 SF basement + 441 SF garage (assessor)",
+        "HOA: Cherry Creek Vista II"
+      ],
+      "coverage": [
+        [
+          "Lot area",
+          "6,401 SF"
+        ],
+        [
+          "Lot coverage limit",
+          "none in the PUD plan"
+        ],
+        [
+          "Existing deck (assessor)",
+          "48 SF (8' x 6') — removed"
+        ],
+        [
+          "New deck",
+          "8' x 12' · ~92 SF of frame, 10' above grade"
+        ]
+      ],
+      "setback_ref": {
+        "rear": 20,
+        "side": 5,
+        "rear_label": "20' PUD rear setback (SFD)",
+        "label": "R-P PUD Cherry Creek Vista: rear 20' (SFD) or 10' (Units 6 & 13), side 5', street side 10' — Zoning Division to confirm"
+      },
+      "setback_notes": [
+        "Elevated decks get no setback projection allowance (Arapahoe LDC) — the deck must meet the setbacks",
+        "GIS puts the new deck front ~13' off the west line: passes the 10' standard, not the 20' — confirm the governing column and the rear line (corner lot) with Zoning before submittal",
+        "E Berry Ave street side 10' required — ~23'-8\" clear; south side 5' — ~33' clear"
+      ],
+      "site_work": [
+        "Remove the existing 8' x 6' deck and its two posts / pads; haul off",
+        "Two Diamond Pier DP-50 foundations (no excavation spoils), 6x6 DF #1 posts with 4x4 knee braces",
+        "New ledger on the 2' cantilevered second floor per the engineer's detail; membrane + Z-flash, (4) DTT1Z lateral ties",
+        "No stairs — the deck is reached from the house door only",
+        "Call 811 before the piers; protect the lawn and the patio slab at the north wall"
+      ],
+      "source": "Arapahoe County GIS (address point, parcel, 2024 roof prints, R-P zoning, jurisdiction, flood, wildfire layers), county assessor record and sketch, 2nd Amended PDP P75-027 setback table, county deck permit guide (rev. 8/20/2024) and the county-amended ICC deck guide. GIS lines are not a survey — an ILC governs if Zoning asks.",
+      "setback_offset": true,
+      "rear_label_dy": 18
+    }
+  },
+  "geometry": {
+    "width_in": 96,
+    "depth_in": 144,
+    "height_in": 120,
+    "attachment": "ledger",
+    "board_direction": "parallel",
+    "picture_frame": true,
+    "house_finish": "lap",
+    "house_color": "#efede7",
+    "house_openings": [
+      [
+        2.5,
+        5.5,
+        0,
+        10.1,
+        16.8
+      ],
+      [
+        13,
+        17,
+        0,
+        12.8,
+        16.6
+      ],
+      [
+        23,
+        27,
+        0,
+        12.8,
+        16.6
+      ],
+      [
+        2.8,
+        6.3,
+        -2,
+        3.2,
+        6.2
+      ],
+      [
+        18,
+        24,
+        -2,
+        0.1,
+        6.8
+      ]
+    ],
+    "house_blocks": [
+      [
+        0,
+        32.3,
+        -26,
+        -2
+      ],
+      [
+        0,
+        32.3,
+        -2,
+        0,
+        "cantilever",
+        8.75
+      ],
+      [
+        -1.6,
+        21.2,
+        -47.9,
+        -26
+      ]
+    ]
+  },
+  "framing": {
+    "system": "dimensional",
+    "joist_size": "2x10",
+    "joist_species": "SYP",
+    "joist_grade": "#1 True Frame GC",
+    "joist_spacing_in": 16,
+    "rim_plies": 2,
+    "ledger_fastener": "LedgerLOK",
+    "post_size": "6x6",
+    "footing_type": "diamond_pier",
+    "footing_model": "DP-50/50",
+    "joist_tape": true,
+    "beams": [
+      {
+        "kind": "drop",
+        "size": "(2)4x10",
+        "species": "DF#1",
+        "setback_in": 24,
+        "posts_x_ft": [
+          0.75,
+          7.25
+        ]
+      }
+    ],
+    "post_species": "DF#1",
+    "footing_price": 150,
+    "knee_braces": true
+  },
+  "decking": {
+    "brand": "TimberTech",
+    "collection": "Reserve",
+    "color": "Driftwood",
+    "profile": "grooved",
+    "border_rows": 1,
+    "fascia": true,
+    "fastener_system": "CONCEALoc"
+  },
+  "railing": {
+    "system": "IRX Baluster",
+    "color": "Bronze",
+    "height_in": 36,
+    "sides": [
+      "left",
+      "right",
+      "front"
+    ]
+  },
+  "stairs": [],
+  "extras": {
+    "demo_existing": true,
+    "demo_sf": 64,
+    "ledger_on_cantilevered_floor": true,
+    "engineered": true,
+    "engineering_note": "The ledger lands on a cantilevered floor: GSX provides the engineer, and the stamped design is billed at cost, separate from this price.",
+    "gm": 0.45,
+    "connection_details": true
+  }
+}

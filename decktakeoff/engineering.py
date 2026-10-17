@@ -61,7 +61,8 @@ BEAM_SPAN["HF"] = BEAM_SPAN["DF"]
 BEAM_SPAN["CEDAR"] = BEAM_SPAN["DF"]
 # 6x beams are not in R507.5 — treat 6x10 ≈ (3)2x10, 6x12 ≈ (3)2x12 (same section modulus class); flagged as engineered.
 BEAM_ALIAS = {"6x10": "(3)2x10", "6x12": "(3)2x12", "6x8": "(3)2x8", "3x10": "(2)2x10", "3x12": "(2)2x12",
-              "(2)600S": "(2)2x8", "(2)800S": "(2)2x10", "(2)1000S": "(2)2x12"}   # boxed CFS beams: lumber-equivalent placeholder, the engineer sizes them
+              "(2)600S": "(2)2x8", "(2)800S": "(2)2x10", "(2)1000S": "(2)2x12",
+              "(2)4x10": "(3)2x10", "(2)4x12": "(3)2x12"}   # doubled 4x solid-sawn: rated no better than the 3-ply table row   # boxed CFS beams: lumber-equivalent placeholder, the engineer sizes them
 
 # ------------------------------------------------------------- posts: Table R507.4 (max height, in)
 POST_MAX_HEIGHT = {"4x4": 81, "4x6": 96, "6x6": 168, "8x8": 168}

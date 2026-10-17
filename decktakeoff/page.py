@@ -16,6 +16,7 @@ from .spec import DeckSpec
 from .report import quote_markdown
 from .units import ftin
 from .takeoff import CATEGORIES
+from .catalog import rail_name, beam_words
 
 E = html.escape
 CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
@@ -257,7 +258,7 @@ def _stack(p, sold: float = None):
     stack = [("Materials (raw)", money(p.materials, True)), (f"Materials × {p.material_factor:g}", money(p.materials_factored, True)),
              (f"Sales tax {p.tax_rate:.2%}" + (" on factored materials" if p.material_factor != 1 else ""), money(p.tax, True)), ("Labor (rate card)", money(p.labor, True)),
              ("Work — carries the margin", money(p.work, True)), ("General conditions at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
-             (f"Sell — check or ACH at {p.gm:.1%} GM", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor", money(p.sell_floor)),
+             (f"Sell — check or ACH at {p.gm:.1%} GM" + (f" ({p.rail_note})" if p.rail_note else ""), f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor" + (" (the deck at 40%, rail at its rate)" if p.rail_note else ""), money(p.sell_floor)),
              ("Financed", f"<b>{money(p.retail)}</b> · {money(p.monthly)}/mo at 6.99% × 10 yr"), ("Gross profit", money(p.gp))]
     if sold:
         stack[7] = ("SOLD — check or ACH", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF")
@@ -332,7 +333,7 @@ def _reads_lite(t, L, sm):
     elif s.railing.existing_parapet:
         rail = "The existing stucco parapet stays" + (f"; {rl.system} {rl.color} {rl.height:g}\" rail on the new stair and landings" if rl and L.stairs else "")
     elif rl:
-        rail = f"{s.decking.brand} {rl.system} {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+        rail = f"{s.decking.brand} {rail_name(rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
     else:
         rail = "None"
     stairs = []
@@ -349,7 +350,7 @@ def _reads_lite(t, L, sm):
     fr = L.zones[0].frame
     beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
     structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on centre, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
-                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {' / '.join(beams)} Douglas fir beams" if beams else "") + f"; {sm['posts']}")
+                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {beam_words(beams)}" if beams else "") + f"; {sm['posts']}")
     reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
@@ -435,7 +436,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker" id="g-what">What it is <span class="tag">included in the price</span></h2>')
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
-        frame_lite = f"{sm['joists']}; {sm['rims']}" + ((f"; {' / '.join(beams)} Douglas fir beams" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams") + "."
+        frame_lite = f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams)}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams") + "."
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
@@ -449,7 +450,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
         w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
         q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
-        w('<div class="quote">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
+        w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
         w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
         w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     elif customer:
@@ -673,7 +674,7 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         sp_ = b["spec"]
         beams = sorted({bm.size for bm in sp_.framing.beams}) if sp_.framing.beams else []
-        frame_lite = f"{b['sm']['joists']}; {b['sm']['rims']}" + (f"; {' / '.join(beams)} Douglas fir beams" if beams else "") + "."
+        frame_lite = f"{b['sm']['joists']}; {b['sm']['rims']}" + (f"; {beam_words(beams)}" if beams else "") + "."
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w('<h3>What it is</h3>' + md_to_html(inc))
     # the choices

@@ -591,7 +591,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
                 notes.append(f"{b.size} {b.species} beam: owner-placed posts give a {ftin(sp)} span against {ftin(allow_b)} allowable — engineer confirms")
         chk = (eng.check_timber_beam(b.size, bsp_key, max(trib, 36), sp, total_psf) if timber
                else eng.check_beam(b.size, b.species, span_for_table, sp, total_psf))
-        if bnote:
+        if bnote and bnote not in (chk.note or ""):
             chk.note = (chk.note + "; " if chk.note else "") + bnote
         from .catalog import post_cap, TIMBER_CAP
         cap = TIMBER_CAP.get(fr.post_size, "CCQ88SDS2.5") if timber else post_cap(fr.post_size, b.size)

@@ -78,6 +78,10 @@
     "2x10_pt": {
       "per_lf": 3.75,
       "source": "EST — D&D 2x8 TFJ x 1.30 (handoff)"
+    },
+    "4x4": {
+      "per_lf": 2.6,
+      "source": "est. (4x4x8 $21)"
     }
   },
   "footings": {
@@ -568,6 +572,21 @@
       "each": 26.0,
       "source": "est. — confirm D&D",
       "desc": "Cinch drink-rail bracket kit, black — per panel"
+    },
+    "CCQ76SDS2.5": {
+      "each": 96.0,
+      "source": "est. — confirm SKU with D&D",
+      "desc": "Simpson CCQ column cap, 7\" seat for the (2)4x10 beam on a 6x6 post (SDS screws incl.) — confirm SKU / engineer's equal"
+    },
+    "bolt_1/2x10": {
+      "each": 4.4,
+      "source": "est.",
+      "desc": "1/2\" x 10\" HDG hex bolt + nut + 2 washers"
+    },
+    "bolt_1/2x12": {
+      "each": 5.2,
+      "source": "est.",
+      "desc": "1/2\" x 12\" HDG hex bolt + nut + 2 washers"
     }
   },
   "decking": {
@@ -892,6 +911,49 @@
       "each": 58.0,
       "source": "est. — confirm D&D",
       "desc": "Cinch HD 2\" post (welded base, cap, skirt, screws), Satin Black"
+    },
+    "IRX Baluster|panel|8|level": {
+      "each": 345.0,
+      "source": "EST — Henry to quote",
+      "desc": "TimberTech Impression Rail Express 8' x 36\" level kit, vertical square aluminum balusters, modern top rail, Bronze"
+    },
+    "IRX Baluster|panel|6|level": {
+      "each": 285.0,
+      "source": "EST — Henry to quote",
+      "desc": "TimberTech Impression Rail Express 6' x 36\" level kit, vertical square aluminum balusters, modern top rail, Bronze"
+    },
+    "IRX Baluster|panel|8|stair": {
+      "each": 395.0,
+      "source": "est."
+    },
+    "IRX Baluster|panel|6|stair": {
+      "each": 330.0,
+      "source": "est."
+    },
+    "IRX Baluster|post|END": {
+      "each": 96.0,
+      "source": "EST — Henry to quote"
+    },
+    "IRX Baluster|post|LINE": {
+      "each": 96.0,
+      "source": "EST — Henry to quote"
+    },
+    "IRX Baluster|post|CORNER": {
+      "each": 104.0,
+      "source": "EST — Henry to quote"
+    },
+    "IRX Baluster|post|STAIR": {
+      "each": 110.0,
+      "source": "EST — Henry to quote"
+    },
+    "IRX Baluster|post_kit": {
+      "each": 96.0,
+      "source": "EST — Henry to quote",
+      "desc": "TimberTech Impression Rail Express 2\" aluminum post kit 36\" (post, base, cap, skirt), Bronze"
+    },
+    "IRX Baluster|handrail_kit": {
+      "each": 120.0,
+      "source": "est."
     }
   },
   "labor": {
@@ -1219,5 +1281,11 @@
       "source": "est.",
       "desc": "Splash block (discharge away from the footings)"
     }
+  },
+  "rail_sell_per_lf": {
+    "_note": "owner rule: these rail systems SELL at a fixed installed price per LF (materials + labor + margin); the rest of the job carries the GM",
+    "IRX": 120.0,
+    "IRX Baluster": 120.0,
+    "Impression Rail Express": 120.0
   }
 }

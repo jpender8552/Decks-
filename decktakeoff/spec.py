@@ -147,6 +147,9 @@ class Framing:
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
+    knee_braces: bool = False                # 4x4 knee braces at 45 deg, both directions at every beam post (tall posts / lateral)
+    knee_leg_in: float = 30.0                # brace leg (each way) from the post / beam intersection
+    post_species: str = ""                   # deck posts: "" -> #2 GC treated; "DF#1" -> Douglas fir #1 (owner-specified)
     post_rough: bool = False                 # 6x6 posts are rough-sawn full dimension (Douglas fir rough): R-series bases and caps
     steel_deck_post: str = "hss"             # steel frame: what stands on a deck-only pier — "hss" (3x3 stub) | "wood" (6x6 post, steel saddle to the beam)
     steel_joist: str = "600S162-54"          # steel frame jobs: SSMA joist designation (depth S flange - mils), G90
@@ -252,6 +255,7 @@ class Extras:
     no_general_conditions: bool = False  # drop the $/SF general conditions and site extras entirely
     labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}
     extra_beam_sets: Optional[int] = None             # override the "extra beam set" labor count (None -> beam lines minus one)
+    rail_sell_per_lf: Optional[float] = None          # rail sold at a fixed installed price per LF (None -> pricebook rail_sell_per_lf for the system, if any)
     sell_override: Optional[float] = None             # owner-set check/ACH price; the allocation scales to it
     retail_markup: Optional[float] = None             # financed = sell x (1 + markup) instead of sell / 0.93
     options: List[Option] = field(default_factory=list)
@@ -263,6 +267,7 @@ class Extras:
     cover_gutters: bool = False          # 5" K-style seamless aluminum gutter on the low eave + 2x3 downspouts on the cover posts
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
+    connection_details: bool = False    # permit set: add the wood-frame connection detail sheets (D-502 frame, D-504 edge / rail / lateral)
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
     cover_post_species: str = "WRC"      # roof-cover posts: "WRC" (western red cedar) | "DF" (Douglas fir #1)
     labor_total: Optional[float] = None         # owner-set total labor for the job: owner-set lots stay, the rest scale to make it up
@@ -408,6 +413,8 @@ def post_words(spec) -> str:
     """How a 6x6 post reads: 'Douglas fir rough' / 'Douglas fir #1' / 'cedar' (cover posts) — the deck posts follow the same wood."""
     if spec.framing.post_rough:
         return "Douglas fir rough"
+    if spec.framing.post_species.upper().startswith("DF"):
+        return "Douglas fir #1"
     return "Douglas fir #1" if spec.extras.cover_post_species.upper().startswith("DF") else "cedar"
 
 

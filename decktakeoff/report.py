@@ -11,6 +11,7 @@ from .flags import Flag, run_flags
 from .pricing import Pricing
 from .takeoff import Takeoff, CATEGORIES
 from .units import ftin
+from .catalog import rail_name
 
 
 def _q(v: float) -> str:
@@ -85,7 +86,7 @@ def takeoff_markdown(t: Takeoff, flags: Optional[List[Flag]] = None, pricing: Op
         w(f"| Work (carries the margin) | ${pricing.work:,.2f} |")
         w(f"| General conditions at cost | ${pricing.gc:,.2f} |")
         w(f"| Cost | ${pricing.cost:,.2f} |")
-        w(f"| **Sell — check or ACH** at {pricing.gm:.1%} GM | **${pricing.sell:,.0f}** (${pricing.sell_per_sf:,.2f}/SF) |")
+        w(f"| **Sell — check or ACH** at {pricing.gm:.1%} GM" + (f" ({pricing.rail_note})" if pricing.rail_note else "") + f" | **${pricing.sell:,.0f}** (${pricing.sell_per_sf:,.2f}/SF) |")
         w(f"| Sell at the 40% floor | ${pricing.sell_floor:,.0f} |")
         w(f"| **Financed** (÷ 0.93) | **${pricing.retail:,.0f}** · ${pricing.monthly:,.0f}/mo at 6.99% / 10 yr |")
         w(f"| Gross profit | ${pricing.gp:,.0f} |")
@@ -196,7 +197,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"{fr_txt} — on {foot}{' with stone column bases' if s.extras.stone_bases else ''}. "
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
-      + (f", {rl.system} {'cable ' if rl.system == 'IRX' else ''}rail" + (f" with a {s.railing.drink_rail_color} drink rail" if s.railing.drink_rail else "") if rl else "")
+      + (f", {rail_name(rl.system)} {'cable ' if rl.system == 'IRX' else ''}rail" + (f" with a {s.railing.drink_rail_color} drink rail" if s.railing.drink_rail else "") if rl else "")
       + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
@@ -243,7 +244,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Railing | The existing stucco parapet stays on the deck edges. {s.decking.brand} {rl.system} Rail, {rl.color}, {rl.height:g}\" on the new stair and landings. |")
     elif rl:
         rs = RAIL_SYSTEMS.get(rl.system, {})
-        w(f"| Railing | {s.decking.brand} {rl.system}{' cable rail' if rs.get('cable') else ' Rail'}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
+        w(f"| Railing | {s.decking.brand} {rail_name(rl.system)}{' cable rail' if rs.get('cable') else (' Rail' if rail_name(rl.system) == rl.system else '')}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
           + (f"; {s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "") + f". {rl.rail_lf} LF. |")
     if s.is_timber:
         w(f"| Timbers | Douglas fir #1 {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, {s.framing.joist_size} joists at {fr.spacing:g}\"; "

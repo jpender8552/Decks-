@@ -20,7 +20,7 @@ IN = 1 / 12.0
 
 @dataclass
 class Box:
-    kind: str          # house | wall | privacy | ground | gravel | footing | base | post | stone | cap | beam | ledger | joist | rim | block | doubler | board | border | fascia | railpost | toprail | cable | baluster | botrail | drink | tub | stringer | tread
+    kind: str          # house | wall | privacy | ground | gravel | footing | base | post | stone | cap | beam | ledger | joist | rim | block | doubler | board | border | fascia | railpost | toprail | cable | baluster | botrail | drink | tub | stringer | tread | brace
     x0: float; x1: float; y0: float; y1: float; z0: float; z1: float
     mat: str
     phase: int = 0
@@ -147,6 +147,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         osb=dict(color="#c9a46a", rough=0.95, label="7/16\" OSB roof sheathing"),
         underlay=dict(color="#3d4651", rough=0.9, label="high-temp self-adhered underlayment"),
         steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
+        railmetal=dict(color=_rail_hex(spec.railing.color), metal=0.55, rough=0.5, label=f"{spec.railing.color or 'black'} powder-coat"),
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
         stone=dict(color="#8c8478", pattern="stone", rough=0.95, label="ledgestone veneer"),
@@ -212,7 +213,7 @@ def build_scene(L) -> Scene:
         cx_, cy_, sz = float(tc[0]), float(tc[1]), float(tc[2]) if len(tc) > 2 else 0.67
         z_top = max([float(ov[4]) for ov in (spec.geometry.overhead or [])] + [zt + 8.0])
         add("post", cx_ - sz / 2, cx_ + sz / 2, cy_ - sz / 2, cy_ + sz / 2, 0.0, z_top, "house", 8, tag="existing column through the deck (stays)")
-    else:
+    if not spec.geometry.house_blocks:      # (was a for-else: the stand-in house was drawn over the measured blocks too)
         for zi, z in enumerate(L.zones):
             yw = z.wall_y * IN
             x0h = z.x0 * IN - (3.0 if zi == 0 else 0.0)
@@ -298,6 +299,17 @@ def build_scene(L) -> Scene:
                 add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
                 add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1}")
             add("cap", x - pb_ / 2 - 0.03, x + pb_ / 2 + 0.03, y - bw_ / 2 - 0.03, y + bw_ / 2 + 0.03, top - bd_ - 0.02, top - bd_ + 0.35, "steel", 4)
+            if spec.framing.knee_braces and not spec.framing.existing_posts and spec.framing.system != "steel":
+                lg, th = spec.framing.knee_leg_in / 12.0, 3.5 / 12.0
+                Lb, zb = lg * math.sqrt(2) + th, top - bd_
+                sx = 1 if px * IN < (ln.pieces[0][0] + ln.pieces[-1][1]) * IN / 2 else -1     # along the beam: toward the middle
+                cx_ = x + sx * (pb_ / 2 + lg / 2)
+                add("brace", cx_ - Lb / 2, cx_ + Lb / 2, y - th / 2, y + th / 2, zb - lg / 2 - th / 2, zb - lg / 2 + th / 2, "timber", 3,
+                    tag="4x4 knee brace (along the beam)", rot=sx * math.pi / 4, rot_axis="y")
+                zj = top if ln.kind == "drop" else top - bd_      # up to the joist bottoms, toward the house
+                cy_ = y - bw_ / 2 - lg / 2
+                add("brace", x - th / 2, x + th / 2, cy_ - Lb / 2, cy_ + Lb / 2, zj - lg / 2 - th / 2, zj - lg / 2 + th / 2, "timber", 3,
+                    tag="4x4 knee brace (to the joists)", rot=math.pi / 4, rot_axis="x")
             if spec.extras.stone_bases:
                 add("stone", x - 1.0, x + 1.0, y - 1.0, y + 1.0, 0.0, 3.0, "stone", 3)
                 add("stonecap", x - 1.08, x + 1.08, y - 1.08, y + 1.08, 3.0, 3.17, "stonecap", 3)
@@ -459,8 +471,8 @@ def build_scene(L) -> Scene:
             return shift.get((round(x, 3), round(y, 3)), (x, y))
         for p in rl.posts:
             x, y = sh(p.x * IN, p.y * IN)
-            add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "steel", 7, tag=p.kind)
-            add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "steel", 7)
+            add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "railmetal", 7, tag=p.kind)
+            add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "railmetal", 7)
         # sections: reconstruct post pairs along each edge run from the post list order
         posts = [(p.x * IN, p.y * IN) for p in rl.posts]
         pairs = _rail_pairs(rl)
@@ -471,25 +483,25 @@ def build_scene(L) -> Scene:
                 (xa, ya), (xb, yb) = sh(xa, ya), sh(xb, yb)
                 pts_ = [(xa, ya)] + [(px, py - RP_) for px, py in curve] + [(xb, yb)]
                 for (p0, q0), (p1, q1) in zip(pts_, pts_[1:]):
-                    B.append(rot_box("toprail", p0, q0, p1, q1, zt + h - 0.08, zt + h, "steel", 7, 0.12))
+                    B.append(rot_box("toprail", p0, q0, p1, q1, zt + h - 0.08, zt + h, "railmetal", 7, 0.12))
                     if cable:
                         for k in range(10):
                             zc = zt + 0.3 + k * 0.27
                             B.append(rot_box("cable", p0, q0, p1, q1, zc - 0.01, zc + 0.01, "cable", 7, 0.02))
                     else:
-                        B.append(rot_box("botrail", p0, q0, p1, q1, zt + 0.25, zt + 0.33, "steel", 7, 0.12))
+                        B.append(rot_box("botrail", p0, q0, p1, q1, zt + 0.25, zt + 0.33, "railmetal", 7, 0.12))
                         n_ = int(math.hypot(p1 - p0, q1 - q0) / (4 * IN))
                         for k in range(1, n_):
                             t_ = k / n_
                             bx_, by_ = p0 + (p1 - p0) * t_, q0 + (q1 - q0) * t_
-                            add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "steel", 7)
+                            add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
                 continue
             horiz = abs(yb - ya) < 0.01
             if horiz:
                 x0_, x1_ = min(xa, xb), max(xa, xb); y0_, y1_ = ya - 0.06, ya + 0.06
             else:
                 x0_, x1_ = xa - 0.06, xa + 0.06; y0_, y1_ = min(ya, yb), max(ya, yb)
-            add("toprail", x0_, x1_, y0_, y1_, zt + h - 0.08, zt + h, "steel", 7)
+            add("toprail", x0_, x1_, y0_, y1_, zt + h - 0.08, zt + h, "railmetal", 7)
             if cable:
                 for k in range(10):
                     zc = zt + 0.3 + k * 0.27
@@ -498,14 +510,14 @@ def build_scene(L) -> Scene:
                     else:
                         add("cable", xa - 0.01, xa + 0.01, y0_, y1_, zc - 0.01, zc + 0.01, "cable", 7)
             else:
-                add("botrail", x0_, x1_, y0_, y1_, zt + 0.25, zt + 0.33, "steel", 7)
+                add("botrail", x0_, x1_, y0_, y1_, zt + 0.25, zt + 0.33, "railmetal", 7)
                 n = int(((x1_ - x0_) if horiz else (y1_ - y0_)) / (4 * IN))
                 for k in range(1, n):
                     t = k * 4 * IN
                     if horiz:
-                        add("baluster", x0_ + t - 0.03, x0_ + t + 0.03, ya - 0.03, ya + 0.03, zt + 0.33, zt + h - 0.08, "steel", 7)
+                        add("baluster", x0_ + t - 0.03, x0_ + t + 0.03, ya - 0.03, ya + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
                     else:
-                        add("baluster", xa - 0.03, xa + 0.03, y0_ + t - 0.03, y0_ + t + 0.03, zt + 0.33, zt + h - 0.08, "steel", 7)
+                        add("baluster", xa - 0.03, xa + 0.03, y0_ + t - 0.03, y0_ + t + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
             if spec.railing.drink_rail:
                 if horiz:
                     add("drink", x0_ - pw / 2, x1_ + pw / 2, ya - bw / 2, ya + bw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())
@@ -597,10 +609,10 @@ def build_scene(L) -> Scene:
                 for sd in rail_sides:
                     vc = va_ + pw / 2 + 0.02 if sd == "a" else vb_ - pw / 2 - 0.02
                     for u_, zb_ in ((0.25, z_top - rise), (trun - 0.25, zb0)):
-                        sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "steel", 7, tag="stair post")
+                        sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb_, zb_ + hr + 0.3, "railmetal", 7, tag="stair post")
                     rail_len = math.hypot(trun - 0.5, H - rise)
                     zc = zb0 + (H - rise) / 2 + hr + 0.1
-                    sb_("toprail", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "steel", 7, rot=theta)
+                    sb_("toprail", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.06, vc + 0.06, zc - 0.05, zc + 0.05, "railmetal", 7, rot=theta)
                     # no drink rail on a stair: the graspable handrail is the stair's top
                     if RAIL_SYSTEMS.get(L.rail.system, {}).get("cable"):
                         n_c = int((hr - 0.25) / (3.125 * IN))
@@ -609,13 +621,13 @@ def build_scene(L) -> Scene:
                             sb_("cable", trun / 2 - rail_len / 2, trun / 2 + rail_len / 2, vc - 0.01, vc + 0.01, zc_ - 0.01, zc_ + 0.01, "cable", 7, rot=theta)
                         if rail_len > 6.5:
                             u_ = trun / 2
-                            sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb0 + (H - rise) / 2, zb0 + (H - rise) / 2 + hr + 0.3, "steel", 7, tag="stair post")
+                            sb_("railpost", u_ - pw / 2, u_ + pw / 2, vc - pw / 2, vc + pw / 2, zb0 + (H - rise) / 2, zb0 + (H - rise) / 2 + hr + 0.3, "railmetal", 7, tag="stair post")
                     else:
                         for k in range(1, n_t + 1):
                             for frac in (0.3, 0.7):
                                 u_ = (k - 1) * run + frac * run
                                 ztop = z_top - k * rise
-                                sb_("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "steel", 7)
+                                sb_("baluster", u_ - 0.03, u_ + 0.03, vc - 0.03, vc + 0.03, ztop, ztop + hr - 0.02, "railmetal", 7)
             for frac in (st.carrier_fracs or [0.5]) if mid else []:
                 # carriers: (2)2x6 under the stringers on two posts and footings — no stringer span over 6'
                 um = trun * frac
@@ -715,16 +727,16 @@ def build_scene(L) -> Scene:
                 e0, e1 = p0 + pw / 2, p1 - pw / 2
                 for e in (e0, e1):
                     cx, cy = (e, c_line) if axis == "x" else (c_line, e)
-                    add("railpost", cx - pw / 2, cx + pw / 2, cy - pw / 2, cy + pw / 2, z_top, z_top + hr + 0.3, "steel", 7, tag="landing post")
+                    add("railpost", cx - pw / 2, cx + pw / 2, cy - pw / 2, cy + pw / 2, z_top, z_top + hr + 0.3, "railmetal", 7, tag="landing post")
                 if axis == "x":
-                    add("toprail", e0, e1, c_line - 0.06, c_line + 0.06, z_top + hr, z_top + hr + 0.1, "steel", 7, tag="landing rail")
+                    add("toprail", e0, e1, c_line - 0.06, c_line + 0.06, z_top + hr, z_top + hr + 0.1, "railmetal", 7, tag="landing rail")
                 else:
-                    add("toprail", c_line - 0.06, c_line + 0.06, e0, e1, z_top + hr, z_top + hr + 0.1, "steel", 7, tag="landing rail")
+                    add("toprail", c_line - 0.06, c_line + 0.06, e0, e1, z_top + hr, z_top + hr + 0.1, "railmetal", 7, tag="landing rail")
                 n_b = max(1, int((e1 - e0) / (4 * IN)))
                 for i in range(1, n_b):
                     e = e0 + (e1 - e0) * i / n_b
                     cx, cy = (e, c_line) if axis == "x" else (c_line, e)
-                    add("baluster", cx - 0.03, cx + 0.03, cy - 0.03, cy + 0.03, z_top + 0.02, z_top + hr - 0.02, "steel", 7)
+                    add("baluster", cx - 0.03, cx + 0.03, cy - 0.03, cy + 0.03, z_top + 0.02, z_top + hr - 0.02, "railmetal", 7)
 
         flights = g.flights
         frails = list(st.flight_rails) + [st.stair_rail_sides] * (len(flights) - len(st.flight_rails))
@@ -894,6 +906,16 @@ def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
             if hit is not None:
                 ctcs.pop(hit)
             pairs.append(((a[0], a[1]), (b[0], b[1])))
+    # a run with sections but no posts of its own (a short front spanned corner to corner): pair its corners
+    for side in {sec.side for sec in rl.sections} - set(runs):
+        ctcs = [sec.ctc for sec in rl.sections if sec.side == side]
+        for i, a in enumerate(corners):
+            for b in corners[i + 1:]:
+                horiz = abs(a[1] - b[1]) < 0.02
+                d = (abs(b[0] - a[0]) if horiz else abs(b[1] - a[1])) * 12
+                if (horiz or abs(a[0] - b[0]) < 0.02) and any(abs(c - d) < 1.5 for c in ctcs):
+                    pairs.append((a, b) if (a[0], a[1]) <= (b[0], b[1]) else (b, a))
+                    ctcs.remove(next(c for c in ctcs if abs(c - d) < 1.5))
     return pairs
 
 
@@ -908,7 +930,7 @@ def step_captions(L: Layout) -> Dict[int, str]:
     out = {1: f"Step 1 · Footings — {ft}",
            2: ((("Step 2 · Posts — 6x6 " + post_words(s) + " deck posts on " + post_base_sku(s) + " bases, steel saddles to the beams" if s.framing.steel_deck_post == "wood" else "Step 2 · Posts — 3x3 galvanized steel stubs on pier-head brackets")
                 + ("; 6x6 " + post_words(s) + " cover posts carry the deck beams where they line up" if any(c.get("footing") == "deck_pier" for c in covers_of(s)) else ""))
-               if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if s.is_timber else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
+               if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if (s.is_timber or s.framing.post_species.upper().startswith('DF')) else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
            4: f"Step 4 · Beams — {beams}",
            5: (f"Step 5 · Frame — CEMCO {__import__('decktakeoff.steel', fromlist=['names']).names(s)['joist']} C-joists at {L.frame.spacing:g}\" OC, {s.framing.steel_track} track rims, ledger track on a steel angle, clip angles, all G90" if s.framing.system == "steel" else
@@ -979,6 +1001,12 @@ def draw_house_from_spec(add, spec, zt, H_house):
         brick = kind_ == "brick"
         if kind_ == "brickhouse":   # a brick-clad house block: running-bond brick, eave and roof slab like the sided blocks
             add("house", bx0, bx1, by0, by1, 0.0, H_house, "brick", tag="house (brick)")
+            add("roof", bx0 - 1.0, bx1 + 1.0, by0 - 1.0, by1 + 1.0, H_house, H_house + 0.55, "roof")
+            continue
+        if kind_ == "cantilever":   # an upper floor that overhangs the wall below: [x0, x1, y0, y1, "cantilever", z_underside]
+            z0c = float(h[5]) if len(h) > 5 else 8.0
+            add("house", bx0, bx1, by0, by1, z0c, H_house, "house", tag="cantilevered floor (overhangs the wall below)")
+            add("trim", bx0, bx1, by0, by1, z0c - 0.06, z0c, "trim", tag="cantilever soffit")
             add("roof", bx0 - 1.0, bx1 + 1.0, by0 - 1.0, by1 + 1.0, H_house, H_house + 0.55, "roof")
             continue
         if brick:   # a chimney: brick, taller than the eave, no roof slab; optional [.., "brick", z0, z1]
@@ -1165,6 +1193,11 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
             out.append(Box("fascia", cx - nx * fas_t / 2 - L_e / 2, cx - nx * fas_t / 2 + L_e / 2, cy - ny * fas_t / 2 - fas_t / 2, cy - ny * fas_t / 2 + fas_t / 2, jbot - 0.15, zt - 0.02, "fascia", 6,
                            tag=f"angled fascia {L_e:.1f}' mitred", rot=phi, rot_axis="z"))
     return out
+
+
+def _rail_hex(color: str) -> str:
+    c = (color or "").lower()
+    return "#4b3b2c" if "bronze" in c else "#ecebe6" if "white" in c else "#6b6e70" if ("gray" in c or "grey" in c) else "#141416"
 
 
 def _roof_hex(color: str) -> str:

@@ -56,6 +56,7 @@ class Pricing:
     dealer_fee_note: str = ""
     gc_base: float = 0.0
     gc_extras: List[Tuple[str, float]] = field(default_factory=list)
+    rail_note: str = ""          # "rail at $120/LF, the rest at 45% GM" when the rail sells at a fixed rate
 
 
 def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
@@ -197,8 +198,21 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     gc = sum(a for _, a, _ in gc_lines)
     work = mat_f + tax + labor
     cost = work + gc
-    sell = round(work / (1 - gm) + gc)
-    sell_floor = round(work / (1 - pb["gm_floor"]) + gc)
+    # a rail system sold at a fixed installed price per LF: that LF sells at the rate, the rest of the job carries the margin
+    rate_lf = s.extras.rail_sell_per_lf
+    if rate_lf is None and L.rail:          # 0 on a job = quoted before the rule, keep the margin pricing
+        rate_lf = pb.get("rail_sell_per_lf", {}).get(L.rail.system)
+    rail_sell = round(float(rate_lf) * L.rail.rail_lf, 2) if (rate_lf and L.rail) else 0.0
+    rail_work = 0.0
+    if rail_sell:
+        _lr = sum(e for i, q, u, r_, e in labor_lines if i.startswith(("Railing", "Cable rail")))
+        _rm = sum(l.ext for l in t.lines if l.category == "Rail" and not ("rink rail" in l.item or "drink-rail" in l.item))
+        rail_work = _rm * factor * (1 + rate) + _lr
+    sell = round((work - rail_work) / (1 - gm) + rail_sell + gc)
+    sell_floor = round((work - rail_work) / (1 - pb["gm_floor"]) + rail_sell + gc)
+    gm_base = gm
+    if rail_sell and not s.extras.sell_override:
+        gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
     if s.extras.sell_override:
         sell = round(float(s.extras.sell_override))
         gm = 1 - work / max(sell - gc, 1)          # the margin the override actually carries
@@ -215,7 +229,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - gm)
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if rail_sell and not s.extras.sell_override else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
@@ -252,7 +266,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         stair_m = mats(lambda l: l.category == "Stairs")
         alloc.append(("Foundation & structure", round(comp(frame_m, labsum("Frame", "Diamond Pier", "Caissons", "Large footings", "Concrete piers", "Extra beam", "Hot-tub", "Steel frame", "Under-deck")))))
         alloc.append(("Decking & fascia", round(comp(deck_m, labsum("Decking")))))
-        rail_c = round(comp(rail_m, labsum("Railing", "Cable rail"))) if L.rail else 0
+        rail_c = (round(rail_sell) if rail_sell else round(comp(rail_m, labsum("Railing", "Cable rail")))) if L.rail else 0
         stair_c = round(comp(stair_m, labsum("Stairs"))) if L.stairs else 0
         if L.rail and (rail_c >= 100 or not L.stairs):
             alloc.append(("Railing", rail_c))
@@ -273,6 +287,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     pr = Pricing(round(mat, 2), factor, round(mat_f, 2), rate, round(tax, 2), labor_lines, round(labor, 2), gc_lines, round(gc, 2), round(work, 2), round(cost, 2),
                  gm, sell, sell_floor, retail, round(monthly, 2), round(gp, 2), round(comm, 2), alloc, cats, round(sell / L.deck_sf, 2), engineering,
                  [], pb.get("_dealer_fee_note", ""), gc_base, gc_extras)
+    if rail_sell:
+        pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.0f}/LF (${rail_sell:,.0f}), everything else at {gm_base:.1%} GM"
     if with_options and s.extras.options:
         pr.options = price_options(t, pr, gm)
     return pr

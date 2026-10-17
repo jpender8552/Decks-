@@ -13,6 +13,7 @@ from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, M
 from .layout import Layout
 from .scene import build_scene, Scene, PHASES
 from .takeoff import Takeoff
+from .catalog import parse_beam
 from .spec import covers_of, post_words, post_base_sku
 from .units import ftin
 from .viewer import viewer_html
@@ -68,8 +69,14 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps.append(dict(n=4, code="T-403", title="Beams", still="step4",
         goes_in=items(lambda l: l.category == "Lumber" and ("6x" in l.item or "4x10x" in l.item and not timber or "4x12" in l.item)) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware"),
         how=[f"{bl.label}: {ftin(bl.length)} " + (f"in {len(bl.pieces)} pieces spliced over posts" if len(bl.pieces) > 1 else "one piece") + f", {bl.n_posts} posts @ {ftin(max((b - a) for a, b in zip(bl.posts_x, bl.posts_x[1:])) if bl.n_posts > 1 else bl.length)} max" for bl in L.beam_lines]
-            + ["Crown up, strung straight, caps screwed off with the SDS screws in the box."],
-        check=["Beam top = joist bottom (drop) / joist top (flush)", "Splices land on a post; caps fully fastened"]))
+            + ["Crown up, strung straight, caps screwed off with the SDS screws in the box."]
+            + ([f"Two-ply beam: through-bolt the plies with 1/2\" HDG bolts, 2 rows 2\" from top and bottom, staggered @ 24\" OC, a pair 6\" from each end — before it goes up."]
+               if any(parse_beam(bl.size)[0] == 2 and parse_beam(bl.size)[1].startswith("4x") for bl in L.beam_lines) else [])
+            + ([f"Knee braces once the beam is capped: 4x4 at 45°, {ftin(s.framing.knee_leg_in)} legs, one along the beam toward mid-span and one toward the house up to a {s.framing.joist_size} block between two joists (set the block with the frame) — 1/2\" through-bolt each end, then pull the temporary bracing."]
+               if s.framing.knee_braces else []),
+        check=["Beam top = joist bottom (drop) / joist top (flush)", "Splices land on a post; caps fully fastened"] + (["Every knee brace bolted both ends; posts still plumb"] if s.framing.knee_braces else [])))
+    if s.framing.knee_braces:
+        steps[-1]["goes_in"] = steps[-1]["goes_in"] + items(lambda l: "knee brace" in l.item or "1/2\" x 8\"" in l.item)
     if s.framing.system == "steel":
         steps[-1] = dict(n=4, code="T-403", title="Beams", still="step4",
             goes_in=items(lambda l: "boxed beams" in l.item or "side bracket" in l.item.lower()),

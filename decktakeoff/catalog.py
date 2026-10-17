@@ -129,7 +129,7 @@ TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
 POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"}}
 POST_BASE_SCREWS = {"ABA66Z": 12, "ABU66Z": 12, "ABA44Z": 8}
-POST_CAP_SCREWS = {"BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8}
+POST_CAP_SCREWS = {"CCQ76SDS2.5": 0, "BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8}
 FOOTING_CAPACITY_LB = {"DP-50/50": 3300, "DP-75/63": 6000}
 
 
@@ -139,7 +139,7 @@ def post_cap(post: str, beam_size: str) -> str:
         return "CCQ68SDS2.5" if nom.startswith("6x") else "CCQ88SDS2.5"
     if post == "6x6":
         if nom.startswith("4x"):
-            return "BC46Z"
+            return "CCQ76SDS2.5" if plies == 2 else "BC46Z"     # (2)4x = 7" seat
         if nom.startswith("6x"):
             return "BC6Z"
         if plies == 3:
@@ -167,6 +167,26 @@ RAIL_SYSTEMS["Cinch"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_al
 RAIL_SYSTEMS["Fulton"]["noncombustible"] = True
 RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
 RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]
+RAIL_SYSTEMS["IRX Baluster"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
+                                    noncombustible=True, surface=True, display="Impression Rail Express, vertical balusters, modern top rail", max_ctc=96.0, brand="TimberTech", colors=["Black", "White", "Bronze"],
+                                    note="TimberTech Impression Rail Express: 2\" aluminum posts on surface bases, modern top rail, vertical square aluminum balusters, "
+                                         "bottom rail; 6' / 8' level kits cut to bay, posts on the divider lines")
+
+
+def rail_name(system: str) -> str:
+    """How a rail system reads in client documents (the catalog key otherwise)."""
+    return RAIL_SYSTEMS.get(system, {}).get("display", system)
+
+
+def beam_words(sizes, species: str = "Douglas fir") -> str:
+    """'a doubled 4x10 Douglas fir beam' / '4x10 / 4x12 Douglas fir beams' — client wording for the beam list."""
+    sizes = list(sizes)
+    if len(sizes) == 1:
+        sz = sizes[0]
+        if sz.startswith("(2)4x") or sz.startswith("(2)6x"):
+            return f"a doubled {sz[3:]} {species} beam"
+        return f"{sz} {species} beam"
+    return f"{' / '.join(sizes)} {species} beams"
 
 
 def tax_rate_for(city: str, override=None) -> float:

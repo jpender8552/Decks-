@@ -84,7 +84,9 @@ def run_flags(L: Layout) -> List[Flag]:
     ok, mx = fr.post_height_check
     if not ok:
         add("STOP", "engineering", f"{fr.post_size} post {ftin(fr.post_len)} exceeds {ftin(mx)} max — go to 6x6/8x8 or brace", "IRC Table R507.4")
-    if fr.post_len > 96:
+    if fr.post_len > 96 and L.spec.framing.knee_braces:
+        add("INFO", "engineering", f"posts {ftin(fr.post_len)}: 4x4 knee braces both directions at every post are in the takeoff — engineer confirms the lateral design", "DCA6 / IRC R507.4")
+    elif fr.post_len > 96:
         add("CODE", "engineering", f"posts over 8' ({ftin(fr.post_len)}) — add diagonal knee bracing at each post (both directions at the corners)", "DCA6 / IRC R507.4")
     if g.height_in > 120:
         add("ENGINEER", "engineering", f"deck surface {ftin(g.height_in)} above grade — over 10': lateral bracing and an engineered design")
