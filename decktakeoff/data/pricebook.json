@@ -1283,9 +1283,10 @@
     }
   },
   "rail_sell_per_lf": {
-    "_note": "owner rule: these rail systems SELL at a fixed installed price per LF (materials + labor + margin); the rest of the job carries the GM",
+    "_note": "owner rule: these rail systems sell at this installed price per LF at a 40% GM (at_gm); at another job GM the rate scales by (1 - at_gm) / (1 - GM)",
     "IRX": 120.0,
     "IRX Baluster": 120.0,
-    "Impression Rail Express": 120.0
+    "Impression Rail Express": 120.0,
+    "_at_gm": 0.4
   }
 }
