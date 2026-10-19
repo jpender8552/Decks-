@@ -300,7 +300,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         sail_m = mats(lambda l: l.category == "Shade sail")
         if sail_m:
             _np = sum(len(sl.get('posts', [])) for sl in s.geometry.sails)
-            alloc.append((f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}" + (" at the rail corner" if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else ""), round(comp(sail_m, labsum("Shade sail")))))
+            alloc.append((f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}" + ((" at the rail corners" if _np != 1 else " at the rail corner") if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else ""), round(comp(sail_m, labsum("Shade sail")))))
         alloc += parts
     if gc:
         alloc.append(("Site & project services", round(gc)))
