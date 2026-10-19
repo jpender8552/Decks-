@@ -279,7 +279,7 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
     Q_.n_joists += n_field + n_pf
     rear_t = jb if fr.ledger else fr.rim_plies * jb
     # ---- joists (one bay, or hung on both faces of a mid flush beam)
-    flush_mid = [b for b in fr.beams if b.kind == "flush" and b.cl_y < z.D - 3]
+    flush_mid = [b for b in fr.beams if b.kind == "flush" and b.cl_y + b.width / 2 < z.D - 0.5]
     if not flush_mid:
         Q_.lumber += [(jsize, fr.joist_len, "field joist")] * n_field + [(jsize, fr.joist_len, "PF joist")] * n_pf
         Q_.cuts.append(CutPiece(f"Field joists{tag}", jsize, fr.joist_len, n_field, f"@ {fr.spacing:g}\" OC, crown up"))

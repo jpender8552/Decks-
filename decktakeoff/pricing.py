@@ -314,7 +314,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     diff = sell - sum(a[1] for a in alloc)
     i = 1 if (s.extras.demo_existing and not s.is_timber) else 0
     alloc[i] = (alloc[i][0], alloc[i][1] + diff)
-    engineering = (s.extras.engineering_fee_low, s.extras.engineering_fee_high) if s.extras.engineered else None
+    engineering = (s.extras.engineering_fee_low, s.extras.engineering_fee_high) if (s.extras.engineered and not s.extras.engineering_included) else None
     pr = Pricing(round(mat, 2), factor, round(mat_f, 2), rate, round(tax, 2), labor_lines, round(labor, 2), gc_lines, round(gc, 2), round(work, 2), round(cost, 2),
                  gm, sell, sell_floor, retail, round(monthly, 2), round(gp, 2), round(comm, 2), alloc, cats, round(sell / L.deck_sf, 2), engineering,
                  [], pb.get("_dealer_fee_note", ""), gc_base, gc_extras)

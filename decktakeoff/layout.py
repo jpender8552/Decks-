@@ -485,6 +485,11 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         rear_auto = None
         if not ledger:
             notes.append("freestanding zone framed on its declared beam; no ledger — lateral bracing per the engineer")
+    # a front flush beam IS the front rim: the frame's front thickness is the beam's width (a 7" (2)4x, not the 3" rim)
+    for b in declared:
+        if b.kind == "flush" and not (b.setback_in or 0) and b.position_in is None and (not zone or not b.zones or zone in b.zones):
+            front_t = max(front_t, parse_beam(b.size)[2])
+    joist_len = D - rear_t - front_t
     # resolve centrelines
     cls = []
     engineered = spec.extras.engineered
@@ -495,7 +500,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         if b.position_in is not None and (not zone or b is rear_auto):
             cl = float(b.position_in)
         elif b.kind == "flush":
-            cl = D - (b.setback_in or 0.0) - (0.0 if (b.setback_in or 0) > 0 else front_t / 2)   # flush: setback = CL back from the rim face
+            cl = D - (b.setback_in or 0.0) - (0.0 if (b.setback_in or 0) > 0 else max(front_t, bwid) / 2)   # flush: setback = CL back from the rim face; at the front its outer face is the frame face
         else:
             cl = D - (b.setback_in if b.setback_in is not None else 24.0) - bwid / 2
             # cantilever past a drop beam may not exceed 1/4 of the back-span: c <= (D - rear_t) / 5 — unless the job is engineered
@@ -572,7 +577,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         trib = back / 2 + (cantilever if is_last else nxt / 2)
         if not ledger and idx == 0:
             trib = nxt / 2 + (cl - 0)     # rear beam carries the rear overhang plus half the first span
-        front_flush = b.kind == "flush" and abs(cl - (D - front_t / 2)) < 1.0
+        front_flush = b.kind == "flush" and abs(cl - (D - max(front_t, parse_beam(b.size)[2]) / 2)) < 1.0
         length = W - 2 * BEAM_HOLD_IN if b.kind == "drop" else (W if front_flush else W - 2 * rim_t)
         # beam span table: joist span including the cantilever (IRC R507.5)
         span_for_table = back + cantilever if is_last else back

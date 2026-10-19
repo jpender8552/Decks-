@@ -331,12 +331,14 @@ def build_scene(L) -> Scene:
             for k in range(fr.rim_plies):
                 add("rim", x0, x0 + W_z, yw + k * jb, yw + (k + 1) * jb, jbot, jtop, "timber", 5)
         # joist runs: one bay, or split at a mid flush beam
-        flush_mid = sorted([b for b in fr.beams if b.kind == "flush" and b.cl_y < z.D - 3], key=lambda b: b.cl_y)
+        flush_mid = sorted([b for b in fr.beams if b.kind == "flush" and b.cl_y + b.width / 2 < z.D - 0.5], key=lambda b: b.cl_y)
         bays: List[Tuple[float, float]] = []
+        front_beam = [b for b in fr.beams if b.kind == "flush" and b.cl_y + b.width / 2 >= z.D - 0.5]
+        front_t = max([rim_t] + [b.width * IN for b in front_beam])     # a front flush beam is the front rim, at its own width
         ya = yw + rear_t
         for b in flush_mid:
             bays.append((ya, yw + (b.cl_y - b.width / 2) * IN - 0.02)); ya = yw + (b.cl_y + b.width / 2) * IN + 0.02
-        bays.append((ya, yf - rim_t))
+        bays.append((ya, yf - front_t))
         xs = [x0 + jx * IN for jx in fr.joist_x] + [x0 + px * IN for px in fr.pf_x]
         for dx, Ld, lab in L.divider_x:
             if x0 - 0.05 <= dx * IN <= x0 + W_z + 0.05 and (dx * IN < x0 + W_z - 0.05 or zi == len(L.zones) - 1):
@@ -345,8 +347,8 @@ def build_scene(L) -> Scene:
             for (ya_, yb_) in bays:
                 add("joist", xj - jb / 2, xj + jb / 2, ya_, yb_, jbot, jtop, "timber", 5)
         for k in range(fr.rim_plies):
-            add("rim", x0 + k * jb, x0 + (k + 1) * jb, yw + rear_t, yf - rim_t, jbot, jtop, "timber", 5, tag="side rim")
-            add("rim", x0 + W_z - (k + 1) * jb, x0 + W_z - k * jb, yw + rear_t, yf - rim_t, jbot, jtop, "timber", 5, tag="side rim")
+            add("rim", x0 + k * jb, x0 + (k + 1) * jb, yw + rear_t, yf - front_t, jbot, jtop, "timber", 5, tag="side rim")
+            add("rim", x0 + W_z - (k + 1) * jb, x0 + W_z - k * jb, yw + rear_t, yf - front_t, jbot, jtop, "timber", 5, tag="side rim")
             if not any(b.label.startswith("FRONT FLUSH") for b in fr.beams):
                 add("rim", x0, x0 + W_z, yf - (k + 1) * jb, yf - k * jb, jbot, jtop, "timber", 5, tag="front rim")
         # blocking

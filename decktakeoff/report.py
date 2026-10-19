@@ -322,7 +322,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
             w(f"- {o.name} — {sign} ${abs(o.financed):,.0f} (${abs(o.check):,.0f} check/ACH)" + (f" — {o.note}" if o.note else ""))
         w("")
     w("## NEXT STEP")
-    if s.extras.engineered:
+    if s.extras.engineered and s.extras.engineering_included:
+        w("Next step: we will get the engineer letter.")
+    elif s.extras.engineered:
         w("Engineering first. This is a quote: the numbers depend on the stamped engineering, so the first step is engineering. "
           "GSX provides the Colorado engineer and supplies the design package; you pay GSX the engineer's cost at no markup and you own the stamped set. "
           "When the stamped set is in hand, GSX issues a fixed-price proposal on these numbers with the payment terms.")

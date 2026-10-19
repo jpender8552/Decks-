@@ -253,6 +253,7 @@ class Extras:
     engineered: bool = False             # a stamped design is part of the job (quote shows engineering at cost)
     engineering_fee_low: float = 1800.0
     engineering_fee_high: float = 3000.0
+    engineering_included: bool = False   # the engineer's letter is in the price: no fee range shown (engineering_note says so)
     engineering_note: str = ""           # customer-facing line when engineering is outside the price ("billed at cost if the county asks for a stamped set")
     no_general_conditions: bool = False  # drop the $/SF general conditions and site extras entirely
     labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}

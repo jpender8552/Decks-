@@ -484,11 +484,12 @@
     "demo_sf": 64,
     "ledger_on_cantilevered_floor": true,
     "engineered": true,
-    "engineering_note": "The ledger lands on a cantilevered floor: GSX provides the engineer, and the stamped design is billed at cost, separate from this price.",
+    "engineering_note": "Engineer letter included.",
     "gm": 0.37,
     "connection_details": true,
     "gm_below_floor": true,
     "sell_override": 13000,
-    "price_breakdown": false
+    "price_breakdown": false,
+    "engineering_included": true
   }
 }
