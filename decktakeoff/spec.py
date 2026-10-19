@@ -269,6 +269,7 @@ class Extras:
     cover_gutters: bool = False          # 5" K-style seamless aluminum gutter on the low eave + 2x3 downspouts on the cover posts
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
+    price_breakdown: bool = True        # proposal shows a sell value per item; False -> the items listed, one total
     connection_details: bool = False    # permit set: add the wood-frame connection detail sheets (D-502 frame, D-504 edge / rail / lateral)
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
     cover_post_species: str = "WRC"      # roof-cover posts: "WRC" (western red cedar) | "DF" (Douglas fir #1)

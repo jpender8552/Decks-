@@ -214,10 +214,16 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"**Check or ACH: ${p.sell:,.0f}** ({(1 - p.sell / p.retail) * 100:.0f}% savings)")
     w("")
     w("## WHAT THE PRICE INCLUDES")
-    w("| Item | Value |")
-    w("|---|---:|")
-    for k, v in p.allocation:
-        w(f"| {k} | ${v:,.0f} |")
+    if s.extras.price_breakdown:
+        w("| Item | Value |")
+        w("|---|---:|")
+        for k, v in p.allocation:
+            w(f"| {k} | ${v:,.0f} |")
+    else:                                    # owner: no per-item prices to the homeowner — the scope, then the total
+        w("| Item | |")
+        w("|---|---:|")
+        for k, v in p.allocation:
+            w(f"| {k} | included |")
     w(f"| **Total, check or ACH** | **${p.sell:,.0f}** |")
     w(f"| **Total, financed** | **${p.retail:,.0f}** |")
     w("")

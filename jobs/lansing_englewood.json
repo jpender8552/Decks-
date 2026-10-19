@@ -1,7 +1,7 @@
 {
   "job": "5549 S Lansing Ct — elevated deck, 8' x 12' at 10' (TimberTech Reserve Driftwood, Fulton black, shade sail)",
   "client": "Rachel Chiu",
-  "notes": "Owner plan (Oct 2026): a new second-story deck off the existing door, 8' along the house x 12' out, surface 10' above the backyard. Replaces the smaller existing deck in the photos (two posts on concrete pads), which is demo'd. The ledger lands on a cantilevered floor (the floor framing overhangs the foundation wall), so the attachment and the lateral load path are engineered: GSX provides the engineer. Frame: TrueFrame by ProWood #1 SYP 2x10 joists at 16\" OC, double rims hung in HUCQ210-2, one row of blocking over the beam. One drop beam, (2)4x10 Douglas fir #1 (two 4x10 plies, through-bolted), 2' back from the front rim face, on only (2) 6x6 DF #1 posts on Diamond Piers. Decking TimberTech Reserve Driftwood, CONCEALoc hidden fasteners, single picture frame on the 3 open sides (none against the house), Driftwood fascia; G-Tape on the joists, rims and beam. Rail: TimberTech Impression Rail Express (IRX), vertical square aluminum balusters, modern top rail, Bronze, 36\", on the left, right and front. No stairs (none in the photos or the plan). OWNER 19 Oct: one 4-corner (square) shade sail on TWO posts — two anchors on the house under the eave (engineered into the framing) and two 4\" x 4\" steel HSS posts powder-coated Bronze at the front deck corners, integrated with the railing as the corner posts, side-bolted through the double rim with blocking, (3) 5/8\" bolts each; twisted (hypar) for runoff, 7' clear over the deck at the low corner; color to be selected (drawn Sand). OWNER 19 Oct: rail changed to TimberTech Fulton, Black (GSX detail: 2\" steel posts inside the outer rim ply); the two sail posts are the front Fulton corners, powder-coated black. OWNER 19 Oct: SOLD PRICE $13,000 cash (check/ACH). The homeowner buys the shade sail; GSX supplies the two sail posts, the house anchors and the hardware, and hangs and tensions her sail. Fulton sells $85/LF installed, costs $35/LF installed.",
+  "notes": "Owner plan (Oct 2026): a new second-story deck off the existing door, 8' along the house x 12' out, surface 10' above the backyard. Replaces the smaller existing deck in the photos (two posts on concrete pads), which is demo'd. The ledger lands on a cantilevered floor (the floor framing overhangs the foundation wall), so the attachment and the lateral load path are engineered: GSX provides the engineer. Frame: TrueFrame by ProWood #1 SYP 2x10 joists at 16\" OC, double rims hung in HUCQ210-2, one row of blocking over the beam. One drop beam, (2)4x10 Douglas fir #1 (two 4x10 plies, through-bolted), 2' back from the front rim face, on only (2) 6x6 DF #1 posts on Diamond Piers. Decking TimberTech Reserve Driftwood, CONCEALoc hidden fasteners, single picture frame on the 3 open sides (none against the house), Driftwood fascia; G-Tape on the joists, rims and beam. Rail: TimberTech Impression Rail Express (IRX), vertical square aluminum balusters, modern top rail, Bronze, 36\", on the left, right and front. No stairs (none in the photos or the plan). OWNER 19 Oct: one 4-corner (square) shade sail on TWO posts — two anchors on the house under the eave (engineered into the framing) and two 4\" x 4\" steel HSS posts powder-coated Bronze at the front deck corners, integrated with the railing as the corner posts, side-bolted through the double rim with blocking, (3) 5/8\" bolts each; twisted (hypar) for runoff, 7' clear over the deck at the low corner; color to be selected (drawn Sand). OWNER 19 Oct: rail changed to TimberTech Fulton, Black (GSX detail: 2\" steel posts inside the outer rim ply); the two sail posts are the front Fulton corners, powder-coated black. OWNER 19 Oct: SOLD PRICE $13,000 cash (check/ACH). The homeowner buys the shade sail; GSX supplies the two sail posts, the house anchors and the hardware, and hangs and tensions her sail. Fulton sells $85/LF installed, costs $35/LF installed. OWNER 19 Oct: square sun shade (flat, square corners, pitched to the yard — not a twist); GSX buys only the 2 posts, $600, and pays the crew $200 to install everything for the sail; the homeowner buys the sail. No per-item price breakdown on the proposal.",
   "site": {
     "address": "5549 S Lansing Ct",
     "city": "Englewood",
@@ -401,22 +401,22 @@
           [
             0.3,
             0.0,
-            18.75
+            18.5
           ],
           [
             7.5,
             0.0,
-            17.0
+            18.5
           ],
           [
             7.542,
             11.25,
-            18.5
+            17.25
           ],
           [
             0.208,
             11.25,
-            17.0
+            17.25
           ]
         ],
         "posts": [
@@ -425,9 +425,9 @@
         ],
         "color": "Sand",
         "post_in": 4,
-        "fabric_price_sf": 14.0,
-        "post_price_lf": 42.0,
-        "fabric_by_owner": true
+        "fabric_by_owner": true,
+        "posts_cost_total": 600,
+        "labor_lot": 200
       }
     ]
   },
@@ -488,6 +488,7 @@
     "gm": 0.37,
     "connection_details": true,
     "gm_below_floor": true,
-    "sell_override": 13000
+    "sell_override": 13000,
+    "price_breakdown": false
   }
 }

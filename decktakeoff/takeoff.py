@@ -1053,6 +1053,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Shade sail", f"{nm} — custom commercial-grade HDPE shade sail, {'triangle, 3 corners' if len(P) == 3 else f'{len(P)} corners, hypar twist'}, {color}, stainless D-rings, sewn-in perimeter cable",
                               area, area, "SF", "made to the measured attachment points, ~6% under for tensioning", float(sl.get("fabric_price_sf", 14.0)), "EST — sail fabricator to quote"))
         posts = [P[k] for k in sl.get("posts", [])]
+        if posts and sl.get("posts_cost_total") is not None:      # owner-set: the posts bought as one lot, nothing else for the sail
+            lines.append(Line("Shade sail", f"Sail posts ({len(posts)}) — {sl.get('post_in', 4)}\" steel, {spec.railing.color if spec.railing.system != 'none' else 'black'}, "
+                              + ("the rail corner posts at the front of the deck" if sl.get("mount") == "deck_rail" else "on footings"), 1, 1, "lot", "owner's price", float(sl["posts_cost_total"]), "owner"))
+            continue
         if posts and sl.get("mount") == "deck_rail":
             sq = sl.get("post_in", 4); color = spec.railing.color if spec.railing.system != "none" else "black"
             for k, p in enumerate(posts):
