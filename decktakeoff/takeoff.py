@@ -1011,7 +1011,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _price("rail", "touchup_paint")
             tu = "Rust-Oleum flat black touch-up (cut ends)" if "black" in (rl.color or "black").lower() else f"{rbrand} {rl.color} touch-up paint (cut ends)"
             lines.append(Line("Rail", tu, 1, 1, "ea", "exact", uc, src))
+        n_sail_ = sum(len(sl.get("posts", [])) for sl in (spec.geometry.sails or []) if sl.get("mount") == "deck_rail")
         sched["Rail"] = (f"{sysn} {rl.height:g}\" — {len(rl.posts)} posts ({', '.join(f'{v} {k}' for k, v in sorted(pk.items()))})"
+                         + (f"; the {n_sail_} front corners are the shade-sail posts, base-plated on the deck — the panels bracket to them" if n_sail_ else "")
                          + (f", {len(rl.sections)} bays at " + " / ".join(sorted(set(ftin(s_.ctc) for s_ in rl.sections))) + " CTC (8' kits cut to bay), posts on the divider lines, no bottom rail; HeadLOK 6\" x 4 per post" if cable
                             else " surface-mounted on the decking over a 2x blocking pair between the rim plies and the PF joist at every post, (4) HeadLOK 6\" per post through the base" if sysd.get("surface")
                             else " inside the outer rim ply, inner ply pocketed 2\" wide, (2) 7/16\" x 4-1/2\" bolts per post")
@@ -1055,17 +1057,20 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         posts = [P[k] for k in sl.get("posts", [])]
         if posts and sl.get("posts_cost_total") is not None:      # owner-set: the posts bought as one lot, nothing else for the sail
             lines.append(Line("Shade sail", f"Sail posts ({len(posts)}) — {sl.get('post_in', 4)}\" steel, {spec.railing.color if spec.railing.system != 'none' else 'black'}, "
-                              + ("the rail corner posts at the front of the deck" if sl.get("mount") == "deck_rail" else "on footings"), 1, 1, "lot", "owner's price", float(sl["posts_cost_total"]), "owner"))
+                              + ("on base plates on top of the deck, the rail corner posts at the front corners" if sl.get("mount") == "deck_rail" else "on footings"), 1, 1, "lot", "owner's price", float(sl["posts_cost_total"]), "owner"))
+            if sl.get("mount") == "deck_rail":
+                lines.append(Line("Shade sail", f"{jsize}x8 #1 True Frame — solid blocking under each sail post base plate (rim to PF joist, doubled)", 1, 1, "ea", f"{2 * len(posts)} blocks", _lumber_price(jsize, 8)[0], "GS sheet"))
+                lines.append(Line("Shade sail", "1/2\" x 8\" HDG through-bolt + nut + washers — base plates through the decking into the blocking", 4 * len(posts), 4 * len(posts) + 2, "ea", "+2  (4 per post)", 4.2, "est."))
             continue
         if posts and sl.get("mount") == "deck_rail":
             sq = sl.get("post_in", 4); color = spec.railing.color if spec.railing.system != "none" else "black"
             for k, p in enumerate(posts):
                 above = p[2] + 0.6 - spec.geometry.height_in / 12
-                ln = int(math.ceil(above + 1.6))
+                ln = int(math.ceil(above + 0.5))
                 lines.append(Line("Shade sail", f"Steel sail post {sq}\" x {sq}\" x 1/4\" HSS, galvanized + powder coat {color}, pad eye welded at the top, rail-bracket tabs — {ln}' "
-                                  f"({ftin(above * 12)} above the deck + 1'-7\" down the rim)", 1, 1, "ea", f"post {k + 1}: the rail corner post at this corner", round(ln * float(sl.get("post_price_lf", 42.0)) + 120.0, 2), "EST — steel fabricator to quote"))
+                                  f"({ftin(above * 12)} above the deck), 3/8\" base plate", 1, 1, "ea", f"post {k + 1}: the rail corner post at this corner", round(ln * float(sl.get("post_price_lf", 42.0)) + 120.0, 2), "EST — steel fabricator to quote"))
             nb = 3 * len(posts)
-            lines.append(Line("Shade sail", "5/8\" x 10\" HDG through-bolt + nut + plate washers — sail posts through the double rim and blocking", nb, nb + 2, "ea", f"+2  (3 per post)", 7.5, "est."))
+            lines.append(Line("Shade sail", "1/2\" x 8\" HDG through-bolt + nut + washers — sail post base plates through the decking into solid blocking", 4 * len(posts), 4 * len(posts) + 2, "ea", "+2  (4 per post)", 4.2, "est."))
             Qz_sail_blocks = 2 * len(posts)
             lines.append(Line("Shade sail", f"{jsize}x8 #1 True Frame — solid blocking behind each sail post (rim to PF joist and the next joist)", 1, 1, "ea", f"{Qz_sail_blocks} blocks", _lumber_price(jsize, 8)[0], "GS sheet"))
         elif posts:

@@ -1242,8 +1242,10 @@ def draw_sails(add, spec):
                     shape="mesh", pts=[list(p), list(q), [q[0], q[1], q[2] - 0.04], list(p), [q[0], q[1], q[2] - 0.04], [p[0], p[1], p[2] - 0.04]])
             if k in sl.get("posts", []) and sl.get("mount") == "deck_rail":     # on the deck: the rail's corner post, side-bolted to the rim
                 sq = float(sl.get("post_in", 4.0)) / 12
-                add("sailpost", p[0] - sq / 2, p[0] + sq / 2, p[1] - sq / 2, p[1] + sq / 2, spec.geometry.height_in / 12 - 1.6, p[2] + 0.6, "railmetal", 7,
-                    tag=f"{sl.get('post_in', 4)}\" steel sail post — the rail corner post, bolted through the double rim")
+                zd = spec.geometry.height_in / 12
+                add("sailpost", p[0] - sq / 2 - 0.12, p[0] + sq / 2 + 0.12, p[1] - sq / 2 - 0.12, p[1] + sq / 2 + 0.12, zd, zd + 0.04, "railmetal", 7, tag="sail post base plate")
+                add("sailpost", p[0] - sq / 2, p[0] + sq / 2, p[1] - sq / 2, p[1] + sq / 2, zd + 0.04, p[2] + 0.6, "railmetal", 7,
+                    tag=f"{sl.get('post_in', 4)}\" steel sail post on the deck — the rail corner post")
             elif k in sl.get("posts", []):
                 fd = float(sl.get("footing_dia_in", 24)) / 12
                 add("footing", p[0] - fd / 2, p[0] + fd / 2, p[1] - fd / 2, p[1] + fd / 2, -0.5, 0.15, "concrete", 1, tag="sail post footing", shape="cyl")

@@ -148,7 +148,7 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     for sl in s.geometry.sails or []:
         n_p = len(sl.get("posts", []))
         deck_m = sl.get("mount") == "deck_rail"
-        lab.append(((f"Shade sail — {n_p} steel post{'s' if n_p != 1 else ''} bolted through the rim as the rail corner{'s' if n_p != 1 else ''}, blocking, house anchors, hang and tension" if deck_m else
+        lab.append(((f"Shade sail — {n_p} steel post{'s' if n_p != 1 else ''} base-plated on the deck as the rail corner{'s' if n_p != 1 else ''}, blocking, house anchors, hang and tension" if deck_m else
                      f"Shade sail — {n_p} steel posts set in augered footings (lift + auger rental), house anchors, hang and tension") if n_p else "Shade sail — house anchors, hang and tension",
                     1, "lot", float(sl.get("labor_lot", 900.0 + (350.0 if deck_m else 750.0) * n_p)), "ESTIMATE — no sail rate on the card; confirm"))
     if s.extras.blinds_reinstall and _covs:

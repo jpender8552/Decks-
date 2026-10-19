@@ -87,7 +87,7 @@ def run_flags(L: Layout) -> List[Flag]:
     for sl in (L.spec.geometry.sails or []):
         n_p = len(sl.get("posts", []))
         if sl.get("mount") == "deck_rail":
-            add("ENGINEER", "engineering", f"{sl.get('name', 'Shade sail')}: the sail post{'s stand' if n_p != 1 else ' stands'} on the deck as the rail corner{'s' if n_p != 1 else ''} — the sail's wind pull goes into the double rim, the frame, the knee-braced 6x6 posts and the house ledger: engineer checks the post-to-rim bolting, the frame and the lateral system for it", "ASCE 7 / IRC R507")
+            add("ENGINEER", "engineering", f"{sl.get('name', 'Shade sail')}: the sail post{'s stand' if n_p != 1 else ' stands'} on the deck as the rail corner{'s' if n_p != 1 else ''} — base-plated on top of the decking over solid blocking: the sail's wind pull goes through the base plate bolts into the blocking, the frame, the knee-braced 6x6 posts and the house ledger: engineer checks the post-to-rim bolting, the frame and the lateral system for it", "ASCE 7 / IRC R507")
         add("ENGINEER", "engineering", f"{sl.get('name', 'Shade sail')}: sail wind load ({L.spec.site.wind_speed_mph:g} mph) on the {n_p} steel post{'s' if n_p != 1 else ''}{', their footings' if sl.get('mount') != 'deck_rail' else ''} and the house anchors — engineer sizes the posts / footings and the anchor connection into the house framing (not into siding or fascia alone)", "ASCE 7 / IRC R301.2")
         add("CHECK", "site", "shade sail: check whether the county wants a separate permit for the sail structure; the sail must meet the setbacks", "county")
     if fr.post_len > 96 and L.spec.framing.knee_braces:
