@@ -1283,10 +1283,14 @@
     }
   },
   "rail_sell_per_lf": {
-    "_note": "owner rule: these rail systems sell at this installed price per LF at a 40% GM (at_gm); at another job GM the rate scales by (1 - at_gm) / (1 - GM)",
+    "_note": "owner rules: a number = installed sell per LF at the _at_gm margin (scales with the job GM: IRX $120 at 40%); {sell, cost} = fixed installed sell and installed cost per LF (Fulton $85 / $35)",
     "IRX": 120.0,
     "IRX Baluster": 120.0,
     "Impression Rail Express": 120.0,
-    "_at_gm": 0.4
+    "_at_gm": 0.4,
+    "Fulton": {
+      "sell": 85.0,
+      "cost": 35.0
+    }
   }
 }

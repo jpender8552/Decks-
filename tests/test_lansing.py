@@ -17,10 +17,12 @@ def result():
     return run(DeckSpec.from_dict(SPEC), with_pricing=True)
 
 
-def test_rail_sells_at_the_owner_rate(result):
+def test_rail_sell_rule_only_for_irx(result):
     t, f, p = result
-    # $120/LF is the 40% price: at the job's GM it scales by 0.60 / (1 - GM)
-    assert dict(p.allocation)["Railing"] == round(120 * 0.60 / (1 - SPEC['extras']['gm']) * t.layout.rail.rail_lf)
+    # $120/LF at 40% is the IRX rule; this job's Fulton rail carries the job margin
+    assert t.spec.railing.system != "IRX Baluster" or t.spec.extras.sell_override or dict(p.allocation)["Railing"] == round(120 * 0.60 / (1 - SPEC['extras']['gm']) * t.layout.rail.rail_lf)
+    if t.spec.railing.system == "Fulton" and not t.spec.extras.sell_override:       # owner: Fulton sells $85/LF installed, costs $35/LF installed
+        assert dict(p.allocation)["Railing"] == round(85 * t.layout.rail.rail_lf)
 
 
 def test_front_bay_spans_the_corners(result):

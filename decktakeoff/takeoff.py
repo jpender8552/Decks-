@@ -944,9 +944,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 n_rp = len(rl.posts) - n_sail
                 lines.append(Line("Rail", d_, n_rp, n_rp, "kit", f"exact  ({', '.join(f'{v} {k}' for k, v in sorted(pk.items()))}" + (f"; {n_sail} corner{' is the sail post' if n_sail == 1 else 's are the sail posts'}" if n_sail else "") + ")", uc, src))
             else:
+                n_sail = sum(len(sl.get("posts", [])) for sl in (spec.geometry.sails or []) if sl.get("mount") == "deck_rail")
                 for kind, n in sorted(pk.items()):
+                    why = "exact"
+                    if kind == "CORNER" and n_sail:
+                        n, why = max(0, n - n_sail), f"exact  ({n_sail} corner{' is the sail post' if n_sail == 1 else 's are the sail posts'})"
+                    if not n:
+                        continue
                     uc, src = _price("rail", f"{sysn}|post|{kind}")
-                    lines.append(Line("Rail", f"{rname} 2\" {kind} post {rl.height:g}\" {rl.color} w/ brackets, cap, skirt", n, n, "ea", "exact", uc, src))
+                    lines.append(Line("Rail", f"{rname} 2\" {kind} post {rl.height:g}\" {rl.color} w/ brackets, cap, skirt", n, n, "ea", why, uc, src))
         if spec.railing.drink_rail:
             dcoll = spec.railing.drink_rail_collection or bcoll
             dcolor = spec.railing.drink_rail_color or bcolor
@@ -1040,8 +1046,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         span = max(math.dist(P[i][:2], P[j][:2]) for i in range(len(P)) for j in range(len(P)))
         area = round(a_plan * math.sqrt(1 + (dz / max(span, 1)) ** 2))
         color = sl.get("color", "to be selected")
-        lines.append(Line("Shade sail", f"{nm} — custom commercial-grade HDPE shade sail, {'triangle, 3 corners' if len(P) == 3 else f'{len(P)} corners, hypar twist'}, {color}, stainless D-rings, sewn-in perimeter cable",
-                          area, area, "SF", "made to the measured attachment points, ~6% under for tensioning", float(sl.get("fabric_price_sf", 14.0)), "EST — sail fabricator to quote"))
+        if sl.get("fabric_by_owner"):
+            lines.append(Line("Shade sail", f"{nm} — {'triangle' if len(P) == 3 else f'{len(P)}-corner'} shade sail, ~{area} SF, {color} — SUPPLIED BY THE OWNER (GSX hangs and tensions it)",
+                              1, 1, "ea", "owner-supplied — not ordered", 0.0, "by owner"))
+        else:
+            lines.append(Line("Shade sail", f"{nm} — custom commercial-grade HDPE shade sail, {'triangle, 3 corners' if len(P) == 3 else f'{len(P)} corners, hypar twist'}, {color}, stainless D-rings, sewn-in perimeter cable",
+                              area, area, "SF", "made to the measured attachment points, ~6% under for tensioning", float(sl.get("fabric_price_sf", 14.0)), "EST — sail fabricator to quote"))
         posts = [P[k] for k in sl.get("posts", [])]
         if posts and sl.get("mount") == "deck_rail":
             sq = sl.get("post_in", 4); color = spec.railing.color if spec.railing.system != "none" else "black"

@@ -186,8 +186,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     # estimated prices scale so materials (factored, taxed) + rail labor land on that cost
     _rule = pb.get("rail_sell_per_lf", {})
     _r0 = s.extras.rail_sell_per_lf if s.extras.rail_sell_per_lf is not None else (_rule.get(L.rail.system) if L.rail else None)
+    _fixed = isinstance(_r0, dict)          # {sell, cost}: the owner's installed sell and cost per LF, no scaling
     if _r0 and L.rail and not getattr(t, "_rail_cost_set", False):
-        own = float(_r0) * (1 - _rule.get("_at_gm", 0.40)) * L.rail.rail_lf
+        own = (float(_r0["cost"]) if _fixed else float(_r0) * (1 - _rule.get("_at_gm", 0.40))) * L.rail.rail_lf
         r_lab = sum(q * r_ for i, q, u, r_, n in labor_lines_for(t) if i.startswith(("Railing", "Cable rail")))
         r_lines = [l for l in t.lines if l.category == "Rail" and not ("rink rail" in l.item or "drink-rail" in l.item)]
         r_mat = sum(l.ext for l in r_lines) * factor * (1 + rate)
@@ -195,7 +196,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
             k = (own - r_lab) / r_mat
             for l in r_lines:
                 l.unit_cost = round(l.unit_cost * k, 4)
-                l.source = f"{l.source} · scaled to the owner's ${float(_r0):,.0f}/LF at {_rule.get('_at_gm', 0.40):.0%}"
+                l.source = f"{l.source} · scaled to the owner's " + (f"${float(_r0['cost']):,.0f}/LF installed cost" if _fixed else f"${float(_r0):,.0f}/LF at {_rule.get('_at_gm', 0.40):.0%}")
         t._rail_cost_set = True
     cats: Dict[str, float] = {}
     mat = 0.0
@@ -223,7 +224,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     rate_lf = s.extras.rail_sell_per_lf
     if rate_lf is None and L.rail:          # 0 on a job = quoted before the rule, keep the margin pricing
         rate_lf = pb.get("rail_sell_per_lf", {}).get(L.rail.system)
-    if rate_lf:                                # the rate is quoted at the rule's margin (40%): scale it to this job's GM
+    if isinstance(rate_lf, dict):              # owner's fixed installed sell per LF
+        rate_lf = float(rate_lf["sell"])
+    elif rate_lf:                              # the rate is quoted at the rule's margin (40%): scale it to this job's GM
         rate_lf = float(rate_lf) * (1 - pb.get("rail_sell_per_lf", {}).get("_at_gm", gm)) / (1 - gm)
     rail_sell = round(float(rate_lf) * L.rail.rail_lf, 2) if (rate_lf and L.rail) else 0.0
     rail_work = 0.0
@@ -300,7 +303,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         sail_m = mats(lambda l: l.category == "Shade sail")
         if sail_m:
             _np = sum(len(sl.get('posts', [])) for sl in s.geometry.sails)
-            alloc.append((f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}" + ((" at the rail corners" if _np != 1 else " at the rail corner") if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else ""), round(comp(sail_m, labsum("Shade sail")))))
+            _own = any(sl.get("fabric_by_owner") for sl in s.geometry.sails)
+            alloc.append(((f"Shade sail posts + install — {_np} steel post{'s' if _np != 1 else ''}" if _own else f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}") + ((" at the rail corners" if _np != 1 else " at the rail corner") if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else "") + (" (owner supplies the sail)" if _own else ""), round(comp(sail_m, labsum("Shade sail")))))
         alloc += parts
     if gc:
         alloc.append(("Site & project services", round(gc)))
@@ -314,7 +318,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     pr = Pricing(round(mat, 2), factor, round(mat_f, 2), rate, round(tax, 2), labor_lines, round(labor, 2), gc_lines, round(gc, 2), round(work, 2), round(cost, 2),
                  gm, sell, sell_floor, retail, round(monthly, 2), round(gp, 2), round(comm, 2), alloc, cats, round(sell / L.deck_sf, 2), engineering,
                  [], pb.get("_dealer_fee_note", ""), gc_base, gc_extras)
-    if rail_sell:
+    if rail_sell and not s.extras.sell_override:
         pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f}), everything else at {gm_base:.1%} GM"
     if with_options and s.extras.options:
         pr.options = price_options(t, pr, gm)
