@@ -145,6 +145,12 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Under-deck prep — 6-mil poly + 2\" gravel", round(t.layout.deck_sf), "SF", lr.get("under_deck_gravel_per_sf", 1.5), "ESTIMATE — confirm"))
     if s.framing.system == "steel" and lr.get("steel_frame_premium_per_sf"):     # rate card: no steel up-charge unless the job sets one
         lab.append(("Steel frame premium — cut, clip and screw cold-formed members", round(t.layout.deck_sf), "SF", lr["steel_frame_premium_per_sf"], "ESTIMATE — no steel rate on the card; confirm with the framer"))
+    for sl in s.geometry.sails or []:
+        n_p = len(sl.get("posts", []))
+        deck_m = sl.get("mount") == "deck_rail"
+        lab.append(((f"Shade sail — {n_p} steel post{'s' if n_p != 1 else ''} bolted through the rim as the rail corner{'s' if n_p != 1 else ''}, blocking, house anchors, hang and tension" if deck_m else
+                     f"Shade sail — {n_p} steel posts set in augered footings (lift + auger rental), house anchors, hang and tension") if n_p else "Shade sail — house anchors, hang and tension",
+                    1, "lot", float(sl.get("labor_lot", 900.0 + (350.0 if deck_m else 750.0) * n_p)), "ESTIMATE — no sail rate on the card; confirm"))
     if s.extras.blinds_reinstall and _covs:
         lab.append(("Take down, store and rehang the owner's roll-down blinds on the new beams", 1, "lot", lr.get("blinds_reinstall_lot", 250.0), "ESTIMATE — confirm"))
     return lab
@@ -291,6 +297,10 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
             stair_c += rail_c            # a parapet deck: the only rail is on the stair, so it rides with the stairs
         if L.stairs:
             alloc.append(("Stairs" + (" & stair rail" if s.railing.existing_parapet else ""), stair_c))
+        sail_m = mats(lambda l: l.category == "Shade sail")
+        if sail_m:
+            _np = sum(len(sl.get('posts', [])) for sl in s.geometry.sails)
+            alloc.append((f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}" + (" at the rail corner" if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else ""), round(comp(sail_m, labsum("Shade sail")))))
         alloc += parts
     if gc:
         alloc.append(("Site & project services", round(gc)))

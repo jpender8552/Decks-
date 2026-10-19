@@ -104,6 +104,8 @@ class Geometry:
     house_blocks: List[List[float]] = field(default_factory=list)     # global frame, feet: [x0, x1, y0, y1] blocks of the house footprint (drawn, not counted)
     house_openings: List[List[float]] = field(default_factory=list)   # [x0, x1, y_face, z0, z1] doors / windows on a wall facing the deck
     cover: Optional[List[float]] = None                                 # porch cover: [x0, x1, y0, y1, slope] (feet), drawn as a shed roof on posts
+    sails: List[dict] = field(default_factory=list)    # shade sails: {name, corners: [[x, y, z] x 3-4] (ft, plan frame, z above grade: the attachment points),
+                                                       #   posts: [corner indices on steel posts], color, post_od_in, post_embed_ft, footing_dia_in, fabric_price_sf}
     covers: List[dict] = field(default_factory=list)   # one or more lean-to roof covers: {name, x0, x1, y0, y1 (ft, post/beam rectangle),
                                                        #  slope "+y", clear_high_in / clear_low_in (bottom of the ledger at the house /
                                                        #  bottom of the beam at the posts, above the deck), posts_x_ft, footing

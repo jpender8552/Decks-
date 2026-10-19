@@ -11,7 +11,7 @@ from .scene import Box, Scene
 GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23}      # the viewer's exploded lift per phase (ft)
 SKIP = {"ground", "gravel", "water", "glass", "trim_house"}
 # layered roof-cover parts paint after everything under them when the camera looks down (no z-fighting between slabs and rafters)
-RANK = {"house": -2, "roof": -1, "rafter": 1, "soffit": 0, "sheath": 2, "underlay": 3, "ssroof": 4, "hardie": 5}
+RANK = {"house": -2, "roof": -1, "rafter": 1, "soffit": 0, "sheath": 2, "underlay": 3, "ssroof": 4, "hardie": 5, "sail": 6}
 
 
 def _hex(c: str) -> Tuple[int, int, int]:
@@ -93,6 +93,17 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
     pts_all = []
     for b in boxes:
         lf = lift_of(b, explode, gaps)
+        if b.shape == "mesh" and b.pts:          # shade sail: its own triangles, shaded by how much each faces the light
+            col = colors.get(b.mat, "#d9cdb0")
+            for k in range(0, len(b.pts) - 2, 3):
+                tri = [(q[0], q[1], q[2] + lf) for q in b.pts[k:k + 3]]
+                (ax, ay, az), (bx, by, bz), (qx, qy, qz) = tri
+                nx, ny, nz = (by - ay) * (qz - az) - (bz - az) * (qy - ay), (bz - az) * (qx - ax) - (bx - ax) * (qz - az), (bx - ax) * (qy - ay) - (by - ay) * (qx - ax)
+                ln = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+                k_ = 0.8 + 0.25 * abs(nz / ln)
+                polys.append((RANK.get("sail", 6) if view.d[2] > 0.05 else 0, sum(view.depth(q) for q in tri) / 3, [view.p(q) for q in tri], _shade(col, k_)))
+                pts_all += [view.p(q) for q in tri] if fit_boxes is None else []
+            continue
         cs = corners(b, lf)
         P = [view.p(q) for q in cs]
         clip_z = None if b.kind in ("footing", "base", "house", "ground") else lf     # nothing shows below grade but the piers

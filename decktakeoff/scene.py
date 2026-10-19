@@ -30,6 +30,7 @@ class Box:
     rot: float = 0.0    # radians about the box centre: stair stringers / stair rails (axis below); 0 = axis-aligned
     rot_axis: str = "y" # "y": run along x (viewer rotation.z) | "x": run along y (viewer rotation.x)
     xg: float = 0.0     # extra lift in the exploded view (ft) on top of the phase gap: layers within one phase pull apart
+    pts: Optional[list] = None   # shape "mesh": triangle vertices [[x, y, z], ...] in plan feet (3 per triangle) — shade sails
 
 
 @dataclass
@@ -147,6 +148,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         osb=dict(color="#c9a46a", rough=0.95, label="7/16\" OSB roof sheathing"),
         underlay=dict(color="#3d4651", rough=0.9, label="high-temp self-adhered underlayment"),
         steel=dict(color="#141416", metal=0.55, rough=0.5, label="black powder-coat"),
+        sail=dict(color=_sail_hex(spec), rough=0.95, opacity=0.94, label="shade sail fabric"),
         railmetal=dict(color=_rail_hex(spec.railing.color), metal=0.55, rough=0.5, label=f"{spec.railing.color or 'black'} powder-coat"),
         cable=dict(color="#b8bcc2", metal=0.9, rough=0.35),
         concrete=dict(color="#b9b4aa", rough=0.95),
@@ -203,6 +205,7 @@ def build_scene(L) -> Scene:
         draw_house_from_spec(add, spec, zt, H_house)
     for _c in (spec.geometry.covers or []):
         draw_cover(add, spec, dict(COVER_DEFAULTS, **_c), zt)
+    draw_sails(add, spec)
     # a deck or roof above this one (existing, drawn for context) and the columns that carry it through this deck
     for ov in (spec.geometry.overhead or []):
         ox0, ox1, oy0, oy1, zu, zo = [float(v) for v in ov[:6]]
@@ -469,8 +472,11 @@ def build_scene(L) -> Scene:
                         shift[(round(px_, 3), round(py_, 3))] = (px_, yy - RP_)
         def sh(x, y):
             return shift.get((round(x, 3), round(y, 3)), (x, y))
+        sail_xy = [(float(sl["corners"][k][0]), float(sl["corners"][k][1])) for sl in (spec.geometry.sails or []) if sl.get("mount") == "deck_rail" for k in sl.get("posts", [])]
         for p in rl.posts:
             x, y = sh(p.x * IN, p.y * IN)
+            if any(abs(x - sx) < 0.4 and abs(y - sy) < 0.4 for sx, sy in sail_xy):
+                continue                       # the sail post is this corner post
             add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "railmetal", 7, tag=p.kind)
             add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "railmetal", 7)
         # sections: reconstruct post pairs along each edge run from the post list order
@@ -1193,6 +1199,59 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
             out.append(Box("fascia", cx - nx * fas_t / 2 - L_e / 2, cx - nx * fas_t / 2 + L_e / 2, cy - ny * fas_t / 2 - fas_t / 2, cy - ny * fas_t / 2 + fas_t / 2, jbot - 0.15, zt - 0.02, "fascia", 6,
                            tag=f"angled fascia {L_e:.1f}' mitred", rot=phi, rot_axis="z"))
     return out
+
+
+def _sail_hex(spec) -> str:
+    sl = (spec.geometry.sails or [{}])[0]
+    c = str(sl.get("color", "")).lower()
+    return SAIL_COLORS.get(c, "#e6e1d2") if 'SAIL_COLORS' in globals() else "#e6e1d2"
+
+
+def draw_sails(add, spec):
+    """Shade sails: a tensioned hypar between the attachment points (bilinear patch, corners pulled in 6% for the hardware),
+    steel posts on concrete footings at the post corners, and the tension cables from each sail corner to its point."""
+    for sl in spec.geometry.sails or []:
+        P = [tuple(float(v) for v in c) for c in sl["corners"]]
+        cx = sum(p[0] for p in P) / len(P); cy = sum(p[1] for p in P) / len(P); cz = sum(p[2] for p in P) / len(P)
+        S = [(p[0] + (cx - p[0]) * 0.06, p[1] + (cy - p[1]) * 0.06, p[2] + (cz - p[2]) * 0.06) for p in P]
+        if len(S) == 3:
+            S = S + [S[2]]
+        n = 14
+        def at(u, v):
+            a = [S[0][i] * (1 - u) + S[1][i] * u for i in range(3)]
+            b = [S[3][i] * (1 - u) + S[2][i] * u for i in range(3)]
+            q = [a[i] * (1 - v) + b[i] * v for i in range(3)]
+            sag = 0.35 * math.sin(math.pi * u) * math.sin(math.pi * v)      # the cloth dishes a little between the corners
+            return [q[0], q[1], q[2] - sag]
+        tri = []
+        for i in range(n):
+            for j in range(n):
+                u0, u1, v0, v1 = i / n, (i + 1) / n, j / n, (j + 1) / n
+                tri += [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v0), at(u1, v1), at(u0, v1)]
+        xs = [p[0] for p in tri]; ys = [p[1] for p in tri]; zs = [p[2] for p in tri]
+        add("sail", min(xs), max(xs), min(ys), max(ys), min(zs), max(zs), "sail", 8, tag=sl.get("name", "shade sail"), shape="mesh", pts=tri)
+        od = float(sl.get("post_od_in", 6.625)) / 12
+        for k, p in enumerate(P):
+            q = S[k]
+            L_ = math.dist(p, q)
+            if L_ > 0.05:
+                mx, my, mz = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2
+                add("sailcable", mx - 0.02, mx + 0.02, my - 0.02, my + 0.02, mz - 0.02, mz + 0.02, "cable", 8, tag="turnbuckle + cable",
+                    shape="mesh", pts=[list(p), list(q), [q[0], q[1], q[2] - 0.04], list(p), [q[0], q[1], q[2] - 0.04], [p[0], p[1], p[2] - 0.04]])
+            if k in sl.get("posts", []) and sl.get("mount") == "deck_rail":     # on the deck: the rail's corner post, side-bolted to the rim
+                sq = float(sl.get("post_in", 4.0)) / 12
+                add("sailpost", p[0] - sq / 2, p[0] + sq / 2, p[1] - sq / 2, p[1] + sq / 2, spec.geometry.height_in / 12 - 1.6, p[2] + 0.6, "railmetal", 7,
+                    tag=f"{sl.get('post_in', 4)}\" steel sail post — the rail corner post, bolted through the double rim")
+            elif k in sl.get("posts", []):
+                fd = float(sl.get("footing_dia_in", 24)) / 12
+                add("footing", p[0] - fd / 2, p[0] + fd / 2, p[1] - fd / 2, p[1] + fd / 2, -0.5, 0.15, "concrete", 1, tag="sail post footing", shape="cyl")
+                add("sailpost", p[0] - od / 2, p[0] + od / 2, p[1] - od / 2, p[1] + od / 2, 0.15, p[2] + 0.6, "railmetal", 2, tag=f"{sl.get('post_od_in', 6.625)}\" steel sail post", shape="cyl")
+            else:
+                add("trim", p[0] - 0.15, p[0] + 0.15, p[1] - 0.05, p[1] + 0.12, p[2] - 0.2, p[2] + 0.2, "steel", 8, tag="sail anchor plate on the house")
+
+
+SAIL_COLORS = {"sand": "#d9cdb0", "desert sand": "#d9cdb0", "white": "#f1efe9", "charcoal": "#4a4c4e", "graphite": "#55585b", "steel grey": "#7d8287",
+               "terracotta": "#b5654a", "mocha": "#7b6352", "beige": "#d8ccb4", "bronze": "#6b5340", "black": "#2a2a2c"}
 
 
 def _rail_hex(color: str) -> str:

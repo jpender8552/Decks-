@@ -20,7 +20,7 @@ from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, buil
 from .spec import post_words, post_base_sku, covers_of, DeckSpec
 from .units import ftin
 
-CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Porch cover", "Finish", "Site"]
+CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Porch cover", "Shade sail", "Finish", "Site"]
 BOARD_STOCK_IN = {12: 144.0, 16: 192.0, 20: 240.0}
 
 
@@ -940,7 +940,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                                   f"exact  (cut to {' / '.join(cuts_txt)})", uc, src))
             if (timber or sysd.get("surface")) and f"{sysn}|post_kit" in PRICEBOOK["rail"]:
                 d_, uc, src = _item("rail", f"{sysn}|post_kit")
-                lines.append(Line("Rail", d_, len(rl.posts), len(rl.posts), "kit", f"exact  ({', '.join(f'{v} {k}' for k, v in sorted(pk.items()))})", uc, src))
+                n_sail = sum(len(sl.get("posts", [])) for sl in (spec.geometry.sails or []) if sl.get("mount") == "deck_rail")
+                n_rp = len(rl.posts) - n_sail
+                lines.append(Line("Rail", d_, n_rp, n_rp, "kit", f"exact  ({', '.join(f'{v} {k}' for k, v in sorted(pk.items()))}" + (f"; {n_sail} corner{' is the sail post' if n_sail == 1 else 's are the sail posts'}" if n_sail else "") + ")", uc, src))
             else:
                 for kind, n in sorted(pk.items()):
                     uc, src = _price("rail", f"{sysn}|post|{kind}")
@@ -1026,6 +1028,45 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         else:
             notes.append("timbers unfinished — weather to gray; dark walnut oil is an option")
 
+    # ================= SHADE SAILS
+    for sl in spec.geometry.sails or []:
+        P = [tuple(float(v) for v in c) for c in sl["corners"]]
+        nm = sl.get("name", "Shade sail")
+        # fabric area: the corner polygon pulled in 6% for the hardware (plan area x the slope)
+        cx = sum(p[0] for p in P) / len(P); cy = sum(p[1] for p in P) / len(P)
+        Qs = [(p[0] + (cx - p[0]) * 0.06, p[1] + (cy - p[1]) * 0.06) for p in P]
+        a_plan = abs(sum(Qs[i][0] * Qs[(i + 1) % len(Qs)][1] - Qs[(i + 1) % len(Qs)][0] * Qs[i][1] for i in range(len(Qs)))) / 2
+        dz = max(p[2] for p in P) - min(p[2] for p in P)
+        span = max(math.dist(P[i][:2], P[j][:2]) for i in range(len(P)) for j in range(len(P)))
+        area = round(a_plan * math.sqrt(1 + (dz / max(span, 1)) ** 2))
+        color = sl.get("color", "to be selected")
+        lines.append(Line("Shade sail", f"{nm} — custom commercial-grade HDPE shade sail, {'triangle, 3 corners' if len(P) == 3 else f'{len(P)} corners, hypar twist'}, {color}, stainless D-rings, sewn-in perimeter cable",
+                          area, area, "SF", "made to the measured attachment points, ~6% under for tensioning", float(sl.get("fabric_price_sf", 14.0)), "EST — sail fabricator to quote"))
+        posts = [P[k] for k in sl.get("posts", [])]
+        if posts and sl.get("mount") == "deck_rail":
+            sq = sl.get("post_in", 4); color = spec.railing.color if spec.railing.system != "none" else "black"
+            for k, p in enumerate(posts):
+                above = p[2] + 0.6 - spec.geometry.height_in / 12
+                ln = int(math.ceil(above + 1.6))
+                lines.append(Line("Shade sail", f"Steel sail post {sq}\" x {sq}\" x 1/4\" HSS, galvanized + powder coat {color}, pad eye welded at the top, rail-bracket tabs — {ln}' "
+                                  f"({ftin(above * 12)} above the deck + 1'-7\" down the rim)", 1, 1, "ea", f"post {k + 1}: the rail corner post at this corner", round(ln * float(sl.get("post_price_lf", 42.0)) + 120.0, 2), "EST — steel fabricator to quote"))
+            nb = 3 * len(posts)
+            lines.append(Line("Shade sail", "5/8\" x 10\" HDG through-bolt + nut + plate washers — sail posts through the double rim and blocking", nb, nb + 2, "ea", f"+2  (3 per post)", 7.5, "est."))
+            Qz_sail_blocks = 2 * len(posts)
+            lines.append(Line("Shade sail", f"{jsize}x8 #1 True Frame — solid blocking behind each sail post (rim to PF joist and the next joist)", 1, 1, "ea", f"{Qz_sail_blocks} blocks", _lumber_price(jsize, 8)[0], "GS sheet"))
+        elif posts:
+            emb = float(sl.get("post_embed_ft", 7.0)); od = sl.get("post_od_in", 6.625)
+            for k, p in enumerate(posts):
+                ln = int(math.ceil(p[2] + 0.6 + emb))
+                lines.append(Line("Shade sail", f"Steel sail post {od}\" OD sch 40, hot-dip galvanized + powder coat, pad eye welded at the top — {ln}' ({ftin((p[2] + 0.6) * 12)} above grade + {emb:g}' embed)",
+                                  1, 1, "ea", f"post {k + 1}, raked 5° away from the sail", round(ln * float(sl.get("post_price_lf", 38.0)), 2), "EST — steel supplier to quote"))
+            fd = float(sl.get("footing_dia_in", 24)) / 12
+            cy_ = len(posts) * math.pi * (fd / 2) ** 2 * (emb + 0.5) / 27
+            lines.append(Line("Shade sail", f"Concrete 4,000 psi — sail post footings {int(fd * 12)}\" dia x {emb + 0.5:g}' (short-load ready-mix)", round(cy_, 2), math.ceil(cy_ * 2) / 2, "CY",
+                              f"{len(posts)} footings, engineer to size for the sail wind load", 260.0, "EST"))
+        n_house = len(P) - len(posts)
+        lines.append(Line("Shade sail", f"Sail hardware: {len(P)} stainless turnbuckles (jaw-jaw), D-shackles, snap hooks" + (f", {n_house} house anchor plates with through-bolts / structural screws into the framing" if n_house else ""),
+                          1, 1, "kit", "316 stainless, marine grade", 85.0 * len(P) + 120.0 * n_house, "EST"))
     # ================= SITE
     if spec.extras.under_deck_gravel:
         sf_g = L.deck_sf * 1.1

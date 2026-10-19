@@ -728,6 +728,14 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
     for b in S.boxes:
         if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
+    # shade sails: the sail outline dashed, its posts solid
+    for sl in s.geometry.sails or []:
+        Pc = [(float(c[0]), float(c[1])) for c in sl["corners"]]
+        o.append(PG([(X(x), Y(y)) for x, y in Pc], "none", "#3f5d8a", 1.1).replace("/>", ' stroke-dasharray="5 3"/>', 1))
+        for k in sl.get("posts", []):
+            x, y = Pc[k]
+            o.append(C(X(x), Y(y), 3.2, "#3f5d8a", INK, 0.6))
+        o.append(T(X(sum(p[0] for p in Pc) / len(Pc)), Y(max(p[1] for p in Pc)) + 12, "SHADE SAIL — " + (f"{len(sl.get('posts', []))} post{'s' if len(sl.get('posts', [])) != 1 else ''} at the deck rail corner{'s' if len(sl.get('posts', [])) != 1 else ''}" if sl.get("mount") == "deck_rail" else f"{len(sl.get('posts', []))} steel posts"), 6.6, 800, "middle", "#3f5d8a"))
     # roof covers: roof edge dashed, posts
     from .takeoff import cover_posts_x
     for c in covers_of(s):

@@ -137,8 +137,17 @@ for (const b of D.boxes) {
   const w = b.x1 - b.x0, d = b.y1 - b.y0, h = b.z1 - b.z0;
   let geo;
   if (b.shape === 'cyl') geo = new THREE.CylinderGeometry(w / 2, w / 2, h, 24);
+  else if (b.shape === 'mesh' && b.pts) {                       // a shade sail: triangles in world coordinates
+    geo = new THREE.BufferGeometry();
+    const arr = new Float32Array(b.pts.length * 3);
+    b.pts.forEach((q, i) => { arr[i * 3] = q[0]; arr[i * 3 + 1] = q[2]; arr[i * 3 + 2] = q[1]; });
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3)); geo.computeVertexNormals();
+  }
   else geo = new THREE.BoxGeometry(w, h, d);
-  const mesh = new THREE.Mesh(geo, material(b));
+  const mat_ = material(b);
+  if (b.shape === 'mesh') { mat_.side = THREE.DoubleSide; }
+  const mesh = new THREE.Mesh(geo, mat_);
+  if (b.shape === 'mesh') mesh.position.set(0, 0, 0); else
   mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
   if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
@@ -173,6 +182,17 @@ const VIEWS = {
   isolow: {pos: [cx + span * 0.85, zt + 2.2, D.y_front + span * 0.95], at: [cx, zt - 1.2, cy]},
   underiso: {pos: [cx - span * 0.55, Math.max(1.2, zt * 0.25), D.y_front + span * 0.7], at: [cx, zt - 2.2, cy - 2]},
 };
+// a shade sail above the deck: pull the outside views back and up so the whole sail and its posts are in frame
+(function () {
+  const sails = D.boxes.filter(b => b.kind === 'sail');
+  if (!sails.length) return;
+  const top = Math.max(...sails.map(b => b.z1)), lift = (top - zt) * 0.5;
+  for (const k of ['yard', 'corner', 'iso', 'iso2', 'isolow']) {
+    const v = VIEWS[k]; const at = [v.at[0], v.at[1] + lift, v.at[2]];
+    const dv = [v.pos[0] - v.at[0], v.pos[1] - v.at[1], v.pos[2] - v.at[2]];
+    v.at = at; v.pos = [at[0] + dv[0] * 1.35, at[1] + dv[1] * 1.35 + 1.5, at[2] + dv[2] * 1.35];
+  }
+})();
 function planMode(on) {
   if (renderer.shadowMap.enabled === on) { renderer.shadowMap.enabled = !on; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }   // a plan has no cast shadows
   for (const o of ctx) { o.castShadow = !on; if (o.userData.kind === 'roof') o.visible = !on; else { o.material = o.material.clone(); o.material.transparent = on; o.material.opacity = on ? 0.28 : 1; o.material.depthWrite = !on; } }

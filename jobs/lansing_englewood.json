@@ -1,7 +1,7 @@
 {
   "job": "5549 S Lansing Ct — elevated deck, 8' x 12' at 10' (TimberTech Reserve Driftwood, IRX bronze)",
   "client": "Rachel Chiu",
-  "notes": "Owner plan (Oct 2026): a new second-story deck off the existing door, 8' along the house x 12' out, surface 10' above the backyard. Replaces the smaller existing deck in the photos (two posts on concrete pads), which is demo'd. The ledger lands on a cantilevered floor (the floor framing overhangs the foundation wall), so the attachment and the lateral load path are engineered: GSX provides the engineer. Frame: TrueFrame by ProWood #1 SYP 2x10 joists at 16\" OC, double rims hung in HUCQ210-2, one row of blocking over the beam. One drop beam, (2)4x10 Douglas fir #1 (two 4x10 plies, through-bolted), 2' back from the front rim face, on only (2) 6x6 DF #1 posts on Diamond Piers. Decking TimberTech Reserve Driftwood, CONCEALoc hidden fasteners, single picture frame on the 3 open sides (none against the house), Driftwood fascia; G-Tape on the joists, rims and beam. Rail: TimberTech Impression Rail Express (IRX), vertical square aluminum balusters, modern top rail, Bronze, 36\", on the left, right and front. No stairs (none in the photos or the plan).",
+  "notes": "Owner plan (Oct 2026): a new second-story deck off the existing door, 8' along the house x 12' out, surface 10' above the backyard. Replaces the smaller existing deck in the photos (two posts on concrete pads), which is demo'd. The ledger lands on a cantilevered floor (the floor framing overhangs the foundation wall), so the attachment and the lateral load path are engineered: GSX provides the engineer. Frame: TrueFrame by ProWood #1 SYP 2x10 joists at 16\" OC, double rims hung in HUCQ210-2, one row of blocking over the beam. One drop beam, (2)4x10 Douglas fir #1 (two 4x10 plies, through-bolted), 2' back from the front rim face, on only (2) 6x6 DF #1 posts on Diamond Piers. Decking TimberTech Reserve Driftwood, CONCEALoc hidden fasteners, single picture frame on the 3 open sides (none against the house), Driftwood fascia; G-Tape on the joists, rims and beam. Rail: TimberTech Impression Rail Express (IRX), vertical square aluminum balusters, modern top rail, Bronze, 36\", on the left, right and front. No stairs (none in the photos or the plan). OWNER 19 Oct: ONE shade sail on ONE post — a triangle sail: two anchors on the house under the eave (engineered into the framing) and one 4\" x 4\" steel HSS post powder-coated Bronze at the front-left (north) deck corner, integrated with the railing as that corner post, side-bolted through the double rim with blocking, (3) 5/8\" bolts; 7' clear over the deck at the post; color to be selected (drawn Sand).",
   "site": {
     "address": "5549 S Lansing Ct",
     "city": "Englewood",
@@ -392,6 +392,36 @@
         -47.9,
         -26
       ]
+    ],
+    "sails": [
+      {
+        "name": "Shade sail",
+        "mount": "deck_rail",
+        "corners": [
+          [
+            0.3,
+            0.0,
+            18.75
+          ],
+          [
+            9.0,
+            0.0,
+            17.75
+          ],
+          [
+            0.208,
+            11.25,
+            17.0
+          ]
+        ],
+        "posts": [
+          2
+        ],
+        "color": "Sand",
+        "post_in": 4,
+        "fabric_price_sf": 14.0,
+        "post_price_lf": 42.0
+      }
     ]
   },
   "framing": {
