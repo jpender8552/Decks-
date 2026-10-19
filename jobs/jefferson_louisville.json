@@ -1,7 +1,7 @@
 {
-  "job": "281 S Jefferson Ave — two decks + two lean-to covers (CEMCO steel, TimberTech Landmark American Walnut)",
+  "job": "281 S Jefferson Ave — two decks + two lean-to covers (CEMCO steel, TimberTech Vintage Weathered Teak)",
   "client": "",
-  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg). OWNER 16 Oct (pricing): posts Douglas fir, no extra beam set, no steel up-charge, both covers' labor $4,000 total incl. roofing, decking $5.50/LF, roll-down blinds existing (no work). OWNER 16 Oct: the stair leaves the main deck's left side toward the walkway (into the yard in front of the walkway), not the front. No landing pad — the stair lands on grade. Diamond Piers $150 each (material). Total labor $7,750 (covers $4,000 of it). Margin 33.33% (owner-set, under the 40% floor). Cover framing wood: 2x8 rafters, (2)2x8 beams (2x8 ledger to match), 6x6 Douglas fir posts. Deck frame: CEMCO 600S162-54 C-joists, 600T track, all G90 (6\" deep). Main cover: (2) posts across the front, not (3) — the deck beam keeps its middle pier on a steel stub. Main cover beam upgraded to a 4x10 Douglas fir (11' span between the two posts). SOLD at $36,300 (check / ACH) — margin is what that price carries. Deck posts: 6x6 Douglas fir rough on the deck-only piers (not steel stubs); every 6x6 is rough Douglas fir.",
+  "notes": "OWNER 16 Oct: replace (2) lean-to roof covers and two decks. Main deck 12'x12', one set of stairs (the box step goes). Walkway 3'8\" x 14'8\", ~15\" above grade on average, 9\" at the lowest. Diamond Piers, CEMCO steel frame, TimberTech Advanced PVC Landmark American Walnut, no butt joints, divider boards, single picture frame. 6x6 posts, James Hardie soffit / rakes / fascia on the decks and the covers. No electrical. Keep the roll-down blinds. Main cover: bottom 88\" above the deck at the house dropping to just under 80\" at the posts — raise 3\". Standing seam on both covers, black. DRAWING: house along the bottom; walkway on the left (14'8\" x 44\"), main deck on the right (12' x 12'); small cover posts 64\" apart, 93\" off the ground / 88\" off the deck. SITE (Boulder County GIS): parcel 157517119033, Lot 33 Blk 10 Dutch Creek, 4,678 SF, Dutch Creek PUD (RL). Rear wall faces WNW (299.5 deg). OWNER 16 Oct (pricing): posts Douglas fir, no extra beam set, no steel up-charge, both covers' labor $4,000 total incl. roofing, decking $5.50/LF, roll-down blinds existing (no work). OWNER 16 Oct: the stair leaves the main deck's left side toward the walkway (into the yard in front of the walkway), not the front. No landing pad — the stair lands on grade. Diamond Piers $150 each (material). Total labor $7,750 (covers $4,000 of it). Margin 33.33% (owner-set, under the 40% floor). Cover framing wood: 2x8 rafters, (2)2x8 beams (2x8 ledger to match), 6x6 Douglas fir posts. Deck frame: CEMCO 600S162-54 C-joists, 600T track, all G90 (6\" deep). Main cover: (2) posts across the front, not (3) — the deck beam keeps its middle pier on a steel stub. Main cover beam upgraded to a 4x10 Douglas fir (11' span between the two posts). SOLD at $36,300 (check / ACH) — margin is what that price carries. Deck posts: 6x6 Douglas fir rough on the deck-only piers (not steel stubs); every 6x6 is rough Douglas fir. OWNER 19 Oct (re-opened): field measurements — walkway 177\" x 44\", main deck 155\" x 143\" (overall 27'-8\"); main cover 144\" wall to drip, clear 96\" at the house / 84\" at the front posts; walkway cover 56\" wall to drip, clear 89\" at the house / 82\" at the posts. Decking changed to TimberTech Vintage Weathered Teak (picture frame + dividers in Weathered Teak).",
   "site": {
     "address": "281 S Jefferson Ave",
     "city": "Louisville",
@@ -55,7 +55,7 @@
       [
         "CODE",
         "fire",
-        "Louisville submittal: decking spec sheet showing ASTM E84 Class A (flame spread 25 or less) — TimberTech Landmark is listed Class A; include the TimberTech Class A data sheet",
+        "Louisville submittal: decking spec sheet showing ASTM E84 Class A (flame spread 25 or less) — confirm the TimberTech Vintage (Advanced PVC) data sheet lists Class A before submittal (the decking changed from Landmark)",
         "Louisville deck handout / Fire Hardening Code"
       ],
       [
@@ -272,8 +272,8 @@
           "~1,462 SF · 31.3%"
         ],
         [
-          "Main cover, new (to the posts) 12'-0\" x 11'-9\"",
-          "141 SF"
+          "Main cover, new (to the posts) 12'-11\" x 11'-8\"",
+          "151 SF"
         ],
         [
           "Walkway cover, new (to the posts) 5'-4\" x 3'-5\"",
@@ -281,7 +281,7 @@
         ],
         [
           "Proposed coverage",
-          "~1,479 SF · 31.6% (+~17 SF)"
+          "~1,489 SF · 31.8% (+~27 SF)"
         ],
         [
           "Uncovered decks",
@@ -305,17 +305,17 @@
     "zones": [
       {
         "name": "W",
-        "width_in": 176,
+        "width_in": 177,
         "depth_in": 44,
         "wall_offset_in": 0,
-        "label": "Walkway — 14'8\" x 3'8\" under the small cover"
+        "label": "Walkway — 14'9\" x 3'8\" under the small cover"
       },
       {
         "name": "M",
-        "width_in": 144,
-        "depth_in": 144,
+        "width_in": 155,
+        "depth_in": 143,
         "wall_offset_in": 0,
-        "label": "Main deck — 12' x 12' under the main cover"
+        "label": "Main deck — 12'11\" x 11'11\" under the main cover"
       }
     ],
     "outline": [
@@ -324,19 +324,19 @@
         0
       ],
       [
-        26.667,
+        27.667,
         0
       ],
       [
-        26.667,
-        12
+        27.667,
+        11.917
       ],
       [
-        14.667,
-        12
+        14.75,
+        11.917
       ],
       [
-        14.667,
+        14.75,
         3.667
       ],
       [
@@ -390,30 +390,30 @@
     "covers": [
       {
         "name": "Main cover",
-        "x0": 14.667,
-        "x1": 26.667,
+        "x0": 14.75,
+        "x1": 27.667,
         "y0": 0,
-        "y1": 11.75,
+        "y1": 11.667,
         "slope": "+y",
-        "clear_high_in": 91,
-        "clear_low_in": 82.5,
+        "clear_high_in": 96,
+        "clear_low_in": 84,
         "footing": "deck_pier",
-        "overhang_ft": 1.0,
+        "overhang_ft": 0.333,
         "blinds": [
           {
-            "from_ft": 15.2,
-            "to_ft": 20.6,
+            "from_ft": 15.3,
+            "to_ft": 21.2,
             "lowered": true
           },
           {
-            "from_ft": 20.7,
-            "to_ft": 26.1,
+            "from_ft": 21.3,
+            "to_ft": 27.12,
             "lowered": false
           }
         ],
         "posts_x_ft": [
-          15.167,
-          26.167
+          15.25,
+          27.167
         ],
         "beam": "4x10",
         "ledger": "2x8"
@@ -425,14 +425,14 @@
         "y0": 0,
         "y1": 3.42,
         "slope": "+y",
-        "clear_high_in": 93,
-        "clear_low_in": 88,
+        "clear_high_in": 89,
+        "clear_low_in": 82,
         "posts_x_ft": [
           3.0,
           8.333
         ],
         "footing": "deck_pier",
-        "overhang_ft": 1.0,
+        "overhang_ft": 1.247,
         "beam": "(2)2x8",
         "ledger": "2x8"
       }
@@ -459,7 +459,7 @@
           0.6,
           3.0,
           8.333,
-          14.1
+          14.15
         ]
       },
       {
@@ -471,9 +471,9 @@
           "M"
         ],
         "posts_x_ft": [
-          15.167,
-          20.667,
-          26.167
+          15.25,
+          21.208,
+          27.167
         ]
       }
     ],
@@ -489,12 +489,12 @@
   },
   "decking": {
     "brand": "TimberTech",
-    "collection": "Landmark",
-    "color": "American Walnut",
+    "collection": "Vintage",
+    "color": "Weathered Teak",
     "profile": "grooved",
     "fascia": true,
-    "border_collection": "Landmark",
-    "border_color": "American Walnut",
+    "border_collection": "Vintage",
+    "border_color": "Weathered Teak",
     "dividers": true,
     "price_per_lf": 5.5
   },
