@@ -445,10 +445,10 @@
     "joist_tape": true,
     "beams": [
       {
-        "kind": "drop",
+        "kind": "flush",
         "size": "(2)4x10",
         "species": "DF#1",
-        "setback_in": 24,
+        "setback_in": 0,
         "posts_x_ft": [
           0.75,
           7.25

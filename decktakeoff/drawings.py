@@ -1381,26 +1381,44 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
     _lead(o, x + 186, y + 60, x + 166, y + 192, f"Simpson {hs} face-mount hanger, every joist, 10d HDG in every hole")
     _lead(o, x + 59, y + 120, x + 24, y + 246, "Picture-frame joist 1-1/2\" inboard of the rim")
     _lead(o, x + 42, y + 160, x + 166, y + 246, f"{fr.rim_plies}-ply {js} rim, GRK RSS 3-1/8\", 2 rows @ 12\" staggered")
-    # 3 joists over the drop beam
-    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "JOISTS ON THE DROP BEAM — SECTION")
-    o.append(R(x + 20, y + 74, W3 - 40, 7, FILL["deck"], INK, 0.5))
-    for k in range(5):
-        xx = x + 36 + k * 58
-        _wood(o, xx, y + 81, 7, 44)
-        o.append(R(xx + 7, y + 120, 6, 12, "#7b8186", INK, 0.5))
-        if k < 4:
-            _wood(o, xx + 7, y + 83, 51, 40, dark=True)
-    o.append(R(x + 36, y + 79, 248, 2.5, "#111", "none", 0))
-    _wood(o, x + 24, y + 125, W3 - 48, 46)
-    o.append(LN(x + 24, y + 148, x + W3 - 24, y + 148, INK, 0.5))
-    for k in range(5):
-        _bolt(o, x + 50 + k * 56, y + (136 if k % 2 else 160))
-    _lead(o, x + 66, y + 104, x + 24, y + 40, f"Blocking row over the beam, {js}, (3) 3\" screws each end")
-    _lead(o, x + 41, y + 126, x + 24, y + 210, "Simpson H2.5AZ every joist + rim to the beam (hidden, inside face)")
-    _lead(o, x + 160, y + 160, x + 150, y + 210, f"{bsize} {bsp} drop beam — plies through-bolted 1/2\" HDG, 2 rows staggered @ 24\" OC, 2\" from top / bottom")
-    _lead(o, x + 200, y + 80, x + 200, y + 40, "G-Tape 2\" on every joist and block, 4\" on rims and the beam")
-    o.append(T(x + 24, y + 262, "Joists bear the full beam width", 6.6, 700))
-    o.append(T(x + 24, y + 274, f"Cantilever {ftin(L.frame.beams[0].cantilever) if L.frame.beams else ''} past the beam — over L/4: engineer", 6.6, 700))
+    # 3 joists over the drop beam / into the flush beam
+    flush = bool(bl) and bl.kind == "flush"
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "JOISTS INTO THE FLUSH BEAM — PLAN + SECTION" if flush else "JOISTS ON THE DROP BEAM — SECTION")
+    if flush:
+        _wood(o, x + 20, y + 40, W3 - 40, 26)                          # the (2)4x10 in plan, the front of the deck
+        o.append(LN(x + 20, y + 53, x + W3 - 20, y + 53, INK, 0.5))
+        for k in range(5):
+            xx = x + 36 + k * 58
+            _wood(o, xx, y + 66, 7, 120, dark=True)
+            o.append(R(xx - 3, y + 66, 13, 9, "#7b8186", INK, 0.6))
+        for k in range(5):
+            _bolt(o, x + 50 + k * 56, y + (47 if k % 2 else 59))
+        o.append(T(x + W3 / 2, y + 36, "FRONT OF THE DECK — the beam is the front rim", 6.6, 800, "middle", MUTE))
+        _wood(o, x + 30, y + 214, 120, 46); _wood(o, x + 150, y + 216, 10, 42, dark=True); o.append(R(x + 150, y + 236, 12, 22, "#7b8186", INK, 0.6))
+        o.append(R(x + 30, y + 207, 250, 7, FILL["deck"], INK, 0.5)); _wood(o, x + 160, y + 216, 120, 42, dark=True)
+        _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson LUS hanger every joist off the {bsize} beam face, 10d HDG every hole")
+        _lead(o, x + 60, y + 238, x + 24, y + 196, f"{bsize} {bsp} flush beam = front rim, plies through-bolted 1/2\" @ 24\" staggered")
+        _lead(o, x + 210, y + 236, x + 236, y + 180, f"{js} joist, top flush with the beam")
+        o.append(T(x + 24, y + 278, "No cantilever: the beam carries the front edge, joists hang both ends", 6.6, 700))
+    else:
+        o.append(R(x + 20, y + 74, W3 - 40, 7, FILL["deck"], INK, 0.5))
+        for k in range(5):
+            xx = x + 36 + k * 58
+            _wood(o, xx, y + 81, 7, 44)
+            o.append(R(xx + 7, y + 120, 6, 12, "#7b8186", INK, 0.5))
+            if k < 4:
+                _wood(o, xx + 7, y + 83, 51, 40, dark=True)
+        o.append(R(x + 36, y + 79, 248, 2.5, "#111", "none", 0))
+        _wood(o, x + 24, y + 125, W3 - 48, 46)
+        o.append(LN(x + 24, y + 148, x + W3 - 24, y + 148, INK, 0.5))
+        for k in range(5):
+            _bolt(o, x + 50 + k * 56, y + (136 if k % 2 else 160))
+        _lead(o, x + 66, y + 104, x + 24, y + 40, f"Blocking row over the beam, {js}, (3) 3\" screws each end")
+        _lead(o, x + 41, y + 126, x + 24, y + 210, "Simpson H2.5AZ every joist + rim to the beam (hidden, inside face)")
+        _lead(o, x + 160, y + 160, x + 150, y + 210, f"{bsize} {bsp} drop beam — plies through-bolted 1/2\" HDG, 2 rows staggered @ 24\" OC, 2\" from top / bottom")
+        _lead(o, x + 200, y + 80, x + 200, y + 40, "G-Tape 2\" on every joist and block, 4\" on rims and the beam")
+        o.append(T(x + 24, y + 262, "Joists bear the full beam width", 6.6, 700))
+        o.append(T(x + 24, y + 274, f"Cantilever {ftin(L.frame.beams[0].cantilever) if L.frame.beams else ''} past the beam — over L/4: engineer", 6.6, 700))
     # 4 beam on the post cap
     x, y = P[3]; _panel(o, x, y, W3, H2, "4", f"{bsize} BEAM ON THE 6x6 — ELEVATION")
     _wood(o, x + 20, y + 60, W3 - 40, 46)
