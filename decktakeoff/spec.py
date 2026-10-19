@@ -270,6 +270,8 @@ class Extras:
     cover_gutters: bool = False          # 5" K-style seamless aluminum gutter on the low eave + 2x3 downspouts on the cover posts
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
+    show_financing: bool = True          # proposal shows the financed price / monthly; False on a cash-only job (one-off)
+    proposal_note: str = ""              # a closing paragraph on the proposal, under the next step (owner's terms / exclusions)
     price_breakdown: bool = True        # proposal shows a sell value per item; False -> the items listed, one total
     connection_details: bool = False    # permit set: add the wood-frame connection detail sheets (D-502 frame, D-504 edge / rail / lateral)
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)

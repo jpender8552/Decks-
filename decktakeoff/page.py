@@ -538,8 +538,9 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     if customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "") + f" · {today}"
         head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name)}</h1><p class="who">{E(who)}</p>'
-                f'<div class="pricebar"><div><span class="l">Check or ACH</span><span class="v">{money(p.sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(p.retail)}</span><span class="s">no money down</span></div>'
-                f'<div><span class="l">Monthly</span><span class="v">{money(p.monthly)}</span><span class="s">6.99% · 10 years</span></div></div>'
+                + ((f'<div class="pricebar"><div><span class="l">Check or ACH</span><span class="v">{money(p.sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(p.retail)}</span><span class="s">no money down</span></div>'
+                    f'<div><span class="l">Monthly</span><span class="v">{money(p.monthly)}</span><span class="s">6.99% · 10 years</span></div></div>') if spec.extras.show_financing else
+                   f'<div class="pricebar"><div><span class="l">Price · check or ACH</span><span class="v">{money(p.sell)}</span></div></div>')
                 + (f'<img class="herofig" src="r/{key}-{hero}.jpg" alt="rendering">' if hero in have else "")
                 + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
         body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'

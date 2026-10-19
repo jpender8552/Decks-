@@ -490,6 +490,8 @@
     "gm_below_floor": true,
     "sell_override": 13000,
     "price_breakdown": false,
-    "engineering_included": true
+    "engineering_included": true,
+    "proposal_note": "This price does not include permit fees, or any extra work the engineer or the permit office requires after providing final sign-off. In good faith we believe there will be none, or only a small amount, but we cannot guarantee it.",
+    "show_financing": false
   }
 }

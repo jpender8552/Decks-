@@ -207,11 +207,14 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(("Prepared for " + s.client + (f" · {s.site.address}, {s.site.city}" if s.site.address else "")) if s.client else (f"Prepared for the owner of {s.site.address}, {s.site.city}" if s.site.address else "Prepared for the owner"))
     w("")
     w("## PRICE")
-    w(f"**Total investment ${p.retail:,.0f}** — financed, no money down")
-    w("- 12 months no payments, no down payment")
-    w("- 18 months no payments, no down payment")
-    w(f"- 6.99% for 10 years — about ${p.monthly:,.0f}/month")
-    w(f"**Check or ACH: ${p.sell:,.0f}** ({(1 - p.sell / p.retail) * 100:.0f}% savings)")
+    if s.extras.show_financing:
+        w(f"**Total investment ${p.retail:,.0f}** — financed, no money down")
+        w("- 12 months no payments, no down payment")
+        w("- 18 months no payments, no down payment")
+        w(f"- 6.99% for 10 years — about ${p.monthly:,.0f}/month")
+        w(f"**Check or ACH: ${p.sell:,.0f}** ({(1 - p.sell / p.retail) * 100:.0f}% savings)")
+    else:
+        w(f"**Price: ${p.sell:,.0f}** — check or ACH")
     w("")
     w("## WHAT THE PRICE INCLUDES")
     if s.extras.price_breakdown:
@@ -225,7 +228,8 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         for k, v in p.allocation:
             w(f"| {k} | included |")
     w(f"| **Total, check or ACH** | **${p.sell:,.0f}** |")
-    w(f"| **Total, financed** | **${p.retail:,.0f}** |")
+    if s.extras.show_financing:
+        w(f"| **Total, financed** | **${p.retail:,.0f}** |")
     w("")
     if s.extras.engineering_note and not p.engineering:
         w(f"**Engineering.** {s.extras.engineering_note}")
@@ -324,6 +328,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w("## NEXT STEP")
     if s.extras.engineered and s.extras.engineering_included:
         w("Next step: we will get the engineer letter.")
+        if s.extras.proposal_note:
+            w("")
+            w(s.extras.proposal_note)
     elif s.extras.engineered:
         w("Engineering first. This is a quote: the numbers depend on the stamped engineering, so the first step is engineering. "
           "GSX provides the Colorado engineer and supplies the design package; you pay GSX the engineer's cost at no markup and you own the stamped set. "
@@ -332,6 +339,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w("Quote, not a contract: a fixed-price proposal follows the stamped engineering. Quote numbers hold 30 days. Renders and plan are design intent; the stamped engineering set governs structure, dimensions and locations.")
     else:
         w("This is a fixed-price proposal on the selections above. Check or ACH, or financed with approved credit. Numbers hold 30 days.")
+        if s.extras.proposal_note:
+            w("")
+            w(s.extras.proposal_note)
     return "\n".join(out)
 
 
