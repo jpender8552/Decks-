@@ -1463,7 +1463,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
     o.append(R(x + 136, y + 140, 44, 8, "#5b6166", INK, 0.6)); o.append(R(x + 136, y + 110, 4, 34, "#5b6166", INK, 0.5)); o.append(R(x + 176, y + 110, 4, 34, "#5b6166", INK, 0.5))
     _wood(o, x + 140, y + 36, 36, 104)
     o.append(LN(x + 186, y + 140, x + 186, y + 148, "#b3261e", 0.8)); o.append(T(x + 190, y + 146, "1\" standoff", 6.2, 800, fill="#b3261e"))
-    _lead(o, x + 158, y + 174, x + 210, y + 210, f"Diamond Pier {fr.footing_model}: precast head + 4 x 50\" pins driven at the factory angles — no excavation; frost-protected (engineer lists it as the alternate to the county's 12\" x 36\" pier)")
+    _lead(o, x + 158, y + 174, x + 210, y + 210, f"Diamond Pier {fr.footing_model}: precast head + 4 x 50\" pins driven at the factory angles — no excavation; frost-protected")
     _lead(o, x + 158, y + 150, x + 24, y + 200, "Pier-head bolt / anchor per Diamond Pier")
     _lead(o, x + 178, y + 128, x + 210, y + 110, f"Simpson {post_base_sku(s)} adjustable standoff base, SD screws")
     _lead(o, x + 158, y + 80, x + 24, y + 60, f"6x6 {pw} post, cut ends sealed")

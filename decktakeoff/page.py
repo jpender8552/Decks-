@@ -758,8 +758,21 @@ def _unbrand(html_: str) -> str:
     return html_
 
 
+def _no_engineering(html_: str) -> str:
+    """A set with no engineering wording: the footers, the G-001 row and the callouts that defer to an engineer go."""
+    for pat, rep in ((r"Design intent\. The stamped engineering set governs structure, dimensions and locations\. ", ""),
+                     (r"Design intent; the stamped engineering set governs\.", ""),
+                     (r" · the engineer of record&#x27;s details govern", ""), (r" · the engineer of record's details govern", ""),
+                     (r" · the stamped set governs", ""), (r" ?\(engineered\)", ""), (r" · engineered", ""), (r", engineered", ""),
+                     (r" · the engineer&#x27;s uplift hold-down governs", ""), (r" · the engineer's uplift hold-down governs", ""),
+                     (r" — over L/4: engineer", ""), (r" — engineer\)", ")"), (r" \(engineer\)", ""),
+                     (r'<text[^>]*>Engineering</text><text[^>]*>[^<]*</text>', "")):
+        html_ = re.sub(pat, rep, html_)
+    return html_
+
+
 def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str = "", pdf: bool = False, date_line: Optional[str] = None,
-                      renders: Optional[dict] = None, unbranded: bool = False) -> dict:
+                      renders: Optional[dict] = None, unbranded: bool = False, no_engineering: bool = False) -> dict:
     """parts = [dict(spec, title)]. Sheets G · S · A · D for every part, one sheet per landscape page, then a few 3D views for the
     reviewer. Nothing financial: no prices, no quote, no stack. renders = {title: [(caption, jpg path), ...]} (optional)."""
     from . import run
@@ -804,7 +817,12 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     if unbranded:
         page = _unbrand(page)
         page = page.replace('<span>Permit set — drawings only.', '<span>Permit set — drawings only.').replace("<footer><span></span>", "<footer><span>Permit set</span>")
+    if no_engineering:
+        page = _no_engineering(page)
     txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    if no_engineering:
+        left = re.findall(r"[^<>]{0,60}(?:ngineer|stamped|Stamped|PE required)[^<>]{0,60}", re.sub(r"<style.*?</style>", "", txt, flags=re.S))
+        assert not left, f"engineering wording left: {left[:3]}"
     for bad in ("$", "financ", "Check or ACH", "gross profit", "rate card"):
         assert bad not in txt, f"permit set carries money wording: {bad}"
     if unbranded:
