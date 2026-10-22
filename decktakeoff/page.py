@@ -749,8 +749,17 @@ PERMIT_CSS = """<style>
 </style>"""
 
 
+def _unbrand(html_: str) -> str:
+    """A plain set: no company name, no person, no phone — the drawings, colors and dates stay."""
+    for pat in (r"GS Exterior Experts · Deck Division · Jade Pender 303-550-9558", r"GS Exterior Experts · Deck Division · ", r" · GS Exterior Experts · Deck Division",
+                r"GSX · Jade Pender 303-550-9558 · ", r"GS Exterior Experts · ", r"GS Exterior Experts", r"Jade Pender 303-550-9558 · ", r"Jade Pender 303-550-9558",
+                r"Jade Pender", r"303-550-9558", r"GSX · ", r", provided by GSX", r" by GSX", r"GSX "):
+        html_ = re.sub(pat, "", html_)
+    return html_
+
+
 def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str = "", pdf: bool = False, date_line: Optional[str] = None,
-                      renders: Optional[dict] = None) -> dict:
+                      renders: Optional[dict] = None, unbranded: bool = False) -> dict:
     """parts = [dict(spec, title)]. Sheets G · S · A · D for every part, one sheet per landscape page, then a few 3D views for the
     reviewer. Nothing financial: no prices, no quote, no stack. renders = {title: [(caption, jpg path), ...]} (optional)."""
     from . import run
@@ -792,9 +801,15 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     title = f"{name} — Permit Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{PERMIT_CSS}</head><body>"
             + body + "</body></html>\n")
+    if unbranded:
+        page = _unbrand(page)
+        page = page.replace('<span>Permit set — drawings only.', '<span>Permit set — drawings only.').replace("<footer><span></span>", "<footer><span>Permit set</span>")
     txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
     for bad in ("$", "financ", "Check or ACH", "gross profit", "rate card"):
         assert bad not in txt, f"permit set carries money wording: {bad}"
+    if unbranded:
+        for bad in ("GS Exterior", "GSX", "Jade", "303-550"):
+            assert bad not in re.sub(r"<style.*?</style>", "", txt, flags=re.S), f"unbranded permit set still names: {bad}"
     (out / "page.html").write_text(page)
     json.dump(files, open(out / "files.json", "w"), indent=1)
     result = dict(html=str(out / "page.html"), files=files, sheets=len(index))
