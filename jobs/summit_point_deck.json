@@ -1,7 +1,7 @@
 {
   "job": "1675 Summit Point Ct \u2014 Deck with Porch Cover",
   "client": "William Wright",
-  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). OWNER 22 Oct: MIRRORED to match the site (City GIS aerial): facing the house from the yard the 30' wing runs up the RIGHT (east) side of the house; the porch bay, chimney bay and the stair are on the left (west) of the main deck. All geometry flipped x' = 37' - x.",
+  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). OWNER 22 Oct: MIRRORED to match the site (City GIS aerial): facing the house from the yard the 30' wing runs up the RIGHT (east) side of the house; the porch bay, chimney bay and the stair are on the left (west) of the main deck. All geometry flipped x' = 37' - x. OWNER 22 Oct: footings are Diamond Piers.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -169,7 +169,7 @@
       ],
       "site_work": [
         "Remove the existing L deck and haul off",
-        "New concrete piers 3' deep (frost 30\"), 6x6 posts, drop beams",
+        "Diamond Pier DP-50 foundations (no excavation spoils, frost-protected), 6x6 posts, drop beams",
         "Porch cover over the porch and chimney bays, posts at the rail line",
         "4' stair at the west end of the deck to a concrete landing pad",
         "Call 811 before digging; protect the slope and the yard"
@@ -206,7 +206,15 @@
         }
       ],
       "deck_label": "NEW MAIN DECK + PORCH COVER"
-    }
+    },
+    "ahj_flags": [
+      [
+        "CODE",
+        "footing",
+        "Diamond Pier DP-50 foundations in place of poured piers (frost 30\"): submit the Diamond Pier evaluation report / PPRBD acceptance with the plans; 811 locate before the pins are driven",
+        "PPRBD / IRC R403.1.4 alternate"
+      ]
+    ]
   },
   "geometry": {
     "height_in": 96,
@@ -445,8 +453,9 @@
       }
     ],
     "post_size": "6x6",
-    "footing_type": "concrete",
-    "joist_spacing_in": 12
+    "footing_type": "diamond_pier",
+    "joist_spacing_in": 12,
+    "footing_model": "DP-50/50"
   },
   "decking": {
     "brand": "TimberTech",

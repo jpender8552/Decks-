@@ -1,7 +1,7 @@
 {
   "job": "Deck 2 \u2014 8 x 8",
   "client": "William Wright",
-  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). Deck 2 reduced from 10 x 10 to 8 x 8 (nominal).",
+  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). Deck 2 reduced from 10 x 10 to 8 x 8 (nominal). OWNER 22 Oct: footings are Diamond Piers.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -168,7 +168,7 @@
       ],
       "site_work": [
         "Remove the existing small deck at the west-end door and haul off",
-        "Two concrete piers 3' deep (frost 30\"), 6x6 posts, drop beam, ledger to the house",
+        "Two Diamond Pier DP-50 foundations (no excavation spoils, frost-protected), 6x6 posts, drop beam, ledger to the house",
         "No stair \u2014 reached from the house door only",
         "Call 811 before digging"
       ],
@@ -216,7 +216,15 @@
         }
       ],
       "deck_label": "NEW DECK 2"
-    }
+    },
+    "ahj_flags": [
+      [
+        "CODE",
+        "footing",
+        "Diamond Pier DP-50 foundations in place of poured piers (frost 30\"): submit the Diamond Pier evaluation report / PPRBD acceptance with the plans; 811 locate before the pins are driven",
+        "PPRBD / IRC R403.1.4 alternate"
+      ]
+    ]
   },
   "geometry": {
     "width": 8,
@@ -241,8 +249,9 @@
       }
     ],
     "post_size": "6x6",
-    "footing_type": "concrete",
-    "joist_spacing_in": 12
+    "footing_type": "diamond_pier",
+    "joist_spacing_in": 12,
+    "footing_model": "DP-50/50"
   },
   "decking": {
     "brand": "TimberTech",
