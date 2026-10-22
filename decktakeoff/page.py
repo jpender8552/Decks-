@@ -778,10 +778,11 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     w("".join(sheet_html))
     if renders:
         w('<h2 class="kicker" id="g-views">3D views <span class="tag">design intent</span></h2>')
-        for ttl, items in renders.items():
+        for gi, (ttl, items) in enumerate(renders.items()):
             w(f"<h3>{E(ttl)}</h3><div class=\"gal\">")
             for cap, path in items:
-                fn = f"r/{key}-{Path(path).stem}.jpg"; files[fn] = str(Path(path).resolve())
+                fn = f"r/{key}-{Path(path).stem}.jpg" if len(renders) == 1 else f"r/{key}{gi + 1}-{Path(path).stem}.jpg"   # one file per deck
+                files[fn] = str(Path(path).resolve())
                 w(f'<figure><img src="{fn}" alt="{E(cap)}" loading="lazy"><figcaption>{E(cap)}</figcaption></figure>')
             w("</div>")
     w("</section>")

@@ -1,7 +1,7 @@
 {
-  "job": "Deck 2 \u2014 10 x 10",
+  "job": "Deck 2 \u2014 8 x 8",
   "client": "William Wright",
-  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt.",
+  "notes": "Second deck on the same property: 10 x 10 nominal, 8' above grade, ledgered to the house, no stairs. Same products as the main deck. PHOTO 3: existing 10 x 10 wood deck on two 6x6 posts, black aluminum rail on three sides, ~8' over a sloped rock yard with timber steps below \u2014 demo and replace in place. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). Deck 2 reduced from 10 x 10 to 8 x 8 (nominal).",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -24,8 +24,8 @@
     "hoa": false
   },
   "geometry": {
-    "width": 10,
-    "depth": 10,
+    "width": 8,
+    "depth": 8,
     "size_mode": "nominal",
     "height_in": 96,
     "attachment": "ledger",
@@ -52,7 +52,7 @@
   "decking": {
     "brand": "TimberTech",
     "collection": "Vintage",
-    "color": "Weathered Teak",
+    "color": "English Walnut",
     "profile": "square",
     "fascia": true,
     "fastener_system": "Cortex",
@@ -69,12 +69,13 @@
     ],
     "drink_rail": true,
     "drink_rail_collection": "Vintage",
-    "drink_rail_color": "Weathered Teak"
+    "drink_rail_color": "English Walnut"
   },
   "stairs": [],
   "extras": {
     "demo_existing": true,
     "demo_sf": 100,
-    "hardie_skirt": "4/4 x 12 Timber Bark"
+    "hardie_skirt": "4/4 x 12 Timber Bark",
+    "connection_details": true
   }
 }

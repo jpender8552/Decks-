@@ -1124,12 +1124,16 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
         marks = [("DECK", zt)]
         from .spec import covers_of
         for c in covers_of(s):
-            marks.append((f"{c['name'].split()[0].upper()} CLEAR @ BEAM {c['clear_low_in']:g}\"", zt + float(c["clear_low_in"]) / 12))
-            marks.append((f"{c['name'].split()[0].upper()} CLEAR @ HOUSE {c['clear_high_in']:g}\"", zt + float(c["clear_high_in"]) / 12))
+            if c.get("clear_low_in") is not None:
+                marks.append((f"{c['name'].split()[0].upper()} CLEAR @ BEAM {c['clear_low_in']:g}\"", zt + float(c["clear_low_in"]) / 12))
+            if c.get("clear_high_in") is not None:
+                marks.append((f"{c['name'].split()[0].upper()} CLEAR @ HOUSE {c['clear_high_in']:g}\"", zt + float(c["clear_high_in"]) / 12))
         if az == 0:
             y = to_sheet((0, 0, zt))[1]
             o.append(LN(hx - 40, y, hx, y, "#b3261e", 0.9, "3 2")); o.append(R(hx - 96, y - 11, 54, 10, CREAM, "#b3261e", 0.5)); o.append(T(hx - 44, y - 3, f"DECK · {ftin(zt * 12)} AFG", 6.4, 800, "end", "#b3261e"))
             for c in covers_of(s):
+                if c.get("clear_low_in") is None:
+                    continue
                 xa = to_sheet((float(c["x0"]), float(c["y1"]), 0))[0]
                 for k_, (lab_, inch) in enumerate((("CLEAR @ BEAM", c["clear_low_in"]),)):
                     z = zt + float(inch) / 12
