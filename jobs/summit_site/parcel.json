@@ -1,0 +1,52 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -104.86282742641124,
+       38.93900304332496
+      ],
+      [
+       -104.86307694710958,
+       38.939016159801966
+      ],
+      [
+       -104.86314711029232,
+       38.93856076407788
+      ],
+      [
+       -104.86284838121298,
+       38.93852581969875
+      ],
+      [
+       -104.8626833440379,
+       38.93898620514641
+      ],
+      [
+       -104.86275144296668,
+       38.93899772819862
+      ],
+      [
+       -104.86282742641124,
+       38.93900304332496
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "PARCEL": "7311205063",
+    "ParcelAdr": "1675 SUMMIT POINT CT",
+    "ZONING": "PDZ HS",
+    "Shape_Area": 16961.3379683549,
+    "Shape_Length": 539.7361057347279,
+    "area_units": "sq ft (US survey, EPSG:2232)",
+    "source": "https://gis.coloradosprings.gov/arcgis/rest/services/GeneralUse/LandRecords/MapServer/4"
+   }
+  }
+ ]
+}

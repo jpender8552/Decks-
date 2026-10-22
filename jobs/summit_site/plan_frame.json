@@ -1,0 +1,368 @@
+{
+ "description": "Local plan frame, US survey feet. Origin = west (left, as seen from back yard) end of rear wall LINE AS MAPPED (city footprint = roof dripline, so actual wall face is probably ~1-2 ft at y<0). +x along rear wall to the SE (right as seen from yard); +y outward from rear wall into yard (SW). NOTE: this axis set is left-handed relative to a map; plotting +x right and +y UP gives a mirror image of reality. Plot +x right and +y DOWN (house at top, yard at bottom) for a true plan seen from above, or flip x if you want yard at top.",
+ "units": "ft",
+ "source_crs": "EPSG:2232 (NAD83 CO Central ftUS)",
+ "origin_lonlat": [
+  -104.86308285343503,
+  38.938799413763576
+ ],
+ "rear_wall_right_end_lonlat": [
+  -104.86287715926238,
+  38.9387035563305
+ ],
+ "rear_wall_length_ft": 68.13,
+ "rear_wall_direction_true_deg": 120.8,
+ "rear_azimuth_deg": 210.8,
+ "rear_azimuth_note": "true bearing of outward normal of rear wall (SW). Grid convergence ~0.4 deg already removed.",
+ "lat": 38.938777567858,
+ "lon": -104.862916927219,
+ "latlon_source": "City E911_Sites_Locator address point (score 100, PointAddress)",
+ "parcel": [
+  [
+   24.39,
+   -100.91
+  ],
+  [
+   -39.01,
+   -68.65
+  ],
+  [
+   28.84,
+   84.0
+  ],
+  [
+   108.33,
+   51.39
+  ],
+  [
+   62.72,
+   -116.65
+  ],
+  [
+   43.94,
+   -110.33
+  ],
+  [
+   24.39,
+   -100.91
+  ]
+ ],
+ "parcel_note": "APN 7311205063, 16,961 sf. Front (north) lot line lies on/within ~1 ft of the Summit Point Ct centerline - verify against plat (private street/ access tract?).",
+ "parcel_edges": [
+  {
+   "i": 0,
+   "from": [
+    24.39,
+    -100.91
+   ],
+   "to": [
+    -39.01,
+    -68.65
+   ],
+   "length_ft": 71.14,
+   "outward_faces": "N (3 deg grid)",
+   "adjoins": "1665 PINNACLE RIDGE LN",
+   "dist_to_SummitPointCt_centerline_ft": 0.9
+  },
+  {
+   "i": 1,
+   "from": [
+    -39.01,
+    -68.65
+   ],
+   "to": [
+    28.84,
+    84.0
+   ],
+   "length_ft": 167.05,
+   "outward_faces": "W (276 deg grid)",
+   "adjoins": "1685 SUMMIT POINT CT",
+   "dist_to_SummitPointCt_centerline_ft": 82.6
+  },
+  {
+   "i": 2,
+   "from": [
+    28.84,
+    84.0
+   ],
+   "to": [
+    108.33,
+    51.39
+   ],
+   "length_ft": 85.92,
+   "outward_faces": "S (188 deg grid)",
+   "adjoins": "1856 OAK HILLS DR",
+   "dist_to_SummitPointCt_centerline_ft": 169.4
+  },
+  {
+   "i": 3,
+   "from": [
+    108.33,
+    51.39
+   ],
+   "to": [
+    62.72,
+    -116.65
+   ],
+   "length_ft": 174.12,
+   "outward_faces": "E (105 deg grid)",
+   "adjoins": "1665 SUMMIT POINT CT",
+   "dist_to_SummitPointCt_centerline_ft": 85.2
+  },
+  {
+   "i": 4,
+   "from": [
+    62.72,
+    -116.65
+   ],
+   "to": [
+    43.94,
+    -110.33
+   ],
+   "length_ft": 19.81,
+   "outward_faces": "N (12 deg grid)",
+   "adjoins": "1670 SUMMIT POINT CT",
+   "dist_to_SummitPointCt_centerline_ft": 1.6
+  },
+  {
+   "i": 5,
+   "from": [
+    43.94,
+    -110.33
+   ],
+   "to": [
+    24.39,
+    -100.91
+   ],
+   "length_ft": 21.7,
+   "outward_faces": "N (5 deg grid)",
+   "adjoins": "1670 SUMMIT POINT CT",
+   "dist_to_SummitPointCt_centerline_ft": 0.8
+  }
+ ],
+ "footprint": [
+  [
+   68.13,
+   -0.0
+  ],
+  [
+   68.15,
+   -27.12
+  ],
+  [
+   73.92,
+   -27.17
+  ],
+  [
+   73.97,
+   -46.34
+  ],
+  [
+   68.48,
+   -46.3
+  ],
+  [
+   68.7,
+   -64.7
+  ],
+  [
+   60.02,
+   -64.67
+  ],
+  [
+   60.01,
+   -78.0
+  ],
+  [
+   31.26,
+   -78.08
+  ],
+  [
+   31.2,
+   -64.86
+  ],
+  [
+   29.75,
+   -64.87
+  ],
+  [
+   29.82,
+   -43.02
+  ],
+  [
+   31.56,
+   -43.03
+  ],
+  [
+   31.47,
+   -34.28
+  ],
+  [
+   0.15,
+   -34.3
+  ],
+  [
+   0.0,
+   -0.0
+  ],
+  [
+   68.13,
+   -0.0
+  ]
+ ],
+ "footprint_note": "City building footprint, simplified (collinear densify points removed); appears to be roof/dripline outline incl. eaves. 3,989 sf, 1 story, 13 ft height (city attrs).",
+ "house_dist_to_lot_lines_ft": {
+  "front_north_SummitPointCt": 23.5,
+  "west_side_1685_SummitPointCt": 7.8,
+  "rear_south_1856_OakHillsDr": 62.8,
+  "east_side_1665_SummitPointCt": 7.6
+ },
+ "existing_decks": {
+  "small_west_deck": {
+   "desc": "small deck at WEST (left) end of rear wall; sliding door presumed here",
+   "x_range_ft": [
+    8,
+    25
+   ],
+   "outer_edge_y_ft": 8,
+   "poly": [
+    [
+     8,
+     0
+    ],
+    [
+     25,
+     0
+    ],
+    [
+     25,
+     8
+    ],
+    [
+     8,
+     8
+    ]
+   ],
+   "confidence": "visible in 2018, 2022 and current orthos; edges +/-1.5 ft",
+   "dist_to_lot_lines_ft": {
+    "front_north_SummitPointCt": 82.5,
+    "west_side_1685_SummitPointCt": 11.8,
+    "rear_south_1856_OakHillsDr": 71.8,
+    "east_side_1665_SummitPointCt": 67.0
+   }
+  },
+  "large_rear_L_deck_rear_leg": {
+   "desc": "large deck along rear wall, right (SE) portion",
+   "x_range_ft": [
+    48,
+    79
+   ],
+   "outer_edge_y_ft": 8,
+   "poly": [
+    [
+     48,
+     0
+    ],
+    [
+     79,
+     0
+    ],
+    [
+     79,
+     8
+    ],
+    [
+     48,
+     8
+    ]
+   ],
+   "confidence": "visible all years; west end x=48 +/-3 ft, outer edge +/-1.5 ft",
+   "dist_to_lot_lines_ft": {
+    "front_north_SummitPointCt": 100.6,
+    "west_side_1685_SummitPointCt": 48.4,
+    "rear_south_1856_OakHillsDr": 51.3,
+    "east_side_1665_SummitPointCt": 14.8
+   }
+  },
+  "large_rear_L_deck_return_leg": {
+   "desc": "L return of large deck along SE side of house, between rear-wall end (x=68) and wing; runs toward the street",
+   "x_range_ft": [
+    68,
+    79
+   ],
+   "y_range_ft": [
+    -27,
+    0
+   ],
+   "poly": [
+    [
+     68,
+     -27
+    ],
+    [
+     79,
+     -27
+    ],
+    [
+     79,
+     0
+    ],
+    [
+     68,
+     0
+    ]
+   ],
+   "confidence": "estimated; area partly under eaves/shadow",
+   "dist_to_lot_lines_ft": {
+    "front_north_SummitPointCt": 85.5,
+    "west_side_1685_SummitPointCt": 69.9,
+    "rear_south_1856_OakHillsDr": 58.7,
+    "east_side_1665_SummitPointCt": 7.8
+   }
+  }
+ },
+ "large_L_deck_combined": {
+  "poly": [
+   [
+    48.0,
+    0.0
+   ],
+   [
+    48.0,
+    8.0
+   ],
+   [
+    79.0,
+    8.0
+   ],
+   [
+    79.0,
+    0.0
+   ],
+   [
+    79.0,
+    -27.0
+   ],
+   [
+    68.0,
+    -27.0
+   ],
+   [
+    68.0,
+    0.0
+   ],
+   [
+    48.0,
+    0.0
+   ]
+  ],
+  "length_along_rear_wall_ft": 31,
+  "dist_to_lot_lines_ft": {
+   "front_north_SummitPointCt": 85.5,
+   "west_side_1685_SummitPointCt": 48.4,
+   "rear_south_1856_OakHillsDr": 51.3,
+   "east_side_1665_SummitPointCt": 7.8
+  }
+ },
+ "deck_note": "Deck positions digitized by eye from orthophotos resampled into this frame (5 px/ft source). y measured from the mapped dripline; add eave depth (~1-2 ft) for distance from wall face. Visible large-deck rear leg ~31 ft vs ~37 ft stated; small deck measures ~17 x 8+ ft vs ~10x10 stated - field-verify."
+}

@@ -721,13 +721,21 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
     # decks
     out = deck_outline(S)
     o.append(PG([(X(x), Y(y)) for x, y in out], FILL["deck"], INK, 1.2))
-    for z in S.meta["zones"]:
-        deep = z["front"] - z["wall_y"] > 6
-        o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
+    if sp.get("deck_label"):          # one label for the whole deck, below its front edge
+        o.append(T(X(sum(q[0] for q in out) / len(out)), Y(max(q[1] for q in out)) + 12, sp["deck_label"], 7.2, 900, "middle", INK))
+    else:
+        for z in S.meta["zones"]:
+            deep = z["front"] - z["wall_y"] > 6
+            o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
     # stairs / landings
     for b in S.boxes:
         if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
+    # other work on the lot under its own permit (context): a grey outline with its label
+    for oth in sp.get("others") or []:
+        poly = [tuple(q) for q in oth["poly"]]
+        o.append(PG([(X(x), Y(y)) for x, y in poly], "#d9d4c9", "#8b8478", 1.0).replace("/>", ' stroke-dasharray="4 3"/>', 1))
+        o.append(T(X(sum(q[0] for q in poly) / len(poly)), Y(min(q[1] for q in poly)) - 5 + oth.get("label_dy", 0), oth.get("label", "other deck"), 6.6, 800, "middle", "#6d675d"))
     # shade sails: the sail outline dashed, its posts solid
     for sl in s.geometry.sails or []:
         Pc = [(float(c[0]), float(c[1])) for c in sl["corners"]]
@@ -781,7 +789,15 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(R(mx - 30, my - 8, 60, 11, CREAM, "none", 0)); o.append(T(mx, my + 1, f"{ftin(round(d * 12))}", 8, 900, "middle", "#b3261e"))
     # lot line labels
     ll = sp.get("lot_lines") or {}
-    if ll.get("rear"):
+    if ll.get("rear") and sp.get("setback_offset"):
+        re_ = [(a, b) for a, b in zip(par, par[1:] + par[:1]) if a[1] > 0 and b[1] > 0 and abs(b[0] - a[0]) > abs(b[1] - a[1])]
+        if re_:
+            a, b = max(re_, key=lambda e: math.hypot(e[1][0] - e[0][0], e[1][1] - e[0][1]))
+            mx_, my_ = X(a[0] + (b[0] - a[0]) * 0.6), Y(a[1] + (b[1] - a[1]) * 0.6)
+            ang = math.degrees(math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])))
+            ang = ang - 180 if ang > 90 else ang + 180 if ang < -90 else ang
+            o.append(f'<g transform="rotate({ang:.1f} {mx_:.1f} {my_:.1f})">' + T(mx_, my_ + 12, ll["rear"], 7.2, 800, "middle", MUTE) + "</g>")
+    elif ll.get("rear"):
         o.append(T(X(min(xs) + (max(xs) - min(xs)) * 0.72), Y(rear_y) + 13 + (sp.get("rear_label_dy", 0)), ll["rear"], 7.5, 800, "middle", MUTE))
     if ll.get("left"):
         o.append(T(X(min(xs)) - 6, Y((min(ys) + max(ys)) / 2), ll["left"], 7.5, 800, "middle", MUTE, rot=-90))

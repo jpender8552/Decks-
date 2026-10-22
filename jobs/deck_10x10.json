@@ -21,7 +21,202 @@
     "easements": [
       "Check the plat for rear/side utility + drainage easements (typical 5-10')"
     ],
-    "hoa": false
+    "hoa": false,
+    "lat": 38.938777567858,
+    "lon": -104.862916927219,
+    "rear_azimuth_deg": 210.8,
+    "plan": {
+      "street": "SUMMIT POINT CT (front)",
+      "street_side": "top",
+      "lot_lines": {
+        "rear": "REAR (SOUTH) LOT LINE \u2014 1856 Oak Hills Dr",
+        "left": "SIDE LOT LINE (WEST) \u2014 1685 Summit Point Ct",
+        "right": "SIDE LOT LINE (EAST) \u2014 1665 Summit Point Ct"
+      },
+      "house_label": "existing house, 1 storey (roof outline per City GIS) \u2014 no work",
+      "info": [
+        "Parcel 7311205063 \u00b7 16,961 SF (0.389 ac) \u00b7 City of Colorado Springs",
+        "Zoning PDZ HS (dev. plan CPC P 85-68(HS)) \u00b7 overlays WUI-O + Hillside HS-O",
+        "House: 1 storey, ~3,989 SF roof outline (City GIS)",
+        "Street: Summit Point Ct (front, north) \u00b7 neighbours 1685 (W), 1665 (E), 1856 Oak Hills Dr (S)"
+      ],
+      "setback_ref": {
+        "rear": 25,
+        "side": 5,
+        "rear_label": "25' rear setback (R-1 6000 / HS reference)",
+        "label": "R-1 6000 / HS base: rear 25', side 5' \u2014 verify against the recorded PDZ development plan"
+      },
+      "setback_offset": true,
+      "source": "City of Colorado Springs GIS: E911 address point, LandRecords parcel 7311205063, BuildingsImpSurfaces footprint (roof/drip line), Transportation streets, 2018 / 2022 / current aerials. GIS lines are not a survey; deck dimensions are field-measured. An ILC governs if the City asks.",
+      "parcel": [
+        [
+          11.89,
+          -100.91
+        ],
+        [
+          -51.51,
+          -68.65
+        ],
+        [
+          16.34,
+          84.0
+        ],
+        [
+          95.83,
+          51.39
+        ],
+        [
+          50.22,
+          -116.65
+        ],
+        [
+          31.44,
+          -110.33
+        ],
+        [
+          11.89,
+          -100.91
+        ]
+      ],
+      "footprint": [
+        [
+          55.63,
+          -0.0
+        ],
+        [
+          55.65,
+          -27.12
+        ],
+        [
+          61.42,
+          -27.17
+        ],
+        [
+          61.47,
+          -46.34
+        ],
+        [
+          55.98,
+          -46.3
+        ],
+        [
+          56.2,
+          -64.7
+        ],
+        [
+          47.52,
+          -64.67
+        ],
+        [
+          47.51,
+          -78.0
+        ],
+        [
+          18.76,
+          -78.08
+        ],
+        [
+          18.7,
+          -64.86
+        ],
+        [
+          17.25,
+          -64.87
+        ],
+        [
+          17.32,
+          -43.02
+        ],
+        [
+          19.06,
+          -43.03
+        ],
+        [
+          18.97,
+          -34.28
+        ],
+        [
+          -12.35,
+          -34.3
+        ],
+        [
+          -12.5,
+          -0.0
+        ],
+        [
+          55.63,
+          -0.0
+        ]
+      ],
+      "coverage": [
+        [
+          "Lot area",
+          "16,961 SF"
+        ],
+        [
+          "Deck 2 (this permit)",
+          "8' x 8', 8' above grade, at the west-end door"
+        ],
+        [
+          "Main deck (separate permit)",
+          "~431 SF with porch cover, east of Deck 2"
+        ]
+      ],
+      "setback_notes": [
+        "Measured (red) from Deck 2 to the nearest lot lines \u2014 GIS, not survey",
+        "West side: about 12' clear to the west lot line (5' side setback)"
+      ],
+      "site_work": [
+        "Remove the existing small deck at the west-end door and haul off",
+        "Two concrete piers 3' deep (frost 30\"), 6x6 posts, drop beam, ledger to the house",
+        "No stair \u2014 reached from the house door only",
+        "Call 811 before digging"
+      ],
+      "others": [
+        {
+          "label": "MAIN DECK (separate permit)",
+          "poly": [
+            [
+              61.5,
+              7.5
+            ],
+            [
+              24.5,
+              7.5
+            ],
+            [
+              24.5,
+              -3.0
+            ],
+            [
+              40.5,
+              -3.0
+            ],
+            [
+              40.5,
+              0.0
+            ],
+            [
+              55.5,
+              0.0
+            ],
+            [
+              58.1,
+              -11.25
+            ],
+            [
+              55.5,
+              -22.5
+            ],
+            [
+              61.5,
+              -22.5
+            ]
+          ]
+        }
+      ],
+      "deck_label": "NEW DECK 2"
+    }
   },
   "geometry": {
     "width": 8,

@@ -1,7 +1,7 @@
 {
   "job": "1675 Summit Point Ct \u2014 Deck with Porch Cover",
   "client": "William Wright",
-  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board).",
+  "notes": "Built to the homeowner's TOP DOWN PLAN as drawn (the design intent), with the 6' wing wall per the owner's annotation. Facing the house from the yard, left to right: the wing, 6' at its top wall and 30' deep with its outer edge open (rail); the angled bay in the house cuts into the wing's inner edge (two 10'5\" angled walls, 2'-7\" deep \u2014 the rim and the boards are mitred along them, framed as the full 6' rectangle in the count); the short wall; the brick chimney bay (10'6\" wide, the chimney 3' proud, so 7'-6\" deep); the porch bay 16' wide x 10'-6\" deep. PORCH COVER: a 26'-6\" x 10'-6\" shed roof over the chimney bay and the porch bay \u2014 ledger on the house, rafters down to a beam on four 6x6 cedar posts at the rail line (per the plan's photo) \u2014 DRAWN, NOT PRICED: the roof needs a roof rate (framing, sheathing, roofing, ceiling); the deck frame is engineered to carry it. Heights per the plan: 8' at the left, 6' at the right; frame at 8', posts cut to grade; the 4' stair leaves the right end next to the house, 9 risers (66\") to a concrete pad, one rail. Existing deck demo'd. Cinch Satin Black with the deck-board drink rail (the plan's 'black metal balusters with wood top rail'). The plan's 37' overall is held: 6 + 4.5 + 10.5 + 16. The '9'' and '10'5\"' labels on the plan do not fit inside 37' and were scaled to the drawing. PPRBD: 30 psf snow, 30\" frost, 115 mph \u2014 confirm the lot is not in the special wind region. FINISHES (owner 16 Sep): deck skirt HardieTrim 4/4 x 12 ColorPlus Timber Bark around the rim in place of composite fascia; cover ceiling HardieSoffit 4x10 cedarmill Timber Bark; cover fascia and rakes HardieTrim 4/4 x 7-1/4 rustic Timber Bark over 2x8 sub-fascia. Hardie prices are estimates until D&D quotes them. OWNER 16 Sep: TimberTech Advanced PVC Vintage Weathered Teak, square shoulder, every board Cortex-screwed through the face (Class A / WUI); 2x10 joists at 12\" OC; HardieTrim 4/4 x 12 Timber Bark skirt. OWNER 22 Oct: all decking TimberTech Vintage English Walnut (field, picture frame, drink-rail board). OWNER 22 Oct: MIRRORED to match the site (City GIS aerial): facing the house from the yard the 30' wing runs up the RIGHT (east) side of the house; the porch bay, chimney bay and the stair are on the left (west) of the main deck. All geometry flipped x' = 37' - x.",
   "site": {
     "address": "1675 Summit Point Ct",
     "city": "Colorado Springs",
@@ -21,7 +21,192 @@
       "Check the plat for rear/side utility + drainage easements (typical 5-10')"
     ],
     "hoa": false,
-    "notes": "Parcel 7311205063 (0.389 ac / 16,961 sf), zoning PDZ HS (Planned Development Zone, dev. plan CPC P 85-68(HS)); overlays WUI-O and Hillside HS-O. Setbacks below are the R-1 6000 / HS base standards (rear 25', side 5') \u2014 VERIFY against the recorded development plan and an ILC before layout. Distances are scaled from City GIS building/parcel lines (existing deck footprint): rear line ~62.8', east side line ~7.6' at the stair end, west side ~7.8'. Hillside overlay: grading/retaining review if footing excavation disturbs the slope. WUI-O: ignition-resistant deck surface (Class A PVC), 1/8\" ember screening, no combustible skirting."
+    "notes": "Parcel 7311205063 (0.389 ac / 16,961 sf), zoning PDZ HS (Planned Development Zone, dev. plan CPC P 85-68(HS)); overlays WUI-O and Hillside HS-O. Setbacks below are the R-1 6000 / HS base standards (rear 25', side 5') \u2014 VERIFY against the recorded development plan and an ILC before layout. Distances are scaled from City GIS building/parcel lines (existing deck footprint): rear line ~62.8', east side line ~7.6' at the stair end, west side ~7.8'. Hillside overlay: grading/retaining review if footing excavation disturbs the slope. WUI-O: ignition-resistant deck surface (Class A PVC), 1/8\" ember screening, no combustible skirting.",
+    "lat": 38.938777567858,
+    "lon": -104.862916927219,
+    "rear_azimuth_deg": 210.8,
+    "plan": {
+      "street": "SUMMIT POINT CT (front)",
+      "street_side": "top",
+      "lot_lines": {
+        "rear": "REAR (SOUTH) LOT LINE \u2014 1856 Oak Hills Dr",
+        "left": "SIDE LOT LINE (WEST) \u2014 1685 Summit Point Ct",
+        "right": "SIDE LOT LINE (EAST) \u2014 1665 Summit Point Ct"
+      },
+      "house_label": "existing house, 1 storey (roof outline per City GIS) \u2014 no work",
+      "info": [
+        "Parcel 7311205063 \u00b7 16,961 SF (0.389 ac) \u00b7 City of Colorado Springs",
+        "Zoning PDZ HS (dev. plan CPC P 85-68(HS)) \u00b7 overlays WUI-O + Hillside HS-O",
+        "House: 1 storey, ~3,989 SF roof outline (City GIS)",
+        "Street: Summit Point Ct (front, north) \u00b7 neighbours 1685 (W), 1665 (E), 1856 Oak Hills Dr (S)"
+      ],
+      "setback_ref": {
+        "rear": 25,
+        "side": 5,
+        "rear_label": "25' rear setback (R-1 6000 / HS reference)",
+        "label": "R-1 6000 / HS base: rear 25', side 5' \u2014 verify against the recorded PDZ development plan"
+      },
+      "setback_offset": true,
+      "source": "City of Colorado Springs GIS: E911 address point, LandRecords parcel 7311205063, BuildingsImpSurfaces footprint (roof/drip line), Transportation streets, 2018 / 2022 / current aerials. GIS lines are not a survey; deck dimensions are field-measured. An ILC governs if the City asks.",
+      "parcel": [
+        [
+          -12.61,
+          -100.91
+        ],
+        [
+          -76.01,
+          -68.65
+        ],
+        [
+          -8.16,
+          84.0
+        ],
+        [
+          71.33,
+          51.39
+        ],
+        [
+          25.72,
+          -116.65
+        ],
+        [
+          6.94,
+          -110.33
+        ],
+        [
+          -12.61,
+          -100.91
+        ]
+      ],
+      "footprint": [
+        [
+          31.13,
+          -0.0
+        ],
+        [
+          31.15,
+          -27.12
+        ],
+        [
+          36.92,
+          -27.17
+        ],
+        [
+          36.97,
+          -46.34
+        ],
+        [
+          31.48,
+          -46.3
+        ],
+        [
+          31.7,
+          -64.7
+        ],
+        [
+          23.02,
+          -64.67
+        ],
+        [
+          23.01,
+          -78.0
+        ],
+        [
+          -5.74,
+          -78.08
+        ],
+        [
+          -5.8,
+          -64.86
+        ],
+        [
+          -7.25,
+          -64.87
+        ],
+        [
+          -7.18,
+          -43.02
+        ],
+        [
+          -5.44,
+          -43.03
+        ],
+        [
+          -5.53,
+          -34.28
+        ],
+        [
+          -36.85,
+          -34.3
+        ],
+        [
+          -37.0,
+          -0.0
+        ],
+        [
+          31.13,
+          -0.0
+        ]
+      ],
+      "coverage": [
+        [
+          "Lot area",
+          "16,961 SF"
+        ],
+        [
+          "Main deck (this permit)",
+          "~431 SF, 8' above grade, with a 26'-6\" x 10'-6\" porch cover"
+        ],
+        [
+          "Deck 2 (separate permit)",
+          "8' x 8' at the west end"
+        ]
+      ],
+      "setback_notes": [
+        "Measured (red) from the new deck and cover to the nearest lot lines \u2014 GIS, not survey",
+        "East side: the wing runs up the east side of the house; 5' side setback applies",
+        "Hillside overlay: grading review if footing excavation disturbs the slope; WUI-O: Class A decking (TimberTech Vintage, Advanced PVC), no combustible skirting"
+      ],
+      "site_work": [
+        "Remove the existing L deck and haul off",
+        "New concrete piers 3' deep (frost 30\"), 6x6 posts, drop beams",
+        "Porch cover over the porch and chimney bays, posts at the rail line",
+        "4' stair at the west end of the deck to a concrete landing pad",
+        "Call 811 before digging; protect the slope and the yard"
+      ],
+      "others": [
+        {
+          "label": "DECK 2 \u2014 8' x 8' (separate permit)",
+          "poly": [
+            [
+              -24.5,
+              0.0
+            ],
+            [
+              -24.5,
+              7.5
+            ],
+            [
+              -16.71,
+              7.5
+            ],
+            [
+              -16.71,
+              0.0
+            ],
+            [
+              -16.71,
+              0.0
+            ],
+            [
+              -24.5,
+              0.0
+            ]
+          ]
+        }
+      ],
+      "deck_label": "NEW MAIN DECK + PORCH COVER"
+    }
   },
   "geometry": {
     "height_in": 96,
@@ -30,18 +215,11 @@
     "picture_frame": true,
     "zones": [
       {
-        "name": "W",
-        "label": "Wing \u2014 6' at the top wall, 30' deep, angled bay cuts its inner edge",
-        "width": 6,
-        "depth": 30,
-        "wall_offset": 22.5
-      },
-      {
-        "name": "N",
-        "label": "Under the short wall beside the chimney",
-        "width": 4.5,
-        "depth": 7.5,
-        "wall_offset": 0
+        "name": "P",
+        "label": "Porch bay under the cover",
+        "width": 16,
+        "depth": 10.5,
+        "wall_offset": 3
       },
       {
         "name": "B",
@@ -51,67 +229,74 @@
         "wall_offset": 0
       },
       {
-        "name": "P",
-        "label": "Porch bay under the cover",
-        "width": 16,
-        "depth": 10.5,
-        "wall_offset": 3
+        "name": "N",
+        "label": "Under the short wall beside the chimney",
+        "width": 4.5,
+        "depth": 7.5,
+        "wall_offset": 0
+      },
+      {
+        "name": "W",
+        "label": "Wing \u2014 6' at the top wall, 30' deep, angled bay cuts its inner edge",
+        "width": 6,
+        "depth": 30,
+        "wall_offset": 22.5
       }
     ],
     "outline": [
       [
-        0,
-        -22.5
+        37.0,
+        7.5
       ],
       [
-        6,
-        -22.5
+        0.0,
+        7.5
       ],
       [
-        3.4,
+        0.0,
+        -3.0
+      ],
+      [
+        16.0,
+        -3.0
+      ],
+      [
+        16.0,
+        0.0
+      ],
+      [
+        31.0,
+        0.0
+      ],
+      [
+        33.6,
         -11.25
       ],
       [
-        6,
-        0.0
+        31.0,
+        -22.5
       ],
       [
-        21,
-        0.0
-      ],
-      [
-        21,
-        -3.0
-      ],
-      [
-        37,
-        -3.0
-      ],
-      [
-        37,
-        7.5
-      ],
-      [
-        0,
-        7.5
+        37.0,
+        -22.5
       ]
     ],
     "house_blocks": [
       [
-        0,
-        6,
+        31.0,
+        37.0,
         -52.5,
         -22.5
       ],
       [
-        6,
-        10.5,
+        26.5,
+        31.0,
         -52.5,
         0.0
       ],
       [
-        10.5,
-        21,
+        16.0,
+        26.5,
         -3.0,
         0.0,
         "brick",
@@ -119,8 +304,8 @@
         10.7
       ],
       [
-        12.5,
-        19,
+        18.0,
+        24.5,
         -3.0,
         0.0,
         "brick",
@@ -128,119 +313,119 @@
         30.0
       ],
       [
-        10.5,
-        45,
+        -8.0,
+        26.5,
         -52.5,
         -3.0
       ],
       [
-        5.84,
-        6.0,
+        31.0,
+        31.16,
         -22.5,
         -20.25
       ],
       [
-        5.319999999999999,
-        6.0,
+        31.0,
+        31.68,
         -20.25,
         -18.0
       ],
       [
-        4.8,
-        6.0,
+        31.0,
+        32.2,
         -18.0,
         -15.75
       ],
       [
-        4.279999999999999,
-        6.0,
+        31.0,
+        32.72,
         -15.75,
         -13.5
       ],
       [
-        3.76,
-        6.0,
+        31.0,
+        33.24,
         -13.5,
         -11.25
       ],
       [
-        3.76,
-        6.0,
+        31.0,
+        33.24,
         -11.25,
         -9.0
       ],
       [
-        4.279999999999999,
-        6.0,
+        31.0,
+        32.72,
         -9.0,
         -6.75
       ],
       [
-        4.8,
-        6.0,
+        31.0,
+        32.2,
         -6.75,
         -4.5
       ],
       [
-        5.319999999999999,
-        6.0,
+        31.0,
+        31.68,
         -4.5,
         -2.25
       ],
       [
-        5.84,
-        6.0,
+        31.0,
+        31.16,
         -2.25,
         0.0
       ]
     ],
     "house_walls": [
       [
-        6,
+        31.0,
         -22.5,
-        3.4,
+        33.6,
         -11.25
       ],
       [
-        3.4,
+        33.6,
         -11.25,
-        6,
+        31.0,
         0.0
       ]
     ],
     "house_openings": [
       [
-        1.3,
-        4.2,
+        32.8,
+        35.7,
         -22.5,
         8.05,
         14.8
       ],
       [
-        23.0,
-        26.0,
+        11.0,
+        14.0,
         -3.0,
         8.05,
         14.8
       ],
       [
-        28.5,
-        34.5,
+        2.5,
+        8.5,
         -3.0,
         10.5,
         14.5
       ],
       [
-        7.0,
-        9.5,
+        27.5,
+        30.0,
         0.0,
         10.5,
         14.5
       ]
     ],
     "cover": [
-      10.5,
-      37,
+      0.0,
+      26.5,
       -3.0,
       7.5,
       "+y"
@@ -277,12 +462,12 @@
     "color": "Satin Black",
     "height_in": 36,
     "edges": [
-      "end:left",
+      "end:right",
       "front:W",
       "front:N",
       "front:B",
       "front:P",
-      "end:right"
+      "end:left"
     ],
     "drink_rail": true,
     "drink_rail_collection": "Vintage",
@@ -290,7 +475,7 @@
   },
   "stairs": [
     {
-      "side": "end:right",
+      "side": "end:left",
       "width_in": 48,
       "position_in": 12,
       "total_rise_in": 66,
