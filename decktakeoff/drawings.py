@@ -541,7 +541,14 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
         o.append(R(400, 56, 180, 14, FILL["timber"], INK, 0.5)); o.append(T(400, 52, "joists bear on the beam, H2.5AZ each", 6.5, 600))
     else:
         o.append(T(400, 64, "joists hang on both faces (LUS)", 6.5, 600))
-    note(360, 275, 270, "; ".join(t.summary["beams"])[:150])
+    bls_ = L.beam_lines or []
+    if len(bls_) > 2:          # many beam lines: the count, the size and the worst post — the lines themselves are on S-100 / S-101
+        worst = max((max(b_.post_loads) for b_ in bls_ if getattr(b_, "post_loads", None)), default=0)
+        note(360, 275, 270, f"{len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in bls_}))} beam lines, "
+                            f"{sum(len(b_.posts_x) for b_ in bls_)} posts" + (f", worst post {worst:,.0f} lb" if worst else "") + " (S-100 / S-101)."
+                            + (" Plies on RSS screws, 2 rows @ 12\"; caps with a 1/2\" shim." if any(b_.size.startswith("(2)2x") for b_ in bls_) else ""))
+    else:
+        note(360, 275, 270, "; ".join(t.summary["beams"])[:150])
     # 3 footing / base
     frame_(660, 20, 320, 290, "3", "FOOTING · POST BASE")
     ft = s.framing.footing_type
@@ -558,7 +565,7 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
         o.append(R(800, 190, 40, 14, FILL["concrete"], INK, 0.9)); o.append(T(852, 200, "Diamond Pier head", 6.5, 600))
         for dx, dy in ((-1, 1), (1, 1), (-0.5, 1), (0.5, 1)):
             o.append(LN(820, 204, 820 + dx * 60, 204 + 90, INK, 1.2))
-        o.append(T(852, 240, f"4 x 50\" pins · {L.frame.footing_model}", 6.5, 600)); o.append(R(806, 180, 28, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, "ABA66Z on the pier bolt", 6.5, 600))
+        o.append(T(852, 240, f"4 x 50\" pins · {L.frame.footing_model}", 6.5, 600)); o.append(R(806, 180, 28, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{post_base_sku(s)} on the pier bolt", 6.5, 600))
     else:
         o.append(R(790, 200, 60, 90, FILL["concrete"], INK, 0.9)); o.append(T(852, 240, f"{int(L.frame.footing_dia_in)}\" pier x {ftin(L.frame.footing_depth_in)}", 6.5, 600))
     o.append(R(806, 90, 28, 90, FILL["timber"], INK, 0.8)); o.append(T(820, 140, "post", 6.5, 700, "middle", INK, rot=-90))
@@ -588,7 +595,8 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     o.append(LN(352, 470, 352, 500, GOLD, 1.5)); o.append(T(348, 520, f"overhang {ftin(S.meta['edge'] * 12)}" + ("" if s.decking.fascia else " — no fascia"), 6.5, 600, "end"))
     if s.decking.fascia:
         o.append(R(354, 470, 6, 30, FILL["fascia"], INK, 0.5)); o.append(T(348, 490, "fascia", 6.5, 600, "end"))
-    note(360, 560, 270, t.schedule.get("Field", "")[:160])
+    note(360, 560, 270, t.schedule.get("Field", "")[:160] + (" · Cortex screws + plugs on the borders and dividers (2 per bearing) and the stair treads"
+                                                          if (s.decking.border_fastener or "").lower().startswith("cortex") else ""))
     # 6 zone-specific
     frame_(660, 330, 320, 270, "6", "HOT-TUB BAY" if s.extras.hot_tub else ("FLUSH BEAM" if any(b.kind == "flush" for b in L.beam_lines) else "BLOCKING"))
     if s.extras.hot_tub:
