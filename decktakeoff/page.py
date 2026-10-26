@@ -513,7 +513,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
         w('<details><summary>Cut list</summary>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]) + "</details>")
-        if cost_only:
+        if cost_only and not spec.extras.sell_override:      # a bid: the cost stack with its margin (a sold job gets cost-to-build only)
+            w(_stack(p, None))
+            cats = t.by_category()
+            w("<h3>Materials by category</h3>")
+            w(table(["Category", "Lines", "Cost"], [[E(c), str(len(ls)), money(sum(l.ext for l in ls), True)] for c, ls in cats.items()] + [["<b>Materials (raw)</b>", "", f"<b>{money(p.materials, True)}</b>"]], "", ["l", "r", "r"]))
+        elif cost_only:
             cost_html, cost_total, tax_raw = _cost_stack(p, t)
             w(cost_html)
         else:
@@ -565,6 +570,15 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                 f'<p>{E(sub or addr)} · {E(today)}</p><p>Account GSEXT1 · ship to {E(addr)} · please quote every line; call Jade Pender 303-550-9558 with substitutions.</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings; the stamped engineering set governs structure. Quote requested — no pricing on this sheet.</span></footer></main>'
         title = f"{name} — Take-off + Build Set"
+    elif cost_only and not spec.extras.sell_override:
+        strip = ('<div class="strip"><div><span class="sl">Check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Financed</span><span class="sv">%s</span></div>'
+                 '<div><span class="sl">Cost</span><span class="sv">%s</span></div><div><span class="sl">Gross profit</span><span class="sv">%s</span></div>'
+                 '<div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
+                 % (money(p.sell), money(p.retail), money(p.cost), money(p.gp), 100 * p.gp / p.sell, L.deck_sf))
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div><h1>{E(name)}</h1>'
+                f'<p>{E(sub or addr)}</p></div></header>')
+        body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Cost stack: materials at the order x {p.material_factor:g}, tax, labor at the rate card, site services at cost; {p.gm:.1%} GM on the work. Internal — not for the homeowner.</span></footer></main>'
+        title = f"{name} — Cost Stack"
     elif cost_only:
         tax_raw = round(p.materials * p.tax_rate, 2)
         cost_total = round(p.materials + tax_raw + p.labor + p.gc, 2)

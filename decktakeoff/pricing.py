@@ -140,7 +140,7 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
     import re as _re
     for ss_, st in zip(list(s.stairs) + [None] * len(L.stairs), L.stairs):       # the stair by its name, else by the side it leaves
-        nm_ = getattr(ss_, "name", None) or _re.sub(r"\bedge:(\d+)", r"side \1", f"Stairs ({st.side})")
+        nm_ = (f"Stairs — {ss_.name}" if getattr(ss_, "name", None) else _re.sub(r"\bedge:(\d+)", r"side \1", f"Stairs ({st.side})"))   # "Stairs" leads: the allocation sums by it
         lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
         if st.landing_rail_lf:
             lab.append((f"Landing guard rail ({nm_})", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
