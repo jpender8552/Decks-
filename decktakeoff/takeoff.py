@@ -828,6 +828,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d_, uc, src, sku = _hw("H2.5AZ", False)
         lines.append(Line("Hardware", d_, Qz.h25, Qz.h25, "ea", "exact  (every joist, doubler and rim at the drop beam)" if timber else f"exact  ({Qz.n_joists} joists + 2 rims at each drop beam)", uc, src, sku))
     sd_screws = base_screws
+    beam_lam = 0
     if timber:
         cm, ce = L.beam_lines[0].cap_mid, L.beam_lines[0].cap_end
         if caps_mid:
@@ -850,6 +851,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             plies_, nom_, _, _ = parse_beam(bl.size)
             if plies_ == 2 and nom_.startswith("4x"):
                 nb += sum(2 * (int(math.ceil((b - a) / 24.0)) + 1) for a, b in bl.pieces)
+            elif plies_ >= 2 and nom_.startswith("2x"):    # a built-up 2x beam: plies laminated like the rims, RSS 2 rows @ 12" staggered
+                beam_lam += sum(2 * (int(math.ceil((b - a) / 12.0)) + 1) for a, b in bl.pieces) * (plies_ - 1)
+        if beam_lam:
+            sched["Beam"] = ("built-up 2x beam plies laminated with GRK RSS 3-1/8\" structural screws, 2 rows 2\" from top and bottom, staggered @ 12\" OC; "
+                             "BC46Z cap at each post with SD screws (1/2\" shim: a (2)2x is 3\" in a 3-9/16\" cap)")
         if nb:
             d_, uc, src, sku = _hw("bolt_1/2x8", black)
             lines.append(Line("Hardware", d_, nb, nb + 2, "ea", f"+2  ((2)4x beam plies through-bolted, 2 rows staggered @ 24\" OC, 2\" from top and bottom)", uc, src))
@@ -858,14 +864,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d = PRICEBOOK["hardware"]["SD10212_100"]
         boxes = int(math.ceil(sd_screws / d["count"]))
         lines.append(Line("Hardware", d["desc"], boxes, boxes, "box", f"{sd_screws} needed  (bases {base_screws} · caps {sd_screws - base_screws})", d["each"], d["source"]))
-    blk = 0 if timber else 4 * Qz.n_blocks
-    rss = Qz.rss_lam + blk
+    blk = 0 if timber else 6 * Qz.n_blocks          # (3) each end, as every detail draws it
+    rail_blk = 6 * len(rl.posts) if (rl and surface_rail and not timber) else 0      # the block under each surface-mount post, (3) each end
+    rss = Qz.rss_lam + beam_lam + blk + rail_blk
     if timber and Qz.n_blocks:
         sched["Blocking"] = f"{Qz.n_blocks} x {jsize} blocks, (3) 16d toe-nails each end"
     if rss:
         d = PRICEBOOK["hardware"]["RSS_3-1/8_100"]
         boxes = int(math.ceil(rss / d["count"]))
-        lines.append(Line("Hardware", d["desc"], boxes, boxes, "box", f"{rss} needed  (laminations {Qz.rss_lam} · blocking {blk})", d["each"], d["source"]))
+        lines.append(Line("Hardware", d["desc"], boxes, boxes, "box", f"{rss} needed  (rim laminations {Qz.rss_lam} · " + (f"beam plies {beam_lam} · " if beam_lam else "") + f"blocking {blk}" + (f" · rail post blocks {rail_blk}" if rail_blk else "") + ")", d["each"], d["source"]))
     if rl and n_rail_posts:
         if timber or RAIL_SYSTEMS.get(rl.system, {}).get("cable") or surface_rail:
             d = PRICEBOOK["hardware"]["HeadLOK6_50"]
