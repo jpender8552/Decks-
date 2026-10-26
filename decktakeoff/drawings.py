@@ -832,8 +832,11 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
         best_v = min(out, key=lambda q: (nearest(q[0], q[1], rear_pred) or (9e9, None))[0])
         probes.append((("deck edge", best_v[0], best_v[1]), rear_pred))
     lx_, rx_ = min(p[0] for p in out), max(p[0] for p in out)
-    probes.append((("deck edge", lx_, max(p[1] for p in out if abs(p[0] - lx_) < 0.01) / 2), lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 < lx_))
-    probes.append((("deck edge", rx_, max(p[1] for p in out if abs(p[0] - rx_) < 0.01) / 2), lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 > rx_))
+    left_pred = lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 < lx_
+    right_pred = lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 > rx_
+    for pred_ in (left_pred, right_pred):       # the deck corner nearest each side line (the lines are not parallel to the deck)
+        bv = min(out, key=lambda q: (nearest(q[0], q[1], pred_) or (9e9, None))[0])
+        probes.append((("deck edge", bv[0], bv[1]), pred_))
     for (lab, px, py), pred in probes:
         nb = nearest(px, py, pred)
         if not nb:

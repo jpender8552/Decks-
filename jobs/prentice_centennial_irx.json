@@ -21,7 +21,7 @@
   "tax_rate": 0.0675,
   "rear_setback_required_ft": 17.0,
   "deck_to_rear_line_ft": 17.2,
-  "deck_to_side_line_ft": 18.7,
+  "deck_to_side_line_ft": 18.2,
   "plan_fit": {
    "x0_ft": 0.82,
    "y0_ft": -2.0,
@@ -245,7 +245,7 @@
    "rear_label_dy": 18,
    "setback_notes": [
     "Nearest point: the right octagon's front corner, ~17.2' from the rear lot line (GIS +/- 0.3' to 2') against the 17' allowed \u2014 at the line; verify by tape from the rear fence pins or an ILC before submittal",
-    "Left octagon front corner ~18.1' from the rear line; north side line ~18.7'; south side line ~26'",
+    "Left octagon front corners 17'-10\" / 18'-1\" from the rear line; north side line 18'-3\" (the right end's house-side corner); south side line 27'-5\" (nearest outline corner to each line, GIS)",
     "The deck replaces the existing deck in the same footprint and at the same height; no increase toward any lot line"
    ],
    "site_work": [
