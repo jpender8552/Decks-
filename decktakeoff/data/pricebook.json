@@ -624,8 +624,16 @@
       "source": "est."
     },
     "TimberTech|Terrain+|per_lf": {
-      "each": 3.6,
-      "source": "est. — get D&D quote"
+      "each": 4.13,
+      "source": "D&D Henry Frederick 8 Jul 2026"
+    },
+    "TimberTech|Terrain+|fascia": {
+      "each": 98.64,
+      "source": "D&D Henry Frederick 8 Jul 2026 ($8.22/LF x 12')"
+    },
+    "TimberTech|Terrain+|riser": {
+      "each": 58.56,
+      "source": "D&D Henry Frederick 8 Jul 2026 ($4.88/LF x 12')"
     },
     "TimberTech|Reserve|per_lf": {
       "each": 4.6,
@@ -913,47 +921,59 @@
       "desc": "Cinch HD 2\" post (welded base, cap, skirt, screws), Satin Black"
     },
     "IRX Baluster|panel|8|level": {
-      "each": 345.0,
-      "source": "EST — Henry to quote",
-      "desc": "TimberTech Impression Rail Express 8' x 36\" level kit, vertical square aluminum balusters, modern top rail, Bronze"
+      "each": 275.52,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 8'x36\" section)",
+      "desc": "TimberTech Impression Rail Express 8' x 36\" level universal panel kit, vertical aluminum balusters, bottom rail, {color}"
     },
     "IRX Baluster|panel|6|level": {
-      "each": 285.0,
-      "source": "EST — Henry to quote",
-      "desc": "TimberTech Impression Rail Express 6' x 36\" level kit, vertical square aluminum balusters, modern top rail, Bronze"
+      "each": 220.42,
+      "source": "est. — 6' scaled from the D&D 8' section",
+      "desc": "TimberTech Impression Rail Express 6' x 36\" level universal panel kit, vertical aluminum balusters, bottom rail, {color}"
     },
     "IRX Baluster|panel|8|stair": {
-      "each": 395.0,
-      "source": "est."
+      "each": 308.58,
+      "source": "est. — D&D 8' level section +12%",
+      "desc": "TimberTech Impression Rail Express 8' x 36\" stair universal panel kit, {color}"
     },
     "IRX Baluster|panel|6|stair": {
-      "each": 330.0,
-      "source": "est."
+      "each": 246.87,
+      "source": "est.",
+      "desc": "TimberTech Impression Rail Express 6' x 36\" stair universal panel kit, {color}"
     },
     "IRX Baluster|post|END": {
-      "each": 96.0,
-      "source": "EST — Henry to quote"
+      "each": 86.11,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 3\" post)"
     },
     "IRX Baluster|post|LINE": {
-      "each": 96.0,
-      "source": "EST — Henry to quote"
+      "each": 86.11,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 3\" post)"
     },
     "IRX Baluster|post|CORNER": {
-      "each": 104.0,
-      "source": "EST — Henry to quote"
+      "each": 86.11,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 3\" post)"
     },
     "IRX Baluster|post|STAIR": {
-      "each": 110.0,
-      "source": "EST — Henry to quote"
+      "each": 86.11,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 3\" post)"
     },
     "IRX Baluster|post_kit": {
-      "each": 96.0,
-      "source": "EST — Henry to quote",
-      "desc": "TimberTech Impression Rail Express 2\" aluminum post kit 36\" (post, base, cap, skirt), Bronze"
+      "each": 86.11,
+      "source": "D&D Henry Frederick 8 Jul 2026 (IRX 3\" post)",
+      "desc": "TimberTech Impression Rail Express 3\" x 38-1/4\" post kit (post, surface base, cap, skirt), {color}"
     },
     "IRX Baluster|handrail_kit": {
       "each": 120.0,
       "source": "est."
+    },
+    "IRX Baluster|top_rail|8": {
+      "each": 92.0,
+      "source": "est. — confirm with Henry whether the $275.52 section includes the Modern top rail",
+      "desc": "TimberTech Impression Rail Express Modern top rail 8', {color}"
+    },
+    "IRX Baluster|top_rail|6": {
+      "each": 74.0,
+      "source": "est. — confirm with Henry",
+      "desc": "TimberTech Impression Rail Express Modern top rail 6', {color}"
     }
   },
   "labor": {

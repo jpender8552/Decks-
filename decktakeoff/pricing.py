@@ -10,6 +10,7 @@ Jason Ct (dimensional) uses the same engine with tax 8.5% destination, factor 1.
 from __future__ import annotations
 from .units import ftin
 
+import math
 import copy
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -57,6 +58,35 @@ class Pricing:
     gc_base: float = 0.0
     gc_extras: List[Tuple[str, float]] = field(default_factory=list)
     rail_note: str = ""          # "rail at $120/LF, the rest at 45% GM" when the rail sells at a fixed rate
+
+
+BUILTIN_AT_GM = 0.40          # the owner's built-in section prices carry 40%: materials (factored, taxed) + labor = 60% of the sell
+
+
+def _factor_rate(s) -> Tuple[float, float]:
+    pb = PRICEBOOK
+    factor = s.extras.material_factor if s.extras.material_factor is not None else pb.get("material_factor", 1.0)
+    if s.site.tax_rate is not None:
+        rate = float(s.site.tax_rate)
+    elif pb.get("tax_mode", "flat") == "destination":
+        rate = tax_rate_for(s.site.city)
+    else:
+        rate = pb.get("tax_rate", 0.04)
+    return factor, rate
+
+
+def builtin_sells(s) -> List[Tuple[str, str, int, float]]:
+    """(category, label, sections, sell) for built-ins the owner prices per section (extras.builtin_sell)."""
+    from .scene import bench_segments, planter_segments
+    bs = s.extras.builtin_sell or {}
+    out = []
+    if s.geometry.benches and bs.get("bench"):
+        n = len(bench_segments(s))
+        out.append(("Benches", f"Built-in benches — {n} sections, 17\" seat, back, 4x4 posts wrapped in deck board", n, float(bs["bench"]) * n))
+    if s.geometry.planters and bs.get("planter"):
+        n = len(planter_segments(s))
+        out.append(("Planters", f"Built-in planter{'s' if n > 1 else ''} — 17\" x 17\", deck board on all sides, picture-frame cap", n, float(bs["planter"]) * n))
+    return out
 
 
 def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
@@ -145,6 +175,20 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Under-deck prep — 6-mil poly + 2\" gravel", round(t.layout.deck_sf), "SF", lr.get("under_deck_gravel_per_sf", 1.5), "ESTIMATE — confirm"))
     if s.framing.system == "steel" and lr.get("steel_frame_premium_per_sf"):     # rate card: no steel up-charge unless the job sets one
         lab.append(("Steel frame premium — cut, clip and screw cold-formed members", round(t.layout.deck_sf), "SF", lr["steel_frame_premium_per_sf"], "ESTIMATE — no steel rate on the card; confirm with the framer"))
+    fixed_cats = {c for c, *_ in builtin_sells(s)}
+    if s.geometry.benches and "Benches" not in fixed_cats:
+        from .scene import bench_segments
+        blf = sum(math.hypot(x1 - x0, y1 - y0) for x0, y0, x1, y1, *_ in bench_segments(s))
+        lab.append(("Built-in benches — frame, seat, apron and back (rebuilt in the existing footprint)", round(blf, 1), "LF", lr.get("bench_per_lf", 75.0),
+                    "rate card" if "bench_per_lf" in lr else "ESTIMATE — no bench rate on the card; confirm"))
+    if fixed_cats:
+        factor, rate = _factor_rate(s)
+        for cat, label, n, sell in builtin_sells(s):
+            mats = sum(l.ext for l in t.lines if l.category == cat) * factor * (1 + rate)
+            lab.append((f"{label}: build and install", 1, "lot", round(max(0.0, sell * (1 - BUILTIN_AT_GM) - mats), 2),
+                        f"owner-set: ${sell / n:,.0f} per section at {BUILTIN_AT_GM:.0%}, less its materials"))
+    if getattr(s.geometry, "door_step", None):
+        lab.append(("Door step — frame, deck and riser (the existing step rebuilt)", 1, "lot", lr.get("door_step_lot", 250.0), "ESTIMATE — confirm"))
     for sl in s.geometry.sails or []:
         n_p = len(sl.get("posts", []))
         deck_m = sl.get("mount") == "deck_rail"
@@ -234,10 +278,17 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         _lr = sum(e for i, q, u, r_, e in labor_lines if i.startswith(("Railing", "Cable rail")))
         _rm = sum(l.ext for l in t.lines if l.category == "Rail" and not ("rink rail" in l.item or "drink-rail" in l.item))
         rail_work = _rm * factor * (1 + rate) + _lr
-    sell = round((work - rail_work) / (1 - gm) + rail_sell + gc)
-    sell_floor = round((work - rail_work) / (1 - pb["gm_floor"]) + rail_sell + gc)
+    # built-ins the owner prices per section: they sell at that price; their materials + labor come off the margin base
+    bsell = builtin_sells(s)
+    builtin_sell = sum(v for *_, v in bsell)
+    builtin_work = 0.0
+    for cat, label, n, sv in bsell:
+        builtin_work += sum(l.ext for l in t.lines if l.category == cat) * factor * (1 + rate)
+        builtin_work += sum(e for i, q, u, r_, e in labor_lines if i.startswith(label))
+    sell = round((work - rail_work - builtin_work) / (1 - gm) + rail_sell + builtin_sell + gc)
+    sell_floor = round((work - rail_work - builtin_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + gc)
     gm_base = gm
-    if rail_sell and not s.extras.sell_override:
+    if (rail_sell or builtin_sell) and not s.extras.sell_override:
         gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
     if s.extras.sell_override:
         sell = round(float(s.extras.sell_override))
@@ -306,6 +357,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
             _own = any(sl.get("fabric_by_owner") for sl in s.geometry.sails)
             alloc.append(((f"Shade sail posts + install — {_np} steel post{'s' if _np != 1 else ''}" if _own else f"Shade sail on {_np} steel post{'s' if _np != 1 else ''}") + ((" at the rail corners" if _np != 1 else " at the rail corner") if any(sl.get("mount") == "deck_rail" for sl in s.geometry.sails) else "") + (" (owner supplies the sail)" if _own else ""), round(comp(sail_m, labsum("Shade sail")))))
         alloc += parts
+    for cat, label, n, sv in bsell:        # owner-priced built-ins at their section price
+        alloc.append((label, round(sv)))
     if gc:
         alloc.append(("Site & project services", round(gc)))
     if s.extras.sell_override:        # scale every component to the set price, then true up the rounding
@@ -318,8 +371,10 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     pr = Pricing(round(mat, 2), factor, round(mat_f, 2), rate, round(tax, 2), labor_lines, round(labor, 2), gc_lines, round(gc, 2), round(work, 2), round(cost, 2),
                  gm, sell, sell_floor, retail, round(monthly, 2), round(gp, 2), round(comm, 2), alloc, cats, round(sell / L.deck_sf, 2), engineering,
                  [], pb.get("_dealer_fee_note", ""), gc_base, gc_extras)
+    if builtin_sell and not s.extras.sell_override:
+        pr.rail_note = " · ".join(f"{n} {('bench section' if c == 'Benches' else 'planter')}{'s' if n > 1 else ''} at ${sv / n:,.0f} (${sv:,.0f})" for c, _l, n, sv in bsell)
     if rail_sell and not s.extras.sell_override:
-        pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f}), everything else at {gm_base:.1%} GM"
+        pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f})" + (" · " + pr.rail_note if getattr(pr, 'rail_note', '') else "") + f", everything else at {gm_base:.1%} GM"
     if with_options and s.extras.options:
         pr.options = price_options(t, pr, gm)
     return pr

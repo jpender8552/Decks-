@@ -93,6 +93,17 @@ function patternTex(kind, hex, seed) {
     g.globalAlpha = 0.08; for (let i = 0; i < 300; i++) { g.fillStyle = i % 2 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 20 + rnd() * 80); } g.globalAlpha = 1;
   } else if (kind === 'grass') {
     for (let i = 0; i < 26000; i++) { g.fillStyle = [shade(hex, -0.16), shade(hex, -0.08), shade(hex, 0.08), shade(hex, 0.16), '#93a267', '#6f8c48'][Math.floor(rnd() * 6)]; g.globalAlpha = 0.6 + rnd() * 0.4; g.fillRect(rnd() * 512, rnd() * 512, 1, 1 + rnd() * 2); } g.globalAlpha = 1;
+  } else if (kind === 'louver') {  // plantation shutters: 3-1/2" louvers, a shadow under each blade
+    for (let y = 0; y < 512; y += 18) { g.fillStyle = shade(hex, -0.28); g.fillRect(0, y + 13, 512, 4); g.fillStyle = shade(hex, 0.04); g.fillRect(0, y, 512, 3); }
+  } else if (kind === 'shingle') { // asphalt shingles: 5" courses, staggered tabs, granule speckle
+    for (let y = 0; y < 512; y += 21) { const off = (y / 21) % 2 ? 0 : 32; g.fillStyle = shade(hex, -0.3); g.fillRect(0, y + 18, 512, 3);
+      for (let x = -off; x < 512; x += 64) { g.fillStyle = [shade(hex, -0.1), hex, shade(hex, 0.08), shade(hex, -0.04)][Math.floor(rnd() * 4)]; g.fillRect(x + 1, y, 62, 18); } }
+    g.globalAlpha = 0.25; for (let i = 0; i < 9000; i++) { g.fillStyle = rnd() > 0.5 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 1); } g.globalAlpha = 1;
+  } else if (kind === 'paver') {  // 4x8 clay pavers, basketweave (8" squares of two bricks, alternating), 512px = 8'
+    const u = 512 / 24;
+    for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) { for (let k = 0; k < 2; k++) {
+      g.fillStyle = [shade(hex, -0.12), hex, shade(hex, 0.1), shade(hex, -0.05), shade(hex, 0.16)][Math.floor(rnd() * 5)];
+      if ((i + j) % 2) g.fillRect(i * 2 * u + 1.5, j * 2 * u + k * u + 1.5, 2 * u - 3, u - 3); else g.fillRect(i * 2 * u + k * u + 1.5, j * 2 * u + 1.5, u - 3, 2 * u - 3); } }
   } else if (kind === 'gravel') {
     for (let i = 0; i < 5000; i++) { g.fillStyle = [shade(hex, -0.25), shade(hex, -0.1), shade(hex, 0.12), shade(hex, 0.25)][Math.floor(rnd() * 4)]; g.beginPath(); g.arc(rnd() * 512, rnd() * 512, 1.5 + rnd() * 3, 0, 6.3); g.fill(); }
   }
@@ -117,19 +128,21 @@ function material(b) {
   const vertical = (b.y1 - b.y0) > (b.x1 - b.x0);
   const long = Math.max(b.x1 - b.x0, b.y1 - b.y0);
   const rep = Math.max(1, Math.round(long / 8));
-  const key = b.mat + '|' + ((m.grain || m.pattern) ? (vertical ? 'V' : 'H') : '') + '|' + variant + '|' + rep + '|' + (m.pattern ? Math.round(long) + 'x' + Math.round(b.z1 - b.z0) : '');
+  const key = b.mat + '|' + ((m.grain || m.pattern) ? (vertical ? 'V' : 'H') : '') + '|' + variant + '|' + rep + '|' + (m.pattern ? (b.shape === 'mesh' ? 'mesh' : Math.round(long) + 'x' + Math.round(b.z1 - b.z0)) : '');
   if (MATC[key]) return MATC[key];
   const opts = {roughness: m.rough == null ? 0.8 : m.rough, metalness: m.metal || 0};
   if (m.grain) { const t = texFor(b.mat, vertical, variant).clone(); t.needsUpdate = true; t.repeat.set(vertical ? 1 : rep, vertical ? rep : 1); opts.map = t; opts.color = new THREE.Color(0xffffff); }
   else if (m.pattern) { const t = texFor(b.mat, false, 1).clone(); t.needsUpdate = true;
     const per = m.pattern === 'grass' ? 5 : (m.pattern === 'gravel' ? 6 : 8);   // feet per tile
+    if (b.shape === 'mesh') t.repeat.set(8 / per, 8 / per); else
     t.repeat.set(Math.max(1, long / per), Math.max(1, Math.max(b.z1 - b.z0, Math.min(b.x1 - b.x0, b.y1 - b.y0)) / per)); opts.map = t; opts.color = new THREE.Color(0xffffff); }
   else { opts.color = new THREE.Color(m.color).convertSRGBToLinear(); }
   if (b.mat === 'glass') { opts.envMapIntensity = 1; }
+  if (m.glass) { opts.transparent = true; opts.opacity = 0.2; opts.depthWrite = false; }
   if (m.opacity != null && m.opacity < 1) { opts.transparent = true; opts.opacity = m.opacity; opts.side = THREE.DoubleSide; }
   const mm = new THREE.MeshStandardMaterial(opts); MATC[key] = mm; return mm;
 }
-const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser']);
+const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser', 'wblock']);
 const edgeMat = new THREE.LineBasicMaterial({color: 0x1a1612, transparent: true, opacity: 0.22});
 // meshes
 const phased = [], ctx = [];
@@ -137,11 +150,22 @@ for (const b of D.boxes) {
   const w = b.x1 - b.x0, d = b.y1 - b.y0, h = b.z1 - b.z0;
   let geo;
   if (b.shape === 'cyl') geo = new THREE.CylinderGeometry(w / 2, w / 2, h, 24);
+  else if (b.shape === 'sphere') { geo = new THREE.IcosahedronGeometry(0.5, 2); geo.scale(w, h, d); }
+  else if (b.shape === 'cone') geo = new THREE.ConeGeometry(w / 2, h, 14);
   else if (b.shape === 'mesh' && b.pts) {                       // a shade sail: triangles in world coordinates
     geo = new THREE.BufferGeometry();
     const arr = new Float32Array(b.pts.length * 3);
     b.pts.forEach((q, i) => { arr[i * 3] = q[0]; arr[i * 3 + 1] = q[2]; arr[i * 3 + 2] = q[1]; });
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3)); geo.computeVertexNormals();
+    const uv = new Float32Array(b.pts.length * 2);
+    for (let t = 0; t + 2 < b.pts.length; t += 3) {
+      const A = new THREE.Vector3(arr[t * 3], arr[t * 3 + 1], arr[t * 3 + 2]), B_ = new THREE.Vector3(arr[t * 3 + 3], arr[t * 3 + 4], arr[t * 3 + 5]), C = new THREE.Vector3(arr[t * 3 + 6], arr[t * 3 + 7], arr[t * 3 + 8]);
+      const n = B_.clone().sub(A).cross(C.clone().sub(A)).normalize();
+      let t1 = new THREE.Vector3(0, 1, 0).cross(n); if (t1.length() < 1e-3) t1.set(1, 0, 0); t1.normalize();
+      const t2 = n.clone().cross(t1).normalize(); if (t2.y < 0) t2.multiplyScalar(-1);
+      for (let k = 0; k < 3; k++) { const P = new THREE.Vector3(arr[(t + k) * 3], arr[(t + k) * 3 + 1], arr[(t + k) * 3 + 2]); uv[(t + k) * 2] = P.dot(t1) / 8; uv[(t + k) * 2 + 1] = P.dot(t2) / 8; }
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
   else geo = new THREE.BoxGeometry(w, h, d);
   const mat_ = material(b);
@@ -151,10 +175,10 @@ for (const b of D.boxes) {
   mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
   if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
-  mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0};
+  mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }
   scene.add(mesh); if (b.phase > 0) phased.push(mesh);
-  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass') ctx.push(mesh);
+  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree') ctx.push(mesh);
 }
 const GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23};
 function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; }
@@ -162,10 +186,11 @@ function explode(on) {
   for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) + o.userData.xg : 0);
   explodeCtx(on);
 }
-function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof') o.visible = !on; else { o.material = o.material.clone(); o.material.transparent = on; o.material.opacity = on ? 0.3 : 1; o.material.depthWrite = !on; } } }
+function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof' || o.userData.kind === 'tree') o.visible = !on; else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
 function explodedTop() { let t = 0; for (const o of phased) if (o.visible) { o.geometry.computeBoundingBox(); t = Math.max(t, o.position.y + o.geometry.boundingBox.max.y); } return t; }
 // camera + orbit
 const persp = new THREE.PerspectiveCamera(40, W / H, 0.5, 2000);
+if (q.get('fov')) { persp.fov = parseFloat(q.get('fov')); persp.updateProjectionMatrix(); }
 const cx = X0 + D.W / 2, cy = (D.y_min + D.y_front) / 2, zt = D.deck_top, span = Math.max(D.W, D.y_front - D.y_min, 24);
 const planW = D.W + 16, planD = (D.y_front - D.y_min) + 22;
 const planHalf = Math.max(planW / 2, planD / 2 * (W / H));
@@ -173,6 +198,8 @@ const ortho = new THREE.OrthographicCamera(-planHalf, planHalf, planHalf * H / W
 let cam = persp;
 const VIEWS = {
   yard:   {pos: [cx + span * 0.1, zt + 6.0, D.y_front + span * 1.0], at: [cx, zt - 0.6, cy]},
+  facade: {pos: [cx + span * 0.05, zt + 9.0, D.y_front + span * 1.75], at: [cx, zt + 9.0, cy - 2]},
+  facade2: {pos: [cx - span * 0.75, zt + 12.0, D.y_front + span * 1.35], at: [cx, zt + 8.5, cy - 2]},
   corner: {pos: [X0 + D.W + span * 0.5, zt + 6.5, D.y_front + span * 0.5], at: [cx, zt - 1.0, cy]},
   ondeck: {pos: [X0 + Math.min(D.W - 2, 2.5), zt + 5.6, D.y_front - 2.2], at: [X0 + D.W * 0.92, zt + 0.4, D.y_front - Math.min(6, span * 0.3)]},
   iso:    {pos: [cx + span * 0.95, zt + span * 0.7, D.y_front + span * 0.8], at: [cx, zt - 2, cy]},
@@ -182,6 +209,11 @@ const VIEWS = {
   isolow: {pos: [cx + span * 0.85, zt + 2.2, D.y_front + span * 0.95], at: [cx, zt - 1.2, cy]},
   underiso: {pos: [cx - span * 0.55, Math.max(1.2, zt * 0.25), D.y_front + span * 0.7], at: [cx, zt - 2.2, cy - 2]},
 };
+// a measured site's own camera stations (plan feet: x along the wall, y into the yard, z up) replace the generic ones
+if (D.meta && D.meta.cameras) for (const [k, c] of Object.entries(D.meta.cameras)) VIEWS[k] = {pos: [c.pos[0], c.pos[2], c.pos[1]], at: [c.at[0], c.at[2], c.at[1]], fov: c.fov};
+// ?cam=x,y,z&at=x,y,z in plan feet (x along the wall, y into the yard, z up): a free camera for close checks
+if (q.get('cam') && q.get('at')) { const c_ = q.get('cam').split(',').map(Number), a_ = q.get('at').split(',').map(Number);
+  VIEWS.custom = {pos: [c_[0], c_[2], c_[1]], at: [a_[0], a_[2], a_[1]]}; }
 // a shade sail above the deck: pull the outside views back and up so the whole sail and its posts are in frame
 (function () {
   const sails = D.boxes.filter(b => b.kind === 'sail');
@@ -195,13 +227,14 @@ const VIEWS = {
 })();
 function planMode(on) {
   if (renderer.shadowMap.enabled === on) { renderer.shadowMap.enabled = !on; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }   // a plan has no cast shadows
-  for (const o of ctx) { o.castShadow = !on; if (o.userData.kind === 'roof') o.visible = !on; else { o.material = o.material.clone(); o.material.transparent = on; o.material.opacity = on ? 0.28 : 1; o.material.depthWrite = !on; } }
+  for (const o of ctx) { o.castShadow = !on && o.userData.kind !== 'glass'; if (o.userData.kind === 'roof' || o.userData.kind === 'tree') o.visible = !on; else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.28, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } }
 }
 let target = new THREE.Vector3(), sph = new THREE.Spherical();
 let curView = VIEW0;
 function setView(name) {
   curView = name;
   const v = VIEWS[name] || VIEWS.yard; cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
+  if (!v.ortho) { const f_ = q.get('fov') ? parseFloat(q.get('fov')) : (v.fov || 40); if (persp.fov !== f_) { persp.fov = f_; persp.updateProjectionMatrix(); } }
   cam.up.set(...(v.up || [0, 1, 0]));
   cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target));
   if (typeof exploded !== 'undefined' && exploded && !v.ortho) {      // frame the whole lifted stack, the roof covers included; the house goes see-through

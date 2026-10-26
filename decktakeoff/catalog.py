@@ -32,9 +32,9 @@ DECKING = {
     "Reserve":  dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided",
                      warranty="30-yr product / 30-yr fade & stain", fire="Class C, not WUI", wui=False, class_a=False,
                      colors=["Antique Leather", "Dark Roast", "Driftwood", "Reclaimed Chestnut"]),
-    "Terrain+": dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided",
+    "Terrain+": dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="scalloped", cap="4-sided",
                      warranty="30-yr product / 30-yr fade & stain", fire="Not Class A; WUI status contradictory on timbertech.com — confirm with dealer", wui=False, class_a=False,
-                     colors=["Dark Oak", "Natural White Oak", "Weathered Oak"]),
+                     colors=["Dark Oak", "Natural White Oak", "Weathered Oak"], cortex_ok=True),   # TimberTech: "the first scalloped-profile board to be compatible with ... CORTEX"
     "Terrain":  dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided",
                      warranty="30-yr product / 30-yr fade & stain", fire="Class C, not WUI", wui=False, class_a=False,
                      colors=["Silver Maple", "Brown Oak"], cortex_ok=False),
@@ -167,9 +167,9 @@ RAIL_SYSTEMS["Cinch"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_al
 RAIL_SYSTEMS["Fulton"]["noncombustible"] = True
 RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
 RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]
-RAIL_SYSTEMS["IRX Baluster"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
+RAIL_SYSTEMS["IRX Baluster"] = dict(panels={72: 70.0, 96: 94.0}, post_w=3.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
                                     noncombustible=True, surface=True, display="Impression Rail Express, vertical balusters, modern top rail", max_ctc=96.0, brand="TimberTech", colors=["Black", "White", "Bronze"],
-                                    note="TimberTech Impression Rail Express: 2\" aluminum posts on surface bases, modern top rail, vertical square aluminum balusters, "
+                                    note="TimberTech Impression Rail Express: 3\" aluminum posts (3\" x 38-1/4\" kits) on surface bases, Modern top rail (sold separately), vertical aluminum balusters, "
                                          "bottom rail; 6' / 8' level kits cut to bay, posts on the divider lines")
 
 
@@ -222,9 +222,9 @@ BOARDS_PALETTE = {
     ("Reserve", "Dark Roast"): ["#26190f", "#3a2a1f", "#4c3a2d", "#5e4a3b", "#6e5a4a", "#7d6a5a"],
     ("Reserve", "Driftwood"): ["#5c5954", "#77736c", "#979289", "#aea9a1", "#bdb8b0", "#cac6bf", "#d6d2cb"],
     ("Reserve", "Reclaimed Chestnut"): ["#6e5238", "#88694c", "#a08260", "#b39674", "#c3a888", "#d0b99c"],
-    ("Terrain+", "Dark Oak"): ["#3f2f24", "#4e3b2e", "#5c4838", "#6a5543", "#775f4c"],
-    ("Terrain+", "Natural White Oak"): ["#a8946f", "#b9a683", "#c7b494", "#d3c2a4", "#dccdb2"],
-    ("Terrain+", "Weathered Oak"): ["#6f665b", "#7f776c", "#8f877b", "#9d968a", "#aaa398"],
+    ("Terrain+", "Dark Oak"): ["#62523c", "#6b5b44", "#73624a", "#7b6a51", "#86745a"],
+    ("Terrain+", "Natural White Oak"): ["#ad966a", "#b8a275", "#bfaa7d", "#c5b085", "#cdb98e"],
+    ("Terrain+", "Weathered Oak"): ["#85806d", "#8e8977", "#96907f", "#9d9786", "#a5a08e"],
     ("Terrain", "Silver Maple"): ["#8a8a88", "#959593", "#a0a09e", "#aaaaa8"], ("Terrain", "Brown Oak"): ["#6b4d36", "#76573e", "#816147", "#8b6b50"],
     ("Premier+", "Natural Oak"): ["#8f6f4c", "#a1825d", "#b09069", "#bd9e78", "#c9ac88"],
     ("Prime+", "Coconut Husk"): ["#8f6a42", "#a07a4d", "#b58a58", "#c49a68", "#d2ad7b"],

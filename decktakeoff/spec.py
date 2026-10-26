@@ -104,6 +104,12 @@ class Geometry:
     house_blocks: List[List[float]] = field(default_factory=list)     # global frame, feet: [x0, x1, y0, y1] blocks of the house footprint (drawn, not counted)
     house_openings: List[List[float]] = field(default_factory=list)   # [x0, x1, y_face, z0, z1] doors / windows on a wall facing the deck
     cover: Optional[List[float]] = None                                 # porch cover: [x0, x1, y0, y1, slope] (feet), drawn as a shed roof on posts
+    planters: List[dict] = field(default_factory=list) # built-in planter boxes: {name, path: [[x, y], [x, y]] (ft, the deck edge it sits on, run like the outline), width_in 17, height_in 17}
+    house_model: Optional[dict] = None   # the house behind the deck as measured (house.py): walls + openings, roofs, gutters, downspouts, bays
+    site_model: Optional[dict] = None    # the yard as measured (landscape.py): graded lawn, beds, block walls, pavers, plants, fences, neighbours
+    door_step: Optional[dict] = None   # a box step at the door on top of the deck: {x0, x1 (ft, plan frame), depth_in, rise_in}
+    benches: List[dict] = field(default_factory=list)  # built-in benches: {name, path: [[x, y], ...] (ft, the deck edge the bench backs onto, run like the outline
+                                                       #   so the deck is on the left-hand normal), depth_in 18, seat_in 18 (seat top above the deck), back True, back_in 34}
     sails: List[dict] = field(default_factory=list)    # shade sails: {name, corners: [[x, y, z] x 3-4] (ft, plan frame, z above grade: the attachment points),
                                                        #   posts: [corner indices on steel posts], color, post_od_in, post_embed_ft, footing_dia_in, fabric_price_sf}
     covers: List[dict] = field(default_factory=list)   # one or more lean-to roof covers: {name, x0, x1, y0, y1 (ft, post/beam rectangle),
@@ -178,6 +184,7 @@ class Decking:
     fascia: bool = True
     fascia_color: Optional[str] = None   # None -> field color
     fastener_system: Optional[str] = None      # None -> GSX default by material (composite: Camo EdgeClip; PVC: CONCEALoc)
+    border_fastener: Optional[str] = None   # "Cortex": picture frame, dividers and stair treads face-screwed with Cortex plugs (field stays hidden)
     face_screw: str = "Starborn Cap-Tor xd 2-3/4\""
     gap_in: Optional[float] = None       # override the line's field gap (Eagle's Nest: 1/8" on square-shoulder Vintage)
     border_collection: Optional[str] = None    # contrast picture frame / dividers (None -> field collection)
@@ -230,6 +237,8 @@ class Stair:
     turn_side: str = "left"              # switchback: which side of flight 1 the landing extends to and flight 2 runs down ("left" = toward the stair's low edge in plan)
     flight_rails: List[int] = field(default_factory=list)   # rail sides per flight ([1, 2]); [] -> `rails` on every flight
     landing_guard_lf: Optional[float] = None   # LF of guard on the landings' open sides (None -> each landing's perimeter less the stair widths in and out)
+    build: str = "stringers"             # "stringers" (cut 2x12) | "box": a framed 2x6 box step on a compacted base — no stringers, fascia-wrapped (a step or two at grade)
+    skirts: bool = False                 # fascia skirts on both open sides, stepped under each tread — no stringer or framing shows
 
 
 @dataclass
@@ -258,6 +267,7 @@ class Extras:
     no_general_conditions: bool = False  # drop the $/SF general conditions and site extras entirely
     labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}
     extra_beam_sets: Optional[int] = None             # override the "extra beam set" labor count (None -> beam lines minus one)
+    builtin_sell: Optional[dict] = None               # built-ins sold at a set price per section: {"bench": 3000, "planter": 2500} — their materials + labor cost lands at 60% of it
     rail_sell_per_lf: Optional[float] = None          # rail sold at a fixed installed price per LF (None -> pricebook rail_sell_per_lf for the system, if any)
     sell_override: Optional[float] = None             # owner-set check/ACH price; the allocation scales to it
     retail_markup: Optional[float] = None             # financed = sell x (1 + markup) instead of sell / 0.93

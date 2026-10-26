@@ -25,7 +25,7 @@ class Box:
     mat: str
     phase: int = 0
     tag: str = ""
-    shape: str = "box"  # box | cyl
+    shape: str = "box"  # box | cyl | sphere (ellipsoid in the bounds) | cone (base at z0, apex at z1) | mesh
     tone: float = 0.0   # per-board tone jitter (-1..1)
     rot: float = 0.0    # radians about the box centre: stair stringers / stair rails (axis below); 0 = axis-aligned
     rot_axis: str = "y" # "y": run along x (viewer rotation.z) | "x": run along y (viewer rotation.x)
@@ -170,7 +170,14 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         tub=dict(color="#3b3531", pattern="batten", rough=0.75),
         tubrim=dict(color="#dad6cf", rough=0.35),
         hanger=dict(color="#1c1c1e" if spec.framing.hardware_finish == "black" else "#8f9498", metal=0.7, rough=0.5),
+        **(__import__("decktakeoff.house", fromlist=["materials"]).materials(spec.geometry.house_model) if getattr(spec.geometry, "house_model", None) else {}),
+        **(_site_materials(spec.geometry.site_model) if getattr(spec.geometry, "site_model", None) else {}),
     )
+
+
+def _site_materials(model: dict) -> Dict[str, dict]:
+    from .landscape import materials as _lm, neighbour_materials as _nm
+    return dict(_lm(model), **_nm(model))
 
 
 def build_scene(L) -> Scene:
@@ -195,17 +202,31 @@ def build_scene(L) -> Scene:
     H_house = zt + 10.0
 
     # ---------------- site: ground, rock under the deck, the house behind every zone's wall
-    add("ground", -80, W + 80, y_min - 60, y_front + 90, -0.6, 0.0, "ground")
-    for z in L.zones:   # weed barrier + rock under the deck footprint only
+    site_m = getattr(spec.geometry, "site_model", None)
+    if site_m:                              # the measured yard owns the lot; a flat field beyond the fences fills the horizon
+        add("ground", -140, W + 140, y_min - 90, y_front + 160, -1.6, float(site_m.get("beyond_z", -0.9)), "ground")
+    else:
+        add("ground", -80, W + 80, y_min - 60, y_front + 90, -0.6, 0.0, "ground")
+    for z in (L.zones if not getattr(spec.geometry, "house_model", None) else []):   # weed barrier + rock under the deck footprint only (a measured site: the site model owns the ground)
         add("gravel", z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5, 0.0, 0.04, "gravel")
     depth_back = 26.0
     H_house = zt + 9.5                      # one storey above the deck floor
     door_h = 6.75
-    if spec.geometry.house_blocks:
+    if getattr(spec.geometry, "house_model", None):
+        from .house import build_house
+        def _mesh(kind, tri, mat, tag=""):
+            xs_ = [q[0] for q in tri]; ys_ = [q[1] for q in tri]; zs_ = [q[2] for q in tri]
+            B.append(Box(kind, min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), mat, 0, tag=tag, shape="mesh", pts=[[round(v, 3) for v in q] for q in tri]))
+        build_house(spec.geometry.house_model, add, lambda *a, **k: B.append(rot_box(*a, **k)), _mesh)
+        if site_m:
+            from .landscape import build_site
+            build_site(site_m, add, lambda *a, **k: B.append(rot_box(*a, **k)), _mesh, zt)
+    elif spec.geometry.house_blocks:
         draw_house_from_spec(add, spec, zt, H_house)
     for _c in (spec.geometry.covers or []):
         draw_cover(add, spec, dict(COVER_DEFAULTS, **_c), zt)
     draw_sails(add, spec)
+    draw_benches(add, spec, zt, fixed_append=lambda b: B.append(b))
     # a deck or roof above this one (existing, drawn for context) and the columns that carry it through this deck
     for ov in (spec.geometry.overhead or []):
         ox0, ox1, oy0, oy1, zu, zo = [float(v) for v in ov[:6]]
@@ -317,8 +338,32 @@ def build_scene(L) -> Scene:
                 add("stone", x - 1.0, x + 1.0, y - 1.0, y + 1.0, 0.0, 3.0, "stone", 3)
                 add("stonecap", x - 1.08, x + 1.08, y - 1.08, y + 1.08, 3.0, 3.17, "stonecap", 3)
 
+    # ---------------- frame: a polygon outline is framed as one continuous field (the takeoff counts the same members)
+    from .layout import outline_framing
+    OF = outline_framing(spec, L)
+    if OF is not None:
+        for x0_, y0_, x1_, y1_ in OF.ledgers + OF.ledger_blocks:
+            B.append(rot_box("ledger", x0_ * IN, y0_ * IN, x1_ * IN, y1_ * IN, jbot, jtop, "timber", 5, jb, tag="ledger"))
+        for i_, k_, x0_, y0_, x1_, y1_ in OF.rims:
+            B.append(rot_box("rim", x0_ * IN, y0_ * IN, x1_ * IN, y1_ * IN, jbot, jtop, "timber", 5, jb, tag=f"rim side {i_ + 1} ply {k_ + 1}"))
+        for X_, ya_, yb_, ea_, eb_, lab_ in OF.joists:
+            add("joist", X_ * IN - jb / 2, X_ * IN + jb / 2, ya_ * IN, yb_ * IN, jbot, jtop, "timber", 5, tag=lab_)
+        for x0_, y0_, x1_, y1_, lab_ in OF.blocks:
+            B.append(rot_box("block", x0_ * IN, y0_ * IN, x1_ * IN, y1_ * IN, jbot, jtop, "timber", 5, jb, tag=lab_))
+        if fascia:
+            # fascia on every open side, outside the rim, mitred at the corners
+            Pq = [(float(x), float(y)) for x, y in spec.geometry.outline]
+            for e_, kind_ in zip(L.outline_edges, OF.side_kind):
+                if kind_ not in ("rim", "rim45"):
+                    continue
+                ex0, ey0, ex1, ey1 = e_.x0 * IN, e_.y0 * IN, e_.x1 * IN, e_.y1 * IN
+                Le = math.hypot(ex1 - ex0, ey1 - ey0); ux_, uy_ = (ex1 - ex0) / Le, (ey1 - ey0) / Le
+                nx_, ny_ = -uy_, ux_                    # outward (the outline runs clockwise in the plan frame)
+                ox, oy = nx_ * fas_t / 2, ny_ * fas_t / 2
+                B.append(rot_box("fascia", ex0 + ox - ux_ * fas_t / 2, ey0 + oy - uy_ * fas_t / 2, ex1 + ox + ux_ * fas_t / 2, ey1 + oy + uy_ * fas_t / 2,
+                                 jbot - 0.15, zt - 0.02, "fascia", 6, fas_t, tag=f"fascia side {e_.name}"))
     # ---------------- frame per zone
-    for zi, z in enumerate(L.zones):
+    for zi, z in enumerate(L.zones if OF is None else []):
         fr = z.frame
         x0, W_z = z.x0 * IN, z.W * IN
         yw = z.wall_y * IN
@@ -504,6 +549,22 @@ def build_scene(L) -> Scene:
                             bx_, by_ = p0 + (p1 - p0) * t_, q0 + (q1 - q0) * t_
                             add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
                 continue
+            if abs(yb - ya) > 0.01 and abs(xb - xa) > 0.01:
+                # an angled outline side: rails as rotated boxes post to post
+                B.append(rot_box("toprail", xa, ya, xb, yb, zt + h - 0.08, zt + h, "railmetal", 7, 0.12))
+                if cable:
+                    for k in range(10):
+                        zc = zt + 0.3 + k * 0.27
+                        B.append(rot_box("cable", xa, ya, xb, yb, zc - 0.01, zc + 0.01, "cable", 7, 0.02))
+                else:
+                    B.append(rot_box("botrail", xa, ya, xb, yb, zt + 0.25, zt + 0.33, "railmetal", 7, 0.12))
+                    n_ = int(math.hypot(xb - xa, yb - ya) / (4 * IN))
+                    for k in range(1, n_):
+                        bx_, by_ = xa + (xb - xa) * k / n_, ya + (yb - ya) * k / n_
+                        add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
+                if spec.railing.drink_rail:
+                    B.append(rot_box("drink", xa, ya, xb, yb, zt + h + 0.06, zt + h + 0.06 + 0.08, "drink", 7, 0.45))
+                continue
             horiz = abs(yb - ya) < 0.01
             if horiz:
                 x0_, x1_ = min(xa, xb), max(xa, xb); y0_, y1_ = ya - 0.06, ya + 0.06
@@ -553,6 +614,17 @@ def build_scene(L) -> Scene:
                 direction = "-x"; v_a = (za.wall_y + za.D) * IN + edge + st.opening.start_in * IN
             else:
                 direction = "+x"; v_a = (zb.wall_y + zb.D) * IN + edge + st.opening.start_in * IN
+        elif side.startswith("edge:"):
+            # a side of the outline polygon (axis-aligned): the stair leaves it outward, the opening measured from the side's start
+            e_ = next(q for q in L.outline_edges if q.name == side)
+            if abs(e_.y1 - e_.y0) < 0.5:
+                direction = "+y" if e_.x1 > e_.x0 else "-y"
+                u0 = e_.y0 * IN + (edge if direction == "+y" else -edge)
+                v_a = (min(e_.x0, e_.x1) + (st.opening.start_in if e_.x1 > e_.x0 else abs(e_.x1 - e_.x0) - st.opening.start_in - st.width)) * IN
+            else:
+                direction = "-x" if e_.y1 > e_.y0 else "+x"
+                u0 = e_.x0 * IN
+                v_a = (min(e_.y0, e_.y1) + (st.opening.start_in if e_.y1 > e_.y0 else abs(e_.y1 - e_.y0) - st.opening.start_in - st.width)) * IN
         elif side.startswith("wall:"):
             # a freestanding zone's open rear edge: the stair leaves it away from the deck (-y); the opening is measured from the zone's right end
             zn = side.split(":")[1]
@@ -600,16 +672,40 @@ def build_scene(L) -> Scene:
             slope_len = u_end / math.cos(theta)
             uc = u_end / 2
             z_top_edge = z_top - rise - bt - 0.02 - math.tan(theta) * uc
-            nst = max(2, st.stringers)
-            for i in range(nst):
-                v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
-                zc = z_top_edge - (depth / 2) / math.cos(theta)
-                sb_("stringer", uc - slope_len / 2, uc + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {tag_}", rot=theta)
+            box_ = getattr(st, "build", "stringers") == "box"
+            skirt_ = box_ or getattr(st, "skirts", False)
+            if box_:
+                # a framed 2x6 box under each tread (front + back rims, cross members at 16"), on a compacted base — no stringers
+                for k in range(1, n_t + 1):
+                    zf1 = z_top - k * rise - bt; zf0 = max(zb0, zf1 - 5.5 * IN)
+                    ua, ub = (k - 1) * run, k * run - 0.9 * IN
+                    sb_("rim", ua, ua + 1.5 * IN, va_, vb_, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
+                    sb_("rim", ub - 1.5 * IN, ub, va_, vb_, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
+                    ncm = int(math.ceil(width / (16 * IN))) + 1
+                    for i in range(ncm):
+                        v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (ncm - 1)
+                        sb_("joist", ua + 1.5 * IN, ub - 1.5 * IN, v - 0.75 * IN, v + 0.75 * IN, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
+                sb_("gravel", 0.0, n_t * run, va_, vb_, zb0 - 0.36, zb0 - 0.04, "gravel", 1, tag=f"box step base {tag_}")
+            else:
+                nst = max(2, st.stringers)
+                for i in range(nst):
+                    v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
+                    zc = z_top_edge - (depth / 2) / math.cos(theta)
+                    sb_("stringer", uc - slope_len / 2, uc + slope_len / 2, v - 0.75 * IN, v + 0.75 * IN, zc - depth / 2, zc + depth / 2, "timber", 5, tag=f"stringer {tag_}", rot=theta)
+            ov_ = 0.1 if skirt_ else 0.02            # treads run 1" past the skirt faces
             for k in range(1, n_r + 1):
                 ztop = z_top - k * rise
                 sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
                 if k <= n_t:
-                    sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - 0.02, vb_ + 0.02, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
+                    sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - ov_, vb_ + ov_, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
+            if skirt_:
+                # stepped fascia skirts on both sides: under each tread, down to 1/2" off grade (a 12" fascia covers up to 12")
+                ft_ = 0.58 * IN
+                for k in range(1, n_t + 1):
+                    ztop = z_top - k * rise
+                    zs0 = max(zb0 + (0.005 if box_ else 0.04), ztop - bt - 11.95 * IN)      # a box step sits on its base; a stair skirt holds 1/2" off grade
+                    for v0, v1 in ((va_ - ft_, va_), (vb_, vb_ + ft_)):
+                        sb_("fascia", (k - 1) * run - 0.9 * IN, k * run, v0, v1, zs0, ztop - bt, "fascia", 6, tag=f"stair skirt {tag_}", tone_=tone())
             if rail_sides and L.rail:
                 sysd = rail_system_for(spec.railing)
                 pw = sysd["post_w"] * IN
@@ -869,8 +965,8 @@ def build_scene(L) -> Scene:
         add("water", x0 + 0.5, x0 + bay - 0.5, y0 + 0.5, y0 + bay - 0.5, zt + 2.75, zt + 2.82, "water", 8)
 
     if spec.geometry.outline:
-        fixed = apply_outline(fixed, spec, zt, jbot, jtop, jb, bt, fas_t if fascia else 0.0)
-    if spec.geometry.house_walls:
+        fixed = apply_outline(fixed, spec, zt, jbot, jtop, jb, bt, fas_t if fascia else 0.0, add_rims=OF is None)
+    if spec.geometry.house_walls and not getattr(spec.geometry, "house_model", None):     # with a measured house model these only classify the deck's edges
         for wseg in spec.geometry.house_walls:
             fixed.append(angled_wall(*wseg, z0=0.0, z1=H_house))
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
@@ -880,6 +976,8 @@ def build_scene(L) -> Scene:
                 step_text=step_captions(L))
     if sun_vector(spec.site):
         meta["sun"] = list(sun_vector(spec.site))
+    if getattr(spec.geometry, "site_model", None) and spec.geometry.site_model.get("cameras"):
+        meta["cameras"] = spec.geometry.site_model["cameras"]       # measured-site camera stations (inside the lot), plan feet
     return Scene(fixed, zt, W, y_min, y_front, materials_for(spec), meta)
 
 
@@ -887,6 +985,9 @@ def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
     """Post pairs that carry a section, per run. A run's posts are tagged 'side N'; the corner post shared with the
     neighbouring run lives in that run's list, so every collinear CORNER post is added back before pairing, and a gap
     between two posts is a section only when its length matches one of the run's sections (an opening otherwise)."""
+    if rl.sections and all(getattr(sec, "p0", None) is not None for sec in rl.sections if sec.kind == "level"):
+        # the layout recorded the two posts of every section: draw exactly those
+        return [((sec.p0[0] * IN, sec.p0[1] * IN), (sec.p1[0] * IN, sec.p1[1] * IN)) for sec in rl.sections if sec.kind == "level"]
     runs: Dict[str, List[Tuple[float, float, str]]] = {}
     for p in rl.posts:
         run, _, _ = p.tag.rpartition(" ")
@@ -899,15 +1000,24 @@ def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
         if len(pts) < 2:   # a lone post: decide the axis from the corner that shares a coordinate with it
             horiz = any(abs(c[1] - pts[0][1]) < 0.02 and abs(c[0] - pts[0][0]) > 0.02 for c in corners)
             vert = not horiz
+        # the run's direction (an angled outline side runs neither along x nor y)
+        if horiz:
+            ux, uy = 1.0, 0.0
+        elif vert:
+            ux, uy = 0.0, 1.0
+        else:
+            ax_, ay_ = min(pts)[:2]; bx_, by_ = max(pts)[:2]
+            ln_ = math.hypot(bx_ - ax_, by_ - ay_); ux, uy = (bx_ - ax_) / ln_, (by_ - ay_) / ln_
+        ox, oy = pts[0][0], pts[0][1]
         pts2 = list(pts)
         for c in corners:
-            if (horiz and abs(c[1] - pts[0][1]) < 0.02) or (vert and not horiz and abs(c[0] - pts[0][0]) < 0.02):
+            if abs((c[0] - ox) * uy - (c[1] - oy) * ux) < 0.02:
                 if not any(abs(c[0] - q[0]) < 0.02 and abs(c[1] - q[1]) < 0.02 for q in pts2):
                     pts2.append((c[0], c[1], "CORNER"))
-        pts2.sort(key=(lambda q: q[0]) if horiz else (lambda q: q[1]))
+        pts2.sort(key=lambda q: (q[0] - ox) * ux + (q[1] - oy) * uy)
         ctcs = [sec.ctc for sec in rl.sections if sec.side == run]
         for a, b in zip(pts2, pts2[1:]):
-            d = (abs(b[0] - a[0]) if horiz else abs(b[1] - a[1])) * 12
+            d = math.hypot(b[0] - a[0], b[1] - a[1]) * 12
             hit = next((i for i, c in enumerate(ctcs) if abs(c - d) < 1.5), None)
             if hit is None and ctcs:
                 continue            # an opening (concrete step, stair) — no panel
@@ -1157,12 +1267,31 @@ def _clip_y(poly, x, y0, y1):
     return best
 
 
-def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List[Box]:
+def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t, add_rims: bool = True) -> List[Box]:
     """Clip the deck's pieces to the true outline and add mitred rim / fascia along every angled edge."""
     poly = [(float(x), float(y)) for x, y in spec.geometry.outline]
     out: List[Box] = []
     for b in boxes:
-        if b.kind not in DECK_KINDS or b.rot or b.kind == "fascia":   # fascia hangs outside the outline by its own thickness: never clip it
+        if b.kind == "fascia" and not b.rot:
+            # fascia hangs outside the outline by its own thickness: clip it along a line just inside its face, and only where
+            # the outline cuts it well short (a zone rectangle's fascia past an angled corner); drop what is left of a sliver
+            horiz_ = (b.x1 - b.x0) >= (b.y1 - b.y0)
+            cy_, cx_ = (b.y0 + b.y1) / 2, (b.x0 + b.x1) / 2
+            best = None
+            for sgn_ in (1, -1):
+                sp = _clip_x(poly, cy_ + sgn_ * 0.12, b.x0, b.x1) if horiz_ else _clip_y(poly, cx_ + sgn_ * 0.12, b.y0, b.y1)
+                if sp and (best is None or sp[1] - sp[0] > best[1] - best[0]):
+                    best = sp
+            if best is None or best[1] - best[0] < 0.3:
+                continue
+            lo, hi = (b.x0, b.x1) if horiz_ else (b.y0, b.y1)
+            lo2 = best[0] if best[0] - lo > 0.15 else lo
+            hi2 = best[1] if hi - best[1] > 0.15 else hi
+            if (lo2, hi2) != (lo, hi):
+                b = Box(b.kind, lo2, hi2, b.y0, b.y1, b.z0, b.z1, b.mat, b.phase, b.tag + " (angled cut)", b.shape, b.tone) if horiz_ else \
+                    Box(b.kind, b.x0, b.x1, lo2, hi2, b.z0, b.z1, b.mat, b.phase, b.tag + " (angled cut)", b.shape, b.tone)
+            out.append(b); continue
+        if b.kind not in DECK_KINDS or b.rot:
             out.append(b); continue
         if b.tag and (b.tag.startswith("landing") or b.tag.startswith("tread") or "stair" in b.tag or b.tag.startswith("pf ") or b.tag.startswith("breaker")):
             out.append(b); continue          # stairs and landings sit outside the outline; plan-laid boards and borders are already cut to it
@@ -1183,7 +1312,7 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t) -> List
         out.append(b)
     # mitred rim (and fascia) pieces along the angled edges
     n = len(poly)
-    for i in range(n):
+    for i in (range(n) if add_rims else []):
         (xa, ya), (xb, yb) = poly[i], poly[(i + 1) % n]
         if abs(xa - xb) < 0.01 or abs(ya - yb) < 0.01:
             continue
@@ -1207,6 +1336,87 @@ def _sail_hex(spec) -> str:
     sl = (spec.geometry.sails or [{}])[0]
     c = str(sl.get("color", "")).lower()
     return SAIL_COLORS.get(c, "#e6e1d2") if 'SAIL_COLORS' in globals() else "#e6e1d2"
+
+
+def bench_segments(spec):
+    """Each bench side as (x0, y0, x1, y1, nx, ny, bench dict) in feet; (nx, ny) points onto the deck."""
+    out = []
+    for bn in spec.geometry.benches or []:
+        P = [(float(x), float(y)) for x, y in bn["path"]]
+        for (x0, y0), (x1, y1) in zip(P, P[1:]):
+            L_ = math.hypot(x1 - x0, y1 - y0)
+            if L_ < 1e-6:
+                continue
+            ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+            out.append((x0, y0, x1, y1, uy, -ux, bn))
+    return out
+
+
+def planter_segments(spec):
+    """Each planter as (x0, y0, x1, y1, nx, ny, planter dict) in feet; (nx, ny) points onto the deck."""
+    out = []
+    for pl in spec.geometry.planters or []:
+        (x0, y0), (x1, y1) = [(float(x), float(y)) for x, y in pl["path"][:2]]
+        L_ = math.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        out.append((x0, y0, x1, y1, uy, -ux, pl))
+    return out
+
+
+def draw_benches(add, spec, zt, fixed_append):
+    """Built-in benches on the deck: 4x4 back posts bolted to the rim and 4x4 front legs, every post wrapped in deck
+    board; a 2x6 seat bracket at each post pair; three seat boards with the outer two in the picture-frame colour, a
+    front apron; three back slats. Planters: a treated 2x4 box skinned in deck board all round, picture-frame cap.
+    A box step at the door (the existing step rebuilt): framed, decked, riser fascia."""
+    IN_ = 1 / 12
+    ins = 2.5 * IN_                     # inside the fascia / rim
+    wrap = 5.5 * IN_                    # a 4x4 wrapped in deck board
+    prev_end = None
+    for x0, y0, x1, y1, nx, ny, bn in bench_segments(spec):
+        shared = prev_end is not None and abs(prev_end[0] - x0) < 0.05 and abs(prev_end[1] - y0) < 0.05
+        prev_end = (x1, y1)
+        dep = float(bn.get("depth_in", 17)) * IN_; seat = float(bn.get("seat_in", 17)) * IN_
+        L_ = math.hypot(x1 - x0, y1 - y0); ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        def pt(t, d):
+            return x0 + ux * t + nx * d, y0 + uy * t + ny * d
+        n_seat = 3
+        for k in range(n_seat):
+            d0 = ins + k * (dep / n_seat); d1 = d0 + dep / n_seat - 0.18 * IN_
+            a, b = pt(0, (d0 + d1) / 2), pt(L_, (d0 + d1) / 2)
+            fixed_append(rot_box("board", a[0], a[1], b[0], b[1], zt + seat - 1 * IN_, zt + seat, "border" if k in (0, n_seat - 1) else "deck", 6, d1 - d0,
+                                 tag=f"bench seat {bn.get('name', '')}".strip()))
+        a, b = pt(0.05, ins + dep - 0.5 * IN_), pt(L_ - 0.05, ins + dep - 0.5 * IN_)
+        fixed_append(rot_box("board", a[0], a[1], b[0], b[1], zt + seat - 6.5 * IN_, zt + seat - 1 * IN_, "border", 6, 1 * IN_, tag="bench apron"))
+        n_l = max(2, int(math.ceil(L_ / 3.0)) + 1)          # 36" max: the back slats span between the posts
+        for k in range(1 if shared else 0, n_l):
+            t = wrap / 2 + (L_ - wrap) * k / (n_l - 1)
+            # back post (bolted to the rim, up to the back's top) and front leg, both wrapped
+            for d, top, lab in ((ins + wrap / 2, float(bn.get("back_in", 34)) * IN_ if bn.get("back", True) else seat - 1 * IN_, "bench back post (4x4 wrapped)"),
+                                (ins + dep - wrap / 2 - 0.6 * IN_, seat - 1 * IN_, "bench front leg (4x4 wrapped)")):
+                cx, cy = pt(t, d)
+                fixed_append(rot_box("post", cx - ux * wrap / 2, cy - uy * wrap / 2, cx + ux * wrap / 2, cy + uy * wrap / 2, zt, zt + top, "border", 6, wrap, tag=lab))
+        if bn.get("back", True):
+            top = float(bn.get("back_in", 34)) * IN_
+            a, b = pt(0, ins + wrap + 0.6 * IN_), pt(L_, ins + wrap + 0.6 * IN_)
+            for k in range(3):
+                z0 = zt + seat + 3 * IN_ + k * (top - seat - 3 * IN_) / 3
+                fixed_append(rot_box("board", a[0], a[1], b[0], b[1], z0, z0 + 5.36 * IN_, "deck", 6, 1 * IN_, tag="bench back slat"))
+    for x0, y0, x1, y1, nx, ny, pl in planter_segments(spec):
+        w = float(pl.get("width_in", 17)) * IN_; h = float(pl.get("height_in", 17)) * IN_
+        L_ = math.hypot(x1 - x0, y1 - y0); ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        def pt(t, d):
+            return x0 + ux * t + nx * d, y0 + uy * t + ny * d
+        t0, t1 = w * 0.6, L_ - w * 0.6       # clear of the house and of the left side's corner
+        a, b = pt(t0, ins + w / 2), pt(t1, ins + w / 2)
+        fixed_append(rot_box("board", a[0], a[1], b[0], b[1], zt, zt + h - 1 * IN_, "deck", 6, w, tag=f"planter {pl.get('name', '')} (deck board skin)".strip()))
+        fixed_append(rot_box("board", a[0], a[1], b[0], b[1], zt + h - 1 * IN_, zt + h, "border", 6, w + 0.75 * IN_, tag="planter picture-frame cap"))
+        a2, b2 = pt(t0 + 0.4, ins + w / 2), pt(t1 - 0.4, ins + w / 2)
+        fixed_append(rot_box("board", a2[0], a2[1], b2[0], b2[1], zt + h - 2 * IN_, zt + h + 0.2 * IN_, "gravel", 6, w - 6 * IN_, tag="planter soil"))
+    ds = getattr(spec.geometry, "door_step", None)
+    if ds:
+        xa, xb = float(ds["x0"]), float(ds["x1"]); dd = float(ds.get("depth_in", 21)) * IN_; r = float(ds.get("rise_in", 7)) * IN_
+        fixed_append(Box("board", xa, xb, 0.0, dd, zt, zt + r, "deck", 6, tag="door step (box, decked)"))
+        fixed_append(Box("fascia", xa, xb, dd, dd + 0.05, zt, zt + r, "fascia", 6, tag="door step riser"))
 
 
 def draw_sails(add, spec):
