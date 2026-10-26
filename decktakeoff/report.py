@@ -247,7 +247,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     f = decking_facts(s.decking.collection)
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
-      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('a HardieTrim skirt around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('a HardieTrim skirt around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {f['fire']}; {f['warranty']}. |")
+      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('a HardieTrim skirt around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('a HardieTrim skirt around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {(f['fire'] + '; ') if (s.site.wui_fire_zone or f.get('wui')) else ''}{f['warranty']}. |")
     if s.railing.existing_parapet and s.railing.parapet_note:
         w(f"| Railing | {s.railing.parapet_note} |")
     elif rl and s.railing.existing_parapet:
@@ -276,7 +276,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
           "and color-matched plugs on the picture frame, every screw the steel-frame type. |")
     else:
         w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"
-          + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}. |")
+          + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}"
+          + (f" in the field; Cortex color-matched plugs on the picture frame{', benches' if s.geometry.benches else ''}{' and stairs' if s.stairs else ''}"
+             if (s.decking.border_fastener or '') == 'Cortex' and (s.decking.fastener_system or '') != 'Cortex' else "") + ". |")
     from .spec import covers_of
     _cv = covers_of(s)
     if _cv:
@@ -291,9 +293,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
           + (f". {heights}" if heights else "") + (". The roll-down blinds are taken down, stored and rehung on the new beams" if s.extras.blinds_reinstall else "") + ". |")
     site_ = []
     if s.extras.demo_existing:
-        site_.append("the existing deck" + ("s" if L.multi else "") + (" and roof covers" if s.extras.demo_covers else "") + " removed and hauled off")
+        site_.append("the existing deck" + (" and roof covers" if s.extras.demo_covers else "") + " removed and hauled off")
     if s.extras.under_deck_gravel:
-        site_.append("6-mil poly and 2\" of gravel under the decks")
+        site_.append("6-mil poly and 2\" of gravel under the deck")
     if any(st.landing == "concrete pad" for st in s.stairs):
         site_.append("a concrete landing pad at the stair")
     if site_:
@@ -312,7 +314,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     else:
         w(f"{sm['finished_frame']} · {L.deck_sf} SF · {ftin(s.geometry.height_in)} above grade" + (f" · {rl.rail_lf} LF rail" if rl else ""))
     for st in sm["stairs"]:
-        w(f"- Stair {st}")
+        w(f"- {st}")
     w("")
     w("## SCHEDULE")
     days = _schedule(t)
@@ -345,6 +347,10 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     return "\n".join(out)
 
 
+def _span(a: int, b: int) -> str:
+    return f"Day {a}" if a == b else f"Days {a}–{b}"
+
+
 def _schedule(t: Takeoff) -> List[str]:
     s, L = t.spec, t.layout
     days = []
@@ -361,16 +367,21 @@ def _schedule(t: Takeoff) -> List[str]:
     else:
         days.append(f"Day {d+1} — layout, {n_posts} Diamond Piers driven, ledger set."); d += 1
     fd = max(2, round(L.deck_sf / 150))
-    days.append(f"Days {d+1}–{d+fd} — posts and beams set" + (" (first coat of oil if the finish option is taken)" if s.is_timber and s.framing.finish != 'oil' else "") + "."); d += fd
+    days.append(f"{_span(d+1, d+fd)} — posts and beams set" + (" (first coat of oil if the finish option is taken)" if s.is_timber and s.framing.finish != 'oil' else "") + "."); d += fd
     jd = max(2, round(L.deck_sf / 120))
-    days.append(f"Days {d+1}–{d+jd} — {'timber ' if s.is_timber else ''}frame, flashing at every wall" + (", tub bay doubled" if s.extras.hot_tub else "") + "."); d += jd
+    days.append(f"{_span(d+1, d+jd)} — {'timber ' if s.is_timber else ''}frame, flashing at every wall" + (", tub bay doubled" if s.extras.hot_tub else "") + "."); d += jd
     dd = max(2, round(L.deck_sf / 200))
-    days.append(f"Days {d+1}–{d+dd} — decking, borders first."); d += dd
+    days.append(f"{_span(d+1, d+dd)} — decking, borders first."); d += dd
     if L.rail:
         rd = max(1, round(L.rail.rail_lf / 40))
-        days.append(f"Days {d+1}–{d+rd} — {L.rail.system} rail" + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
+        days.append(f"{_span(d+1, d+rd)} — {rail_name(L.rail.system)} rail" + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
     if L.stairs:
-        days.append(f"Day {d+1} — stairs."); d += 1
+        days.append(f"Day {d+1} — stairs" + (" and the box step" if any(getattr(st, 'build', '') == 'box' for st in L.stairs) and len(L.stairs) > 1 else "") + "."); d += 1
+    nb = len(s.geometry.benches or []); npl = len(s.geometry.planters or [])
+    if nb or npl:
+        bd = max(1, round(nb * 0.75 + npl * 0.5))
+        what = " and ".join(x for x in ((f"built-in bench{'es' if nb > 1 else ''}" if nb else ""), (f"planter{'s' if npl > 1 else ''}" if npl else "")) if x)
+        days.append(f"{_span(d+1, d+bd)} — {what}, wrapped in the deck boards."); d += bd
     if s.extras.stone_bases:
         days.append(f"Day {d+1} — stone bases and caps; end of construction."); d += 1
     else:

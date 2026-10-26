@@ -1089,7 +1089,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
             xs_n = [x for x, y in notch if abs(y - ny_) < 0.5]
             xm = (min(xs_n) + max(xs_n)) / 2
             o.append(LN(X(xm) - 30, Y(0), X(xm) - 30, Y(ny_), MUTE, 0.6, "3 3"))
-            o.append(T(X(xm) - 33, (Y(0) + Y(ny_)) / 2 + 30, f"{inch(ny_)} house to the centre front", 7.5, 700, "middle", MUTE, rot=-90))
+            o.append(T(X(xm) - 33, (Y(0) + Y(ny_)) / 2 + 30, f"{inch(ny_)} house to the center front", 7.5, 700, "middle", MUTE, rot=-90))
     # dividers
     for k_, dx in enumerate(s.decking.divider_x_ft or []):
         xi = float(dx) * 12

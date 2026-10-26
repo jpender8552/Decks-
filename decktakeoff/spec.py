@@ -238,6 +238,7 @@ class Stair:
     flight_rails: List[int] = field(default_factory=list)   # rail sides per flight ([1, 2]); [] -> `rails` on every flight
     landing_guard_lf: Optional[float] = None   # LF of guard on the landings' open sides (None -> each landing's perimeter less the stair widths in and out)
     build: str = "stringers"             # "stringers" (cut 2x12) | "box": a framed 2x6 box step on a compacted base — no stringers, fascia-wrapped (a step or two at grade)
+    name: Optional[str] = None           # how the stair reads in client documents ("Centre stair", "Left-side box step"); None -> from the side
     skirts: bool = False                 # fascia skirts on both open sides, stepped under each tread — no stringer or framing shows
 
 

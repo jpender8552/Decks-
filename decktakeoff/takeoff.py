@@ -92,6 +92,33 @@ def _item(section: str, key: str, default_desc: str = "") -> Tuple[str, float, s
     return d.get("desc", default_desc or key), float(d.get("each", d.get("per_lf", 0.0))), d.get("source", "no price on file")
 
 
+def stair_name(ss, st=None) -> str:
+    """A stair as the client reads it: its own name, else from the side it leaves."""
+    if getattr(ss, "name", None):
+        return ss.name
+    side = getattr(ss, "side", "") or ""
+    if side.startswith("step:"):
+        return side                      # renamed to "<zone> side, toward the <zone>" once the takeoff is built
+    box = st is not None and getattr(st, "build", "") == "box"
+    base = "Box step" if box else "Stair"
+    if side in ("front", "") or side.startswith("front:"):
+        return f"{base} at the front"
+    if side in ("left", "end:left"):
+        return f"{base} on the left end"
+    if side in ("right", "end:right"):
+        return f"{base} on the right end"
+    return base
+
+
+def inches_frac(v: float, frac: int = 16) -> str:
+    n = round(v * frac)
+    whole, rem = divmod(int(n), frac)
+    if rem == 0:
+        return f'{whole}"'
+    g = math.gcd(rem, frac)
+    return f'{whole}-{rem // g}/{frac // g}"'
+
+
 def _lumber_price(nominal: str, stock_ft: int, timber: bool = False):
     key = f"{nominal}_DF#1" if (timber or nominal not in PRICEBOOK["lumber"]) and f"{nominal}_DF#1" in PRICEBOOK["lumber"] else nominal
     d = PRICEBOOK["lumber"].get(key)
@@ -1322,7 +1349,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
         rail=((spec.railing.parapet_note or "Existing stucco parapet stays — no rail in this scope") if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),
-        stairs=[f"{s_.side}: {s_.geo.risers} risers @ {s_.geo.riser_in:.2f}\", {s_.geo.treads} treads, {s_.stringers} stringers, {ftin(s_.width)} wide"
+        stairs=[f"{stair_name(ss, s_)}: {s_.geo.risers} risers @ {inches_frac(s_.geo.riser_in)}, {s_.geo.treads} tread{'s' if s_.geo.treads != 1 else ''}, "
+                + (f"framed box, no stringers" if getattr(s_, 'build', '') == 'box' else f"{s_.stringers} stringers") + (", fascia skirts" if getattr(s_, 'skirts', False) and getattr(s_, 'build', '') != 'box' else "")
+                + f", {ftin(s_.width)} wide"
                 + (" — " + " + ".join(f"{fg.risers} risers" for fg in s_.geo.flights) + f" ({ss.turn})" if len(s_.geo.flights) > 1 else "")
                 + ("; landings " + " + ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "")
                 + (f"; landing guard {s_.landing_rail_lf:g} LF" if s_.landing_rail_lf else "")

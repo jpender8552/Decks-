@@ -1957,7 +1957,8 @@
    "rails": 0,
    "stringer_size": "2x12",
    "closed_risers": true,
-   "skirts": true
+   "skirts": true,
+   "name": "Center stair"
   },
   {
    "side": "edge:2",
@@ -1969,7 +1970,8 @@
    "stringer_size": "2x12",
    "closed_risers": true,
    "build": "box",
-   "skirts": true
+   "skirts": true,
+   "name": "Left-side box step"
   }
  ],
  "extras": {
