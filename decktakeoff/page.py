@@ -391,6 +391,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     sun_names = sorted(n_ for n_ in have if n_.startswith("sun-"))
     if (rd / "sun.json").exists():
         CAP.update(json.load(open(rd / "sun.json")))
+    if (rd / "captions.json").exists():          # a job's own captions (its camera stations, option renders)
+        CAP.update(json.load(open(rd / "captions.json")))
+    alt_names = sorted(n_ for n_ in have if n_.startswith("alt-"))
+    alt_html = ('<h2 class="kicker pb" id="g-alt">The option, rendered <span class="tag">same deck, the optional rail</span></h2>'
+                + _gallery(key, alt_names, have)) if alt_names else ""
     sun_html = ('<h2 class="kicker pb" id="g-sun">Sun and shade <span class="tag">the real sun at this address · the covers and the blinds through the day</span></h2>'
                 + _gallery(key, sun_names, have)) if sun_names else ""
     cap = dict(CAP); cap.update({f"step{n}": S.meta["step_text"][n] for n in range(1, 9)})
@@ -440,7 +445,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
-        w(_gallery(key, ["corner", "ondeck", "isolow", "under"], have))
+        w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "isolow", "under"], have))
+        w(alt_html)
         w(sun_html)
         w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
         w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
@@ -463,7 +469,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         if spec.extras.engineering_note:
             w(f'<p><b>Engineering and permit.</b> {E(spec.extras.engineering_note)}</p>')
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
-        w(_gallery(key, ["corner", "ondeck", "under", "isolow"], have))
+        w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "under", "isolow"], have))
+        w(alt_html)
         w(sun_html)
         w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso"], have))
@@ -510,7 +517,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
-        w(_gallery(key, ["yard", "corner", "ondeck", "under"], have))
+        w(_gallery(key, ["yard", "corner", "corner2", "ondeck", "facade", "under"], have))
+        w(alt_html)
         w(sun_html)
         w('<h2 class="kicker">Isometrics</h2>')
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso", "plan"], have))

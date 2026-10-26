@@ -167,7 +167,8 @@ RAIL_SYSTEMS["Cinch"] = dict(panels={72: 70.0, 96: 94.0}, post_w=2.0, bracket_al
 RAIL_SYSTEMS["Fulton"]["noncombustible"] = True
 RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
 RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]
-RAIL_SYSTEMS["IRX Baluster"] = dict(panels={72: 70.0, 96: 94.0}, post_w=3.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
+RAIL_SYSTEMS["IRX Baluster"] = dict(profile=dict(top=(0.22, 0.13), bottom=(0.115, 0.10), baluster=0.0625, baluster_oc_in=4.5),   # Modern top rail 2-5/8" x 1-1/2"; 3/4" balusters, 20 per 8'
+                                    panels={72: 70.0, 96: 94.0}, post_w=3.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
                                     noncombustible=True, surface=True, display="Impression Rail Express, vertical balusters, modern top rail", max_ctc=96.0, brand="TimberTech", colors=["Black", "White", "Bronze"],
                                     note="TimberTech Impression Rail Express: 3\" aluminum posts (3\" x 38-1/4\" kits) on surface bases, Modern top rail (sold separately), vertical aluminum balusters, "
                                          "bottom rail; 6' / 8' level kits cut to bay, posts on the divider lines")

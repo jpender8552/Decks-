@@ -498,6 +498,10 @@ def build_scene(L) -> Scene:
         cable = sysd.get("cable", False)
         pw = sysd["post_w"] * IN
         h = rl.height * IN
+        prof = sysd.get("profile") or {}                   # the system's own members (ft): IRX's Modern top rail is wide and flat
+        trw, trh = prof.get("top", (0.12, 0.08))
+        brw, brh = prof.get("bottom", (0.12, 0.08))
+        bal, bal_oc = prof.get("baluster", 0.06), prof.get("baluster_oc_in", 4.0) * IN
         # posts on a curved run move onto the curve (inset RP), so the rail between them follows the outline without a kink
         RP_ = 2.5 * IN
         shift: Dict[Tuple[float, float], Tuple[float, float]] = {}
@@ -536,41 +540,41 @@ def build_scene(L) -> Scene:
                 (xa, ya), (xb, yb) = sh(xa, ya), sh(xb, yb)
                 pts_ = [(xa, ya)] + [(px, py - RP_) for px, py in curve] + [(xb, yb)]
                 for (p0, q0), (p1, q1) in zip(pts_, pts_[1:]):
-                    B.append(rot_box("toprail", p0, q0, p1, q1, zt + h - 0.08, zt + h, "railmetal", 7, 0.12))
+                    B.append(rot_box("toprail", p0, q0, p1, q1, zt + h - trh, zt + h, "railmetal", 7, trw))
                     if cable:
                         for k in range(10):
                             zc = zt + 0.3 + k * 0.27
                             B.append(rot_box("cable", p0, q0, p1, q1, zc - 0.01, zc + 0.01, "cable", 7, 0.02))
                     else:
-                        B.append(rot_box("botrail", p0, q0, p1, q1, zt + 0.25, zt + 0.33, "railmetal", 7, 0.12))
-                        n_ = int(math.hypot(p1 - p0, q1 - q0) / (4 * IN))
+                        B.append(rot_box("botrail", p0, q0, p1, q1, zt + 0.25, zt + 0.25 + brh, "railmetal", 7, brw))
+                        n_ = int(math.hypot(p1 - p0, q1 - q0) / bal_oc)
                         for k in range(1, n_):
                             t_ = k / n_
                             bx_, by_ = p0 + (p1 - p0) * t_, q0 + (q1 - q0) * t_
-                            add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
+                            add("baluster", bx_ - bal / 2, bx_ + bal / 2, by_ - bal / 2, by_ + bal / 2, zt + 0.25 + brh, zt + h - trh, "railmetal", 7)
                 continue
             if abs(yb - ya) > 0.01 and abs(xb - xa) > 0.01:
                 # an angled outline side: rails as rotated boxes post to post
-                B.append(rot_box("toprail", xa, ya, xb, yb, zt + h - 0.08, zt + h, "railmetal", 7, 0.12))
+                B.append(rot_box("toprail", xa, ya, xb, yb, zt + h - trh, zt + h, "railmetal", 7, trw))
                 if cable:
                     for k in range(10):
                         zc = zt + 0.3 + k * 0.27
                         B.append(rot_box("cable", xa, ya, xb, yb, zc - 0.01, zc + 0.01, "cable", 7, 0.02))
                 else:
-                    B.append(rot_box("botrail", xa, ya, xb, yb, zt + 0.25, zt + 0.33, "railmetal", 7, 0.12))
-                    n_ = int(math.hypot(xb - xa, yb - ya) / (4 * IN))
+                    B.append(rot_box("botrail", xa, ya, xb, yb, zt + 0.25, zt + 0.25 + brh, "railmetal", 7, brw))
+                    n_ = int(math.hypot(xb - xa, yb - ya) / bal_oc)
                     for k in range(1, n_):
                         bx_, by_ = xa + (xb - xa) * k / n_, ya + (yb - ya) * k / n_
-                        add("baluster", bx_ - 0.03, bx_ + 0.03, by_ - 0.03, by_ + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
+                        add("baluster", bx_ - bal / 2, bx_ + bal / 2, by_ - bal / 2, by_ + bal / 2, zt + 0.25 + brh, zt + h - trh, "railmetal", 7)
                 if spec.railing.drink_rail:
                     B.append(rot_box("drink", xa, ya, xb, yb, zt + h + 0.06, zt + h + 0.06 + 0.08, "drink", 7, 0.45))
                 continue
             horiz = abs(yb - ya) < 0.01
             if horiz:
-                x0_, x1_ = min(xa, xb), max(xa, xb); y0_, y1_ = ya - 0.06, ya + 0.06
+                x0_, x1_ = min(xa, xb), max(xa, xb); y0_, y1_ = ya - trw / 2, ya + trw / 2
             else:
-                x0_, x1_ = xa - 0.06, xa + 0.06; y0_, y1_ = min(ya, yb), max(ya, yb)
-            add("toprail", x0_, x1_, y0_, y1_, zt + h - 0.08, zt + h, "railmetal", 7)
+                x0_, x1_ = xa - trw / 2, xa + trw / 2; y0_, y1_ = min(ya, yb), max(ya, yb)
+            add("toprail", x0_, x1_, y0_, y1_, zt + h - trh, zt + h, "railmetal", 7)
             if cable:
                 for k in range(10):
                     zc = zt + 0.3 + k * 0.27
@@ -579,14 +583,17 @@ def build_scene(L) -> Scene:
                     else:
                         add("cable", xa - 0.01, xa + 0.01, y0_, y1_, zc - 0.01, zc + 0.01, "cable", 7)
             else:
-                add("botrail", x0_, x1_, y0_, y1_, zt + 0.25, zt + 0.33, "railmetal", 7)
-                n = int(((x1_ - x0_) if horiz else (y1_ - y0_)) / (4 * IN))
+                if horiz:
+                    add("botrail", x0_, x1_, ya - brw / 2, ya + brw / 2, zt + 0.25, zt + 0.25 + brh, "railmetal", 7)
+                else:
+                    add("botrail", xa - brw / 2, xa + brw / 2, y0_, y1_, zt + 0.25, zt + 0.25 + brh, "railmetal", 7)
+                n = int(((x1_ - x0_) if horiz else (y1_ - y0_)) / bal_oc)
                 for k in range(1, n):
-                    t = k * 4 * IN
+                    t = k * bal_oc
                     if horiz:
-                        add("baluster", x0_ + t - 0.03, x0_ + t + 0.03, ya - 0.03, ya + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
+                        add("baluster", x0_ + t - bal / 2, x0_ + t + bal / 2, ya - bal / 2, ya + bal / 2, zt + 0.25 + brh, zt + h - trh, "railmetal", 7)
                     else:
-                        add("baluster", xa - 0.03, xa + 0.03, y0_ + t - 0.03, y0_ + t + 0.03, zt + 0.33, zt + h - 0.08, "railmetal", 7)
+                        add("baluster", xa - bal / 2, xa + bal / 2, y0_ + t - bal / 2, y0_ + t + bal / 2, zt + 0.25 + brh, zt + h - trh, "railmetal", 7)
             if spec.railing.drink_rail:
                 if horiz:
                     add("drink", x0_ - pw / 2, x1_ + pw / 2, ya - bw / 2, ya + bw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())

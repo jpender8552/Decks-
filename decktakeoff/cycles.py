@@ -375,8 +375,8 @@ class Mats:
                 # tumbled concrete block: mottled, rough, rounded arrises (bevel), tone per block via the tint
                 nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 9.0; nz.inputs["Detail"].default_value = 8.0
                 ramp = nt.nodes.new("ShaderNodeValToRGB")
-                ramp.color_ramp.elements[0].color = tuple(c * 0.78 for c in col) + (1,)
-                ramp.color_ramp.elements[1].color = tuple(min(1, c * 1.12) for c in col) + (1,)
+                ramp.color_ramp.elements[0].color = tuple(c * 0.9 for c in col) + (1,)
+                ramp.color_ramp.elements[1].color = tuple(min(1, c * 1.07) for c in col) + (1,)
                 nt.links.new(nz.outputs["Fac"], ramp.inputs[0])
                 self._tint(nt, ramp.outputs[0], bsdf)
                 bev = nt.nodes.new("ShaderNodeBevel"); bev.inputs["Radius"].default_value = 0.05
@@ -398,7 +398,11 @@ class Mats:
                 self._bump(nt, bsdf, wv.outputs["Fac"], 0.1, 0.005)
             else:
                 self._tint(nt, rgb.outputs[0], bsdf)
-            if key in ("railmetal", "steel", "storm"):
+                if key.startswith(("siding", "nsiding", "htrim", "hsoffit", "trim", "shutter", "foundation", "concrete")):
+                    # painted fibre-cement / trim / concrete: a fine embossed texture, never a perfect CG plane
+                    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 60.0 if not key.startswith(("foundation", "concrete")) else 25.0
+                    nz.inputs["Detail"].default_value = 8.0
+                    self._bump(nt, bsdf, nz.outputs["Fac"], 0.06 if key.startswith(("siding", "nsiding")) else 0.03, 0.004)
                 bsdf.inputs["Roughness"].default_value = 0.42           # powder coat: a soft sheen, not metal
                 bsdf.inputs["Metallic"].default_value = 0.0
                 bsdf.inputs["Coat Weight"].default_value = 0.15
@@ -630,7 +634,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
         tile = TILE.get(pat, 8.0)
         tint = (1, 1, 1, 1)
         if mk.startswith("wblock") or mk == "cedar":
-            v = float(rng.uniform(0.86, 1.1)); tint = (v, v * float(rng.uniform(0.97, 1.02)), v * float(rng.uniform(0.95, 1.0)), 1)
+            v = float(rng.uniform(0.93, 1.06)); tint = (v, v * float(rng.uniform(0.98, 1.02)), v * float(rng.uniform(0.97, 1.01)), 1)
         if shape == "mesh":
             add_tris(G(mk), b["pts"], tile=tile, tint=tint)
         elif shape == "cyl":
@@ -711,8 +715,154 @@ def _cone(g: Geo, b, s=1.0, n=16):
         g.face([B(cx + r * math.cos(a0), cy + r * math.sin(a0), z0), B(cx, cy, z1), B(cx + r * math.cos(a1), cy + r * math.sin(a1), z0)], [(0, 0)] * 3)
 
 
+# ====================================================================== grass (real blades in the near field)
+def _grass_patch(name, rng, n_blades=650, size=1.0):
+    """A 1' x 1' patch of blades: a bent two-segment strip each, colour per vertex (darker at the root)."""
+    g = Geo()
+    greens = [(92, 122, 48), (108, 138, 56), (124, 150, 62), (82, 110, 42), (136, 156, 72), (98, 128, 50), (116, 132, 60), (150, 158, 86)]
+    lin = lambda c: tuple(((v / 255) / 12.92 if v / 255 <= 0.04045 else ((v / 255 + 0.055) / 1.055) ** 2.4) for v in c)
+    for _ in range(n_blades):
+        x, y = rng.uniform(-size / 2, size / 2), rng.uniform(-size / 2, size / 2)      # centred: a turned patch stays on its cell
+        h = rng.uniform(0.16, 0.30)
+        w = rng.uniform(0.010, 0.017)
+        a = rng.uniform(0, 2 * math.pi)
+        lean = rng.uniform(0.05, 0.55)
+        dx, dy = math.cos(a), math.sin(a)
+        px, py = -dy * w / 2, dx * w / 2                    # across the blade
+        p0 = (x, y, 0.0)
+        p1 = (x + dx * h * lean * 0.35, y + dy * h * lean * 0.35, h * 0.55)
+        p2 = (x + dx * h * lean, y + dy * h * lean, h * (1.0 - 0.25 * lean))
+        c = lin(greens[int(rng.integers(len(greens)))])
+        c0 = (c[0] * 0.45, c[1] * 0.5, c[2] * 0.4, 1.0); c1 = (c[0] * 0.8, c[1] * 0.85, c[2] * 0.75, 1.0); c2 = (c[0], c[1], c[2], 1.0)
+        v0l, v0r = (p0[0] - px, p0[1] - py, p0[2]), (p0[0] + px, p0[1] + py, p0[2])
+        v1l, v1r = (p1[0] - px * 0.8, p1[1] - py * 0.8, p1[2]), (p1[0] + px * 0.8, p1[1] + py * 0.8, p1[2])
+        i0 = len(g.v)
+        g.v += [B(*v0l), B(*v0r), B(*v1r), B(*v1l), B(*p2)]
+        g.f += [(i0, i0 + 1, i0 + 2, i0 + 3), (i0 + 3, i0 + 2, i0 + 4)]
+        g.uv += [(0, 0)] * 7
+        g.tint += [c0, c0, c1, c1] + [c1, c1, c2]
+    return g
+
+
+def _grass_mask(spec, D):
+    """A test for 'no grass here': the deck and its stairs (+ margin), beds, paver bands, walls, flagstones, the house, fences, trunks."""
+    from decktakeoff.landscape import _resample, _in_poly
+    sm = spec.geometry.site_model or {}
+    polys = []
+    walls = {w.get("name"): w for w in sm.get("walls", [])}
+    for b in sm.get("beds", []):
+        if b.get("wall"):
+            w = walls[b["wall"]]
+            polys.append(_resample(w["path"], 0.5, smooth=w.get("smooth", True)) + [tuple(q) for q in b.get("close", [])])
+        else:
+            polys.append([tuple(q) for q in b["poly"]])
+    segs = []                                               # (polyline, half width)
+    for w in sm.get("walls", []):
+        segs.append((_resample(w["path"], 0.5, smooth=w.get("smooth", True)), 0.85))
+    for p in sm.get("pavers", []):
+        segs.append(([tuple(q[:2]) for q in p["path"]], float(p.get("width_in", 16)) / 12 + 0.15))
+    for f in sm.get("fences", []):
+        segs.append(([tuple(q[:2]) for q in f["path"]], 0.35))
+    discs = [(f["at"][0], f["at"][1], max(f.get("size", [3.0, 2.2])) / 2 + 0.15) for f in sm.get("flagstones", [])]
+    discs += [(t["at"][0], t["at"][1], 0.9) for t in sm.get("trees", []) if t.get("type", "deciduous") != "shrub"]
+    discs += [(t["at"][0], t["at"][1], float(t.get("radius", 2.0)) * 0.8) for t in sm.get("trees", []) if t.get("type") == "shrub"]
+    boxes = [(b["x0"] - 0.35, b["x1"] + 0.35, b["y0"] - 0.35, b["y1"] + 0.35) for b in D["boxes"] if b["kind"] in ("tread", "riser", "stringer") or (b.get("tag") or "").startswith("box step")]
+    out = [tuple(p) for p in (spec.geometry.outline or [])]
+    def seg_d(x, y, pl):
+        best = 9e9
+        for (ax, ay), (bx, by) in zip(pl, pl[1:]):
+            vx, vy = bx - ax, by - ay
+            L2 = vx * vx + vy * vy or 1e-9
+            t = max(0.0, min(1.0, ((x - ax) * vx + (y - ay) * vy) / L2))
+            best = min(best, math.hypot(x - (ax + vx * t), y - (ay + vy * t)))
+        return best
+    def blocked(x, y):
+        if y < 0.4:                                         # the house side
+            return True
+        if out and (_in_poly(x, y, out) or seg_d(x, y, out + out[:1]) < 0.6):
+            return True
+        if any(_in_poly(x, y, P) for P in polys):
+            return True
+        if any(seg_d(x, y, pl) < hw for pl, hw in segs):
+            return True
+        if any(math.hypot(x - cx, y - cy) < r for cx, cy, r in discs):
+            return True
+        if any(x0 <= x <= x1 and y0 <= y <= y1 for x0, x1, y0, y1 in boxes):
+            return True
+        return False
+    return blocked
+
+
+def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: float = 34.0, cell: float = 1.0):
+    """Instance blade patches on the lawn within `reach` ft of the cameras that will render (and in front of them)."""
+    from decktakeoff.landscape import Grade
+    sm = spec.geometry.site_model or {}
+    gm = sm.get("grade", {})
+    grade = Grade(gm.get("points", [[0, 0, 0]]))
+    x0, x1, y0, y1 = gm.get("extent", [-40, 60, -12, 36])
+    blocked = _grass_mask(spec, D)
+    rng = np.random.default_rng(31)
+    patches = []
+    mat = bpy.data.materials.new("grass_blades")
+    try:
+        mat.use_nodes = True
+    except Exception:
+        pass
+    nt = mat.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    attr = nt.nodes.new("ShaderNodeAttribute"); attr.attribute_name = "tint"
+    nt.links.new(attr.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 0.6
+    out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
+    tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); nt.links.new(attr.outputs["Color"], tr.inputs["Color"])
+    mx = nt.nodes.new("ShaderNodeMixShader"); mx.inputs[0].default_value = 0.3
+    nt.links.new(bsdf.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2]); nt.links.new(mx.outputs[0], out.inputs[0])
+    for k in range(3):
+        g = _grass_patch(f"grass{k}", rng)
+        me = bpy.data.meshes.new(f"grass_patch_{k}")
+        me.from_pydata(g.v, [], g.f)
+        ca = me.color_attributes.new(name="tint", type="FLOAT_COLOR", domain="CORNER")
+        ca.data.foreach_set("color", np.array(g.tint, dtype=np.float32).ravel())
+        me.materials.append(mat)
+        patches.append(me)
+    stations = []
+    for nm in names:
+        c = cams.get(nm)
+        if not c:
+            continue
+        px, py = c["pos"][0], c["pos"][1]
+        ax, ay = c["at"][0] - px, c["at"][1] - py
+        L = math.hypot(ax, ay) or 1.0
+        stations.append((px, py, ax / L, ay / L, math.radians(float(c.get("fov", 40))) * 0.5 * 1.7))
+    n = 0
+    xs = np.arange(x0, x1, cell); ys = np.arange(y0, y1, cell)
+    for x in xs:
+        for y in ys:
+            cx, cy = x + cell / 2, y + cell / 2
+            ok = False
+            for px, py, dx, dy, half in stations:
+                vx, vy = cx - px, cy - py
+                dd = math.hypot(vx, vy)
+                if dd > reach or dd < 0.5:
+                    continue
+                ang = math.acos(max(-1.0, min(1.0, (vx * dx + vy * dy) / dd)))
+                if ang <= half or dd < 4.0:
+                    ok = True
+                    break
+            if not ok or blocked(cx, cy):
+                continue
+            ob = bpy.data.objects.new(f"grass_{n}", patches[int(rng.integers(3))])
+            ob.location = B(cx, cy, grade(cx, cy) - 0.02)
+            ob.rotation_euler = (0, 0, float(rng.integers(4)) * math.pi / 2 + float(rng.uniform(-0.05, 0.05)))
+            ob.scale = (cell, cell, float(rng.uniform(0.85, 1.15)))
+            col.objects.link(ob)
+            n += 1
+    print(f"grass: {n} patches", flush=True)
+    return n
+
+
 # ====================================================================== light, camera, render
-def setup_world(D, spec, sky_strength=0.12, sun_strength=5.0):
+def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0):
     scn = bpy.context.scene
     sun = D["meta"].get("sun") or [-0.5, 0.5, 0.7]
     v = mathutils.Vector(B(*sun)).normalized()                  # toward the sun, Blender frame
@@ -738,7 +888,7 @@ def setup_world(D, spec, sky_strength=0.12, sun_strength=5.0):
     ld = bpy.data.lights.new("sun", "SUN")
     ld.energy = sun_strength
     ld.angle = math.radians(0.53)
-    ld.color = (1.0, 0.97, 0.92)
+    ld.color = (1.0, 0.955, 0.89)                 # late-summer noon sun through ~5,850 ft of clear air
     ob = bpy.data.objects.new("sun", ld)
     bpy.context.scene.collection.objects.link(ob)
     ob.rotation_euler = v.to_track_quat("Z", "Y").to_euler()
@@ -830,7 +980,10 @@ def main(argv):
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()
     spec, sc, D = build(spec_path, out_dir, quick=quick)
-    setup_world(D, spec, sky_strength=float(opts.get("--sky", 0.12)), sun_strength=float(opts.get("--sun", 5.0)))
+    setup_world(D, spec, sky_strength=float(opts.get("--sky", 0.2)), sun_strength=float(opts.get("--sun", 5.0)))
+    if getattr(spec.geometry, "site_model", None) and not opts.get("--no-grass"):
+        cams = dict(generic_views(D)); cams.update(D["meta"].get("cameras") or {})
+        add_grass(spec, D, cams, names, bpy.context.scene.collection, reach=float(opts.get("--grass-reach", 34.0)))
     print(f"scene built in {time.time() - t:.0f}s: {len(bpy.data.objects)} objects", flush=True)
     if opts.get("--blend"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out_dir, "scene.blend"))

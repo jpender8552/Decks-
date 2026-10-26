@@ -956,6 +956,237 @@ def sheet_meta(L: Layout, customer: bool = False) -> dict:
                         else "Design intent per 2021 IRC R507 prescriptive. Field verify. Do not scale.") + (" Oil finish is an option; base timbers unfinished, end grain sealed." if s.is_timber and s.framing.finish != "oil" else ""))
 
 
+def inch(v: float, frac: int = 8) -> str:
+    """Inches to the nearest 1/frac: 68", 47 3/4", 160 7/8"."""
+    n = round(v * frac)
+    whole, rem = divmod(int(abs(n)), frac)
+    sgn = "-" if n < 0 else ""
+    if rem == 0:
+        return f'{sgn}{whole}"'
+    g = math.gcd(rem, frac)
+    return f'{sgn}{whole} {rem // g}/{frac // g}"' if whole else f'{sgn}{rem // g}/{frac // g}"'
+
+
+def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
+    """A-100: the deck outline with every side in inches, chain dimensions along the house and the front, the depths,
+    the stairs, built-ins and dividers — inches throughout, the overall width in feet and inches."""
+    if not S.meta.get("outline"):
+        return None
+    s = L.spec
+    P = [(float(a) * 12, float(b) * 12) for a, b in S.meta["outline"]]          # inches, plan frame
+    n = len(P)
+    xs = [p[0] for p in P]; ys = [p[1] for p in P]
+    Wd, Dp = max(xs) - min(xs), max(ys) - min(ys)
+    o = []
+    top = []                                             # labels drawn last, over the strips and fills
+    # inches -> sheet: deck left end at px 70, house line at y 110
+    sc = min(590 / Wd, 330 / Dp)
+    X = lambda x: 92 + (x - min(xs)) * sc
+    Y = lambda y: 122 + (y - min(ys)) * sc
+    kinds = {}
+    for e in L.outline_edges or []:
+        kinds[e.name] = e
+    rail_edges = set(s.railing.edges or []) if s.railing and s.railing.edges else set()
+    bench_paths = [b.get("path") for b in (s.geometry.benches or [])]
+    plant_paths = [b.get("path") for b in (s.geometry.planters or [])]
+    def on_path(a, b, paths):
+        for pth in paths:
+            if not pth:
+                continue
+            q = [(u * 12, v * 12) for u, v in pth]
+            for (u0, v0), (u1, v1) in zip(q, q[1:]):
+                if (math.hypot(a[0] - u0, a[1] - v0) < 3 and math.hypot(b[0] - u1, b[1] - v1) < 3) or (math.hypot(a[0] - u1, a[1] - v1) < 3 and math.hypot(b[0] - u0, b[1] - v0) < 3):
+                    return True
+        return False
+    stair_by_edge = {st.side: st for st in s.stairs}
+    # the house wall and the bay (the polygon's sides that lie on the house)
+    o.append(LN(X(min(xs)) - 40, Y(0), X(max(xs)) + 40, Y(0), "#8a8172", 5))
+    o.append(T(X(min(xs)) - 36, Y(0) - 44, "HOUSE (rear wall) — deck to house along the top chain", 8, 800, fill="#8a8172"))
+    o.append(PG([(X(x), Y(y)) for x, y in P], "#efe3cc", INK, 2.2))
+    rows = []
+    for i in range(n):
+        a, b = P[i], P[(i + 1) % n]
+        L_ = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L_ < 0.5:
+            continue
+        name = f"edge:{i + 1}"
+        e = kinds.get(name)
+        house_side = e is not None and not e.exposed
+        mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        ux, uy = (b[0] - a[0]) / L_, (b[1] - a[1]) / L_
+        nx, ny = uy, -ux                                     # outward for the polygon's winding (house at the top)
+        if _poly_area_in(P) > 0:
+            nx, ny = -nx, -ny
+        what = ("house / ledger" if (house_side and abs(a[1]) < 0.5 and abs(b[1]) < 0.5) else ("house — bay face" if house_side else
+                ("RAIL" if name in rail_edges else ("bench" if on_path((a[0] / 12, a[1] / 12), (b[0] / 12, b[1] / 12), []) or on_path(a, b, bench_paths) else
+                 ("planter" if on_path(a, b, plant_paths) else "open")))))
+        if name in stair_by_edge:
+            st = stair_by_edge[name]
+            what += f" + stair {inch(st.width_in)} wide"
+        ang = math.degrees(math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])))
+        if ang > 90: ang -= 180
+        if ang < -90: ang += 180
+        builtin = what.startswith(("bench", "planter"))
+        covered = ((abs(a[0] - b[0]) < 0.5 and (abs(a[0] - min(xs)) < 0.5 or abs(a[0] - max(xs)) < 0.5))
+                   or (abs(a[1] - b[1]) < 0.5 and abs(a[1] - max(ys)) < 0.5))          # a side chain already carries it
+        if not house_side and not (builtin and covered):     # house sides read off the chain along the house
+            k_ = -14 if builtin else 13                      # a bench / planter fills the inside: label it outside
+            tx, ty = X(mx) + nx * k_, Y(my) + ny * k_ + 3
+            top.append(T(tx, ty, inch(L_), 9.5, 900, "middle", INK, rot=ang))
+            if name in rail_edges:                           # the owner's sketch marks rail with a blue R: so does this sheet
+                segs_ = [(0.0, L_)]
+                if name in stair_by_edge:                    # rail only on the stubs beside the stair
+                    st_ = stair_by_edge[name]
+                    p0_ = float(st_.position_in or 0.0)
+                    segs_ = [(0.0, p0_), (p0_ + float(st_.width_in), L_)]
+                for s0_, s1_ in segs_:
+                    if s1_ - s0_ > 0.5:
+                        o.append(LN(X(a[0] + ux * s0_), Y(a[1] + uy * s0_), X(a[0] + ux * s1_), Y(a[1] + uy * s1_), "#1f4fb5", 3.2))
+                top.append(T(X(mx) + nx * 27, Y(my) + ny * 27 + 4, "R", 11, 900, "middle", "#1f4fb5"))
+            kn = 36 if builtin else -22                      # the side number: inside past a bench / planter strip, else outside
+            o.append(T(X(mx) + nx * kn, Y(my) + ny * kn + 3, str(i + 1), 7, 800, "middle", GOLD))
+        rows.append((i + 1, inch(L_), ftin(L_), what))
+    # chain dimensions: along the front (every corner's x) and along the house (where the deck meets it)
+    fx = sorted(set(round(x, 2) for x, y in P if y > max(ys) - 40 or x in (min(xs), max(xs))))
+    hx = sorted(set(round(x, 2) for x, y in P if abs(y) < 0.5) | {round(min(xs), 2), round(max(xs), 2)})
+    yb = Y(max(ys)) + 40
+    for xa, xb in zip(fx, fx[1:]):
+        dim_h(o, X, yb, xa, xb, inch(xb - xa), 8, up=True)
+    dim_h(o, X, yb + 30, min(xs), max(xs), f"{inch(Wd)} = {ftin(Wd)} overall", 10.5, up=False)
+    yt = Y(0) - 26
+    for xa, xb in zip(hx, hx[1:]):
+        dim_h(o, X, yt, xa, xb, inch(xb - xa), 8, up=True)
+    # the bay (house sides off the wall line): its corners along x, and how far it stands out
+    bay = [(x, y) for x, y in P if 0.5 < y < 60 and any(abs(y - y2) < 0.5 and abs(x - x2) > 1 for x2, y2 in P)]
+    hpts = [(x, y) for x, y in P if abs(y) < 0.5]
+    if bay:
+        by_ = bay[0][1]
+        bxs = sorted(set(round(x, 2) for x, y in bay))
+        x_l = max((x for x, y in hpts if x < bxs[0]), default=None); x_r = min((x for x, y in hpts if x > bxs[-1]), default=None)
+        if x_l is not None and x_r is not None:
+            chain = [x_l] + bxs + [x_r]
+            for xa, xb in zip(chain, chain[1:]):
+                dim_h(o, X, Y(by_) + 16, xa, xb, inch(xb - xa), 7, up=False)
+            dim_v(o, Y, X(bxs[0]) + 10, 0, by_, inch(by_), 6.5, left=False)
+            o.append(T((X(x_l) + X(x_r)) / 2, Y(by_) + 40, "BOX BAY (house) — deck runs around it", 7, 800, "middle", "#8a8172"))
+    # depths: the left end, the deepest corners, the centre front
+    def depth_at(xq):
+        hits = [y for (x0_, y0_), (x1_, y1_) in zip(P, P[1:] + P[:1]) for y in [y0_, y1_] if False]
+        return max((y for x, y in P if abs(x - xq) < 0.5), default=None)
+    zfront = sorted(set(round(y, 2) for x, y in P))
+    dim_v(o, Y, X(min(xs)) - 78, 0, max(ys), f"{inch(max(ys))} deep", 9, left=True)
+    left_pts = sorted(set(round(y, 2) for x, y in P if abs(x - min(xs)) < 0.5) | {0.0, round(max(ys), 2)})
+    for ya, yb_ in zip(left_pts, left_pts[1:]):
+        dim_v(o, Y, X(min(xs)) - 22, ya, yb_, inch(yb_ - ya), 7.5, left=True)
+    right_pts = sorted(set(round(y, 2) for x, y in P if abs(x - max(xs)) < 0.5) | {0.0, round(max(ys), 2)})
+    for ya, yb_ in zip(right_pts, right_pts[1:]):
+        dim_v(o, Y, X(max(xs)) + 16, ya, yb_, inch(yb_ - ya), 7.5, left=False)
+    # the centre notch depth
+    notch = [(x, y) for x, y in P if 0.5 < y < max(ys) - 0.5 and min(xs) + 1 < x < max(xs) - 1]
+    if notch:
+        ny_ = min(y for x, y in notch if y > Dp * 0.5) if any(y > Dp * 0.5 for x, y in notch) else None
+        if ny_:
+            xs_n = [x for x, y in notch if abs(y - ny_) < 0.5]
+            xm = (min(xs_n) + max(xs_n)) / 2
+            o.append(LN(X(xm) - 30, Y(0), X(xm) - 30, Y(ny_), MUTE, 0.6, "3 3"))
+            o.append(T(X(xm) - 33, (Y(0) + Y(ny_)) / 2 + 30, f"{inch(ny_)} house to the centre front", 7.5, 700, "middle", MUTE, rot=-90))
+    # dividers
+    for k_, dx in enumerate(s.decking.divider_x_ft or []):
+        xi = float(dx) * 12
+        y_end = max((y for x, y in P if abs(x - xi) < 1.0), default=Dp)
+        o.append(LN(X(xi), Y(0), X(xi), Y(y_end), GOLD, 1.4, "6 3"))
+        o.append(T(X(xi) + (-4 if k_ == 0 else 4), Y(y_end) - 10, f"divider {inch(xi)} from the left end", 7, 700, "end" if k_ == 0 else "start", "#9a7414"))
+    # stairs and the box step: their footprints from the scene treads
+    for b in S.boxes:
+        if b.kind == "tread":
+            o.append(R(X(b.x0 * 12), Y(b.y0 * 12), (b.x1 - b.x0) * 12 * sc, (b.y1 - b.y0) * 12 * sc, "#d7c3a0", INK, 0.6))
+    for st in s.stairs:
+        e = kinds.get(st.side)
+        if e is None:
+            continue
+        Le = math.hypot(e.x1 - e.x0, e.y1 - e.y0)
+        p0 = float(st.position_in or 0.0); p1 = p0 + float(st.width_in)
+        if abs(e.y1 - e.y0) < 0.5:          # a front side: chain under it
+            xa_, xb_ = min(e.x0, e.x1), max(e.x0, e.x1)
+            yy_ = Y(e.y0) + 14
+            for a_, b_ in ((xa_, xa_ + p0), (xa_ + p0, xa_ + p1), (xa_ + p1, xb_)):
+                if b_ - a_ > 0.5:
+                    dim_h(o, X, yy_, a_, b_, inch(b_ - a_), 7, up=False)
+        elif abs(e.x1 - e.x0) < 0.5:        # a side wall: chain beside it
+            ya_, yb_ = min(e.y0, e.y1), max(e.y0, e.y1)
+            xx_ = X(e.x0) - 46
+            for a_, b_ in ((ya_, ya_ + p0), (ya_ + p0, ya_ + p1), (ya_ + p1, yb_)):
+                if b_ - a_ > 0.5:
+                    dim_v(o, Y, xx_, a_, b_, inch(b_ - a_), 7, left=True)
+    for st, sl in zip(s.stairs, L.stairs):
+        g = sl.geo
+        lab = (f"{'BOX STEP' if getattr(sl, 'build', '') == 'box' else 'STAIR'} {inch(st.width_in)} wide · {g.risers} risers @ {inch(g.riser_in, 16)} · "
+               f"{g.treads} tread{'s' if g.treads != 1 else ''} @ {inch(g.tread_in, 16)}")
+        e = kinds.get(st.side)
+        if e is not None:
+            mx = (e.x0 + e.x1) / 2; my = (e.y0 + e.y1) / 2
+            if abs(e.y1 - e.y0) < 0.5:
+                o.append(T(X(mx), Y(my) + 52, lab, 7.5, 800, "middle", "#5a4520"))
+            else:
+                o.append(T(X(mx) - 62, Y(my), lab, 7.2, 800, "middle", "#5a4520", rot=-90))
+    # built-ins: benches and the planter as 17" strips inside their sides
+    for b in S.boxes:
+        if (b.tag or "").startswith(("bench seat", "planter")) and b.kind in ("board", "border", "fascia") and False:
+            pass
+    for nm, items in (("BENCH", s.geometry.benches or []), ("PLANTER", s.geometry.planters or [])):
+        for it in items:
+            pth = [(u * 12, v * 12) for u, v in it.get("path", [])]
+            dep = float(it.get("depth_in", it.get("width_in", 17)))
+            for (u0, v0), (u1, v1) in zip(pth, pth[1:]):
+                Lb = math.hypot(u1 - u0, v1 - v0)
+                if Lb < 1:
+                    continue
+                ux, uy = (u1 - u0) / Lb, (v1 - v0) / Lb
+                # inward = toward the polygon centroid
+                cx_, cy_ = sum(xs) / n, sum(ys) / n
+                nx, ny = -uy, ux
+                if (cx_ - u0) * nx + (cy_ - v0) * ny < 0:
+                    nx, ny = -nx, -ny
+                quad = [(u0, v0), (u1, v1), (u1 + nx * dep, v1 + ny * dep), (u0 + nx * dep, v0 + ny * dep)]
+                o.append(PG([(X(a), Y(b_)) for a, b_ in quad], "#cdb48f", INK, 0.6))
+                ang = math.degrees(math.atan2(Y(v1) - Y(v0), X(u1) - X(u0)))
+                if ang > 90: ang -= 180
+                if ang < -90: ang += 180
+                o.append(T(X((u0 + u1) / 2 + nx * dep / 2), Y((v0 + v1) / 2 + ny * dep / 2) + 3,
+                           f"{nm} {inch(dep)} deep" + (f" x {inch(float(it.get('seat_in', 17)))} high" if nm == "BENCH" else f" x {inch(float(it.get('height_in', 17)))} high"),
+                           6.5, 800, "middle", "#4a3a20", rot=ang))
+    ds = getattr(s.geometry, "door_step", None)
+    if ds:
+        x0d, x1d = float(ds["x0"]) * 12, float(ds["x1"]) * 12
+        dd = float(ds.get("depth_in", 21))
+        o.append(R(X(x0d), Y(0), (x1d - x0d) * sc, dd * sc, "#e0cfae", INK, 0.6))
+        o.append(T(X((x0d + x1d) / 2), Y(dd / 2) + 3, f"DOOR STEP {inch(x1d - x0d)} x {inch(dd)} · {inch(float(ds.get('rise_in', 7)))} up", 6.5, 800, "middle", "#4a3a20"))
+    # the side table
+    tx0 = 752
+    o.append(T(tx0, 24, "EVERY SIDE — INCHES", 9, 800, fill=GOLD))
+    yy = 40
+    o.append(T(tx0, yy, "#", 7.5, 800)); o.append(T(tx0 + 22, yy, "inches", 7.5, 800)); o.append(T(tx0 + 86, yy, "ft-in", 7.5, 800)); o.append(T(tx0 + 140, yy, "what", 7.5, 800))
+    yy += 12
+    for k, li, fi, what in rows:
+        o.append(T(tx0, yy, str(k), 8, 700, fill=GOLD)); o.append(T(tx0 + 22, yy, li, 8, 800)); o.append(T(tx0 + 86, yy, fi, 7.5, 500, fill=MUTE))
+        o.append(T(tx0 + 140, yy, textwrap.shorten(what, 30, placeholder="…"), 7.2, 500)); yy += 11.5
+    yy += 10
+    for ln in [f"Overall: {inch(Wd)} = {ftin(Wd)} wide x {inch(Dp)} = {ftin(Dp)} deep (house to the outer front corners).",
+               f"Deck surface {inch(s.geometry.height_in)} above the stair landing grade; picture frame overhangs the fascia 1\".",
+               "Sides measured at the outside face of the picture frame / fascia line, corner to corner.",
+               "Verify in the field before ordering: the house line, the bay and the rear-lot-line distance (see C-100)."]:
+        for w_ in textwrap.wrap(ln, 44):
+            o.append(T(tx0, yy, w_, 7.4, 400)); yy += 10
+        yy += 3
+    o += top
+    return sheet("A-100", "Dimension plan — inches", "Every side of the deck in inches, the overall width in feet and inches", o,
+                 "Plan · not to scale · house at the top · inches govern", meta)
+
+
+def _poly_area_in(P) -> float:
+    return 0.5 * sum(P[i][0] * P[(i + 1) % len(P)][1] - P[(i + 1) % len(P)][0] * P[i][1] for i in range(len(P)))
+
+
 def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: bool = False) -> List[Tuple[str, str, str]]:
     """[(num, title, svg)] — everything except A-001 (renders) and T-400 (build steps), which the build set adds.
     customer=True leaves the internal flags block off G-001."""
@@ -973,6 +1204,9 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     site = sheet_site(L, S, t, meta)
     if site:
         out.append(("C-100", "Site plan", site))
+    dims = sheet_dimensions(L, S, t, meta)
+    if dims:
+        out.append(("A-100", "Dimension plan — inches", dims))
     out += [("A-002", "Isometric — assembled, labeled", sheet_iso_assembled(L, S, t, meta)),
             ("A-003", "Isometric — exploded, labeled", sheet_iso_exploded(L, S, t, meta)),
             ("S-100", "Foundation plan", sheet_foundation(L, S, meta)),

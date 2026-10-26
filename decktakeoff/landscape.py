@@ -13,8 +13,8 @@ from typing import Callable, Dict, List, Sequence, Tuple
 
 IN = 1 / 12.0
 
-DEFAULT_COLORS = dict(lawn="#6d8a3c", mulch="#4b3326", soil="#5d4a36", groundcover="#3f5a2c", block="#b8806a", block2="#c9a487",
-                      block3="#94715f", block4="#a98e7e", brick="#9b4b3b", brick2="#b0624c", flag="#c8a184", flag2="#b38f76",
+DEFAULT_COLORS = dict(lawn="#6d8a3c", mulch="#4b3326", soil="#5d4a36", groundcover="#3f5a2c", block="#c99d86", block2="#d3b499",
+                      block3="#ad9483", block4="#bea291", brick="#9b4b3b", brick2="#b0624c", flag="#c8a184", flag2="#b38f76",
                       cedar="#9b7a5c", bark="#5a4637", leaf="#93a03c", leaf2="#c2b043", spruce="#5d7f7b", spruce2="#6f9089",
                       shrub="#8c3b2a", shrub2="#5f7537", rock="#a39b8f", well="#9ea3a6")
 
@@ -41,6 +41,7 @@ def materials(model: dict) -> Dict[str, dict]:
         shrub=dict(color=c["shrub"], rough=0.9),
         shrub2=dict(color=c["shrub2"], rough=0.9),
         rock=dict(color=c["rock"], pattern="gravel", rough=1.0, label="river rock"),
+        soil=dict(color=c["soil"], pattern="gravel", rough=1.0, label="bare soil"),
     )
 
 
