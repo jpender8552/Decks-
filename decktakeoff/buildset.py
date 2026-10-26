@@ -36,7 +36,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
         goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),   # the bases go in with the posts
         how=[f"Call 811 and locate before any hole or pin. Strip the existing deck first." if s.extras.demo_existing else "Call 811 and locate before any hole or pin.",
-             "Pull the beam lines from the house wall: " + "; ".join(f"{bl.label} at {ftin(bl.y)} from the reference wall, posts at " + " / ".join(ftin(x) for x in bl.posts_x) for bl in L.beam_lines) + "."
+             ("Pull the beam lines from the house wall: " + "; ".join(f"{bl.label} at {ftin(bl.y)} from the reference wall, posts at " + " / ".join(ftin(x) for x in bl.posts_x) for bl in L.beam_lines) + "." if L.beam_lines else "Lay out from the house wall.")
              + (f" Edge posts {L.edge_posts[0].label}-{L.edge_posts[-1].label} at the outline corners, under both rims (S-100 schedule)." if getattr(L, "edge_posts", None) else ""),
              {"caisson": f"Auger {n_posts} holes {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
               "diamond_pier": f"Set {n_posts} Diamond Pier heads level at grade on undisturbed soil and drive the 4 pins in each; caps on.",
@@ -50,15 +50,16 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item),
         how=([f"The existing stucco columns stay. Strip the old beam off each column top, check the column core and its bearing; new column caps / saddles per the engineer, then the beams land on them."]
              if s.framing.existing_posts else
-             [f"{s.framing.post_size} posts on the bases; cut so the beam top lands at "
+             ([f"{s.framing.post_size} posts on the bases; cut so the beam top lands at "
               + {frozenset({"drop"}): "the joist bottom (drop beams)", frozenset({"flush"}): "the joist top (flush beams)"}.get(
                   frozenset(b_.kind for b_ in s.framing.beams), "the joist bottom (drop beam) or the joist top (flush beam)")
               + ": " + " / ".join(f"{bl.label} posts {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
-              "Plumb both ways, brace, then the caps go on with the beams."]
+              "Plumb both ways, brace, then the caps go on with the beams."] if L.beam_lines else ["Plumb both ways and brace until the rims are on."])
              + ([f"Edge posts {L.edge_posts[0].label}-{L.edge_posts[-1].label}: one under each outline corner, top cut to the rim bottom ({ftin(L.edge_post_len)} nominal); "
                  "the rims land on them with (2) A35Z per rim — the rims span post to post as flush beams."] if getattr(L, "edge_posts", None) else [])
              + (["Seal every cut end before it goes up."] if timber and s.framing.end_grain_seal else [])),
-        check=["Posts plumb to a string; tops on the beam line", "Every cut end sealed" if timber else "No post in ground contact without a standoff"]))
+        check=["Posts plumb to a string; tops on the beam line" if L.beam_lines else "Posts plumb; tops at the rim bottom, level to a string around the outline",
+               "Every cut end sealed" if timber else "No post in ground contact without a standoff"]))
     if s.extras.stone_bases:
         steps.append(dict(n=3, code="T-402", title="Stone column bases", still="step3",
             goes_in=items(lambda l: "Stone" in l.item),
@@ -92,6 +93,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                    frozenset(b_.kind for b_ in s.framing.beams), "Beam top = joist bottom (drop) / joist top (flush)"), "Splices land on a post; caps fully fastened"] + (["Every knee brace bolted both ends; posts still plumb"] if s.framing.knee_braces else [])))
     if s.framing.knee_braces:
         steps[-1]["goes_in"] = steps[-1]["goes_in"] + items(lambda l: "knee brace" in l.item or "1/2\" x 8\"" in l.item)
+    if not L.beam_lines and s.framing.system != "steel":
+        steps.pop()                        # no beam lines: the doubled rims on the edge posts are the beams — they go up with the frame
     if s.framing.system == "steel":
         steps[-1] = dict(n=4, code="T-403", title="Beams", still="step4",
             goes_in=items(lambda l: "boxed beams" in l.item or "side bracket" in l.item.lower()),
@@ -102,10 +105,14 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         goes_in=items(lambda l: l.category == "Lumber" and s.framing.joist_size in l.item and not is_beam(l), 6)
                 + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane", "DTT1Z"))
                         or (l.category == "Hardware" and l.item.startswith("GRK RSS") and "100 ct" in l.item), 14),
-        how=[t.schedule.get("Ledger", "Ledger per the schedule."),
-             "; ".join(f"{z.name}: {len(z.frame.joist_x)} joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones) + ". Crown up, hangers at the ledger" + (", both faces of the flush beam" if any(b.kind == "flush" for b in L.beam_lines) else "") + ".",
+        how=[t.schedule.get("Ledger", "Ledger per the schedule.")]
+            + ([f"Doubled rims first: laminate the plies with GRK RSS 3-1/8\", 2 rows @ 12\" staggered, set them on the edge posts crown up and mitred at every corner, "
+                f"(2) A35Z per rim at each post — the rims span post to post as flush beams. Then the joists hang between the ledger and the rims."]
+               if (getattr(L, "edge_posts", None) and not L.beam_lines) else [])
+            + ["; ".join(f"{z.name}: {len(z.frame.joist_x)} joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones) + ". Crown up, hangers at the ledger" + (", both faces of the flush beam" if any(b.kind == "flush" for b in L.beam_lines) else "") + ".",
              t.schedule.get("Blocking", "Blocking one row over the beam, staggered."), t.schedule.get("Joist tape", "Tape every joist top.")],
-        check=["Frame square: diagonals within 1/8\"", "Every hanger fully nailed; ledger fasteners per the schedule", "Tape continuous; photos of the ledger, hangers and footings before decking"]))
+        check=(["Rims level all round at the joist top; every A35Z fully nailed"] if (getattr(L, "edge_posts", None) and not L.beam_lines) else [])
+              + ["Frame square: diagonals within 1/8\"", "Every hanger fully nailed; ledger fasteners per the schedule", "Tape continuous; photos of the ledger, hangers and footings before decking"]))
     if s.framing.system == "steel":
         steps[-1] = dict(n=5, code="T-404", title="Frame", still="step5",
             goes_in=items(lambda l: l.category == "Lumber" and ("C-joist" in l.item or "track" in l.item or "ledger angle" in l.item))

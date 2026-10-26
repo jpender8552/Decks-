@@ -204,6 +204,9 @@ class Q:
     hangers_double: int = 0
     hangers_skew: int = 0          # 45-degree skewed hangers (joists into an angled rim)
     hangers_skew_double: int = 0
+    hangers_field: int = 0         # field-skewable hangers (joists into a bay face at the house's own angle)
+    hangers_field_double: int = 0
+    bay_angles: str = ""
     h25: int = 0
     ledger_len: float = 0.0
     ledger_fasteners: int = 0
@@ -477,10 +480,17 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     Q_.n_blocks = len(blk)
     # hangers: every joist end by what it lands on
     Q_.hangers_single = sum((e in ("ledger", "beam", "rim")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
-    Q_.hangers_skew = sum((e in ("rim45", "bay45", "ledger45")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
-    Q_.hangers_double = 0
-    Q_.hangers_skew_double = 2 * len(OF.ledger_blocks) + (OF.rim_to_ledger if any(k_ == "ledger45" for k_ in OF.side_kind) else 0)
-    Q_.skew_double_note = ("the two angled rims at the ledger block beside the bay" if OF.ledger_blocks else "the doubled angled rims where they die into the ledger")
+    Q_.hangers_skew = sum((e in ("rim45", "bay45")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
+    Q_.hangers_field = sum((e == "ledger45") for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))     # a bay face runs at the house's angle, not 45
+    rl_ = list(getattr(OF, "rim_ledger", []))
+    Q_.hangers_double = rl_.count("square")
+    Q_.hangers_skew_double = 2 * len(OF.ledger_blocks) + rl_.count("skew45")
+    Q_.hangers_field_double = rl_.count("field")
+    Q_.skew_double_note = ("the two angled rims at the ledger block beside the bay" if OF.ledger_blocks else
+                           "the doubled angled rim where it dies into the main-wall ledger" if rl_.count("skew45") == 1 else "the doubled angled rims where they die into the ledger")
+    poly_ = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
+    Q_.bay_angles = " / ".join(sorted({f"{math.degrees(math.atan2(abs(poly_[(i + 1) % len(poly_)][1] - poly_[i][1]), abs(poly_[(i + 1) % len(poly_)][0] - poly_[i][0]))):.0f}°"
+                                       for i, k_ in enumerate(OF.side_kind) if k_ == "ledger45"}))
     # fascia: every open side, its own mitred length
     Q_.fascia_pieces = []
     if spec.decking.fascia:
@@ -798,16 +808,27 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         dh = DOUBLE_HANGER.get(jsize, "HUCQ210-2-SDS")
         d_, uc, src, sku = _hw(dh, black)
         lines.append(Line("Hardware", d_, Qz.hangers_double, Qz.hangers_double, "ea",
-                          "exact  (doubled joists under the dividers, hung rims at the flush beam)" if timber else "exact  (2 side rims x 2 ends) — confirm stock", uc, src, sku))
+                          "exact  (doubled joists under the dividers, hung rims at the flush beam)" if timber else
+                          "exact  (the doubled rims hung square on the ledger) — confirm stock" if getattr(Qz, "outline_ledgers", None) is not None else "exact  (2 side rims x 2 ends) — confirm stock", uc, src, sku))
     if Qz.hangers_skew:
         lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}Z / SUL{jsize.replace('2x', '2')}Z skewed 45-degree hanger (right / left as the angle runs)", Qz.hangers_skew, Qz.hangers_skew + 2, "ea",
                           f"+2  (joist ends on the 45-degree rims, from the framing plan)", 9.5, "est. — confirm D&D stock"))
     if Qz.hangers_skew_double:
         lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}-2Z / SUL{jsize.replace('2x', '2')}-2Z skewed double hanger — {getattr(Qz, 'skew_double_note', 'the two angled rims at the ledger block beside the bay')}", Qz.hangers_skew_double, Qz.hangers_skew_double, "ea",
                           "exact", 24.0, "est. — confirm D&D stock"))
+    if getattr(Qz, "hangers_field", 0):
+        lines.append(Line("Hardware", f"Simpson LSSU{jsize.replace('2x', '2')}Z field-skewable hanger — joists on the bay's angled faces, bent to the bay's angle", Qz.hangers_field, Qz.hangers_field + 2, "ea",
+                          f"+2  (joist ends on the bay faces, from the framing plan — the faces measure {Qz.bay_angles or 'off 45 degrees'} to the wall on the plan, not a true 45: bend each to fit)", 9.5, "est. — confirm D&D stock"))
+    if getattr(Qz, "hangers_field_double", 0):
+        lines.append(Line("Hardware", f"Simpson LSSU{jsize.replace('2x', '2')}-2Z field-skewable double hanger — the doubled rim where it dies into the bay face", Qz.hangers_field_double, Qz.hangers_field_double, "ea",
+                          "exact", 24.0, "est. — confirm D&D stock"))
     nh, nj = HANGER_NAILS.get(hanger, (6, 4))
-    n_long = Qz.hangers_single * nh
-    n_short = Qz.hangers_single * nj + Qz.h25 * H25_NAILS + 4 * 12 * len(getattr(L, "edge_posts", None) or [])   # A35Z: 12 nails each, 4 per edge post
+    # every hanger takes its nails: face-mount (catalog), skewed 45 (14 + 6), field-skewable (10 + 7), the skewed / field doubles (16 + 8)
+    n_skew1 = Qz.hangers_skew + getattr(Qz, "hangers_field", 0)
+    n_skew2 = Qz.hangers_skew_double + getattr(Qz, "hangers_field_double", 0)
+    n_long = Qz.hangers_single * nh + 14 * Qz.hangers_skew + 10 * getattr(Qz, "hangers_field", 0) + 16 * n_skew2
+    n_short = (Qz.hangers_single * nj + 6 * Qz.hangers_skew + 7 * getattr(Qz, "hangers_field", 0) + 8 * n_skew2
+               + Qz.h25 * H25_NAILS + 4 * 12 * len(getattr(L, "edge_posts", None) or []))   # A35Z: 12 nails each, 4 per edge post
     if timber:
         # 4x hangers take 16d into the header: from the ring-shank box, with the rim end-nailing and blocking toe-nails
         need16 = n_long + 6 * Qz.n_blocks + 4 * Qz.n_joists
@@ -964,7 +985,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 d = PRICEBOOK["hardware"][key]
                 rolls = int(math.ceil(need / d["lf"]))
                 lines.append(Line("Flashing & waterproofing", d["desc"], rolls, rolls, "roll", f"{need:.0f}' needed of {rolls * d['lf']}'", d["each"], d["source"]))
-            sched["Joist tape"] = "G-Tape 2\" every joist, PF joist, blocking and the ledger top · 4\" on both rims and the beam(s)"
+            sched["Joist tape"] = "G-Tape 2\" every joist, PF joist, blocking and the ledger top · 4\" on " + ("both rims and the beam(s)" if L.beam_lines else "the doubled rims")
 
     # ================= DECKING
     prof = "Grooved" if spec.decking.profile == "grooved" else "Square Edge"

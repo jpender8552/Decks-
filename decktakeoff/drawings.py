@@ -398,7 +398,7 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
         for ln in textwrap.wrap(n, 40)[:5]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
         yy += 3
-    return sheet("S-101", "Framing plan", "Ledger, joists, rims, blocking, beams; every member in the model — the cut list is on T-600", o, "Plan · not to scale · house at the top · dimensions govern", meta)
+    return sheet("S-101", "Framing plan", "Ledger, joists, rims, blocking" + (", beams" if L.beam_lines else ", edge posts" if getattr(L, "edge_posts", None) else "") + "; every member in the model — the cut list is on T-600", o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
 
 def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
@@ -563,7 +563,8 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
     nx = 620
     o.append(T(nx, 400, "SECTION NOTES", 9, 800, fill=GOLD))
     yy = 416
-    notes = [f"Deck surface {ftin(s.geometry.height_in)} above grade; guard {L.rail.height:g}\" where the drop exceeds 30\"" if L.rail else f"Deck surface {ftin(s.geometry.height_in)} above grade",
+    notes = [(f"Deck surface {ftin(s.geometry.height_in)} above grade; guard {L.rail.height:g}\" where the drop exceeds 30\"" if s.geometry.height_in > 30
+              else f"Deck surface {ftin(s.geometry.height_in)} above grade — under 30\", no guard required (IRC R312.1); the {L.rail.height:g}\" rail is the owner's choice") if L.rail else f"Deck surface {ftin(s.geometry.height_in)} above grade",
              (f"{len(L.beam_lines)} {' / '.join(sorted({b_.kind for b_ in L.beam_lines}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in L.beam_lines}))} — every line on S-100 / S-101"
               if len(L.beam_lines or []) > 2 else "; ".join(t.summary["beams"])),
              f"Posts {t.summary['posts']}", t.schedule.get("Ledger", ""), t.schedule.get("Joist tape", "")]
@@ -571,7 +572,7 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
         for ln in textwrap.wrap(n, 62)[:3]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
         yy += 3
-    return sheet("A-301", "Section + front elevation", "Cut through the deepest zone; heights to grade, frost line, cantilever, guard", o, "Section left · elevation right · not to a common scale", meta)
+    return sheet("A-301", "Section + front elevation", "Cut through the deepest zone; heights to grade, frost line" + (", cantilever" if any(b_.cantilever > 0.5 for z in L.zones if z.frame for b_ in z.frame.beams) else "") + (", guard" if L.rail else ""), o, "Section left · elevation right · not to a common scale", meta)
 
 
 def sheet_details(L: Layout, S: Scene, t, meta) -> str:
@@ -686,7 +687,7 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
                             + (" and the stamped set." if s.extras.engineered else "'s installation notes."))
     else:
         note(680, 360, 290, t.schedule.get("Blocking", "Blocking one row over the beam, staggered up and down so every block can be end-nailed."))
-    return sheet("D-501", "Details", "Ledger · post / beam / cap · footing · rail post · deck edge · the job's special condition", o, "Schematic details, not to scale", meta)
+    return sheet("D-501", "Details", "Ledger · " + ("post / rim / ties" if edge_only else "post / beam / cap") + " · footing · rail post · deck edge · the job's special condition", o, "Schematic details, not to scale", meta)
 
 
 def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
@@ -1505,7 +1506,7 @@ def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
 def sheet_iso_exploded(L: Layout, S: Scene, t, meta) -> str:
     bx = [b for b in S.boxes if (b.kind not in ("ground", "glass") and not _house(b)) or (b.tag or "").startswith("blind") or (b.tag or "") == "snow retention bar"]
     cov = any(b.kind in ("cpost", "rafter", "ssroof") for b in bx)
-    sub = "Each build layer lifted in order: piers · posts" + (" + knee braces" if any(b.kind == "brace" for b in bx) else "") + " · beams · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "") + (" · rail" if L.rail else "") + (" · roof covers layer by layer" if cov else "")
+    sub = "Each build layer lifted in order: piers · posts" + (" + knee braces" if any(b.kind == "brace" for b in bx) else "") + (" · beams" if (L.beam_lines or (L.frame and L.frame.beams)) else "") + " · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "") + (" · rail" if L.rail else "") + (" · roof covers layer by layer" if cov else "")
     return _axo_sheet("A-003", "Isometric — exploded, labeled", sub, L, S, t, meta, bx, explode=True, az=35, el=24,
                       note="Layers lifted in build order." + (" Roof covers pulled apart: posts, beam + ledger, rafters, soffit, sheathing, underlayment, standing seam, snow bar, Hardie trim." if cov else " Lifts are for clarity only; every member returns straight down to its place."))
 
@@ -1534,8 +1535,10 @@ def sheet_iso_structure(L: Layout, S: Scene, t, meta) -> str:
     note = ("Decking, rail and house removed to show the frame. " + (f"Joists hang from {hang} in face-mount hangers" if hang else "Joists")
             + ("; they bear on the drop beam with H2.5AZ ties" if "drop" in kinds else "")
             + ("; skewed 45° hangers where joists meet the angled rims" if "skewed" in items else "")
+            + ("; field-skewable hangers on the bay faces" if "field-skewable" in items else "")
+            + ("; the doubled rims stand on the edge posts with A35Z ties" if getattr(L, "edge_posts", None) else "")
             + ("; double rims in concealed-flange hangers" if "concealed" in items else "") + ".")
-    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Piers, post bases, posts" + (", knee braces" if any(b.kind == "brace" for b in bx) else "") + ", post caps, beam" + ("s" if len(bls) > 1 else "") + ", joists, "
+    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Piers, post bases, posts" + (", knee braces" if any(b.kind == "brace" for b in bx) else "") + (", post caps, beam" if bls else ", A35Z rim ties" if getattr(L, "edge_posts", None) else "") + ("s" if len(bls) > 1 else "") + ", joists, "
                       + ("double rims" if L.spec.framing.rim_plies > 1 else "rims") + (", ledger" if ledger else "") + ", blocking", L, S, t, meta, bx, az=-32, el=32, key=key, note=note)
 
 
@@ -1836,9 +1839,11 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
     o.append(LN(x + 123, y + 140, x + 183, y + 140, "#b3261e", 0.8)); o.append(T(x + 153, y + 136, f"{fr.spacing:g}\" OC", 6.6, 800, "middle", "#b3261e"))
     hs = "LUS28Z" if js in ("2x8", "2x10") else "LUS210Z"
     items = " ".join(ln.item for ln in getattr(t, "lines", []))
-    skew2 = "-2Z" in items and "skewed" in items and "HUCQ" not in items
-    _lead(o, x + 38, y + 62, x + 24, y + 192, (f"Angled double rims in Simpson SUR/SUL{js.replace('x', '')}-2Z skewed double hangers at the ledger" if skew2 else
-                                              f"Double rim in a Simpson HUCQ{js.replace('x', '')}-2-SDS concealed-flange hanger at the ledger"))
+    js_ = js.replace('x', '')
+    rim_h = [w_ for k_, w_ in (("HUCQ", f"HUCQ{js_}-2-SDS concealed-flange"), (f"SUR{js_}-2Z", f"SUR/SUL{js_}-2Z skewed (45°)"),
+                               (f"LSSU{js_}-2Z", f"LSSU{js_}-2Z field-skewed (bay face)")) if k_ in items]
+    _lead(o, x + 38, y + 62, x + 24, y + 192, ("Double rims at the ledger in Simpson " + " · ".join(rim_h) + " double hangers") if rim_h else
+                                             f"Double rim in a Simpson HUCQ{js_}-2-SDS concealed-flange hanger at the ledger")
     _lead(o, x + 186, y + 60, x + 166, y + 192, f"Simpson {hs} face-mount hanger, every joist, 10d HDG in every hole")
     _lead(o, x + 59, y + 120, x + 24, y + 246, "Picture-frame joist 1-1/2\" inboard of the rim")
     _lead(o, x + 42, y + 160, x + 166, y + 246, f"{fr.rim_plies}-ply {js} rim, GRK RSS 3-1/8\", 2 rows @ 12\" staggered")
@@ -1862,7 +1867,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
         _wood(o, x + 30, y + 214, 120, 46); _wood(o, x + 150, y + 216, 10, 42, dark=True); o.append(R(x + 150, y + 236, 12, 22, "#7b8186", INK, 0.6))
         o.append(R(x + 30, y + 207, 250, 7, FILL["deck"], INK, 0.5)); _wood(o, x + 160, y + 216, 120, 42, dark=True)
         _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson LUS28Z every joist off the rim's inside face, 10d HDG every hole")
-        _lead(o, x + 60, y + 238, x + 24, y + 196, f"{rimsz} = the flush beam, plies laminated GRK RSS 3-1/8\", 2 rows @ 12\" staggered")
+        _lead(o, x + 60, y + 238, x + 24, y + 192, f"{rimsz} = the flush beam; plies RSS-screwed 2 rows @ 12\"")
         _lead(o, x + 210, y + 236, x + 236, y + 180, f"{js} joist, top flush with the rim")
         o.append(T(x + 24, y + 278, f"Joists span ledger to rim at {fr.spacing:g}\" OC; the rim spans post to post — no cantilever", 6.6, 700))
     elif flush:
@@ -2078,7 +2083,8 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(T(x + 24, y + 286, "(IRC Table R301.5) — submit the rail code report", 6.4, 700))
     # 4 lateral tie plan
     x, y = P[3]; _panel(o, x, y, W3, H2, "4", "LATERAL LOAD — DTT1Z TIES (PLAN)")
-    o.append(R(x + 20, y + 40, W3 - 40, 110, FILL["house"], INK, 0.6)); o.append(T(x + 30, y + 54, "house floor framing (joists run ⟂ or ∥ — engineer)", 6.4, 700, fill=MUTE))
+    o.append(R(x + 20, y + 40, W3 - 40, 110, FILL["house"], INK, 0.6)); o.append(T(x + 30, y + 54, "house floor framing (joists run ⟂ or ∥ — engineer)" if s.extras.engineered
+                                                                                    else "house floor framing — a floor joist, or blocking where ∥", 6.4, 700, fill=MUTE))
     for k in range(5):
         o.append(R(x + 40 + k * 56, y + 60, 5, 90, FILL["timber_dk"], INK, 0.4))
     _wood(o, x + 20, y + 150, W3 - 40, 8, dark=True)
@@ -2095,9 +2101,10 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
         _wood(o, xx, y + 90, 3 * 6 * (2 if wd == 4 else 1), 70)
         o.append(R(xx - 2, y + 86, 3 * 6 * (2 if wd == 4 else 1) + 4, 4, "#111", "none", 0))
         o.append(T(xx + 9, y + 176, lab, 6.4, 700, "start")); o.append(T(xx + 9, y + 186, f"{wd}\" tape", 6.4, 800, "start", "#b3261e"))
-    o.append(T(x + 24, y + 230, "Nichigo G-Tape 3035 (black) on every top edge before decking, lapped over the ends and", 6.6, 600))
-    o.append(T(x + 24, y + 240, (f"down the sides 1/2\"; one row of {js} blocking over the beam, (3) structural screws each end" if L.beam_lines else
-                                 f"down the sides 1/2\"; {js} blocks under the angled borders, (3) structural screws each end"), 6.6, 600))
+    tape_txt = ("Nichigo G-Tape 3035 (black) on every top edge before decking, lapped over the ends and down the sides 1/2\"; "
+                + (f"one row of {js} blocking over the beam, (3) structural screws each end" if L.beam_lines else f"{js} blocks under the angled borders, (3) structural screws each end"))
+    for i, ln in enumerate(textwrap.wrap(tape_txt, 64)[:4]):
+        o.append(T(x + 24, y + 222 + i * 10, ln, 6.6, 600))
     # 6 fastening schedule
     x, y = P[5]; _panel(o, x, y, W3, H2, "6", "FASTENING SCHEDULE")
     items = " ".join(ln.item for ln in getattr(t, "lines", []))          # what the order carries: the schedule says the same
@@ -2111,19 +2118,23 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     rows = [("Ledger to house", "LedgerLOK 3-5/8\", 2 rows staggered 12\" OC" + (" — engineer" if s.extras.ledger_on_cantilevered_floor else "")),
             ("Lateral", "(4) DTT1Z, 1/2\" rod into the floor framing"),
             ("Joist to ledger", f"{hang}, 10d HDG every hole")]
-    if "HUCQ" in items or not ("-2Z" in items and "skewed" in items):
-        rows.append(("Rim to ledger", f"HUCQ{js.replace('x', '')}-2-SDS, SDS screws"))
-    else:
-        rows.append(("Rim to ledger", f"SUR/SUL{js.replace('x', '')}-2Z skewed double hanger (45° rims)"))
-    if "SUR" in items:
-        rows.append(("Joist to 45° rim", f"SUR/SUL{js.replace('x', '')}Z skewed hanger, 10d HDG every hole"))
-    rows += [("Rim plies", "GRK RSS 3-1/8\", 2 rows @ 12\" staggered"),
-             ("Joist to beam", f"{hang} each side of the flush beam, 10d HDG" if kinds == {"flush"} else "H2.5AZ each joist + rim, 10d x 1-1/2\"" if kinds <= {"drop"}
-              else f"{hang} at flush beams; H2.5AZ at drop beams"),
-             ("Beam plies", "GRK RSS 3-1/8\", 2 rows @ 12\" staggered" if two_by and not four_by else "1/2\" x 8\" HDG bolts, 2 rows staggered @ 24\"" if not two_by
-              else "RSS on the (2)2x, 1/2\" bolts on the (2)4x"),
-             ("Beam to post", f"{cap} cap, SD screws" + (" (1/2\" shim, (2)2x beam)" if two_by and cap.startswith("BC46") else "")),
-             ("Post to pier", f"{post_base_sku(s)} on the Diamond Pier, SD screws"),
+    js_ = js.replace('x', '')
+    rim_rows = [w_ for k_, w_ in (("HUCQ", f"HUCQ{js_}-2-SDS"), (f"SUR{js_}-2Z", f"SUR/SUL{js_}-2Z (45°)"), (f"LSSU{js_}-2Z", f"LSSU{js_}-2Z (bay)")) if k_ in items]
+    rows.append(("Rim to ledger", " · ".join(rim_rows) if rim_rows else f"HUCQ{js_}-2-SDS, SDS screws"))
+    if f"SUR{js_}Z" in items:
+        rows.append(("Joist to 45° rim", f"SUR/SUL{js_}Z skewed hanger, 10d HDG every hole"))
+    if f"LSSU{js_}Z" in items:
+        rows.append(("Joist to bay face", f"LSSU{js_}Z bent to the bay's angle, 10d HDG every hole"))
+    rows.append(("Rim plies", "GRK RSS 3-1/8\", 2 rows @ 12\" staggered"))
+    if bls:
+        rows += [("Joist to beam", f"{hang} each side of the flush beam, 10d HDG" if kinds == {"flush"} else "H2.5AZ each joist + rim, 10d x 1-1/2\"" if kinds <= {"drop"}
+                  else f"{hang} at flush beams; H2.5AZ at drop beams"),
+                 ("Beam plies", "GRK RSS 3-1/8\", 2 rows @ 12\" staggered" if two_by and not four_by else "1/2\" x 8\" HDG bolts, 2 rows staggered @ 24\"" if not two_by
+                  else "RSS on the (2)2x, 1/2\" bolts on the (2)4x"),
+                 ("Beam to post", f"{cap} cap, SD screws" + (" (1/2\" shim, (2)2x beam)" if two_by and cap.startswith("BC46") else ""))]
+    if getattr(L, "edge_posts", None):
+        rows.append(("Rim to edge post", "(2) A35Z per rim per post, 10d x 1-1/2\""))
+    rows += [("Post to pier", f"{post_base_sku(s)} on the Diamond Pier, SD screws"),
              ("Knee braces", "1/2\" through-bolt each end (x10 / x12 / x6)") if s.framing.knee_braces else ("Blocking", "(3) structural screws each end"),
              ("Field boards", f"{fsys}, every joist, every gap"),
              ("Borders / fascia", ("Borders: Cortex + plugs · fascia: Cap-Tor xd" if cortex else "Cap-Tor xd color-matched, pre-drilled")),

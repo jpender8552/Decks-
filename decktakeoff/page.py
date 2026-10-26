@@ -26,6 +26,9 @@ CAP = {"yard": "From the yard", "corner": "From the front corner", "ondeck": "St
        "iso": "Isometric from the stair corner", "iso2": "Isometric from the open corner", "isolow": "Low isometric", "underiso": "Isometric from under the frame",
        "exploded": "Exploded — every layer", "exploded2": "Exploded — from the open corner", "exploded-corner": "Exploded — from the front corner", "exploded-low": "Exploded — low angle",
        "frame-iso2": "Frame only — joists, rims, beams, ledger", "rail-iso2": "Through the rail", "structure-underiso": "Posts and beams on the footings", "plan": "Plan from above"}
+CAP0 = dict(CAP)
+CAP_NO_BEAM = {"under": "Under the deck — posts, footings", "frame-iso2": "Frame only — joists, rims, ledger",
+               "structure-underiso": "Posts on the footings, the doubled rims on the posts"}
 
 
 def money(v, cents=False):
@@ -395,6 +398,9 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         have -= {"under", "underiso"}
     files = {f"r/{key}-{n_}.jpg": str(rd / f"{n_}.jpg") for n_ in have}
     sun_names = sorted(n_ for n_ in have if n_.startswith("sun-"))
+    CAP.clear(); CAP.update(CAP0)                # this job's captions only
+    if not L.beam_lines:
+        CAP.update(CAP_NO_BEAM)
     if (rd / "sun.json").exists():
         CAP.update(json.load(open(rd / "sun.json")))
     if (rd / "captions.json").exists():          # a job's own captions (its camera stations, option renders)
@@ -419,7 +425,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         st_txt = "; ".join(sm["stairs"]) if sm["stairs"] else "none"
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in [
             ("Deck", f"{L.deck_sf:g} SF · {ftin(spec.geometry.height_in)} above grade · {sm['finished_frame']}"), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
-            ("Beams", "; ".join(sm["beams"]) or "—"), ("Footings / posts", sm["posts"]), ("Decking", sm["decking"]), ("Rail", sm["rail"]), ("Stairs", st_txt)]) + "</dl>")
+            ("Beams", "; ".join(sm["beams"]) or ("none — the doubled rims span post to post on the edge posts" if getattr(L, "edge_posts", None) else "—")), ("Footings / posts", sm["posts"]), ("Decking", sm["decking"]), ("Rail", sm["rail"]), ("Stairs", st_txt)]) + "</dl>")
         w(_gallery(key, ["iso", "iso2"], have))
         w('<h2 class="kicker">Material take-off <span class="tag">NET = counted off the drawings · ORDER = what to pull and ship</span></h2>')
         for cat, lines in t.by_category().items():
@@ -449,7 +455,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
         frame_lite = (f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams, beam_species_words(spec.framing.beams), len(spec.framing.beams))}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams")
-                      + ("; joist tape on every joist, rim and beam" if spec.framing.joist_tape else "") + ".")
+                      + (("; joist tape on every joist, rim and beam" if L.beam_lines else "; joist tape on every joist and rim") if spec.framing.joist_tape else "") + ".")
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
@@ -460,7 +466,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
         w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
-        w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, beams, frame</span></h2>')
+        w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
         w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
         w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
         q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
@@ -484,7 +490,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso"], have))
         w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
-        w('<h2 class="kicker pb" id="g-structure">Structure <span class="tag">footings, posts, beams, frame, rail</span></h2>')
+        w('<h2 class="kicker pb" id="g-structure">Structure <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame, rail</span></h2>')
         w(_gallery(key, ["structure-underiso", "frame-iso2", "under", "rail-iso2"], have))
         w('<h2 class="kicker pb" id="g-sheets">Drawing set <span class="tag">G · S · A · D sheets</span></h2><div class="sheets">')
         for num, ttl, svg in r["sheets"]:

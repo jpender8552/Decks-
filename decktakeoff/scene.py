@@ -32,6 +32,7 @@ class Box:
     xg: float = 0.0     # extra lift in the exploded view (ft) on top of the phase gap: layers within one phase pull apart
     pts: Optional[list] = None   # shape "mesh": triangle vertices [[x, y, z], ...] in plan feet (3 per triangle) — shade sails
     layer: str = ""              # "site": the yard (lawn, beds, walls, plants, fences, neighbours) — the 3D views draw it, the drawing sheets leave it out
+    quad: Optional[list] = None  # a mitred board's true top outline, 4 plan points [x, y] (ft): the photoreal pass builds the prism from it, the viewer keeps the box
 
 
 @dataclass
@@ -47,6 +48,51 @@ class Scene:
     def to_dict(self) -> dict:
         return dict(boxes=[asdict(b) for b in self.boxes], deck_top=self.deck_top, W=self.W, x_min=getattr(self, 'x_min', 0.0), y_min=self.y_min, y_front=self.y_front,
                     materials=self.materials, meta=self.meta, phases=PHASES)
+
+
+def _line_x(p, d, q, e):
+    """Where p + t d meets q + s e (None when parallel)."""
+    den = d[0] * e[1] - d[1] * e[0]
+    if abs(den) < 1e-9:
+        return None
+    t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den
+    return (p[0] + t * d[0], p[1] + t * d[1])
+
+
+def _mitred_quads(borders, poly, sgn, edge, bw):
+    """The true top outline of each picture-frame border (plan inches): the outer face `edge` past its side, the inner face
+    `bw` in from that; each end cut on the bisector where the next border joins it, else along the outline side it dies
+    into (the house wall or a bay face)."""
+    segs = []
+    for x0, y0, x1, y1, *_ in borders:
+        L_ = math.hypot(x1 - x0, y1 - y0)
+        u = ((x1 - x0) / L_, (y1 - y0) / L_)
+        segs.append(((x0, y0), (x1, y1), u, (-u[1] * sgn, u[0] * sgn)))
+
+    def along(P_, u):                    # the outline side through vertex P_ that does not run along u
+        m = len(poly)
+        for k in range(m):
+            for v, w in ((poly[k], poly[(k + 1) % m]), (poly[(k + 1) % m], poly[k])):
+                if math.hypot(v[0] - P_[0], v[1] - P_[1]) < 0.5:
+                    L_ = math.hypot(w[0] - v[0], w[1] - v[1])
+                    d = ((w[0] - v[0]) / L_, (w[1] - v[1]) / L_)
+                    if abs(d[0] * u[1] - d[1] * u[0]) > 1e-3:
+                        return d
+        return (-u[1], u[0])             # nothing there: a square cut
+
+    def off(P_, n, k):
+        return (P_[0] + n[0] * k, P_[1] + n[1] * k)
+
+    quads = []
+    for i, (A, B_, u, n) in enumerate(segs):
+        pts = {}
+        for end, P_ in (("a", A), ("b", B_)):
+            nb = [s for j, s in enumerate(segs) if j != i and math.hypot((s[1] if end == "a" else s[0])[0] - P_[0], (s[1] if end == "a" else s[0])[1] - P_[1]) < 0.5]
+            for face, k in (("o", -edge), ("i", bw - edge)):
+                q = _line_x(off(P_, n, k), u, off(P_, nb[0][3], k), nb[0][2]) if nb else _line_x(off(P_, n, k), u, P_, along(P_, u))
+                pts[face + end] = q or off(P_, n, k)
+        quads.append([pts["oa"], pts["ob"], pts["ib"], pts["ia"]])
+    return quads
 
 
 def _palette(collection: str, color: str) -> List[str]:
@@ -498,19 +544,25 @@ def build_scene(L) -> Scene:
         from .layout import _poly_orient
         poly_in = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
         sgn = _poly_orient(poly_in)
-        for x0_, y0_, x1_, y1_, _ in P.borders:
+        quads = _mitred_quads(P.borders, poly_in, sgn, edge / IN, bw / IN)
+        # Boxes that overlap must not share a top face (a coplanar overlap renders black in the photoreal pass and
+        # z-fights in the viewer): the breakers sit one lift up, the frame above them by its run (horizontal, vertical,
+        # each diagonal), so where two pieces cross the one on top shows.
+        for (x0_, y0_, x1_, y1_, _), qd in zip(P.borders, quads):
             L_e = math.hypot(x1_ - x0_, y1_ - y0_) * IN
             ux, uy = (x1_ - x0_) / (L_e / IN), (y1_ - y0_) / (L_e / IN)
             nx, ny = -uy * sgn, ux * sgn                       # inward
             off = bw / 2 - edge                                  # the border's centre line: half a board in from the overhang
             cx, cy = (x0_ + x1_) / 2 * IN + nx * off, (y0_ + y1_) / 2 * IN + ny * off
+            lv = lift * (1.5 if abs(y1_ - y0_) < 0.5 else 2.0 if abs(x1_ - x0_) < 0.5 else 2.5 if (x1_ - x0_) * (y1_ - y0_) > 0 else 3.0)
             if abs(y1_ - y0_) < 0.5:
-                add("border", cx - L_e / 2 - bw / 2, cx + L_e / 2 + bw / 2, cy - bw / 2, cy + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border", tone=tone())
+                add("border", cx - L_e / 2 - bw / 2, cx + L_e / 2 + bw / 2, cy - bw / 2, cy + bw / 2, zt - bt + lv, zt + lv, "border", 6, tag="pf border", tone=tone())
             elif abs(x1_ - x0_) < 0.5:
-                add("border", cx - bw / 2, cx + bw / 2, cy - L_e / 2 - bw / 2, cy + L_e / 2 + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border", tone=tone())
+                add("border", cx - bw / 2, cx + bw / 2, cy - L_e / 2 - bw / 2, cy + L_e / 2 + bw / 2, zt - bt + lv, zt + lv, "border", 6, tag="pf border", tone=tone())
             else:
                 phi = math.atan2(y1_ - y0_, x1_ - x0_)
-                add("border", cx - L_e / 2 - 0.1, cx + L_e / 2 + 0.1, cy - bw / 2, cy + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border (mitred)", rot=phi, rot_axis="z", tone=tone())
+                add("border", cx - L_e / 2 - 0.1, cx + L_e / 2 + 0.1, cy - bw / 2, cy + bw / 2, zt - bt + lv, zt + lv, "border", 6, tag="pf border (mitred)", rot=phi, rot_axis="z", tone=tone())
+            B[-1].quad = [[px * IN, py * IN] for px, py in qd]
         for x, y_lo, y_hi, lab in P.dividers:
             add("border", x * IN - bw / 2, x * IN + bw / 2, y_lo * IN, y_hi * IN, zt - bt + lift, zt + lift, "border", 6, tag=f"breaker {lab}", tone=tone())
     fixed = B
@@ -1081,7 +1133,7 @@ def step_captions(L: Layout) -> Dict[int, str]:
                 + ("; 6x6 " + post_words(s) + " cover posts carry the deck beams where they line up" if any(c.get("footing") == "deck_pier" for c in covers_of(s)) else ""))
                if s.framing.system == "steel" else f"Step 2 · Posts — {s.framing.post_size} {'Douglas fir #1' if (s.is_timber or s.framing.post_species.upper().startswith('DF')) else '#2 GC'} on {'black' if s.framing.hardware_finish == 'black' else 'ZMAX'} bases"),
            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
-           4: f"Step 4 · Beams — {beams}",
+           4: f"Step 4 · Beams — {beams}" if beams else "Step 4 · (no beams — the doubled rims on the edge posts carry the joists)" if getattr(L, "edge_posts", None) else "Step 4 · (no beams)",
            5: (f"Step 5 · Frame — CEMCO {__import__('decktakeoff.steel', fromlist=['names']).names(s)['joist']} C-joists at {L.frame.spacing:g}\" OC, {s.framing.steel_track} track rims, ledger track on a steel angle, clip angles, all G90" if s.framing.system == "steel" else
                f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if (L.frame.blocking_rows_y and L.beam_lines) else "")),
            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}" + (f", {s.decking.border_color} border" if s.decking.border_color else "") + (", hidden fasteners" if (s.decking.fastener_system or '') != 'Cap-Tor xd face screw' else ""),

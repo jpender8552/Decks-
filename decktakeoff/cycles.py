@@ -516,6 +516,40 @@ def add_box(g: Geo, b: dict, uv_mode: str, tile: float = 8.0, board_len: float =
         g.face(pts[::-1], uvs[::-1], tint)                 # the y flip mirrors: reverse the winding to keep normals out
 
 
+def add_quad_board(g: Geo, b: dict, board_len: float = 20.0, board_w: float = 5.36 * IN, u_off: float = 0.0, tint=(1, 1, 1, 1)):
+    """A mitred board: the prism over its plan quad (b["quad"], ft) from z0 to z1, the grain along its first edge."""
+    q = [(float(x), float(y)) for x, y in b["quad"]]
+    z0, z1 = b["z0"], b["z1"]
+    ox, oy = q[0]
+    L_ = math.hypot(q[1][0] - ox, q[1][1] - oy) or 1.0
+    ux, uy = (q[1][0] - ox) / L_, (q[1][1] - oy) / L_
+    wid = max(abs((x - ox) * -uy + (y - oy) * ux) for x, y in q) or board_w
+    cx, cy = sum(x for x, _ in q) / 4, sum(y for _, y in q) / 4
+
+    def uv(x, y, z, side=False):
+        a = ((x - ox) * ux + (y - oy) * uy) / board_len + u_off
+        c = (z - z0) if side else abs((x - ox) * -uy + (y - oy) * ux)
+        return (a, 0.01 + 0.98 * c / max(board_w, wid))
+
+    def put(P, out):                     # scene-frame polygon -> Blender, wound so its normal points along `out`
+        V = [B(*p) for p in P]
+        e1 = [V[1][k] - V[0][k] for k in range(3)]; e2 = [V[2][k] - V[0][k] for k in range(3)]
+        nrm = (e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0])
+        o = B(*out)
+        side = abs(out[2]) < 0.5
+        uvs = [uv(*p, side=side) for p in P]
+        if nrm[0] * o[0] + nrm[1] * o[1] + nrm[2] * o[2] < 0:
+            V, uvs = V[::-1], uvs[::-1]
+        g.face(V, uvs, tint)
+
+    put([(x, y, z1) for x, y in q], (0, 0, 1))
+    put([(x, y, z0) for x, y in q], (0, 0, -1))
+    for k in range(4):
+        (xa, ya), (xb, yb) = q[k], q[(k + 1) % 4]
+        mx, my = (xa + xb) / 2 - cx, (ya + yb) / 2 - cy
+        put([(xa, ya, z0), (xb, yb, z0), (xb, yb, z1), (xa, ya, z1)], (mx, my, 0.0))
+
+
 def add_tris(g: Geo, pts: List[List[float]], tile: float = 8.0, tint=(1, 1, 1, 1)):
     """Scene-frame triangles with planar UVs: courses horizontal along the slope (like the viewer)."""
     for t in range(0, len(pts) - 2, 3):
@@ -631,6 +665,8 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
             t = 1.0 + 0.05 * tone
             if shape == "mesh":
                 add_tris(G(f"{mk}#{k}"), b["pts"], tile=20.0, tint=(t, t, t, 1))
+            elif b.get("quad"):
+                add_quad_board(G(f"{mk}#{k}"), b, u_off=u_off, tint=(t, t, t, 1))
             else:
                 add_box(G(f"{mk}#{k}"), b, "board", u_off=u_off, tint=(t, t, t, 1))
             continue

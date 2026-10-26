@@ -944,6 +944,7 @@ class OutlineFrame:
     side_kind: List[str] = field(default_factory=list)                                        # per outline side
     notes: List[str] = field(default_factory=list)
     rim_to_ledger: int = 0                                                                     # doubled rim ends hung on a ledger
+    rim_ledger: List[str] = field(default_factory=list)                                         # each of them by the angle it meets: square | skew45 | field
 
 
 def _col_cross(poly, x) -> List[Tuple[float, int]]:
@@ -1045,9 +1046,18 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
         if of.side_kind[i] in ("ledger", "ledger45"):
             (x0, y0), (x1, y1) = qL[i], qL[(i + 1) % n]
             of.ledgers.append((x0, y0, x1, y1))
-    # a doubled rim that dies into a ledger (the house corner of an angled side): hung on it in a skewed double hanger
-    of.rim_to_ledger = sum(1 for i in range(n) for a, b in ((of.side_kind[i], of.side_kind[(i + 1) % n]),)
-                           if {a, b} & {"rim", "rim45"} and {a, b} & {"ledger", "ledger45"})
+    # a doubled rim that dies into a ledger hangs on it in a double hanger chosen by the angle the two meet at: square
+    # (concealed flange), 45 degrees (skewed), anything else (a bay face at the house's own angle: field-skewable)
+    for i in range(n):
+        j = (i + 1) % n
+        a, b = of.side_kind[i], of.side_kind[j]
+        if not ({a, b} & {"rim", "rim45"} and {a, b} & {"ledger", "ledger45"}):
+            continue
+        (xa, ya), (xb, yb), (xc, yc) = poly[i], poly[j], poly[(j + 1) % n]
+        ang = abs(math.degrees(math.atan2(yb - ya, xb - xa) - math.atan2(yc - yb, xc - xb))) % 180
+        ang = min(ang, 180 - ang)                     # the acute angle between the rim and the ledger line
+        of.rim_ledger.append("square" if ang > 87 else "skew45" if abs(ang - 45) <= 3 else "field")
+    of.rim_to_ledger = len(of.rim_ledger)
     # an angled rim that dies into the main wall where no ledger runs (beside a bay): a 24" ledger block on the wall
     for i in range(n):
         j = (i + 1) % n

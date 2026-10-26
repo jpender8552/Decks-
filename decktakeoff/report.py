@@ -368,7 +368,7 @@ def _schedule(t: Takeoff) -> List[str]:
     else:
         days.append(f"Day {d+1} — layout, {n_posts} Diamond Piers driven, ledger set."); d += 1
     fd = max(2, round(L.deck_sf / 150))
-    days.append(f"{_span(d+1, d+fd)} — posts and beams set" + (" (first coat of oil if the finish option is taken)" if s.is_timber and s.framing.finish != 'oil' else "") + "."); d += fd
+    days.append(f"{_span(d+1, d+fd)} — posts " + ("and beams set" if L.beam_lines else "set, the doubled rims on them") + (" (first coat of oil if the finish option is taken)" if s.is_timber and s.framing.finish != 'oil' else "") + "."); d += fd
     jd = max(2, round(L.deck_sf / 120))
     days.append(f"{_span(d+1, d+jd)} — {'timber ' if s.is_timber else ''}frame, flashing at every wall" + (", tub bay doubled" if s.extras.hot_tub else "") + "."); d += jd
     dd = max(2, round(L.deck_sf / 200))
