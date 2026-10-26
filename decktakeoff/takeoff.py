@@ -1353,7 +1353,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 f"{n_posts} x {spec.framing.post_size} on the {n_posts} existing caissons, epoxy-set bases") if ft == "existing" else
                f"{n_posts} x {spec.framing.post_size}" + (" Douglas fir #1" if spec.framing.post_species.upper().startswith("DF") and not timber else "") + (" with 4x4 knee braces" if spec.framing.knee_braces else "") + " on " + (
             fr0.footing_model if ft == "diamond_pier" else f"{int(fr0.footing_dia_in)}\" {'caissons' if ft == 'caisson' else 'concrete piers'} {ftin(fr0.footing_depth_in)} deep") + (" with stone column bases" if spec.extras.stone_bases else "")),
-        design_load=f"{max(z.frame.total_psf for z in L.zones):g} psf ({fr0.load_note})" + (" · engineered" if spec.extras.engineered else ""),
+        design_load=(f"{max(z.frame.total_psf for z in L.zones):g} psf ({fr0.load_note})" if spec.extras.hot_tub else eng.design_load_words(spec.site.ground_snow_psf))
+                    + (" · engineered" if spec.extras.engineered else ""),
         decking=f"{brand} {coll} {color} — {Qz.field_rows} rows {'parallel to' if dk0.direction == 'parallel' else 'perpendicular to'} the house"
                 + (f", picture frame{' & dividers' if L.divider_x else ''} in {bcoll} {bcolor}" if spec.geometry.picture_frame else "") + f", {ftin(spec.deck_gap)} gaps, {fsys}",
         rail=((spec.railing.parapet_note or "Existing stucco parapet stays — no rail in this scope") if spec.railing.existing_parapet else f"{rl.system} {rl.height:g}\" {rl.color}: {len(rl.sections)} bays, {len(rl.posts)} posts, {rl.rail_lf} LF" + (" + drink rail" if spec.railing.drink_rail else "") if rl else "none"),

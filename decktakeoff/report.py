@@ -203,7 +203,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
     w(f"**{L.deck_sf} SF** · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''} · **{ftin(s.geometry.height_in)}** above grade"
-      + (", engineered" if s.extras.engineered else "") + f" · **{s.site.ground_snow_psf:g} psf** snow design")
+      + (", engineered" if s.extras.engineered else "") + f" · **{sm['design_load'].split(':')[0].split(' (')[0]}** design load")
     if s.client or s.site.address:
         w(("Prepared for " + s.client + (f" · {s.site.address}, {s.site.city}" if s.site.address else "")) if s.client else (f"Prepared for the owner of {s.site.address}, {s.site.city}" if s.site.address else "Prepared for the owner"))
     w("")
@@ -270,7 +270,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         _np = int(sum(l.order for l in t.lines if l.category == "Footings" and l.item.startswith("Diamond Pier")))
         _fd = f"{_np or L.n_footings} Diamond Pier foundations ({s.framing.footing_model}" + ("; upsized where a cover post and the deck share a pier" if any(l.item.startswith("Upgrade to Diamond Pier") for l in t.lines) else "") + ") — no excavation"
     w(f"| Foundation | {(_fd[0].upper() + _fd[1:]) if _fd else ''}" + (f" (frost depth {ftin(s.site.frost_depth_in)})" if s.framing.footing_type in ('caisson', 'concrete') else "") + ". |")
-    w(f"| Design load | {s.site.ground_snow_psf:g} psf snow" + (", stamped by a Colorado engineer" if s.extras.engineered else "")
+    w(f"| Design load | {sm['design_load'].replace(' · engineered', '')}" + (", stamped by a Colorado engineer" if s.extras.engineered else "")
       + (". Colorado Wildfire Resiliency Code practice: Class A decking, noncombustible rail, metal flashing at every wall" if s.site.wui_fire_zone else "") + ". |")
     if s.framing.system == "steel":
         w(f"| Hardware | Galvanized steel clip angles and self-drilling screws throughout the frame; {s.decking.brand} {s.decking.fastener_system or 'CONCEALoc'} hidden fasteners in the field "

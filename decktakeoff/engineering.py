@@ -108,6 +108,15 @@ def design_load_psf(ground_snow_psf: float, hot_tub: bool = False) -> Tuple[floa
     return ll + DEAD_PSF, why
 
 
+def design_load_words(ground_snow_psf: float) -> str:
+    """The deck's design load in one line, worded the same everywhere it is quoted (no hot tub)."""
+    total, _ = design_load_psf(ground_snow_psf)
+    s_ = float(ground_snow_psf or 0)
+    if s_ <= LIVE_PSF:
+        return f"{total:g} psf: {LIVE_PSF:g} psf live + {DEAD_PSF:g} psf dead" + (f" (the {s_:g} psf ground snow is less)" if s_ else "")
+    return f"{total:g} psf: {s_:g} psf ground snow (more than the {LIVE_PSF:g} psf live) + {DEAD_PSF:g} psf dead"
+
+
 def load_factor(total_psf: float) -> float:
     """Scale factor on tabulated spans for loads above the table's 50 psf (bending governs: span ∝ 1/sqrt(w))."""
     if total_psf <= TABLE_TOTAL_PSF:

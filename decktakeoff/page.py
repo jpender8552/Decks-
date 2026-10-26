@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from .spec import DeckSpec
 from .report import quote_markdown
 from .units import ftin
-from .takeoff import CATEGORIES
+from .takeoff import CATEGORIES, inches_frac
 from .catalog import rail_name, beam_words, beam_species_words
 from .pricing import gc_name
 
@@ -341,20 +341,20 @@ def _reads_lite(t, L, sm):
     stairs = []
     for st, ss in zip(L.stairs, s.stairs):
         g = st.geo
-        txt = f"{g.risers} risers at {g.riser_in:.1f}\", {ftin(st.width)} wide"
+        txt = f"{g.risers} risers at {inches_frac(g.riser_in)}, {ftin(st.width)} wide"
         if len(g.flights) > 1:
             lands = " and ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "a landing"
             turn = {"switchback": "turn back", "left": "turn left", "right": "turn right", "straight": "continue"}.get(ss.turn, ss.turn)
             txt += ": " + " then ".join(f"{fg.risers} down" for fg in g.flights[:1]) + f" to the {lands} landing, {turn}, " + " then ".join(f"{fg.risers} down" for fg in g.flights[1:]) + " to the lower level"
             if st.landing_rail_lf:
                 txt += f" · guard rail on the landings"
-        stairs.append(txt)
+        stairs.append((getattr(ss, "name", None) or "Stair", txt))
     fr = L.zones[0].frame
     beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
     structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on center, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
                  f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on center"
                  + (f", {beam_words(beams, beam_species_words(s.framing.beams), len(s.framing.beams))}" if beams else "") + f"; {sm['posts']}")
-    reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
+    reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + stairs + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
 
