@@ -245,7 +245,7 @@ class FieldPlan:
     def summary(self) -> str:
         parts = [f"panel {i + 1} ({ftin(a)}–{ftin(b)}) {n} rows" for i, (a, b, n, _) in enumerate(self.panels)]
         rips = sum(1 for r in self.rows if r.rip)
-        return "Rows per panel: " + " · ".join(parts) + (f" · {rips} ripped pieces" if rips else " · no rips") + (f" · {len(self.dividers)} breaker{'s' if len(self.dividers) != 1 else ''}" if self.dividers else " · no breakers")
+        return "Rows per panel: " + " · ".join(parts) + (f" · {rips} ripped piece{'s' if rips != 1 else ''}" if rips else " · no rips") + (f" · {len(self.dividers)} breaker{'s' if len(self.dividers) != 1 else ''}" if self.dividers else " · no breakers")
 
 
 @dataclass

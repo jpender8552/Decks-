@@ -66,10 +66,17 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                  f"Where a roof-cover post lands on the deck beam line it stands on the same Diamond Pier on an {post_base_sku(s)} base; the 6x6 {post_words(s)} post runs up to the cover beam and the deck beam bolts to it with the steel side bracket.",
                  "Plumb both ways and brace until the beams are on."],
             check=["Posts plumb to a string; tops on the beam line", "Every bracket and saddle fastened: thru-bolts and #12 screws per the engineer"])
+    import re as _re
+    is_beam = lambda l: l.category == "Lumber" and (("beam" in (l.why or "").lower() and "stringer" not in (l.why or "").lower())
+                                                    or bool(_re.match(r"^(6x(8|10|12|14)|4x12)x", l.item)) or ("4x10x" in l.item and not timber))
+    caps = sorted({bl.cap_mid for bl in L.beam_lines if bl.cap_mid})
+    two_by = any(parse_beam(bl.size)[0] >= 2 and parse_beam(bl.size)[1].startswith("2x") for bl in L.beam_lines)
     steps.append(dict(n=4, code="T-403", title="Beams", still="step4",
-        goes_in=items(lambda l: l.category == "Lumber" and ("6x" in l.item or "4x10x" in l.item and not timber or "4x12" in l.item)) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware"),
+        goes_in=items(is_beam) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware") + items(lambda l: l.item.startswith("Simpson SD10212")),
         how=[f"{bl.label}: {ftin(bl.length)} " + (f"in {len(bl.pieces)} pieces spliced over posts" if len(bl.pieces) > 1 else "one piece") + f", {bl.n_posts} posts @ {ftin(max((b - a) for a, b in zip(bl.posts_x, bl.posts_x[1:])) if bl.n_posts > 1 else bl.length)} max" for bl in L.beam_lines]
-            + ["Crown up, strung straight, caps screwed off with the SDS screws in the box."]
+            + ["Crown up, strung straight, caps screwed off with the " + ("SDS screws in the box." if any(c.startswith("CCQ") for c in caps) else "SD screws (SD10212).")]
+            + ([f"Built-up beam: laminate the plies with GRK RSS 3-1/8\", 2 rows 2\" from top and bottom, staggered @ 12\" OC, before it goes up; "
+                f"a 1/2\" shim in each {caps[0] if caps else 'BC46Z'} (the (2)2x is 3\" in the 3-9/16\" seat)."] if two_by else [])
             + ([f"Two-ply beam: through-bolt the plies with 1/2\" HDG bolts, 2 rows 2\" from top and bottom, staggered @ 24\" OC, a pair 6\" from each end — before it goes up."]
                if any(parse_beam(bl.size)[0] == 2 and parse_beam(bl.size)[1].startswith("4x") for bl in L.beam_lines) else [])
             + ([f"Knee braces once the beam is capped: 4x4 at 45°, {ftin(s.framing.knee_leg_in)} legs, one along the beam toward mid-span and one toward the house up to a {s.framing.joist_size} block between two joists (set the block with the frame) — 1/2\" through-bolt each end, then pull the temporary bracing."]
@@ -84,7 +91,9 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                 + ["Box two C sections toe-to-toe, #12 self-drilling screws per the engineer's pattern; set flush with the joist tops; brackets to the stubs and cover posts."],
             check=["Beam top = joist top (flush)", "Brackets fully fastened; cut ends cold-galvanized"])
     steps.append(dict(n=5, code="T-404", title="Frame", still="step5",
-        goes_in=items(lambda l: l.category == "Lumber" and s.framing.joist_size in l.item, 6) + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane")), 8),
+        goes_in=items(lambda l: l.category == "Lumber" and s.framing.joist_size in l.item and not is_beam(l), 6)
+                + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane", "DTT1Z"))
+                        or (l.category == "Hardware" and l.item.startswith("GRK RSS") and "100 ct" in l.item), 14),
         how=[t.schedule.get("Ledger", "Ledger per the schedule."),
              "; ".join(f"{z.name}: {len(z.frame.joist_x)} joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones) + ". Crown up, hangers at the ledger" + (", both faces of the flush beam" if any(b.kind == "flush" for b in L.beam_lines) else "") + ".",
              t.schedule.get("Blocking", "Blocking one row over the beam, staggered."), t.schedule.get("Joist tape", "Tape every joist top.")],
@@ -101,14 +110,53 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                  t.schedule.get("Steel frame", "")],
             check=["Frame square: diagonals within 1/8\"", "Every clip fully screwed; ledger screws per the schedule", "Cut ends cold-galvanized; photos of the ledger, clips and footings before decking"])
     steps.append(dict(n=6, code="T-405", title="Decking", still="step6",
-        goes_in=items(lambda l: l.category in ("Decking", "Fasteners", "Fascia")),
+        goes_in=items(lambda l: l.category in ("Decking", "Fasteners", "Fascia"), 14),
         how=[t.schedule.get("Field", ""), t.schedule.get("Face screws", "Borders first, then the field."),
              (L.plan.summary() if L.plan is not None else "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones)) + ". Borders and breakers first, then the field rows from the outer edge toward the house."],
         check=[f"{ftin(s.deck_gap)} gaps held", "No cut end shows at the outer edge", "Color: every board from the same run"]))
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
-        goes_in=items(lambda l: l.category == "Rail"),
+        goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
         how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else []),
         check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—", "Cables tensioned / balusters under 4\" clear", "End of construction"]))
+    # stairs and the box step (their own crew day), then the built-ins — the order lines that go in with each
+    from .takeoff import inches_frac
+    if s.stairs and L.stairs:
+        how_ = []
+        for ss_, sl_ in zip(s.stairs, L.stairs):
+            nm_, g_ = getattr(ss_, "name", None) or "Stair", sl_.geo
+            if getattr(sl_, "build", "") == "box":
+                how_.append(f"{nm_}: {g_.risers} risers @ {inches_frac(g_.riser_in)} — a framed 2x6 box {ftin(sl_.width)} wide on a 4\" compacted 3/4\" base, "
+                            "screwed to the rim (RSS), fascia on the front and both ends, decked in the field board; no stringers.")
+            else:
+                oc_ = sl_.width / max(1, sl_.stringers - 1)
+                how_.append(f"{nm_}: {g_.risers} risers @ {inches_frac(g_.riser_in)}, {g_.treads} tread{'s' if g_.treads != 1 else ''} @ {inches_frac(g_.tread_in)} — "
+                            f"{sl_.stringers} 2x12 stringers @ {oc_:.0f}\" OC on LSCZ connectors at the rim"
+                            + (", fascia skirts both sides stepped under each tread" if getattr(sl_, "skirts", False) else "") + ", closed risers, treads Cortex 2 per stringer per board.")
+        if any(getattr(ss_, "landing", "") == "grade" for ss_ in s.stairs):
+            how_.append("Each stair lands on grade: 36\" of firm, level ground at the bottom, as wide as the stair (no pad in this scope).")
+        steps.append(dict(n=8, code="T-407", title="Stairs" + (" and the box step" if any(getattr(sl_, "build", "") == "box" for sl_ in L.stairs) else ""), still="yard",
+            goes_in=items(lambda l: (l.category == "Lumber" and any(k in (l.why or "") for k in ("stair", "box step")))
+                          or (l.category == "Stairs" and "door step" not in l.item.lower()) or (l.category == "Hardware" and ("stair" in l.item.lower() or "box step" in l.item.lower())), 14),
+            how=how_,
+            check=["Risers within 3/8\" of each other; treads level, nosings straight", "Landing at the bottom firm and level, 36\" deep", "Skirts and fascia tight; plugs set flush"]))
+    if s.geometry.benches or s.geometry.planters or getattr(s.geometry, "door_step", None):
+        how_ = []
+        for bn in (s.geometry.benches or []):
+            nb_ = bn.get("name") or ""
+            how_.append(f"{nb_ if 'bench' in nb_.lower() else ('Bench, ' + nb_ if nb_ else 'Bench')}: {bn.get('seat_in', 17):g}\" seat, {bn.get('depth_in', 17):g}\" deep" + (f", back to {bn.get('back_in', 34):g}\"" if bn.get("back", True) else "")
+                        + " — 4x4 back posts bolted through the rim (2 x 1/2\" carriage bolts each), 4x4 front legs, 2x6 seat rails with supports @ 16\" OC, every post wrapped in deck board; "
+                        "three seat boards (the outer two in the frame color), a front apron, three back slats; Cortex throughout.")
+        for pl in (s.geometry.planters or []):
+            np_ = pl.get("name") or ""
+            how_.append(f"{np_ if 'planter' in np_.lower() else ('Planter, ' + np_ if np_ else 'Planter')}: {pl.get('width_in', 17):g}\" x {pl.get('height_in', 17):g}\" — treated 2x4 walls (studs 12\" OC, top and bottom plates), 7/16\" OSB, "
+                        "6-mil liner over a drainage mat, deck-board skin on every side, picture-frame cap; Cortex.")
+        if getattr(s.geometry, "door_step", None):
+            how_.append("Door step: the framed 2x6 box on the deck at the door, decked, riser board and returns.")
+        steps.append(dict(n=9, code="T-408", title="Built-ins — " + ", ".join(w for w, on in (("benches", s.geometry.benches), ("planter" + ("s" if len(s.geometry.planters or []) > 1 else ""), s.geometry.planters),
+                                                                                            ("door step", getattr(s.geometry, "door_step", None))) if on), still="corner",
+            goes_in=items(lambda l: l.category in ("Benches", "Planters") or "door step" in l.item.lower(), 14),
+            how=how_,
+            check=["Bench seats level at the seat height, backs plumb, posts tight to the rim", "Planter liner lapped and drained before any soil", "No screw head showing; plugs flush"]))
     if s.geometry.cover or s.geometry.covers:
         from .takeoff import cover_size
         along, out, area = cover_size(s)
@@ -125,6 +173,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             check=["Ledger flashed and counterflashed — hose test before the ceiling closes", "Posts plumb over blocking, beam level, rafters tied",
                    "Panels straight, seams engaged full length, no oil-canning; snow bar continuous" if ss else "Shingles straight, ridge cap sealed",
                    "Gutter falls to the outlets, downspouts discharge away from the footings" if s.extras.cover_gutters else "Water sheds clear of the deck edge"]))
+    for i, st_ in enumerate(steps):          # numbered as built: the phase numbers skip (no stone bases, no cover)
+        st_["n"], st_["code"] = i + 1, f"T-4{i:02d}"
     return steps
 
 
