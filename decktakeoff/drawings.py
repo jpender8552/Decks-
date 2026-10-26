@@ -353,8 +353,8 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
                                   "roof load adds — the engineer sizes the pier.",
                                   f"Beams: boxed CEMCO {L.spec.framing.steel_joist}, flush (D-502 / 2)."]):
             o.append(T(sx, yy + 36 + k_ * 11, ln_, 7.2, 500))
-    return sheet("S-100", "Foundation plan", "Footings, posts and beam lines with the footing schedule; beams dashed"
-                 + (" (below the joists)" if any(b_.kind == "drop" for b_ in L.beam_lines) else "") + (f"; edge posts {eps_[0].label}-{eps_[-1].label} under the rims" if eps_ else ""), o, "Plan · not to scale · house at the top · dimensions govern", meta)
+    return sheet("S-100", "Foundation plan", ("Footings, posts and beam lines with the footing schedule; beams dashed" + (" (below the joists)" if any(b_.kind == "drop" for b_ in L.beam_lines) else "")
+                                              if L.beam_lines else "Footings and posts with the footing schedule") + (f"; edge posts {eps_[0].label}-{eps_[-1].label} under the rims" if eps_ else ""), o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
 
 def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
@@ -599,12 +599,22 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
         o.append(LN(58, yy, 108, yy, INK, 1.4)); o.append(C(108, yy, 2.2, INK))
     note(40, 275, 270, t.schedule.get("Ledger", "") + (" · 26 ga wall flashing (WUI)" if s.site.wui_fire_zone else ""))
     # 2 post / beam / cap
-    frame_(340, 20, 300, 290, "2", "POST · BEAM · CAP")
     bl = L.beam_lines[0] if L.beam_lines else None
-    o.append(R(470, 120, 40, 138, FILL["timber"], INK, 0.9)); o.append(T(490, 195, f"{s.framing.post_size} post", 7, 700, "middle", INK, rot=-90))
-    o.append(R(400, 70, 180, 50, FILL["timber_dk"], INK, 0.9)); o.append(T(490, 100, f"{bl.size if bl else ''} {'drop' if (bl and bl.kind == 'drop') else 'flush'} beam", 7.5, 700, "middle"))
-    o.append(R(462, 112, 56, 16, FILL["steel"], INK, 0.6)); o.append(T(530, 126, (bl.cap_end if bl else "cap") + (" black" if s.framing.hardware_finish == "black" else ""), 6.5, 600))
-    if bl and bl.kind == "drop":
+    eps_ = getattr(L, "edge_posts", None) or []
+    edge_only = (not bl) and bool(eps_)        # no beam: the doubled rims stand on edge posts
+    frame_(340, 20, 300, 290, "2", "POST · RIM · TIES" if edge_only else "POST · BEAM · CAP")
+    o.append(R(470, 120, 40, 138, FILL["timber"], INK, 0.9)); o.append(T(490, 195, f"{s.framing.post_size} " + ("edge post" if edge_only else "post"), 7, 700, "middle", INK, rot=-90))
+    o.append(R(400, 70, 180, 50, FILL["timber_dk"], INK, 0.9))
+    o.append(T(490, 100, (f"{L.frame.rim_plies}-ply {s.framing.joist_size} rim = flush beam" if edge_only else f"{bl.size if bl else ''} {'drop' if (bl and bl.kind == 'drop') else 'flush'} beam"), 7.5, 700, "middle"))
+    if edge_only:
+        for ax in (458, 506):
+            o.append(R(ax, 112, 16, 4, FILL["steel"], INK, 0.5)); o.append(R(ax + (0 if ax < 490 else 12), 112, 4, 18, FILL["steel"], INK, 0.5))
+        o.append(T(530, 132, "(4) A35Z — no cap", 6.5, 600))
+    else:
+        o.append(R(462, 112, 56, 16, FILL["steel"], INK, 0.6)); o.append(T(530, 126, (bl.cap_end if bl else "cap") + (" black" if s.framing.hardware_finish == "black" else ""), 6.5, 600))
+    if edge_only:
+        o.append(T(400, 64, "joists hang on the rim's inside face (LUS)", 6.5, 600))
+    elif bl and bl.kind == "drop":
         o.append(R(400, 56, 180, 14, FILL["timber"], INK, 0.5)); o.append(T(400, 52, "joists bear on the beam, H2.5AZ each", 6.5, 600))
     else:
         o.append(T(400, 64, "joists hang on both faces (LUS)", 6.5, 600))
@@ -614,6 +624,9 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
         note(360, 275, 270, f"{len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in bls_}))} beam lines, "
                             f"{sum(len(b_.posts_x) for b_ in bls_)} posts" + (f", worst post {worst:,.0f} lb" if worst else "") + " (S-100 / S-101)."
                             + (" Plies on RSS screws, 2 rows @ 12\"; caps with a 1/2\" shim." if any(b_.size.startswith("(2)2x") for b_ in bls_) else ""))
+    elif edge_only:
+        note(360, 275, 270, f"{len(eps_)} edge posts {eps_[0].label}-{eps_[-1].label} under the rim corners (S-100), worst {max(e.load for e in eps_):,.0f} lb; "
+                            f"the rims span post to post as flush beams; no interior beam.")
     else:
         note(360, 275, 270, "; ".join(t.summary["beams"])[:150])
     # 3 footing / base
@@ -1570,7 +1583,7 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
                     o.append(R(xa + 1, yv + 2, len(lab_txt) * 3.5 + 4, 10, CREAM, "#b3261e", 0.5)); o.append(T(xa + 3, yv + 9.5, lab_txt, 6.2, 800, "start", "#b3261e"))
     o.append(T(20, 330 + 12, "NOTES", 9, 800, fill=GOLD))
     notes = [f"Deck surface {ftin(s.geometry.height_in)} above grade (walkway low point {ftin(s.geometry.height_min_in)})" if s.geometry.height_min_in else f"Deck surface {ftin(s.geometry.height_in)} above grade",
-             "Heights AFG = above finished grade at the beam line; field-verify grade before setting the piers",
+             "Heights AFG = above finished grade at the " + ("beam line" if L.beam_lines else "posts") + "; field-verify grade before setting the piers",
              ]
     from .spec import covers_of as _cov
     if _cov(s):
@@ -1835,8 +1848,24 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
     plyfast = "plies laminated GRK RSS 3-1/8\", 2 rows @ 12\" staggered" if two_by else "plies through-bolted 1/2\" @ 24\" staggered"
     sb = [b_ for b_ in (s.framing.beams or []) if b_.kind == "flush"]
     setback = min((float(b_.setback_in or 0) for b_ in sb), default=0.0)
-    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "JOISTS INTO THE FLUSH BEAM — PLAN + SECTION" if flush else "JOISTS ON THE DROP BEAM — SECTION")
-    if flush:
+    edge_only = (not bl) and bool(getattr(L, "edge_posts", None))       # no beam: the doubled rims on edge posts carry the joists
+    rimsz = f"{fr.rim_plies}-ply {js} rim"
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "JOISTS INTO THE FLUSH BEAM — PLAN + SECTION" if flush else ("JOISTS INTO THE DOUBLED RIM — PLAN + SECTION" if edge_only else "JOISTS ON THE DROP BEAM — SECTION"))
+    if edge_only:
+        _wood(o, x + 20, y + 40, W3 - 40, 26)
+        o.append(LN(x + 20, y + 53, x + W3 - 20, y + 53, INK, 0.5))
+        for k in range(5):
+            xx = x + 36 + k * 58
+            _wood(o, xx, y + 66, 7, 120, dark=True)
+            o.append(R(xx - 3, y + 66, 13, 9, "#7b8186", INK, 0.6))
+        o.append(T(x + W3 / 2, y + 36, "FRONT OF THE DECK — the doubled rim on the edge posts", 6.6, 800, "middle", MUTE))
+        _wood(o, x + 30, y + 214, 120, 46); _wood(o, x + 150, y + 216, 10, 42, dark=True); o.append(R(x + 150, y + 236, 12, 22, "#7b8186", INK, 0.6))
+        o.append(R(x + 30, y + 207, 250, 7, FILL["deck"], INK, 0.5)); _wood(o, x + 160, y + 216, 120, 42, dark=True)
+        _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson LUS28Z every joist off the rim's inside face, 10d HDG every hole")
+        _lead(o, x + 60, y + 238, x + 24, y + 196, f"{rimsz} = the flush beam, plies laminated GRK RSS 3-1/8\", 2 rows @ 12\" staggered")
+        _lead(o, x + 210, y + 236, x + 236, y + 180, f"{js} joist, top flush with the rim")
+        o.append(T(x + 24, y + 278, f"Joists span ledger to rim at {fr.spacing:g}\" OC; the rim spans post to post — no cantilever", 6.6, 700))
+    elif flush:
         _wood(o, x + 20, y + 40, W3 - 40, 26)                          # the (2)4x10 in plan, the front of the deck
         o.append(LN(x + 20, y + 53, x + W3 - 20, y + 53, INK, 0.5))
         for k in range(5):
@@ -1874,20 +1903,29 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
         o.append(T(x + 24, y + 262, "Joists bear the full beam width", 6.6, 700))
         o.append(T(x + 24, y + 274, f"Cantilever {ftin(L.frame.beams[0].cantilever) if L.frame.beams else ''} past the beam — over L/4: engineer", 6.6, 700))
     # 4 beam on the post cap
-    x, y = P[3]; _panel(o, x, y, W3, H2, "4", f"{bsize} BEAM ON THE 6x6 — ELEVATION")
+    x, y = P[3]; _panel(o, x, y, W3, H2, "4", "DOUBLED RIM ON THE EDGE POST — ELEVATION" if edge_only else f"{bsize} BEAM ON THE 6x6 — ELEVATION")
     _wood(o, x + 20, y + 60, W3 - 40, 46)
     for k in range(6):
         _bolt(o, x + 36 + k * 48, y + (70 if k % 2 == 0 else 96))
-    o.append(R(x + 128, y + 104, 48, 14, "#5b6166", INK, 0.6)); o.append(R(x + 124, y + 60, 4, 58, "#5b6166", INK, 0.5)); o.append(R(x + 176, y + 60, 4, 58, "#5b6166", INK, 0.5))
-    _wood(o, x + 136, y + 118, 32, 168)
+    if edge_only:                       # two A35Z angles each side of the post, rim to post — no cap
+        for ax in (x + 122, x + 168):
+            o.append(R(ax, y + 96, 14, 4, "#5b6166", INK, 0.5)); o.append(R(ax + (0 if ax < x + 150 else 10), y + 96, 4, 22, "#5b6166", INK, 0.5))
+    else:
+        o.append(R(x + 128, y + 104, 48, 14, "#5b6166", INK, 0.6)); o.append(R(x + 124, y + 60, 4, 58, "#5b6166", INK, 0.5)); o.append(R(x + 176, y + 60, 4, 58, "#5b6166", INK, 0.5))
+    _wood(o, x + 136, y + 106 if edge_only else 118, 32, 180 if edge_only else 168)
     if s.framing.knee_braces:
         o.append(PG([(x + 168, y + 190), (x + 168, y + 176), (x + 240, y + 106), (x + 254, y + 106)], FILL["timber_dk"], INK, 0.7))
         _bolt(o, x + 168 + 6, y + 186); _bolt(o, x + 244, y + 112 - 30 + 30)
-    _lead(o, x + 150, y + 108, x + 24, y + 140, f"Simpson {cap} column cap" + (" — 7\" seat for the (2)4x, SDS screws (confirm SKU / engineer)" if cap.startswith("CCQ7") else
-                                                                          ", SD screws — 1/2\" shim: a (2)2x is 3\" in the 3-9/16\" seat" if two_by and cap.startswith("BC46") else ""))
-    _lead(o, x + 60, y + 72, x + 24, y + 36, ("GRK RSS 3-1/8\" through the plies, 2 rows 2\" from top / bottom, staggered @ 12\" OC" if two_by
-                                             else "1/2\" x 8\" HDG bolts, 2 rows staggered @ 24\" OC, a pair 6\" from each end"))
-    _lead(o, x + 150, y + 220, x + 24, y + 230, f"6x6 {pw} post")
+    if edge_only:
+        _lead(o, x + 128, y + 104, x + 24, y + 140, "(2) Simpson A35Z per rim to the post, 10d x 1-1/2\" HDG every hole — no cap")
+        _lead(o, x + 60, y + 72, x + 24, y + 36, f"{rimsz}, GRK RSS 3-1/8\" through the plies, 2 rows 2\" from top / bottom, staggered @ 12\" OC")
+        _lead(o, x + 150, y + 220, x + 24, y + 230, f"6x6 {pw} edge post, top cut to the rim bottom, under both rim ends at the corner")
+    else:
+        _lead(o, x + 150, y + 108, x + 24, y + 140, f"Simpson {cap} column cap" + (" — 7\" seat for the (2)4x, SDS screws (confirm SKU / engineer)" if cap.startswith("CCQ7") else
+                                                                              ", SD screws — 1/2\" shim: a (2)2x is 3\" in the 3-9/16\" seat" if two_by and cap.startswith("BC46") else ""))
+        _lead(o, x + 60, y + 72, x + 24, y + 36, ("GRK RSS 3-1/8\" through the plies, 2 rows 2\" from top / bottom, staggered @ 12\" OC" if two_by
+                                                 else "1/2\" x 8\" HDG bolts, 2 rows staggered @ 24\" OC, a pair 6\" from each end"))
+        _lead(o, x + 150, y + 220, x + 24, y + 230, f"6x6 {pw} post")
     if s.framing.knee_braces:
         _lead(o, x + 210, y + 150, x + 236, y + 180, "4x4 knee brace at 45°, 1/2\" through-bolt each end (see 6)")
     # 5 post base on the pier
@@ -1922,10 +1960,10 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
         _lead(o, x + 199, y + 66, x + 70, y + 236, f"{js} block between two joists takes the brace top, 1/2\" x 6\" bolt; block screwed (3) each end")
         o.append(T(x + 24, y + 274, f"Posts {ftin(fr.post_len)}: braces both ways at every post (engineer)", 6.6, 700))
     else:
-        o.append(T(x + 20, y + 40, "Post length, top of the standoff base to the beam seat", 7.2, 800))
-        o.append(T(x + 20, y + 52, "cut in the field to the string line; the beam tops sit flush with the joists", 6.6, 500, fill=MUTE))
+        o.append(T(x + 20, y + 40, "Post length, top of the standoff base to the " + ("rim" if edge_only else "beam") + " seat", 7.2, 800))
+        o.append(T(x + 20, y + 52, "cut in the field to the string line; the " + ("rims sit" if edge_only else "beam tops sit") + " flush with the joists", 6.6, 500, fill=MUTE))
         yy = y + 74
-        for t_, a_ in (("Beam line", 20), ("Posts", 170), ("Post", 230)):
+        for t_, a_ in (("Support" if edge_only else "Beam line", 20), ("Posts", 170), ("Post", 230)):
             o.append(T(x + a_, yy, t_.upper(), 6.4, 800, fill=MUTE))
         for bl_ in (L.beam_lines or []):
             yy += 16
@@ -1945,7 +1983,8 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
             for ln_ in textwrap.wrap("Under 8\" there is little room for the pier head, the standoff base and a post: check the grade at each pier "
                                      "before setting (see the field flags); where it is tight the beam bears on the pier through a bracket, no post.", 78):
                 o.append(T(x + 20, yy, ln_, 6.6, 600, fill="#b3261e")); yy += 11
-    return sheet("D-502", "Connection details — frame", f"Ledger{' on the cantilever' if cant else ''} · hangers · joists {'into' if flush else 'on'} the beam · {bsize} on the cap · pier + base · "
+    return sheet("D-502", "Connection details — frame", (f"Ledger{' on the cantilever' if cant else ''} · hangers · joists into the rim · the rim on the edge post · pier + base · " if edge_only else
+                 f"Ledger{' on the cantilever' if cant else ''} · hangers · joists {'into' if flush else 'on'} the beam · {bsize} on the cap · pier + base · ")
                  + ("knee braces" if s.framing.knee_braces else "post lengths"), o,
                  _detail_note(s), meta)
 
