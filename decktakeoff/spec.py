@@ -90,6 +90,7 @@ class Geometry:
     height_high_in: Optional[float] = None   # surface above grade at the highest point (sloped lots), if different
     height_min_in: Optional[float] = None    # the lowest surface-to-grade point when height_in is an average (a walkway over uneven grade)
     attachment: str = "ledger"           # "ledger" | "freestanding"
+    bay_ledger: bool = False             # a bay on the house takes a ledger on its faces (it bears on the foundation — not a cantilevered floor)
     board_direction: str = "parallel"    # "parallel" (to the house) | "perpendicular"
     picture_frame: bool = True
     fit_frame_to_boards: bool = True     # shrink/grow the depth a hair so the last field board is a full board

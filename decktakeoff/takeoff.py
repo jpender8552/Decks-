@@ -462,7 +462,8 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
         ln = math.hypot(x1 - x0, y1 - y0)
         Q_.ledger_len += ln
         Q_.lumber.append((spec.ledger_size, round(ln, 2), "ledger"))
-        Q_.cuts.append(CutPiece("Ledger (main wall)", spec.ledger_size, round(ln, 2), 1, "top at deck height less the board; membrane behind, flashing over; LedgerLOK per the schedule"))
+        Q_.cuts.append(CutPiece("Ledger (main wall)" if abs(y0) < 1.0 and abs(y1) < 1.0 else "Ledger (bay face)", spec.ledger_size, round(ln, 2), 1,
+                                "top at deck height less the board; membrane behind, flashing over; LedgerLOK per the schedule"))
     for x0, y0, x1, y1 in OF.ledger_blocks:
         ln = math.hypot(x1 - x0, y1 - y0)
         Q_.ledger_len += ln
@@ -476,9 +477,10 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     Q_.n_blocks = len(blk)
     # hangers: every joist end by what it lands on
     Q_.hangers_single = sum((e in ("ledger", "beam", "rim")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
-    Q_.hangers_skew = sum((e in ("rim45", "bay45")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
+    Q_.hangers_skew = sum((e in ("rim45", "bay45", "ledger45")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
     Q_.hangers_double = 0
-    Q_.hangers_skew_double = 2 * len(OF.ledger_blocks)
+    Q_.hangers_skew_double = 2 * len(OF.ledger_blocks) + (OF.rim_to_ledger if any(k_ == "ledger45" for k_ in OF.side_kind) else 0)
+    Q_.skew_double_note = ("the two angled rims at the ledger block beside the bay" if OF.ledger_blocks else "the doubled angled rims where they die into the ledger")
     # fascia: every open side, its own mitred length
     Q_.fascia_pieces = []
     if spec.decking.fascia:
@@ -491,7 +493,27 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     Q_.tape_block_lf = sum(blk) / 12.0
     Q_.rss_lam = int(rim_lf / plies / 12.0 * 2 + 0.999) * (plies - 1) if plies > 1 else 0
     Q_.outline_notes = OF.notes
+    Q_.outline_block_note = (f"{len(blk)} x {jsize} blocks under the 45-degree picture-frame borders, (3) structural screws each end"
+                             + ("; one row over each flush beam" if L.beam_lines else "; the joists hang at both ends — no mid-span row"))
     Q_.outline_ledgers = list(OF.ledgers)
+
+
+def _ledger_runs(segs) -> int:
+    """Ledger segments that touch end to end are one ledger (a main wall that wraps a bay): the lateral ties go 2 near each end of a run."""
+    segs = list(segs)
+    if not segs:
+        return 0
+    parent = list(range(len(segs)))
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]; i = parent[i]
+        return i
+    ends = [((a, b), (c, d)) for a, b, c, d in segs]
+    for i in range(len(segs)):
+        for j in range(i + 1, len(segs)):
+            if any(math.hypot(p[0] - q[0], p[1] - q[1]) < 6.0 for p in ends[i] for q in ends[j]):
+                parent[find(i)] = find(j)
+    return len({find(i) for i in range(len(segs))})
 
 
 def jb_of(nominal: str) -> float:
@@ -769,7 +791,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     d_, uc, src, sku = _hw(hanger, black)
     n_flush = sum(1 for bl in L.beam_lines if bl.kind == "flush" and not bl.label.startswith("FRONT"))
     why = (f"exact  (joists at the ledgers + rim ends" + (f" + both faces of the flush beam" if n_flush else "") + ")") if timber \
-        else (f"exact  ({Qz.hangers_single} joist ends on the ledger, the flush beams and the square rims — framing plan)" if getattr(Qz, 'outline_ledgers', None) is not None
+        else (f"exact  ({Qz.hangers_single} joist ends on the ledger" + (", the flush beams" if any(bl.kind == "flush" for bl in L.beam_lines) else "") + " and the square rims — framing plan)" if getattr(Qz, 'outline_ledgers', None) is not None
               else f"exact  ({Qz.n_joists} joists x {Qz.hangers_single // max(1, Qz.n_joists)} ends)")
     lines.append(Line("Hardware", d_, Qz.hangers_single, Qz.hangers_single, "ea", why, uc, src, sku))
     if Qz.hangers_double:
@@ -781,7 +803,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}Z / SUL{jsize.replace('2x', '2')}Z skewed 45-degree hanger (right / left as the angle runs)", Qz.hangers_skew, Qz.hangers_skew + 2, "ea",
                           f"+2  (joist ends on the 45-degree rims, from the framing plan)", 9.5, "est. — confirm D&D stock"))
     if Qz.hangers_skew_double:
-        lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}-2Z / SUL{jsize.replace('2x', '2')}-2Z skewed double hanger — the two angled rims at the ledger block beside the bay", Qz.hangers_skew_double, Qz.hangers_skew_double, "ea",
+        lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}-2Z / SUL{jsize.replace('2x', '2')}-2Z skewed double hanger — {getattr(Qz, 'skew_double_note', 'the two angled rims at the ledger block beside the bay')}", Qz.hangers_skew_double, Qz.hangers_skew_double, "ea",
                           "exact", 24.0, "est. — confirm D&D stock"))
     nh, nj = HANGER_NAILS.get(hanger, (6, 4))
     n_long = Qz.hangers_single * nh
@@ -825,7 +847,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         Qz.ledger_fasteners = n_ll
         sched["Ledger"] = f"{spec.ledger_size} ledger x {ftin(Qz.ledger_len)} total · {rule} · {n_ll} fasteners"
         if not timber:
-            n_ledgers = len(getattr(Qz, 'outline_ledgers', [])) if getattr(Qz, 'outline_ledgers', None) is not None else ((len(L.zones) if L.multi else 1))
+            n_ledgers = _ledger_runs(Qz.outline_ledgers) if getattr(Qz, 'outline_ledgers', None) is not None else ((len(L.zones) if L.multi else 1))
             n_dtt = spec.framing.lateral_ties * max(1, n_ledgers)
             d = PRICEBOOK["hardware"]["DTT1Z"]
             lines.append(Line("Hardware", d["desc"], n_dtt, n_dtt, "ea", "exact  (2 near each end of every ledger, into house floor framing)", d["each"], d["source"], "DTT1Z"))
@@ -873,12 +895,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     if sd_screws:
         d = PRICEBOOK["hardware"]["SD10212_100"]
         boxes = int(math.ceil(sd_screws / d["count"]))
-        lines.append(Line("Hardware", d["desc"], boxes, boxes, "box", f"{sd_screws} needed  (bases {base_screws} · caps {sd_screws - base_screws})", d["each"], d["source"]))
+        lines.append(Line("Hardware", d["desc"], boxes, boxes, "box", f"{sd_screws} needed  (bases {base_screws}" + (f" · caps {sd_screws - base_screws}" if sd_screws > base_screws else "") + ")", d["each"], d["source"]))
     blk = 0 if timber else 6 * Qz.n_blocks          # (3) each end, as every detail draws it
     rail_blk = 6 * len(rl.posts) if (rl and surface_rail and not timber) else 0      # the block under each surface-mount post, (3) each end
     rss = Qz.rss_lam + beam_lam + blk + rail_blk
     if timber and Qz.n_blocks:
         sched["Blocking"] = f"{Qz.n_blocks} x {jsize} blocks, (3) 16d toe-nails each end"
+    elif getattr(Qz, "outline_block_note", None):
+        sched["Blocking"] = Qz.outline_block_note
     if rss:
         d = PRICEBOOK["hardware"]["RSS_3-1/8_100"]
         boxes = int(math.ceil(rss / d["count"]))

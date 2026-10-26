@@ -943,6 +943,7 @@ class OutlineFrame:
     blocks: List[Tuple[float, float, float, float, str]] = field(default_factory=list)        # blocking centrelines
     side_kind: List[str] = field(default_factory=list)                                        # per outline side
     notes: List[str] = field(default_factory=list)
+    rim_to_ledger: int = 0                                                                     # doubled rim ends hung on a ledger
 
 
 def _col_cross(poly, x) -> List[Tuple[float, int]]:
@@ -971,6 +972,7 @@ def outline_side_faces(spec: DeckSpec, edges: List["Edge"], rim_t: float, jb: fl
     sits from the line — a 2-ply rim on open sides, the ledger on the straight main wall, 1/2" off a bay front (the
     header beam stands off it), a 2-ply rim 1/2" off an angled bay face."""
     kinds = []
+    bay_led = spec.geometry.bay_ledger
     for e in edges:
         horiz, vert = abs(e.y1 - e.y0) < 0.5, abs(e.x1 - e.x0) < 0.5
         if e.exposed:
@@ -978,10 +980,10 @@ def outline_side_faces(spec: DeckSpec, edges: List["Edge"], rim_t: float, jb: fl
         elif abs(e.y0) < 0.5 and abs(e.y1) < 0.5:
             kinds.append("ledger")
         elif horiz:
-            kinds.append("bayfront")
+            kinds.append("ledger" if bay_led else "bayfront")
         else:
-            kinds.append("bay45")
-    face = {"rim": rim_t, "rim45": rim_t, "ledger": jb, "bayfront": 0.5, "bay45": rim_t + 0.5}
+            kinds.append("ledger45" if bay_led else "bay45")       # a ledger on an angled bay face: joists land in skewed hangers
+    face = {"rim": rim_t, "rim45": rim_t, "ledger": jb, "ledger45": jb, "bayfront": 0.5, "bay45": rim_t + 0.5}
     return kinds, [face[k] for k in kinds]
 
 
@@ -1031,18 +1033,21 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
                     of.joists.append((X, a, b, ea, eb, lab))
     # rims: ply centrelines along every open side and every angled bay face (mitred: each ply its own inset polygon)
     for k in range(plies):
-        off = {"rim": (k + 0.5) * jb, "rim45": (k + 0.5) * jb, "bay45": 0.5 + (k + 0.5) * jb, "ledger": 0.0, "bayfront": 0.0}
+        off = {"rim": (k + 0.5) * jb, "rim45": (k + 0.5) * jb, "bay45": 0.5 + (k + 0.5) * jb, "ledger": 0.0, "ledger45": 0.0, "bayfront": 0.0}
         q = _inset_inward(poly, [off[t] for t in of.side_kind])
         for i in range(n):
             if of.side_kind[i] in ("rim", "rim45", "bay45"):
                 (x0, y0), (x1, y1) = q[i], q[(i + 1) % n]
                 of.rims.append((i, k, x0, y0, x1, y1))
     # ledger: centreline on the main wall between the neighbouring rims' faces
-    qL = _inset_inward(poly, [(jb / 2 if t == "ledger" else face[t]) for t in of.side_kind])
+    qL = _inset_inward(poly, [(jb / 2 if t in ("ledger", "ledger45") else face[t]) for t in of.side_kind])
     for i in range(n):
-        if of.side_kind[i] == "ledger":
+        if of.side_kind[i] in ("ledger", "ledger45"):
             (x0, y0), (x1, y1) = qL[i], qL[(i + 1) % n]
             of.ledgers.append((x0, y0, x1, y1))
+    # a doubled rim that dies into a ledger (the house corner of an angled side): hung on it in a skewed double hanger
+    of.rim_to_ledger = sum(1 for i in range(n) for a, b in ((of.side_kind[i], of.side_kind[(i + 1) % n]),)
+                           if {a, b} & {"rim", "rim45"} and {a, b} & {"ledger", "ledger45"})
     # an angled rim that dies into the main wall where no ledger runs (beside a bay): a 24" ledger block on the wall
     for i in range(n):
         j = (i + 1) % n

@@ -2051,13 +2051,14 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     _lead(o, x + 89, y + 200, x + 24, y + 240, f"(4) Simpson DTT1Z, 2 near each end of the ledger: 1/2\" threaded rod through the ledger and the band into a floor joist (or blocking) inside — 750 lb each (IRC R507.9.2)")
     # 5 G-tape
     x, y = P[4]; _panel(o, x, y, W3, H2, "5", "JOIST TAPE + BLOCKING")
-    for k, (lab, wd) in enumerate((("joist", 2), ("PF joist", 2), ("block", 2), ("rim (2-ply)", 4), ("beam", 4))):
+    for k, (lab, wd) in enumerate((("joist", 2), ("PF joist", 2), ("block", 2), ("rim (2-ply)", 4)) + ((("beam", 4),) if L.beam_lines else ())):
         xx = x + 30 + k * 56
         _wood(o, xx, y + 90, 3 * 6 * (2 if wd == 4 else 1), 70)
         o.append(R(xx - 2, y + 86, 3 * 6 * (2 if wd == 4 else 1) + 4, 4, "#111", "none", 0))
         o.append(T(xx + 9, y + 176, lab, 6.4, 700, "start")); o.append(T(xx + 9, y + 186, f"{wd}\" tape", 6.4, 800, "start", "#b3261e"))
     o.append(T(x + 24, y + 230, "Nichigo G-Tape 3035 (black) on every top edge before decking, lapped over the ends and", 6.6, 600))
-    o.append(T(x + 24, y + 240, f"down the sides 1/2\"; one row of {js} blocking over the beam, (3) structural screws each end", 6.6, 600))
+    o.append(T(x + 24, y + 240, (f"down the sides 1/2\"; one row of {js} blocking over the beam, (3) structural screws each end" if L.beam_lines else
+                                 f"down the sides 1/2\"; {js} blocks under the angled borders, (3) structural screws each end"), 6.6, 600))
     # 6 fastening schedule
     x, y = P[5]; _panel(o, x, y, W3, H2, "6", "FASTENING SCHEDULE")
     items = " ".join(ln.item for ln in getattr(t, "lines", []))          # what the order carries: the schedule says the same
