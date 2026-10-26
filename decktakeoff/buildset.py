@@ -36,7 +36,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
         goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),   # the bases go in with the posts
         how=[f"Call 811 and locate before any hole or pin. Strip the existing deck first." if s.extras.demo_existing else "Call 811 and locate before any hole or pin.",
-             "Pull the beam lines from the house wall: " + "; ".join(f"{bl.label} at {ftin(bl.y)} from the reference wall, posts at " + " / ".join(ftin(x) for x in bl.posts_x) for bl in L.beam_lines) + ".",
+             "Pull the beam lines from the house wall: " + "; ".join(f"{bl.label} at {ftin(bl.y)} from the reference wall, posts at " + " / ".join(ftin(x) for x in bl.posts_x) for bl in L.beam_lines) + "."
+             + (f" Edge posts {L.edge_posts[0].label}-{L.edge_posts[-1].label} at the outline corners, under both rims (S-100 schedule)." if getattr(L, "edge_posts", None) else ""),
              {"caisson": f"Auger {n_posts} holes {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
               "diamond_pier": f"Set {n_posts} Diamond Pier heads level at grade on undisturbed soil and drive the 4 pins in each; caps on.",
               "concrete": f"Dig and form {n_posts} piers {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)}, pour, set the standoff bases wet.",
@@ -46,14 +47,17 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         check=["Footings on the layout within 1/2\"; bearing on undisturbed soil" if ft != "existing" else "Every existing caisson sound, level and on the beam line; engineer's sign-off in the file",
                "Frost depth met" if ft not in ("diamond_pier", "existing") else ("Pins fully driven, heads level" if ft == "diamond_pier" else "Epoxy cured before load"), "Photos before backfill"]))
     steps.append(dict(n=2, code="T-401", title="Posts", still="step2",
-        goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower()),
+        goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item),
         how=([f"The existing stucco columns stay. Strip the old beam off each column top, check the column core and its bearing; new column caps / saddles per the engineer, then the beams land on them."]
              if s.framing.existing_posts else
              [f"{s.framing.post_size} posts on the bases; cut so the beam top lands at "
               + {frozenset({"drop"}): "the joist bottom (drop beams)", frozenset({"flush"}): "the joist top (flush beams)"}.get(
                   frozenset(b_.kind for b_ in s.framing.beams), "the joist bottom (drop beam) or the joist top (flush beam)")
               + ": " + " / ".join(f"{bl.label} posts {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
-              "Plumb both ways, brace, then the caps go on with the beams."] + (["Seal every cut end before it goes up."] if timber and s.framing.end_grain_seal else [])),
+              "Plumb both ways, brace, then the caps go on with the beams."]
+             + ([f"Edge posts {L.edge_posts[0].label}-{L.edge_posts[-1].label}: one under each outline corner, top cut to the rim bottom ({ftin(L.edge_post_len)} nominal); "
+                 "the rims land on them with (2) A35Z per rim — the rims span post to post as flush beams."] if getattr(L, "edge_posts", None) else [])
+             + (["Seal every cut end before it goes up."] if timber and s.framing.end_grain_seal else [])),
         check=["Posts plumb to a string; tops on the beam line", "Every cut end sealed" if timber else "No post in ground contact without a standoff"]))
     if s.extras.stone_bases:
         steps.append(dict(n=3, code="T-402", title="Stone column bases", still="step3",

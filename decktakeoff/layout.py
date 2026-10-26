@@ -294,6 +294,8 @@ class Layout:
     wall_lf: float = 0.0          # LF of house wall that gets membrane + flashing (ledgers + return walls; never a privacy wall)
     plan: Optional[FieldPlan] = None      # outline-laid decking (multi-zone plans with an outline and breakers)
     outline_edges: List[Edge] = field(default_factory=list)   # the outline polygon's sides ("edge:N") when the rail or a stair names them
+    edge_posts: List["EdgePost"] = field(default_factory=list)   # posts under the rims (outline corners) carrying the front
+    edge_post_len: float = 0.0
 
     @property
     def deck_sf(self) -> float:
@@ -561,11 +563,18 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     n_posts = 0
     worst_load = 0.0
     joist_bays = 1
+    front_sup = bool(spec.framing.edge_posts_ft)      # the front rim stands on edge posts: the last span ends on it, no cantilever
     for idx, (cl, b) in enumerate(cls):
         plies, nom, bwid, bdep = parse_beam(b.size)
         is_last = idx == len(cls) - 1
         if b.kind == "flush" and abs(cl - (D - front_t / 2)) < 1.0:
             cantilever = 0.0
+        elif front_sup and is_last:
+            cantilever = 0.0
+            fs_ = (D - front_t) - cl                  # the span from this beam to the rim on the edge posts
+            if fs_ > 6:
+                joist_checks.append(eng.check_timber_joist(jsize, jsp_key, spacing, fs_, total_psf) if timber
+                                    else eng.check_joist(jsize, jsp, spacing, fs_, total_psf))
         else:
             cantilever = (D - cl) if is_last else 0.0
         back = (cl - prev_support) if prev_support is not None else 0.0
@@ -578,14 +587,14 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
             if cantilever > eng.CANTILEVER_RATIO * back + 0.5:
                 notes.append(f"cantilever {ftin(cantilever)} exceeds L/4 of the {ftin(back)} back-span — pull the beam out or engineer it")
         # tributary depth the beam carries: half the back span + half the next span (or the cantilever)
-        nxt = (cls[idx + 1][0] - cl) if not is_last else 0.0
-        trib = back / 2 + (cantilever if is_last else nxt / 2)
+        nxt = (cls[idx + 1][0] - cl) if not is_last else (((D - front_t) - cl) if front_sup else 0.0)
+        trib = back / 2 + (cantilever if (is_last and not front_sup) else nxt / 2)
         if not ledger and idx == 0:
             trib = nxt / 2 + (cl - 0)     # rear beam carries the rear overhang plus half the first span
         front_flush = b.kind == "flush" and abs(cl - (D - max(front_t, parse_beam(b.size)[2]) / 2)) < 1.0
         length = W - 2 * BEAM_HOLD_IN if b.kind == "drop" else (W if front_flush else W - 2 * rim_t)
         # beam span table: joist span including the cantilever (IRC R507.5)
-        span_for_table = back + cantilever if is_last else back
+        span_for_table = (max(back, nxt) if front_sup else back + cantilever) if is_last else back
         bsp_key = "DF#1" if (timber and b.species == "DF") else b.species
         if timber:
             allow_b, bgov = eng.timber_allowable_span(b.size, bsp_key, total_psf * max(trib, 36) / 12.0, repetitive=False)
@@ -612,7 +621,8 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         worst_load = max(worst_load, eng.footing_load_lb(sp if sp else length, trib, total_psf))
         prev_support = cl
     if not cls:
-        notes.append("no beam — joists span ledger to front rim; front rim must be carried (posts under a flush front beam)")
+        notes.append("no beam — joists span the ledger to the front rim, carried on the edge posts" if front_sup else
+                     "no beam — joists span ledger to front rim; front rim must be carried (posts under a flush front beam)")
         joist_checks.append(eng.check_timber_joist(jsize, jsp_key, spacing, joist_len, total_psf) if timber
                             else eng.check_joist(jsize, jsp, spacing, joist_len, total_psf))
 
@@ -1156,6 +1166,123 @@ def _place_posts_line(x0: float, x1: float, boundaries: List[float], allow_by_se
     return out
 
 
+@dataclass
+class EdgePost:
+    """A post under the doubled rim at an outline corner (or mid-side): the rim spans post to post as a flush beam."""
+    x: float              # plan inches, post centre
+    y: float
+    zone: str
+    load: float           # lb, tributary
+    label: str = ""       # E1, E2, ...
+    where: str = ""       # "corner sides 3/4" | "side 6"
+
+
+def build_edge_posts(spec: DeckSpec, zl: List[ZoneLayout], lines: List[BeamLine]) -> Tuple[List[EdgePost], float, List[str]]:
+    """Posts under the rims at the owner's outline points. Each sits under both rim ends at a corner (centre half a post in
+    from each side line); its load is half the rim to the next support each way (posts, or the house where a rim dies
+    into it) times half the joist span ending on that rim. Every rim run between supports is checked as a doubled flush beam."""
+    pts = spec.framing.edge_posts_ft or []
+    if not pts or not spec.geometry.outline:
+        return [], 0.0, []
+    notes: List[str] = []
+    poly = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
+    n = len(poly)
+    jb, jd = actual(spec.framing.joist_size)
+    plies = zl[0].frame.rim_plies
+    pb = actual(spec.framing.post_size)[0]
+    d = pb / 2
+    total_psf = max(z.frame.total_psf for z in zl)
+    seg = []                                   # cumulative perimeter length at each vertex
+    acc = 0.0
+    for i in range(n):
+        seg.append(acc)
+        (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+        acc += math.hypot(x1 - x0, y1 - y0)
+    per = acc
+    def normal(i):                             # inward normal of side i (the outline runs clockwise)
+        (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+        L_ = math.hypot(x1 - x0, y1 - y0) or 1.0
+        ux, uy = (x1 - x0) / L_, (y1 - y0) / L_
+        return uy, -ux
+    open_ = [e.exposed for e in outline_poly_edges(spec)]
+    house = lambda i: not open_[i]             # a side on the house (main wall, bay faces): not a rim the posts carry
+    placed = []                                # (s along the perimeter, x, y, where)
+    for px, py in pts:
+        X, Y = float(px) * 12, float(py) * 12
+        vi = min(range(n), key=lambda i: math.hypot(poly[i][0] - X, poly[i][1] - Y))
+        if math.hypot(poly[vi][0] - X, poly[vi][1] - Y) <= 6.0:
+            a_, b_ = normal((vi - 1) % n), normal(vi)
+            k = 1.0 + a_[0] * b_[0] + a_[1] * b_[1]
+            cx, cy = poly[vi][0] + d * (a_[0] + b_[0]) / k, poly[vi][1] + d * (a_[1] + b_[1]) / k
+            placed.append((seg[vi], cx, cy, f"corner, sides {(vi - 1) % n + 1}/{vi + 1}"))
+            continue
+        best = None
+        for i in range(n):
+            (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+            L_ = math.hypot(x1 - x0, y1 - y0)
+            if L_ < 1:
+                continue
+            t = max(0.0, min(1.0, ((X - x0) * (x1 - x0) + (Y - y0) * (y1 - y0)) / L_ ** 2))
+            qx, qy = x0 + t * (x1 - x0), y0 + t * (y1 - y0)
+            dist = math.hypot(qx - X, qy - Y)
+            if best is None or dist < best[0]:
+                best = (dist, i, t, qx, qy, L_)
+        dist, i, t, qx, qy, L_ = best
+        nx_, ny_ = normal(i)
+        placed.append((seg[i] + t * L_, qx + nx_ * d, qy + ny_ * d, f"side {i + 1}"))
+    placed.sort()
+    # supports along the perimeter: the posts, plus the house where an open side dies into it
+    sup = [(s, "post") for s, *_ in placed]
+    for i in range(n):
+        if house(i) and not house((i - 1) % n):
+            sup.append((seg[i], "house"))
+        if house(i) and not house((i + 1) % n):
+            sup.append((seg[(i + 1) % n], "house"))
+    sup.sort()
+    def joist_span_at(x, y):
+        """Distance from this point back to the nearest support: a beam line over it, else the house (ledger)."""
+        behind = [ln.y for ln in lines if ln.x0 - 6 <= x <= ln.x1 + 6 and ln.y < y - 6]
+        return y - (max(behind) if behind else 0.0)
+    out = []
+    zone_of = lambda x: next((z.name for z in zl if z.x0 - 0.5 <= x <= z.x0 + z.W + 0.5), zl[-1].name)
+    for k, (s, x, y, where) in enumerate(placed):
+        si = next(j for j, (ss, kind) in enumerate(sup) if abs(ss - s) < 1e-6 and kind == "post")
+        prev_s = sup[si - 1][0] if si > 0 else sup[-1][0] - per
+        next_s = sup[si + 1][0] if si + 1 < len(sup) else sup[0][0] + per
+        trib_len = (s - prev_s) / 2 + (next_s - s) / 2
+        load = total_psf * trib_len * max(joist_span_at(x, y), 12.0) / 2 / 144.0
+        out.append(EdgePost(x, y, zone_of(x), round(load, 0), f"E{k + 1}", where))
+    # the rims between supports, each a doubled flush beam
+    size = f"({plies}){spec.framing.joist_size}"
+    for (s0, k0), (s1, k1) in zip(sup, sup[1:] + [(sup[0][0] + per, sup[0][1])]):
+        span = s1 - s0
+        sm_ = (s0 + s1) / 2 % per
+        i = max(j for j in range(n) if seg[j] <= sm_ + 1e-6)
+        (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+        L_ = math.hypot(x1 - x0, y1 - y0) or 1.0
+        t = (sm_ - seg[i]) / L_
+        mx, my = x0 + t * (x1 - x0), y0 + t * (y1 - y0)
+        if house(i):
+            continue
+        js = joist_span_at(mx, my)
+        allow, _, _ = eng.beam_allowable(size, spec.framing.joist_species, max(js, 72), total_psf)
+        if span - pb > allow + 0.5:
+            notes.append(f"rim run on side {i + 1}: {ftin(span - pb)} between supports against {ftin(allow)} for a {size} — add an edge post")
+    g = spec.geometry
+    dk_t = decking_facts(spec.decking.collection)["thick"]
+    standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(spec.framing.footing_type, CONC_STANDOFF)
+    post_len = max(6.0, g.height_in - dk_t - jd - standoff)
+    # the zone frames count them: footings, worst load
+    for z in zl:
+        mine = [e for e in out if e.zone == z.name]
+        z.frame.n_posts += len(mine)
+        if mine:
+            z.frame.footing_load_lb = max(z.frame.footing_load_lb, max(e.load for e in mine))
+    notes.append(f"{len(out)} edge posts under the doubled rims (" + ", ".join(f"{e.label} {e.where}" for e in out)
+                 + f"): the rims span post to post as flush beams, so the front is carried without a cantilever")
+    return out, post_len, notes
+
+
 def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
     from .catalog import post_cap, TIMBER_CAP
     timber = spec.is_timber
@@ -1564,6 +1691,7 @@ def build_layout(spec: DeckSpec) -> Layout:
         deepest = max(zl, key=lambda q: q.D)
         st = stair_layouts(spec, deepest.W, deepest.D, deepest.decking)
         lines = build_beam_lines(spec, zl)
+        eposts, epost_len, ep_notes = build_edge_posts(spec, zl, lines)
         divs = build_dividers(spec, zl)
         plan = build_field_plan(spec, zl, zl[0].decking) if (spec.decking.dividers or spec.decking.divider_x_ft) else None
         if plan is not None:
@@ -1581,6 +1709,8 @@ def build_layout(spec: DeckSpec) -> Layout:
         L = Layout(spec, zl[0].frame, zl[0].decking, rl, st, x, deepest.D, notes, zl, edges, True, lines, divs, wall_lf)
         L.plan = plan
         L.outline_edges = oedges
+        L.edge_posts, L.edge_post_len = eposts, epost_len
+        L.notes += ep_notes
         return L
     W, D = float(g.width_in), float(g.depth_in)
     if g.size_mode == "nominal":

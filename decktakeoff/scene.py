@@ -345,6 +345,18 @@ def build_scene(L) -> Scene:
                 add("stone", x - 1.0, x + 1.0, y - 1.0, y + 1.0, 0.0, 3.0, "stone", 3)
                 add("stonecap", x - 1.08, x + 1.08, y - 1.08, y + 1.08, 3.0, 3.17, "stonecap", 3)
 
+    # ---------------- edge posts: under both rim ends at the outline corners (the rims span post to post as flush beams)
+    for ep in (getattr(L, "edge_posts", None) or []):
+        x, y = ep.x * IN, ep.y * IN
+        if ft == "diamond_pier":
+            add("footing", x - 0.45, x + 0.45, y - 0.45, y + 0.45, -0.2, 0.3, "concrete", 1, tag="Diamond Pier")
+            base_top = 0.3
+        else:
+            add("footing", x - 0.6, x + 0.6, y - 0.6, y + 0.6, -1.0, 0.15, "concrete", 1, shape="cyl")
+            base_top = 0.15
+        add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
+        add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, jbot, "timber", 2, tag=f"{ep.label} edge post")
+
     # ---------------- frame: a polygon outline is framed as one continuous field (the takeoff counts the same members)
     from .layout import outline_framing
     OF = outline_framing(spec, L)

@@ -618,6 +618,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         caps_end += 2 if bl.n_posts >= 2 else bl.n_posts
         caps_mid += max(0, bl.n_posts - 2)
         timber_sf += plies * 2 * (bw_ + bd_) / 12 * bl.length / 12
+    eps_ = getattr(L, "edge_posts", None) or []          # posts under the rims at the outline corners (the rims span post to post)
+    if eps_ and not spec.framing.existing_posts:
+        post_pieces += [(spec.framing.post_size, L.edge_post_len + 1.0, "edge post")] * len(eps_)
+        cuts.append(CutPiece(f"Edge posts {eps_[0].label}-{eps_[-1].label} under the rims", spec.framing.post_size, L.edge_post_len, len(eps_),
+                             "field-measure each; centred under both rim ends at the corner, rims tied with A35Z"))
     sp = spec.framing.beams[0].species if spec.framing.beams else "DF"
     df1_beam = sp == "DF#1" and not timber
     for (nom, st), (n, labels) in pack_lumber(beam_pieces, short_stock_ft=8 if df1_beam else 12).items():
@@ -647,7 +652,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
         desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}" + (" rough" if spec.framing.post_rough and not timber else "")
-        lens = sorted(set(ftin(bl.post_len) for bl in L.beam_lines))
+        lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if knee:
         lg = spec.framing.knee_leg_in
@@ -780,7 +785,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                           "exact", 24.0, "est. — confirm D&D stock"))
     nh, nj = HANGER_NAILS.get(hanger, (6, 4))
     n_long = Qz.hangers_single * nh
-    n_short = Qz.hangers_single * nj + Qz.h25 * H25_NAILS
+    n_short = Qz.hangers_single * nj + Qz.h25 * H25_NAILS + 4 * 12 * len(getattr(L, "edge_posts", None) or [])   # A35Z: 12 nails each, 4 per edge post
     if timber:
         # 4x hangers take 16d into the header: from the ring-shank box, with the rim end-nailing and blocking toe-nails
         need16 = n_long + 6 * Qz.n_blocks + 4 * Qz.n_joists
@@ -824,6 +829,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             n_dtt = spec.framing.lateral_ties * max(1, n_ledgers)
             d = PRICEBOOK["hardware"]["DTT1Z"]
             lines.append(Line("Hardware", d["desc"], n_dtt, n_dtt, "ea", "exact  (2 near each end of every ledger, into house floor framing)", d["each"], d["source"], "DTT1Z"))
+    if getattr(L, "edge_posts", None):
+        ne_ = len(L.edge_posts)
+        d_, uc, src, sku = _hw("A35Z", black)
+        lines.append(Line("Hardware", "Simpson A35Z framing angle — the rims to the edge posts", 4 * ne_, 4 * ne_ + 4, "ea",
+                          f"+4  ({ne_} edge posts x 4: 2 per rim at each post)", uc, src, sku))
     if Qz.h25:
         d_, uc, src, sku = _hw("H2.5AZ", False)
         lines.append(Line("Hardware", d_, Qz.h25, Qz.h25, "ea", "exact  (every joist, doubler and rim at the drop beam)" if timber else f"exact  ({Qz.n_joists} joists + 2 rims at each drop beam)", uc, src, sku))

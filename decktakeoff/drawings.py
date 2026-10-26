@@ -217,8 +217,12 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
                      f"{sum(len(b_.posts_x) for b_ in bls_)} posts" + (f" (worst {worst:,.0f} lb)" if worst else "") + " — S-100 / S-101")
     else:
         beams_txt = "; ".join(sm["beams"])
-    struct = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]), ("Beams", beams_txt), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
-              ("Ledger", t.schedule.get("Ledger", "—")), ("Decking", sm["decking"]), ("Rail", sm["rail"])]
+    eps_ = getattr(L, "edge_posts", None) or []
+    struct = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]), ("Beams", beams_txt), ("Joists", sm["joists"]), ("Rims", sm["rims"])]
+    if eps_:
+        struct.append(("Edge posts", f"{len(eps_)} under the doubled rims at the outline corners ({eps_[0].label}-{eps_[-1].label}, worst {max(e.load for e in eps_):,.0f} lb): "
+                                     f"the rims span post to post as flush beams, no cantilever — S-100"))
+    struct += [("Ledger", t.schedule.get("Ledger", "—")), ("Decking", sm["decking"]), ("Rail", sm["rail"])]
     for k, v in struct:
         for i, ln in enumerate(textwrap.wrap(v, 96)[:2]):
             o.append(T(24 if i == 0 else 150, y, k if i == 0 else "", 8.5, 800)); o.append(T(150, y, ln, 8.5, 400)); y += 12
@@ -291,6 +295,10 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
         cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
         o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
         rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "landing"))
+    eps_ = getattr(L, "edge_posts", None) or []
+    for ep in eps_:                         # under the rims at the outline corners: label inside the deck, toward the house
+        o.append(TH(X(ep.x * IN), Y(ep.y * IN) - 9, ep.label, 7.5, 800, "middle", fill="#3f5d8a"))
+        rows.append((ep.label, ftin(ep.x), ftin(ep.y), f"{ep.zone} rim", f"{ep.load:,.0f} lb"))
     for bl in L.beam_lines:                 # beam lines are in inches; the plan transform takes feet
         o.append(TH(X(bl.x0 * IN) + 4, Y(bl.y * IN) - 6, bl.label, 7.5, 800, fill=MUTE))
     # dims: beam lines from the front, zone widths
@@ -302,7 +310,8 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     for bl in sorted(L.beam_lines, key=lambda b: -b.y):      # to the front rim of the beam's own zone(s); dims that would stack step out
         zf = max((z["front"] for z in zs if z["name"] in (bl.zones or [])), default=S.y_front)
         xd = X(bl.x1 * IN) + 10
-        while any(abs(xd - u) < 14 for u in used_x):
+        while any(abs(xd - u) < 14 for u in used_x) or any(abs(xd - X(e_.x * IN)) < 16 and bl.y * IN - 2.5 <= e_.y * IN <= zf + 0.1
+                                                           for e_ in (getattr(L, "edge_posts", None) or [])):
             xd += 16
         used_x.append(xd)
         dim_v(o, Y, xd, bl.y * IN, zf, f"{ftin((zf - bl.y * IN) * 12)} to rim face", left=False)
@@ -329,6 +338,12 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
             o.append(T(xx, yy, v, 8, 500))
         yy += 11.5
     o.append(T(sx, yy + 10, "x from the left frame face facing the house; y from the reference wall.", 7.2, 400, fill=MUTE))
+    if eps_:
+        for k_, ln_ in enumerate(textwrap.wrap(f"E = edge post under both doubled rims at an outline corner: the rims span "
+                                               f"post to post as {L.zones[0].frame.rim_plies}-ply flush beams, so nothing cantilevers past a flush beam. "
+                                               "Rims tied to each post with (4) A35Z (D-502).", 62)):
+            o.append(T(sx, yy + 32 + k_ * 10, ln_, 7.2, 500, fill="#3f5d8a"))
+        yy += 12 + 10 * len(textwrap.wrap("x" * 200, 62))
     o.append(T(sx, yy + 21, f"Frost {ftin(L.spec.site.frost_depth_in)} · soil {L.spec.site.soil_bearing_psf:,.0f} psf · worst post {max(z.frame.footing_load_lb for z in L.zones):,.0f} lb", 7.2, 400, fill=MUTE))
     if L.spec.framing.system == "steel":
         for k_, ln_ in enumerate([(f"Deck-only piers: 6x6 {post_words(L.spec)} post on {post_base_sku(L.spec)}, steel saddle to the beam (D-502 / 3)."
@@ -338,7 +353,8 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
                                   "roof load adds — the engineer sizes the pier.",
                                   f"Beams: boxed CEMCO {L.spec.framing.steel_joist}, flush (D-502 / 2)."]):
             o.append(T(sx, yy + 36 + k_ * 11, ln_, 7.2, 500))
-    return sheet("S-100", "Foundation plan", "Footings, posts and beam lines with the footing schedule; beams dashed (below the joists)", o, "Plan · not to scale · house at the top · dimensions govern", meta)
+    return sheet("S-100", "Foundation plan", "Footings, posts and beam lines with the footing schedule; beams dashed"
+                 + (" (below the joists)" if any(b_.kind == "drop" for b_ in L.beam_lines) else "") + (f"; edge posts {eps_[0].label}-{eps_[-1].label} under the rims" if eps_ else ""), o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
 
 def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
@@ -1567,7 +1583,8 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
         bl_ = bls_[0] if bls_ else None
         notes.append(f"Deck frame: {s.framing.joist_size} {s.framing.joist_grade} @ {L.frame.spacing:g}\" OC"
                      + ((f" on {len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species.replace('DF#1', 'DF #1') for b_ in bls_}))}, "
-                         f"{sum(b_.n_posts for b_ in bls_)} posts (S-100 / S-101)") if len(bls_) > 1 else
+                         f"{sum(b_.n_posts for b_ in bls_)} posts" + (f" + {len(L.edge_posts)} edge posts under the rims" if getattr(L, "edge_posts", None) else "")
+                         + " (S-100 / S-101)") if len(bls_) > 1 else
                         (f" on a {bl_.size} {bl_.species.replace('DF#1', 'DF #1')} {bl_.kind} beam, {bl_.n_posts} posts" if bl_ else ""))
                      + (" with 4x4 knee braces both ways" if s.framing.knee_braces else ""))
     if L.rail and s.geometry.height_in > 30:
@@ -1834,7 +1851,8 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
         _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson LUS hanger every joist off the {bsize} beam face, 10d HDG every hole")
         _lead(o, x + 60, y + 238, x + 24, y + 196, (f"{bsize} {bsp} flush beam, {plyfast}" if setback > 3 else f"{bsize} {bsp} flush beam = front rim, {plyfast}"))
         _lead(o, x + 210, y + 236, x + 236, y + 180, f"{js} joist, top flush with the beam")
-        o.append(T(x + 24, y + 278, (f"Joists hang on both faces: from the ledger to the beam, and {ftin(setback)} out to the front rim" if setback > 3
+        o.append(T(x + 24, y + 278, (f"Joists hang on both faces: from the ledger to the beam, and {ftin(setback)} out to the front rim"
+                                     + (" — the rim stands on edge posts (S-100)" if getattr(L, "edge_posts", None) else "") if setback > 3
                                      else "No cantilever: the beam carries the front edge, joists hang both ends"), 6.6, 700))
     else:
         o.append(R(x + 20, y + 74, W3 - 40, 7, FILL["deck"], INK, 0.5))
@@ -1913,6 +1931,15 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
             yy += 16
             o.append(T(x + 20, yy, bl_.label, 6.8, 700)); o.append(T(x + 170, yy, str(len(bl_.posts_x)), 6.8, 600))
             o.append(T(x + 230, yy, inch(bl_.post_len, 16) if bl_.post_len < 24 else ftin(bl_.post_len), 6.8, 700))
+        eps_ = getattr(L, "edge_posts", None) or []
+        if eps_:                            # under the rims at the outline corners: the rim's bottom is the seat
+            yy += 16
+            o.append(T(x + 20, yy, f"EDGE POSTS {eps_[0].label}-{eps_[-1].label} (under the rims)", 6.8, 700)); o.append(T(x + 170, yy, str(len(eps_)), 6.8, 600))
+            o.append(T(x + 230, yy, inch(L.edge_post_len, 16) if L.edge_post_len < 24 else ftin(L.edge_post_len), 6.8, 700))
+            yy += 16
+            for ln_ in textwrap.wrap("Edge post: centred under both rim ends at the corner, post top cut to the rim bottom, (2) Simpson A35Z per rim "
+                                     "to the post. The doubled rims span post to post as flush beams — nothing cantilevers past a flush beam.", 78):
+                o.append(T(x + 20, yy, ln_, 6.6, 600)); yy += 11
         if any(bl_.post_len < 8 for bl_ in (L.beam_lines or [])):
             yy += 26
             for ln_ in textwrap.wrap("Under 8\" there is little room for the pier head, the standoff base and a post: check the grade at each pier "

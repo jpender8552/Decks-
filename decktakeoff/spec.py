@@ -151,6 +151,9 @@ class Framing:
     ledger_size: Optional[str] = None    # None -> same as joist
     ledger_fastener: str = "LedgerLOK"   # "LedgerLOK" | "1/2 lag" | "1/2 bolt"
     beams: List[Beam] = field(default_factory=lambda: [Beam()])
+    edge_posts_ft: List[List[float]] = field(default_factory=list)   # outline plans: posts under the rims at these outline points ([x, y] ft;
+                                         # a corner snaps to the vertex, else to the side) — the doubled rim spans post to post as a
+                                         # flush beam, so the front is carried without a cantilever (a flush beam cannot cantilever)
     post_size: str = "6x6"
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
