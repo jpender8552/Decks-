@@ -1088,8 +1088,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Fascia", tu["desc"].replace("Timber Bark", hcol), 1, 1, "kit", "cut ends", tu["each"], tu["source"]))
         else:
             lines.append(Line("Fascia", f"{brand} {coll} Fascia {spec.decking.fascia_color or color} {fas['thick']:g}x{fas['width']:g}x12", nf, nf + 1, "ea", why, uc, src))
+        face_ = decking_facts(spec.decking.collection).get("thick", 1.0) + actual(spec.framing.joist_size)[1] + 1.56   # the frame face + the drop below the rim (as modeled)
+        rip_ = (f"ripped to {inches_frac(face_)} (the {spec.framing.joist_size} frame face + 1-1/2\" below the rim); " if fas["width"] > face_ + 0.5 else "")
         for name, Lf in Qz.fascia_pieces:
-            cuts.append(CutPiece(name.capitalize(), "fascia", Lf, 1, "flush under the board nose; full board at the front corners, short piece at the house"))
+            cuts.append(CutPiece(name.capitalize(), "fascia", Lf, 1, rip_ + "flush under the board nose; full board at the front corners, short piece at the house"))
     elif not spec.decking.fascia:
         notes.append("no fascia — the rim is the finished edge under a 1-1/2\" board overhang" + (" (timber, end grain sealed)" if timber else ""))
 
