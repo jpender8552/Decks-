@@ -169,11 +169,12 @@ def plan_bounds(S: Scene):
 
 
 # ------------------------------------------------------------------ sheets
-def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
+def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[str, str]]] = None) -> str:
+    """G-001. index: [(num, title)] of the sheets actually in the set (built last by all_sheets); None -> the standard list."""
     s = L.spec
     o = []
     o.append(T(24, 24, "PROJECT", 9, 800, fill=GOLD))
-    lines = [f"{s.job}", f"{s.site.address}, {s.site.city} {s.site.state} {s.site.zip}".strip(", "), f"Prepared for {s.client}" if s.client else "",
+    lines = textwrap.wrap(f"{s.job}", 92) + [f"{s.site.address}, {s.site.city} {s.site.state} {s.site.zip}".strip(", "), f"Prepared for {s.client}" if s.client else "",
              f"{L.deck_sf:g} SF · {ftin(s.geometry.height_in)} above grade · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''}"]
     y = 40
     for ln in [x for x in lines if x]:
@@ -204,7 +205,14 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
         y += 1
     o.append(T(24, y + 12, "STRUCTURE", 9, 800, fill=GOLD)); y += 28
     sm = t.summary
-    struct = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]), ("Beams", "; ".join(sm["beams"])), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
+    bls_ = L.beam_lines or []
+    if len(bls_) > 2:          # many beam lines: count, size, posts, worst load — every line is on S-100 / S-101
+        worst = max((max(b_.post_loads) for b_ in bls_ if getattr(b_, "post_loads", None)), default=0)
+        beams_txt = (f"{len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in bls_}))}, "
+                     f"{sum(len(b_.posts_x) for b_ in bls_)} posts" + (f" (worst {worst:,.0f} lb)" if worst else "") + " — S-100 / S-101")
+    else:
+        beams_txt = "; ".join(sm["beams"])
+    struct = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]), ("Beams", beams_txt), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
               ("Ledger", t.schedule.get("Ledger", "—")), ("Decking", sm["decking"]), ("Rail", sm["rail"])]
     for k, v in struct:
         for i, ln in enumerate(textwrap.wrap(v, 96)[:2]):
@@ -220,6 +228,8 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
         ("A-202", "Elevations"), ("A-301", "Section + front elevation")] + ([SHEET_INDEX_EXTRA[1], ("A-402", "Roof covers — exploded isometric")] if covers_of(s) else []) + [
         ("D-501", "Details")] + ([("D-502", "Connection details — steel frame")] if s.framing.system == "steel" else []) + (
         [("D-503", "Connection details — roof covers")] if s.geometry.covers else []) + [("T-400", "Build steps (build set)"), ("T-700", "Order + schedules (takeoff)")]
+    if index is not None:
+        idx = index
     for num, title in idx:
         o.append(T(x2, yy, num, 8.5, 800, fill=GOLD)); o.append(T(x2 + 52, yy, title, 8.5, 500)); yy += 13
     o.append(T(x2, yy + 12, "SITE", 9, 800, fill=GOLD)); yy += 28
@@ -234,7 +244,8 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta) -> str:
     if not site:
         site = ["Setbacks not on file — verify the plat / ILC before layout"]
     for ln in site:
-        o.append(T(x2, yy, textwrap.shorten(ln, 74, placeholder="…"), 8, 400)); yy += 12
+        for k_, w_ in enumerate(textwrap.wrap(ln, 74)[:3]):
+            o.append(T(x2 + (8 if k_ else 0), yy, w_, 8, 400)); yy += 12
     if flags is not None:
         o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
         for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
@@ -1238,7 +1249,7 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     FILL["deck"] = _MAT_COLORS.get("deck", FILL["deck"]); FILL["border"] = _MAT_COLORS.get("border", FILL["border"])
     meta = sheet_meta(L, customer=customer)
     _STEEL["on"] = L.spec.framing.system == "steel"
-    out = [("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta))]
+    out = [("G-001", "General notes · design criteria", "")]              # built last, from the sheets actually in the set
     site = sheet_site(L, S, t, meta)
     if site:
         out.append(("C-100", "Site plan", site))
@@ -1271,6 +1282,13 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
         dc = sheet_details_cover_connections(L, S, t, meta)
         if dc:
             out.append(("D-503", "Connection details — roof covers", dc))
+    index = [("G-001", "General notes · design criteria")]
+    for num, ttl, _ in out[1:]:
+        if num == "A-002":
+            index.append(("A-001", "Isometric · renders"))
+        index.append((num, ttl))
+    index += [("T-400", "Build steps (build set)"), ("T-700", "Order + schedules (takeoff)")]
+    out[0] = ("G-001", "General notes · design criteria", sheet_notes(L, S, t, flags, meta, index=index))
     return out
 
 
