@@ -1040,7 +1040,7 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
         vx, vy = poly[j]
         if abs(vy) < 0.5 and {a, b} == {"rim45", "bay45"}:
             of.ledger_blocks.append((vx, jb / 2, vx + 24.0, jb / 2))
-            of.notes.append(f"angled rims meet the main wall at {ftin(vx)} beside the bay: a 24\" 2x10 ledger block (3 LedgerLOKs, flashed) carries them in a skewed double hanger")
+            of.notes.append(f"angled rims meet the main wall at {ftin(vx)} beside the bay: a 24\" {spec.framing.joist_size} ledger block (3 LedgerLOKs, flashed) carries them in a skewed double hanger")
     # blocking under the 45-degree picture-frame borders: a line 1-1/2" inside the rim, one block per joist bay
     if spec.geometry.picture_frame:
         pf_off = rim_t + 1.5 + jb / 2

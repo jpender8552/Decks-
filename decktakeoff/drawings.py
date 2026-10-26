@@ -1985,7 +1985,7 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     for xx in (160, 186):
         o.append(LN(x + xx, y + 96, x + xx, y + 120, INK, 0.9))
     o.append(R(x + 128, y + 104, 4, 6, "#5b6166", INK, 0.4))
-    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitred, {pf_fast} 2 per bearing @ 16\"")
+    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitred, {pf_fast} 2 per bearing @ {L.spec.joist_spacing:g}\"")
     _lead(o, x + 130, y + 106, x + 24, y + 60, f"{fsys} clip in every gap at every joist (3/16\" gap)")
     _lead(o, x + 193, y + 150, x + 236, y + 140, f"{s.decking.collection} fascia, pre-drilled, 2 screws at each end then alternating @ 12\"")
     _lead(o, x + 145, y + 140, x + 24, y + 200, "PF joist 1-1/2\" inboard of the rim carries the border's inside edge")
