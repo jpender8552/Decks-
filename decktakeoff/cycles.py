@@ -297,8 +297,9 @@ class Mats:
         m, nt, bsdf, out = self._new(name)
         img = self._img(nt, imgs[k % len(imgs)])
         self._tint(nt, img.outputs["Color"], bsdf)
-        bsdf.inputs["Roughness"].default_value = 0.62
-        bsdf.inputs["Specular IOR Level"].default_value = 0.4
+        # a matte cap (TimberTech: low-gloss): at the low angle of a yard view a glossier cap mirrors the sky and the brown goes grey
+        bsdf.inputs["Roughness"].default_value = 0.85
+        bsdf.inputs["Specular IOR Level"].default_value = 0.25
         bw = nt.nodes.new("ShaderNodeRGBToBW")
         nt.links.new(img.outputs["Color"], bw.inputs[0])
         self._bump(nt, bsdf, bw.outputs[0], strength=0.12, distance=0.004)
@@ -403,9 +404,12 @@ class Mats:
                     nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 60.0 if not key.startswith(("foundation", "concrete")) else 25.0
                     nz.inputs["Detail"].default_value = 8.0
                     self._bump(nt, bsdf, nz.outputs["Fac"], 0.06 if key.startswith(("siding", "nsiding")) else 0.03, 0.004)
-                bsdf.inputs["Roughness"].default_value = 0.42           # powder coat: a soft sheen, not metal
-                bsdf.inputs["Metallic"].default_value = 0.0
-                bsdf.inputs["Coat Weight"].default_value = 0.15
+                if key in ("railmetal", "steel", "storm") or "powder" in (md.get("label") or "").lower():
+                    # textured powder coat (Fulton, Impression Rail Express): a dielectric with a dull sheen, not metal.
+                    # Only the coated metal: siding, trim and concrete keep their own roughness and no clear coat.
+                    bsdf.inputs["Roughness"].default_value = 0.55
+                    bsdf.inputs["Metallic"].default_value = 0.0
+                    bsdf.inputs["Coat Weight"].default_value = 0.05
             if key in ("hmetal", "galv", "cable", "well"):
                 bsdf.inputs["Metallic"].default_value = 0.9; bsdf.inputs["Roughness"].default_value = 0.38
         self.cache[key] = m
@@ -862,7 +866,7 @@ def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: floa
 
 
 # ====================================================================== light, camera, render
-def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0):
+def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065, fill_sat=0.5):
     scn = bpy.context.scene
     sun = D["meta"].get("sun") or [-0.5, 0.5, 0.7]
     v = mathutils.Vector(B(*sun)).normalized()                  # toward the sun, Blender frame
@@ -882,9 +886,19 @@ def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0):
     sky.altitude = 1700.0                         # Centennial, CO: ~5,850 ft
     sky.air_density = 1.0
     sky.aerosol_density = 1.0
+    # Two skies. The camera sees the model's blue sky at sky_strength. Everything else is lit by the same sky, dimmer and pulled
+    # halfway to grey: measured on a white plane, the bare model at 0.2 gave R 0.26 / G 0.52 / B 1.03 against the sun's 1.00 /
+    # 0.96 / 0.89 — half the light on a horizontal surface and four times bluer than the sun, so white trim in full sun came
+    # out blue and the deck brown went grey. A clear sky at ~5,850 ft is ~10-15% of the light on the ground (a daylight
+    # white balance reads sunlit white as white); fill 0.065 at half saturation gives ~20% (G) and sunlit white neutral.
     bg = nt.nodes.new("ShaderNodeBackground"); bg.inputs["Strength"].default_value = sky_strength
+    hs = nt.nodes.new("ShaderNodeHueSaturation"); hs.inputs["Saturation"].default_value = fill_sat
+    fill = nt.nodes.new("ShaderNodeBackground"); fill.inputs["Strength"].default_value = fill_strength
+    lp = nt.nodes.new("ShaderNodeLightPath"); mx = nt.nodes.new("ShaderNodeMixShader")
     out = nt.nodes.new("ShaderNodeOutputWorld")
-    nt.links.new(sky.outputs[0], bg.inputs[0]); nt.links.new(bg.outputs[0], out.inputs[0])
+    nt.links.new(sky.outputs[0], bg.inputs[0]); nt.links.new(sky.outputs[0], hs.inputs["Color"]); nt.links.new(hs.outputs[0], fill.inputs[0])
+    nt.links.new(lp.outputs["Is Camera Ray"], mx.inputs[0]); nt.links.new(fill.outputs[0], mx.inputs[1]); nt.links.new(bg.outputs[0], mx.inputs[2])
+    nt.links.new(mx.outputs[0], out.inputs[0])
     ld = bpy.data.lights.new("sun", "SUN")
     ld.energy = sun_strength
     ld.angle = math.radians(0.53)
@@ -923,7 +937,7 @@ def generic_views(D) -> Dict[str, dict]:
     }
 
 
-def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False):
+def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.75):
     scn = bpy.context.scene
     scn.render.engine = "CYCLES"
     scn.cycles.device = "CPU"
@@ -948,10 +962,10 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False):
     scn.render.image_settings.file_format = "JPEG"
     scn.render.image_settings.quality = 90
     # Khronos PBR Neutral keeps a board's hue and saturation where AgX greys it (the deck colour is the point of the
-    # picture); +0.5 EV is a photographer's exposure for a sunlit yard
+    # picture); +0.75 EV is a photographer's exposure for a sunlit yard with the fill sky (the shade stays readable)
     scn.view_settings.view_transform = "Khronos PBR Neutral"
     scn.view_settings.look = "None"
-    scn.view_settings.exposure = 0.5
+    scn.view_settings.exposure = exposure
     cams = dict(generic_views(D))
     cams.update(D["meta"].get("cameras") or {})
     done = {}
@@ -980,14 +994,15 @@ def main(argv):
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()
     spec, sc, D = build(spec_path, out_dir, quick=quick)
-    setup_world(D, spec, sky_strength=float(opts.get("--sky", 0.2)), sun_strength=float(opts.get("--sun", 5.0)))
+    setup_world(D, spec, sky_strength=float(opts.get("--sky", 0.2)), sun_strength=float(opts.get("--sun", 5.0)),
+                fill_strength=float(opts.get("--fill", 0.065)), fill_sat=float(opts.get("--fill-sat", 0.5)))
     if getattr(spec.geometry, "site_model", None) and not opts.get("--no-grass"):
         cams = dict(generic_views(D)); cams.update(D["meta"].get("cameras") or {})
         add_grass(spec, D, cams, names, bpy.context.scene.collection, reach=float(opts.get("--grass-reach", 34.0)))
     print(f"scene built in {time.time() - t:.0f}s: {len(bpy.data.objects)} objects", flush=True)
     if opts.get("--blend"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out_dir, "scene.blend"))
-    render_views(D, out_dir, names, samples=samples, size=size, quick=quick)
+    render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", 0.75)))
 
 
 if __name__ == "__main__":
