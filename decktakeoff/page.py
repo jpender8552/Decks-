@@ -387,8 +387,10 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     r = build_set(t, flags, str(out / "buildset"), render=render, customer=customer or supplier)
     S = r["scene"]
     rd = Path(renders_dir) if renders_dir else (out / "buildset" / "renders")
-    files = {f"r/{key}-{q.stem}.jpg": str(q) for q in rd.glob("*.jpg")}
     have = {q.stem for q in rd.glob("*.jpg")}
+    if spec.geometry.height_in < 30:         # a deck near grade: the views from under it show a rim at the lawn and nothing else
+        have -= {"under", "underiso"}
+    files = {f"r/{key}-{n_}.jpg": str(rd / f"{n_}.jpg") for n_ in have}
     sun_names = sorted(n_ for n_ in have if n_.startswith("sun-"))
     if (rd / "sun.json").exists():
         CAP.update(json.load(open(rd / "sun.json")))

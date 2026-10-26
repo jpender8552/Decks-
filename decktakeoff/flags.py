@@ -194,7 +194,8 @@ def run_flags(L: Layout) -> List[Flag]:
         if len(st.geo.flights) > 1:
             add("CODE", "stairs", f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair; guard on every open side over 30\" ({st.landing_rail_lf:g} LF counted)" if st.landing_rail_lf else f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair", "IRC R311.7.6 / R312.1")
         if st.landing == "grade":
-            add("CODE", "stairs", f"{st.side} stair lands on grade — a landing is required at the bottom (36\" min in the direction of travel); pour a pad or set pavers", "IRC R311.7.6")
+            add("CODE", "stairs", f"{st.side} stair lands on grade — the bottom landing is the grade itself: 36\" min in the direction of travel, as wide as the stair, "
+                "firm and level (no pad in this scope); if the inspector wants a hard surface there, pavers are an add", "IRC R311.7.6")
         if st.geo.guard_required and st.stair_rail_sides == 0:
             add("STOP", "stairs", f"{st.side} stair: open side over 30\" — stair guard required", "IRC R312.1")
 
