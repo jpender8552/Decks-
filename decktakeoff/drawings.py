@@ -366,12 +366,15 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
     # notes rail
     nx = 760
     o.append(T(nx, 24, "FRAMING NOTES", 9, 800, fill=GOLD))
+    bls_ = L.beam_lines or []
+    beams_ = (f"{len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in bls_}))}: "
+              + "; ".join(f"{b_.label.split()[-1]} {ftin(b_.length)}, {len(b_.posts_x)} posts" for b_ in bls_)) if len(bls_) > 2 else "; ".join(t.summary["beams"])
     notes = [t.summary["joists"], t.summary["rims"], t.schedule.get("Ledger", ""), t.schedule.get("Blocking", "blocking one row over the beam, staggered"),
-             t.schedule.get("Joist tape", ""), "; ".join(t.summary["beams"])]
+             t.schedule.get("Joist tape", ""), beams_]
     hw = [f"{l.item}: {l.net:g}" for l in t.lines if l.category == "Hardware" and l.unit == "ea"][:8]
     yy = 40
     for n in notes + ["Connectors:"] + hw:
-        for ln in textwrap.wrap(n, 40)[:3]:
+        for ln in textwrap.wrap(n, 40)[:5]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
         yy += 3
     return sheet("S-101", "Framing plan", "Ledger, joists, rims, blocking, beams; every member in the model — the cut list is on T-600", o, "Plan · not to scale · house at the top · dimensions govern", meta)
