@@ -16,7 +16,7 @@ from .spec import DeckSpec
 from .report import quote_markdown
 from .units import ftin
 from .takeoff import CATEGORIES
-from .catalog import rail_name, beam_words
+from .catalog import rail_name, beam_words, beam_species_words
 
 E = html.escape
 CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
@@ -349,8 +349,9 @@ def _reads_lite(t, L, sm):
         stairs.append(txt)
     fr = L.zones[0].frame
     beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
-    structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on centre, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
-                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on centre" + (f", {beam_words(beams)}" if beams else "") + f"; {sm['posts']}")
+    structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on center, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
+                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on center"
+                 + (f", {beam_words(beams, beam_species_words(s.framing.beams), len(s.framing.beams))}" if beams else "") + f"; {sm['posts']}")
     reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + [("Stair", x) for x in stairs] + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
@@ -396,7 +397,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     alt_names = sorted(n_ for n_ in have if n_.startswith("alt-"))
     alt_html = ('<h2 class="kicker pb" id="g-alt">The option, rendered <span class="tag">same deck, the optional rail</span></h2>'
                 + _gallery(key, alt_names, have)) if alt_names else ""
-    sun_html = ('<h2 class="kicker pb" id="g-sun">Sun and shade <span class="tag">the real sun at this address · the covers and the blinds through the day</span></h2>'
+    sun_tag = "the covers and the blinds through the day" if (spec.geometry.covers or spec.geometry.cover) else "shade on the deck through the day"
+    sun_html = ('<h2 class="kicker pb" id="g-sun">Sun and shade <span class="tag">the real sun at this address · ' + sun_tag + '</span></h2>'
                 + _gallery(key, sun_names, have)) if sun_names else ""
     cap = dict(CAP); cap.update({f"step{n}": S.meta["step_text"][n] for n in range(1, 9)})
     name = name or spec.job
@@ -441,7 +443,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker" id="g-what">What it is <span class="tag">included in the price</span></h2>')
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
-        frame_lite = f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams)}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams") + "."
+        frame_lite = f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams, beam_species_words(spec.framing.beams), len(spec.framing.beams))}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams") + "."
         inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')

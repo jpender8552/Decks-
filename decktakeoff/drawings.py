@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import html as _html
 import math
+import re
 import textwrap
 from datetime import date
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .catalog import RAIL_SYSTEMS, decking_facts, actual
+from .catalog import RAIL_SYSTEMS, decking_facts, actual, rail_name
 from .layout import Layout
 from .spec import post_words, post_base_sku
 from .scene import Scene, Box, build_scene
@@ -142,7 +143,7 @@ def house_outline(o, X, Y, sc, S: Scene):
             else:
                 o.append(T(X((b.x0 + b.x1) / 2) - 8, Y((b.y0 + b.y1) / 2), lbl, 7, 700, "middle", MUTE, rot=-90))
     for z in S.meta["zones"]:
-        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["wall_y"]) - 6, (f"HOUSE — {z['name']}" if z.get("ledger", True) else f"OPEN — {z['name']} (rear beam, no ledger)"), 8, 800, "middle", "#a89b84"))
+        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["wall_y"]) - 16, (f"HOUSE — {z['name']}" if z.get("ledger", True) else f"OPEN — {z['name']} (rear beam, no ledger)"), 8, 800, "middle", "#a89b84"))
 
 
 def deck_outline(S: Scene) -> List[Tuple[float, float]]:
@@ -1205,6 +1206,9 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     if customer:
         flags = None
     S = scene or build_scene(L)
+    if any(getattr(b, "layer", "") == "site" for b in S.boxes):      # the yard model is for the 3D views, not the drawing sheets
+        import dataclasses as _dc
+        S = _dc.replace(S, boxes=[b for b in S.boxes if getattr(b, "layer", "") != "site"])
     _MAT_COLORS.clear()
     for k in ("deck", "border", "drink", "fascia"):
         if k in S.materials:
@@ -1255,6 +1259,14 @@ def _axo_colors(S: Scene) -> Dict[str, str]:
     return cols
 
 
+_BUILT_IN = ("bench", "planter", "door step")       # board-kind boxes that are built-ins, not the deck field
+
+
+def _a(word: str) -> str:
+    """The article before a part number read letter by letter: 'an ABA66RZ', 'a PBS66'."""
+    return "an" if word[:1].upper() in "AEFHILMNORSX" else "a"
+
+
 def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool], Tuple[float, float, float], str]]:
     """(label, which boxes, where on the box, pick) for every member the job has, in build order — the callout key."""
     s = L.spec
@@ -1262,22 +1274,54 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
     dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
     hc = s.extras.hardie_color or ""
     post_sp = post_words(s)
+    fr = s.framing
+    bls = getattr(L, "beam_lines", None) or (L.frame.beams if L.frame else [])
+    kinds = {b.kind for b in bls}
+    caps = sorted({c for b in bls for c in (getattr(b, "cap_mid", None) or getattr(b, "cap", None),) if c})
+    beam_lab = (f"{' / '.join(sorted({f'{b.size} {b.species}' for b in bls}))} {next(iter(kinds)) if len(kinds) == 1 else ''} beam{'s' if len(bls) > 1 else ''}".replace("  ", " ")
+                + (f", {' / '.join(caps)} post caps" if caps else "")) if bls else "Beam"
+    sp_ = f"{fr.joist_species} " if fr.joist_species else ""
+    rule = ((getattr(t, "schedule", None) or {}).get("Ledger") or "")       # the takeoff's fastening rule, so the key and the order agree
+    oc = re.search(r'staggered (\d+)" OC', rule)
+    lf_ = (fr.ledger_fastener or "LedgerLOK").lower()
+    led_lab = (f"{fr.ledger_size or fr.joist_size} ledger — "
+               + ("LedgerLOK" if lf_.startswith("ledgerlok") else "1/2\" through-bolts" if "bolt" in lf_ else "1/2\" lags")
+               + (f", 2 rows staggered {oc.group(1)}\" OC" if oc else "") + "; membrane + L-flashing")
+    sts = []
+    for ss, st in zip(s.stairs or [], L.stairs or []):
+        nm = getattr(ss, "name", None) or ""
+        if getattr(st, "build", "") == "box":
+            sts.append(f"{nm or 'box step'}: {st.geo.risers} risers, framed box")
+        else:
+            oc = f" @ {st.width / max(1, st.stringers - 1):.0f}\" OC" if st.stringers > 1 else ""
+            sts.append(f"{nm or 'stair'}: {st.geo.risers} risers, {getattr(ss, 'stringer_size', '') or '2x12'} stringers{oc}")
+    stair_lab = ("; ".join(sts) + f"; {s.decking.collection} treads, closed risers") if sts else "Stair"
     from .spec import covers_of
     _cv0 = (covers_of(s) or [{}])[0]
     ks = [
         (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "first"),
-        ((f"6x6 {post_words(s)} deck post on {post_base_sku(s)}, steel saddle to the boxed beam" if s.framing.steel_deck_post == "wood" else "3x3 galvanized HSS post stub on a pier-head bracket") if steel else f"{s.framing.post_size} {post_words(s) if s.framing.post_species else ''} post on a {post_base_sku(s)} standoff base".replace("  ", " "), lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
+        ((f"6x6 {post_words(s)} deck post on {post_base_sku(s)}, steel saddle to the boxed beam" if s.framing.steel_deck_post == "wood" else "3x3 galvanized HSS post stub on a pier-head bracket") if steel else f"{s.framing.post_size} {post_words(s) if s.framing.post_species else ''} post on {_a(post_base_sku(s))} {post_base_sku(s)} standoff base".replace("  ", " "), lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
         (f"4x4 {'DF #1' if s.framing.post_species.upper().startswith('DF') else ''} knee brace at 45°, both directions, through-bolted".replace("  ", " "), lambda b: b.kind == "brace", (0.5, 0.5, 0.5), "first"),
-        ((f"Boxed CEMCO {s.framing.steel_joist} beam (2 C toe-to-toe, G90), flush" if steel else "Beam"), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
-        ((f"CEMCO {s.framing.steel_joist} C-joist, G90, @ {L.frame.spacing:g}\" OC — clip angles each end" if steel else f"{s.framing.joist_size} joist"), lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
-        ((f"CEMCO {s.framing.steel_track} track rim, G90 (caps the joist ends)" if steel else "Rim"), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
-        (("Steel ledger track + 3x3 ledger angle on the house rim, flashed" if steel else "Ledger"), lambda b: b.kind == "ledger", (0.4, 0.5, 1.0), "last"),
-        (("Steel blocking at the breaker / picture-frame joists" if steel else "Blocking"), lambda b: b.kind == "block", (0.5, 0.5, 1.0), "mid"),
-        (f"{dk} field decking, hidden fasteners", lambda b: b.kind == "board", (0.5, 0.5, 1.0), "mid"),
+        ((f"Boxed CEMCO {s.framing.steel_joist} beam (2 C toe-to-toe, G90), flush" if steel else beam_lab), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
+        ((f"CEMCO {s.framing.steel_joist} C-joist, G90, @ {L.frame.spacing:g}\" OC — clip angles each end" if steel
+          else f"{fr.joist_size} {sp_}joist" + (f" ({fr.joist_grade})" if fr.joist_grade else "") + (f" @ {L.frame.spacing:g}\" OC" if L.frame else "") + (", joist tape" if fr.joist_tape else "")),
+         lambda b: b.kind == "joist", (0.5, 0.6, 1.0), "mid"),
+        ((f"CEMCO {s.framing.steel_track} track rim, G90 (caps the joist ends)" if steel
+          else (f"Double {fr.joist_size} rim, plies laminated (RSS screws 2 rows @ 12\")" if fr.rim_plies > 1 else f"{fr.joist_size} rim")), lambda b: b.kind == "rim", (0.5, 0.5, 1.0), "last"),
+        (("Steel ledger track + 3x3 ledger angle on the house rim, flashed" if steel
+          else led_lab), lambda b: b.kind == "ledger", (0.4, 0.5, 1.0), "last"),
+        (("Steel blocking at the breaker / picture-frame joists" if steel else f"{fr.joist_size} blocking — picture frame + divider rows"), lambda b: b.kind == "block", (0.5, 0.5, 1.0), "mid"),
+        (f"{dk} field decking, hidden fasteners", lambda b: b.kind == "board" and not (b.tag or "").startswith(_BUILT_IN), (0.35, 0.5, 1.0), "mid"),
         (f"Picture frame + breaker boards — {dk}", lambda b: b.kind == "border", (0.5, 0.5, 1.0), "last"),
-        ((f"HardieTrim skirt {hc}".strip() if s.extras.hardie_skirt else "Fascia"), lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
-        (f"Stair — steel stringers, {s.decking.collection} treads, closed risers, lands on grade" if steel else "Stair", lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
+        ((f"HardieTrim skirt {hc}".strip() if s.extras.hardie_skirt else
+          f"{s.decking.brand} {s.decking.collection} fascia, {s.decking.fascia_color or s.decking.color}, over the rim" if s.decking.fascia else "Fascia"),
+         lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
+        (f"Stair — steel stringers, {s.decking.collection} treads, closed risers, lands on grade" if steel else stair_lab, lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
+        (f"{rail_name(s.railing.system)} rail, {s.railing.color}, {s.railing.height_in:g}\"" if (s.railing and L.rail) else "Rail", lambda b: b.kind in ("toprail",), (0.5, 0.5, 1.0), "mid"),
+        (f"Built-in bench — 4x4 posts bolted through the rim, all wrapped in {dk}", lambda b: b.kind == "benchpost" or (b.tag or "").startswith("bench seat"), (0.5, 0.5, 1.0), "mid"),
+        (f"Planter — treated 2x4 box, OSB, {dk} skin, picture-frame cap", lambda b: (b.tag or "").startswith("planter") and "soil" not in (b.tag or ""), (0.5, 0.5, 1.0), "mid"),
         ("Gravel over 6-mil poly under the decks", lambda b: b.kind == "gravel", (0.3, 0.6, 1.0), "first"),
+        ("Box step bed — 4\" compacted 3/4\" crushed rock / road base", lambda b: b.kind == "stepbase", (0.5, 0.5, 1.0), "first"),
         (f"6x6 {post_sp} cover post on {post_base_sku(s)} (shared Diamond Pier)", lambda b: b.kind == "cpost", (0.5, 0.5, 0.45), "last"),
         (f"{_cv0.get('beam', '(2)2x10')} cover beam, " + ("Douglas fir, BC46Z cap" if _cv0.get('beam', '').startswith('4x') else "wood, AC6Z cap"), lambda b: b.kind == "cbeam", (0.7, 0.5, 0.5), "last"),
         (f"{_cv0.get('ledger', '2x10')} cover ledger, wood, LedgerLOK 6\" 2 rows, headwall flashed", lambda b: b.kind == "cledger", (0.5, 0.5, 0.5), "last"),
@@ -1313,9 +1357,9 @@ def _axo_sheet(num, title, sub, L, S, t, meta, boxes, explode=False, gaps=None, 
     yy = 38
     for i, q, lab in items:
         o.append(C(kx + 6, yy - 3, 6, GOLD, INK, 0.5)); o.append(T(kx + 6, yy, str(i), 6.8, 900, "middle"))
-        for j, ln in enumerate(textwrap.wrap(lab, 40)[:3]):
-            o.append(T(kx + 18, yy + j * 9.5, ln, 7.4, 600 if j == 0 else 400)); 
-        yy += 9.5 * min(3, len(textwrap.wrap(lab, 40))) + 5
+        for j, ln in enumerate(textwrap.wrap(lab, 40)[:4]):
+            o.append(T(kx + 18, yy + j * 9.5, ln, 7.4, 600 if j == 0 else 400))
+        yy += 9.5 * min(4, len(textwrap.wrap(lab, 40))) + 5
     if note:
         yy += 6
         for ln in textwrap.wrap(note, 46):
@@ -1323,10 +1367,15 @@ def _axo_sheet(num, title, sub, L, S, t, meta, boxes, explode=False, gaps=None, 
     return sheet(num, title, sub, o, "Axonometric · not to scale · the model the plans are drawn from", meta)
 
 
+def _house(b: Box) -> bool:
+    """The house, drawn for context only: the simple wall blocks, or every part of a measured house model."""
+    return b.kind in ("house", "roof", "trim") or getattr(b, "layer", "") == "house"
+
+
 def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
     bx = [b for b in S.boxes if b.kind not in ("ground", "glass", "stringer")]     # closed risers hide the stringers
-    fit = [b for b in bx if b.kind not in ("house", "roof", "trim") or (b.tag or "") in ("snow retention bar",)]
-    hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "sheath", "underlay")
+    fit = [b for b in bx if not _house(b) or (b.tag or "") in ("snow retention bar",)]
+    hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "stepbase", "sheath", "underlay")
     key = [k for k in member_key(L, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
     return _axo_sheet("A-002", "Isometric — assembled, labeled", "Everything you see called out: piers, decking, picture frame, skirt, stair, roof covers, finishes", L, S, t, meta, bx, fit=fit, key=key,
                       note=("House shown for context only (no work). The CEMCO steel deck frame under the decking is called out on S-102 and A-003; cover framing is wood: 2x8 rafters, "
@@ -1335,7 +1384,7 @@ def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
 
 
 def sheet_iso_exploded(L: Layout, S: Scene, t, meta) -> str:
-    bx = [b for b in S.boxes if b.kind not in ("ground", "glass", "house", "roof", "trim") or (b.tag or "").startswith("blind") or (b.tag or "") == "snow retention bar"]
+    bx = [b for b in S.boxes if (b.kind not in ("ground", "glass") and not _house(b)) or (b.tag or "").startswith("blind") or (b.tag or "") == "snow retention bar"]
     cov = any(b.kind in ("cpost", "rafter", "ssroof") for b in bx)
     sub = "Each build layer lifted in order: piers · posts" + (" + knee braces" if any(b.kind == "brace" for b in bx) else "") + " · beams · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "") + (" · rail" if L.rail else "") + (" · roof covers layer by layer" if cov else "")
     return _axo_sheet("A-003", "Isometric — exploded, labeled", sub, L, S, t, meta, bx, explode=True, az=35, el=24,
@@ -1358,8 +1407,17 @@ def sheet_iso_structure(L: Layout, S: Scene, t, meta) -> str:
     if L.spec.framing.system == "steel":
         return _axo_sheet("S-102", "Structure isometric — steel frame, labeled", "Piers, stubs, cover posts at the shared piers, boxed beams, C-joists, track rims, ledger track, blocking", L, S, t, meta, bx, az=-32, el=32, key=key,
                           note="Decking, covers and house removed to show the frame. Every joist end clips to the track, ledger track or boxed beam; the engineer's clip schedule governs.")
-    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Piers, post bases, posts" + (", knee braces" if any(b.kind == "brace" for b in bx) else "") + ", post caps, beam, joists, double rims, ledger, blocking", L, S, t, meta, bx, az=-32, el=32, key=key,
-                      note="Decking, rail and house removed to show the frame. Joists hang from the ledger in face-mount hangers, bear on the drop beam with H2.5AZ ties; double rims in concealed-flange hangers.")
+    bls = getattr(L, "beam_lines", None) or (L.frame.beams if L.frame else [])
+    kinds = {b.kind for b in bls}
+    items = " ".join(ln.item.lower() for ln in getattr(t, "lines", []))
+    ledger = any(b.kind == "ledger" for b in bx)
+    hang = " and ".join(w for w, on in (("the ledger", ledger), ("the flush beams", "flush" in kinds)) if on)
+    note = ("Decking, rail and house removed to show the frame. " + (f"Joists hang from {hang} in face-mount hangers" if hang else "Joists")
+            + ("; they bear on the drop beam with H2.5AZ ties" if "drop" in kinds else "")
+            + ("; skewed 45° hangers where joists meet the angled rims" if "skewed" in items else "")
+            + ("; double rims in concealed-flange hangers" if "concealed" in items else "") + ".")
+    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Piers, post bases, posts" + (", knee braces" if any(b.kind == "brace" for b in bx) else "") + ", post caps, beam" + ("s" if len(bls) > 1 else "") + ", joists, "
+                      + ("double rims" if L.spec.framing.rim_plies > 1 else "rims") + (", ledger" if ledger else "") + ", blocking", L, S, t, meta, bx, az=-32, el=32, key=key, note=note)
 
 
 def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
@@ -1368,7 +1426,7 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
     s = L.spec
     cols = _axo_colors(S)
     bx = [b for b in S.boxes if b.kind not in ("ground", "glass")]
-    fit = [b for b in bx if b.kind not in ("house", "roof", "trim")]
+    fit = [b for b in bx if not _house(b)]
     o = []
     zt = s.geometry.height_in / 12.0
     views = [("FRONT ELEVATION — from the yard", 0.0, (20, 14, 600, 300)), ("RIGHT END ELEVATION", 90.0, (640, 14, 340, 300)), ("LEFT END ELEVATION", -90.0, (640, 330, 340, 270))]

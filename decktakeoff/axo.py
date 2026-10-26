@@ -10,8 +10,21 @@ from .scene import Box, Scene
 
 GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23}      # the viewer's exploded lift per phase (ft)
 SKIP = {"ground", "gravel", "water", "glass", "trim_house"}
-# layered roof-cover parts paint after everything under them when the camera looks down (no z-fighting between slabs and rafters)
-RANK = {"house": -2, "roof": -1, "rafter": 1, "soffit": 0, "sheath": 2, "underlay": 3, "ssroof": 4, "hardie": 5, "sail": 6}
+# layered roof-cover parts paint after everything under them when the camera looks down (no z-fighting between slabs and rafters);
+# the same for the deck's own layers: grade, piers, posts, beams, joists, then everything on top. A long deck board's centre can sit
+# behind a joist's, and depth alone would paint the joist over the decking.
+RANK = {"house": -2, "roof": -1, "gravel": -0.95, "stepbase": -0.95, "footing": -0.9, "base": -0.9, "post": -0.8, "brace": -0.8, "cap": -0.75,
+        "beam": -0.7, "joist": -0.6, "block": -0.6, "ledger": -0.6, "rim": -0.55,
+        "rafter": 1, "soffit": 0, "sheath": 2, "underlay": 3, "ssroof": 4, "hardie": 5, "sail": 6}
+
+
+def _rank(b: Box) -> float:
+    """Paint class when looking down. The parts of a measured house model (siding, trim, shutters...) paint after its walls
+    and before the deck: a siding course runs the width of the wall, so its centre can sit in front of a planter or bench."""
+    r = RANK.get(b.kind)
+    if r is not None:
+        return r
+    return -1.5 if getattr(b, "layer", "") == "house" else 0
 
 
 def _hex(c: str) -> Tuple[int, int, int]:
@@ -129,7 +142,7 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
                 face = _clip_z(face, clip_z)
                 if len(face) < 3:
                     continue
-            polys.append(((RANK.get(b.kind, 0) if view.d[2] > 0.05 else 0), view.depth(((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2 + lift_of(b, explode, gaps))) * 0.7 + dep * 0.3,
+            polys.append(((_rank(b) if view.d[2] > 0.05 else 0), view.depth(((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2 + lift_of(b, explode, gaps))) * 0.7 + dep * 0.3,
                           [view.p(q) for q in face], _shade(col, k)))
     if fit_boxes is not None:
         for b in fit_boxes:

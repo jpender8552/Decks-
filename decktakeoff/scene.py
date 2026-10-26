@@ -31,6 +31,7 @@ class Box:
     rot_axis: str = "y" # "y": run along x (viewer rotation.z) | "x": run along y (viewer rotation.x)
     xg: float = 0.0     # extra lift in the exploded view (ft) on top of the phase gap: layers within one phase pull apart
     pts: Optional[list] = None   # shape "mesh": triangle vertices [[x, y, z], ...] in plan feet (3 per triangle) — shade sails
+    layer: str = ""              # "site": the yard (lawn, beds, walls, plants, fences, neighbours) — the 3D views draw it, the drawing sheets leave it out
 
 
 @dataclass
@@ -217,10 +218,16 @@ def build_scene(L) -> Scene:
         def _mesh(kind, tri, mat, tag=""):
             xs_ = [q[0] for q in tri]; ys_ = [q[1] for q in tri]; zs_ = [q[2] for q in tri]
             B.append(Box(kind, min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), mat, 0, tag=tag, shape="mesh", pts=[[round(v, 3) for v in q] for q in tri]))
+        n_h = len(B)
         build_house(spec.geometry.house_model, add, lambda *a, **k: B.append(rot_box(*a, **k)), _mesh)
+        for b_ in B[n_h:]:
+            b_.layer = "house"
         if site_m:
             from .landscape import build_site
+            n0 = len(B)
             build_site(site_m, add, lambda *a, **k: B.append(rot_box(*a, **k)), _mesh, zt)
+            for b_ in B[n0:]:
+                b_.layer = "site"
     elif spec.geometry.house_blocks:
         draw_house_from_spec(add, spec, zt, H_house)
     for _c in (spec.geometry.covers or []):
@@ -692,7 +699,7 @@ def build_scene(L) -> Scene:
                     for i in range(ncm):
                         v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (ncm - 1)
                         sb_("joist", ua + 1.5 * IN, ub - 1.5 * IN, v - 0.75 * IN, v + 0.75 * IN, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
-                sb_("gravel", 0.0, n_t * run, va_, vb_, zb0 - 0.36, zb0 - 0.04, "gravel", 1, tag=f"box step base {tag_}")
+                sb_("stepbase", 0.0, n_t * run, va_, vb_, zb0 - 0.36, zb0 - 0.04, "gravel", 1, tag=f"box step base {tag_}")
             else:
                 nst = max(2, st.stringers)
                 for i in range(nst):
@@ -1401,7 +1408,7 @@ def draw_benches(add, spec, zt, fixed_append):
             for d, top, lab in ((ins + wrap / 2, float(bn.get("back_in", 34)) * IN_ if bn.get("back", True) else seat - 1 * IN_, "bench back post (4x4 wrapped)"),
                                 (ins + dep - wrap / 2 - 0.6 * IN_, seat - 1 * IN_, "bench front leg (4x4 wrapped)")):
                 cx, cy = pt(t, d)
-                fixed_append(rot_box("post", cx - ux * wrap / 2, cy - uy * wrap / 2, cx + ux * wrap / 2, cy + uy * wrap / 2, zt, zt + top, "border", 6, wrap, tag=lab))
+                fixed_append(rot_box("benchpost", cx - ux * wrap / 2, cy - uy * wrap / 2, cx + ux * wrap / 2, cy + uy * wrap / 2, zt, zt + top, "border", 6, wrap, tag=lab))
         if bn.get("back", True):
             top = float(bn.get("back_in", 34)) * IN_
             a, b = pt(0, ins + wrap + 0.6 * IN_), pt(L_, ins + wrap + 0.6 * IN_)

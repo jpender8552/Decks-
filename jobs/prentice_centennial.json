@@ -266,7 +266,7 @@
   "board_direction": "parallel",
   "picture_frame": true,
   "house_finish": "lap",
-  "house_color": "#c9c3a4",
+  "house_color": "#bcbba8",
   "zones": [
    {
     "name": "L",
@@ -503,7 +503,7 @@
   "house_model": {
    "_source": "rear elevation measured 25 Oct 2026: photo 2 projective fit on the wall plane (door, downspout, column, 3-lite window), assessor sketch (44' rear wall, 2'x14' south bump, 10' 1st-floor bay), county roof print + 2016 ortho (E-W ridge at 17.2', cantilever / box-bay roof jog 15'-34'), 2000 street photo (2-story, green fascia), owner photos (colors, box bay with half-round gable window, window well)",
    "colors": {
-    "siding": "#c8c1a8",
+    "siding": "#bcbba8",
     "trim": "#f3f1ea",
     "fascia": "#2e463b",
     "roof": "#6b655e",

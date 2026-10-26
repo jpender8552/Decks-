@@ -179,15 +179,23 @@ def rail_name(system: str) -> str:
     return RAIL_SYSTEMS.get(system, {}).get("display", system)
 
 
-def beam_words(sizes, species: str = "Douglas fir") -> str:
-    """'a doubled 4x10 Douglas fir beam' / '4x10 / 4x12 Douglas fir beams' — client wording for the beam list."""
+def beam_words(sizes, species: str = "Douglas fir", n: int = 1) -> str:
+    """'a doubled 4x10 Douglas fir beam' / '4x10 / 4x12 Douglas fir beams' — client wording for the beam list (n beams)."""
     sizes = list(sizes)
     if len(sizes) == 1:
         sz = sizes[0]
+        if n > 1:
+            return f"{n} {sz} {species} beams"
         if sz.startswith("(2)4x") or sz.startswith("(2)6x"):
             return f"a doubled {sz[3:]} {species} beam"
         return f"{sz} {species} beam"
     return f"{' / '.join(sizes)} {species} beams"
+
+
+def beam_species_words(beams) -> str:
+    """How the beams' wood reads: SYP beams are the pressure-treated TrueFrame stock, everything else Douglas fir."""
+    sp = {(getattr(b, "species", None) or "DF").upper() for b in beams}
+    return "pressure-treated SYP" if sp and all(x.startswith("SYP") for x in sp) else "Douglas fir"
 
 
 def tax_rate_for(city: str, override=None) -> float:
