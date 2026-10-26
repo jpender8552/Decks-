@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from .catalog import RAIL_SYSTEMS, decking_facts, actual, rail_name
 from .layout import Layout
-from .spec import post_words, post_base_sku
+from .spec import post_words, post_base_sku, covers_of
 from .scene import Scene, Box, build_scene
 from .units import ftin
 
@@ -190,7 +190,7 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
             ("Dead load", "10 psf deck" + ((" · 15 psf porch cover (standing seam steel on sheathing, Hardie soffit; 12 psf actual, 15 used) carried on the deck posts" if s.extras.cover_roof.lower().startswith("standing") else " · 15 psf porch cover (shingles, sheathing, Hardie soffit) carried on the deck posts") if cover else "")),
             ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow" + (" (PPRBD minimum 30 psf)" if "colorado springs" in (s.site.city or "").lower() else "") + ", sliding snow off the house roof + drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
             ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf on the deck" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "") + (" · cover posts add roof snow + dead to the deck frame and footings (engineered)" if cover else "")),
-            ("Wind", s.site.wind_note or f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + " (footings bear below)"),
+            ("Wind", s.site.wind_note or f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + (" (Diamond Piers are frost-protected by the pin design; no excavation)" if s.framing.footing_type == "diamond_pier" else " (footings bear below)")),
             ("Soil bearing", f"{s.site.soil_bearing_psf:,.0f} psf presumptive (IRC R401.4.1) — no soils report"), ("Seismic", s.site.seismic_design_category),
             ("Wildfire (WUI)", ("Ignition-resistant construction: Class A / WUI-listed decking (TimberTech Advanced PVC), noncombustible rail (steel), fiber-cement skirt, soffit and fascia, "
                                 "26 ga flashing at every wall, " + ("Class A noncombustible standing seam steel roof on the cover with metal eave / rake / headwall trims" if (cover and s.extras.cover_roof.lower().startswith("standing")) else "Class A roof on the cover") + "; under-deck kept clear of combustibles (Colorado Springs WUI Code / IWUIC 504)") if s.site.wui_fire_zone else "not in a WUI zone"),
@@ -203,6 +203,7 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
                          + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9")))),
             ("Engineering", ("Stamped structural set by a Colorado PE required — the stamped set governs" if s.extras.engineered
                              else ("Stamped structural set by a Colorado PE, provided by GSX and billed at cost with the permit" if s.extras.engineering_note else "Prescriptive; no engineering required by this design")))]
+    crit = [(k, v) for k, v in crit if not (k == "Roof snow (cover)" and v.strip() in ("—", "-", ""))]   # no cover: no roof-snow row
     for k, v in crit:
         for i, ln in enumerate(textwrap.wrap(v, 92)[:3]):
             o.append(T(24, y, k if i == 0 else "", 8.5, 800)); o.append(T(150, y, ln, 8.5, 400)); y += 12
@@ -652,7 +653,8 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     if s.extras.hot_tub:
         note(680, 360, 290, f"Tub bay in zone {s.extras.hot_tub_zone or 'A'}: {ftin(s.extras.hot_tub_bay_in)} square against the house — sister a joist to every joist across the bay, block between, design 100 psf; engineer confirms. Owner's electrician: 50A GFCI circuit + disconnect.")
     elif any(b.kind == "flush" for b in L.beam_lines):
-        note(680, 360, 290, "Flush beam: top of beam = top of joists. Joists hang on both faces in LUS hangers; opposing hangers per Simpson and the stamped set.")
+        note(680, 360, 290, "Flush beam: top of beam = top of joists. Joists hang on both faces in LUS hangers; opposing hangers per Simpson"
+                            + (" and the stamped set." if s.extras.engineered else "'s installation notes."))
     else:
         note(680, 360, 290, t.schedule.get("Blocking", "Blocking one row over the beam, staggered up and down so every block can be end-nailed."))
     return sheet("D-501", "Details", "Ledger · post / beam / cap · footing · rail post · deck edge · the job's special condition", o, "Schematic details, not to scale", meta)
@@ -789,7 +791,7 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append('<defs><pattern id="hatchC" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#b9ad97" stroke-width="1.2"/></pattern></defs>')
         o.append(PG([(X(x), Y(y)) for x, y in fp], "url(#hatchC)", INK, 1.3))
         cx = sum(p[0] for p in fp) / len(fp); cy = sum(p[1] for p in fp) / len(fp)
-        o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE)); o.append(T(X(cx), Y(cy) + 12, sp.get("house_label", "one storey + garage (no work)"), 7.5, 600, "middle", MUTE))
+        o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE)); o.append(T(X(cx), Y(cy) + 12, sp.get("house_label", "one-story + garage (no work)"), 7.5, 600, "middle", MUTE))
     # decks
     out = deck_outline(S)
     o.append(PG([(X(x), Y(y)) for x, y in out], FILL["deck"], INK, 1.2))
@@ -1465,7 +1467,7 @@ def sheet_iso_assembled(L: Layout, S: Scene, t, meta) -> str:
     fit = [b for b in bx if not _house(b) or (b.tag or "") in ("snow retention bar",)]
     hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "stepbase", "sheath", "underlay")
     key = [k for k in member_key(L, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
-    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Everything you see called out: piers, decking, picture frame, skirt, stair, roof covers, finishes", L, S, t, meta, bx, fit=fit, key=key,
+    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Everything you see called out: piers, decking, picture frame, skirt, stair" + (", roof covers" if covers_of(L.spec) else "") + ", finishes", L, S, t, meta, bx, fit=fit, key=key,
                       note=("House shown for context only (no work). The CEMCO steel deck frame under the decking is called out on S-102 and A-003; cover framing is wood: 2x8 rafters, "
                             + ", ".join(f"{c_['name'].lower()} {c_.get('beam', '(2)2x10')} beam" for c_ in __import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(L.spec)) + ", 6x6 Douglas fir posts.")
                       if L.spec.framing.system == "steel" else "House shown for context only (the deck work only). The frame under the decking is called out on S-102 and A-003.")
@@ -1582,6 +1584,12 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
 
 # ------------------------------------------------------------------ connection details (permit set)
 _PANEL = {"r": 10000.0}
+
+
+def _detail_note(s) -> str:
+    """The detail sheets' scale note: an engineered job's details defer to the engineer of record; a prescriptive one's to the plans."""
+    return ("Schematic details, not to scale · the engineer of record's details govern" if s.extras.engineered
+            else "Schematic details, not to scale · the plans and the manufacturers' instructions govern")
 
 
 def _lead(o, ax, ay, tx, ty, txt, size=6.6, anchor_="start", w_=600):
@@ -1912,7 +1920,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
                 o.append(T(x + 20, yy, ln_, 6.6, 600, fill="#b3261e")); yy += 11
     return sheet("D-502", "Connection details — frame", f"Ledger{' on the cantilever' if cant else ''} · hangers · joists {'into' if flush else 'on'} the beam · {bsize} on the cap · pier + base · "
                  + ("knee braces" if s.framing.knee_braces else "post lengths"), o,
-                 "Schematic details, not to scale · the engineer of record's details govern", meta)
+                 _detail_note(s), meta)
 
 
 def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
@@ -2058,7 +2066,7 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(T(x + 14, yy, a, 6.8, 800)); o.append(T(x + 106, yy, textwrap.shorten(b, 52, placeholder="…"), 6.6, 500)); yy += 18
         o.append(LN(x + 10, yy - 12, x + W3 - 10, yy - 12, "#e2dccf", 0.5))
     return sheet("D-504", "Connection details — deck edge, rail, lateral", "Rail post mounting · picture frame + fascia · guard bay · DTT1Z lateral ties · joist tape · fastening schedule", o,
-                 "Schematic details, not to scale · the engineer of record's details govern", meta)
+                 _detail_note(L.spec), meta)
 
 
 def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[str]:
@@ -2167,4 +2175,4 @@ def sheet_details_cover_connections(L: Layout, S: Scene, t, meta) -> Optional[st
     _lead(o, x + 163, y + 80, x + 24, y + 140, f"HardieTrim beam wrap {hc}".strip())
     _lead(o, x + 135, y + 200, x + 24, y + 210, f"{post} post")
     return sheet("D-503", "Connection details — roof covers (wood framing)", "Ledger + headwall · eave at the beam · post base · rake · standing seam + clip · blinds", o,
-                 "Schematic details, not to scale · the engineer of record's details govern", meta)
+                 _detail_note(L.spec), meta)

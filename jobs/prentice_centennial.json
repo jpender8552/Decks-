@@ -205,14 +205,14 @@
     "left": "SIDE LOT LINE (SOUTH)",
     "right": "SIDE LOT LINE (NORTH)"
    },
-   "house_label": "two storey (1993) \u2014 roof outline incl. eaves, county GIS (no work)",
+   "house_label": "two-story (1993) \u2014 roof outline incl. eaves, county GIS (no work)",
    "deck_label": "NEW DECK \u2014 same footprint, 34'-6\" x 14'-2\", 21\" above grade",
    "info": [
     "AIN 2073-15-2-12-013 \u00b7 PIN 033418221",
     "Lot 12, Block 1, Jackson Farm Subdivision 3rd Filing (plat 92148400)",
     "City of Centennial \u00b7 zoning NC6 (Neighborhood Conservation) \u00b7 flood zone X \u00b7 not in the WUI",
     "Lot 7,549 SF (GIS) \u00b7 rear faces east (90.5 deg)",
-    "House 1993, 2 storey, 2,525 SF above grade + 993 SF basement + 573 SF garage (assessor)",
+    "House 1993, 2-story, 2,525 SF above grade + 993 SF basement + 573 SF garage (assessor)",
     "No deck permit on record (City permit history: re-roofs 2009 / 2018 / 2023, HVAC + alterations 2015)"
    ],
    "coverage": [
@@ -251,7 +251,7 @@
    "site_work": [
     "Remove the existing deck, benches and planter; haul off",
     "11 Diamond Pier DP-50/50 foundations (no excavation spoils); 6x6 DF #1 posts",
-    "Lower the grade ~5\" along the open left side for the 2x10 frame; the brick border there is reset (see the decision log)",
+    "Lower the grade ~5\" along the open left side for the 2x10 frame; the brick border there is reset ~5\" lower before the frame",
     "No change to the downspouts, the retaining wall, the beds or the drainage",
     "Call 811 before the piers; protect the lawn, the beds and the window well"
    ],

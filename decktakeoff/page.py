@@ -570,7 +570,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  % (L.deck_sf, n_piers, sum(1 for l in t.lines if l.category != "Site"), ftin(spec.geometry.height_in)))
         head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · material take-off + build set · for Decks &amp; Docks</div><h1>{E(name)}</h1>'
                 f'<p>{E(sub or addr)} · {E(today)}</p><p>Account GSEXT1 · ship to {E(addr)} · please quote every line; call Jade Pender 303-550-9558 with substitutions.</p></div></header>')
-        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings; the stamped engineering set governs structure. Quote requested — no pricing on this sheet.</span></footer></main>'
+        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings' + ("; the stamped engineering set governs structure" if spec.extras.engineered else "") + '. Quote requested — no pricing on this sheet.</span></footer></main>'
         title = f"{name} — Take-off + Build Set"
     elif cost_only and not spec.extras.sell_override:
         strip = ('<div class="strip"><div><span class="sl">Check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Financed</span><span class="sv">%s</span></div>'
@@ -824,7 +824,9 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
             sheet_html.append(f'<div class="sheet-page" id="s-{pi + 1}-{num}"><h3>{E(pt["title"])} · {num} · {E(ttl)}</h3>{svg}</div>')
     w(f'<section class="job" id="job-{key}">')
     w('<div class="cover-list"><h2 class="kicker" id="g-index">Sheet index</h2><ol class="index">' + "".join(f"<li>{E(a)} · <b>{b}</b> {E(c)}</li>" for a, b, c in index) + "</ol>")
-    w('<p>Design intent. The stamped engineering set governs structure, dimensions and locations. Field verify. Do not scale. This set carries no pricing.</p></div>')
+    eng_any = any(pt_["spec"].extras.engineered for pt_ in parts) and not no_engineering
+    w('<p>' + ("Design intent. The stamped engineering set governs structure, dimensions and locations. " if eng_any else "Design intent per the 2021 IRC R507 prescriptive provisions. ")
+      + 'Field verify. Do not scale. This set carries no pricing.</p></div>')
     w("".join(sheet_html))
     if renders:
         w('<h2 class="kicker" id="g-views">3D views <span class="tag">design intent</span></h2>')
@@ -838,7 +840,7 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     w("</section>")
     head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · permit set</div><h1>{E(name)}</h1>'
             f'<p>{E(sub or addr)} · {E(today)}</p></div></header>')
-    body = head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division · Jade Pender 303-550-9558</span><span>Permit set — drawings only. Design intent; the stamped engineering set governs.</span></footer></main>'
+    body = head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division · Jade Pender 303-550-9558</span><span>Permit set — drawings only. ' + ("Design intent; the stamped engineering set governs." if eng_any else "Design intent; 2021 IRC R507 prescriptive.") + '</span></footer></main>'
     title = f"{name} — Permit Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{PERMIT_CSS}</head><body>"
             + body + "</body></html>\n")
