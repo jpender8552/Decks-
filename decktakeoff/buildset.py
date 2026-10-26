@@ -13,7 +13,7 @@ from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, M
 from .layout import Layout
 from .scene import build_scene, Scene, PHASES
 from .takeoff import Takeoff
-from .catalog import parse_beam
+from .catalog import parse_beam, RAIL_SYSTEMS
 from .spec import covers_of, post_words, post_base_sku
 from .units import ftin
 from .viewer import viewer_html
@@ -49,7 +49,10 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower()),
         how=([f"The existing stucco columns stay. Strip the old beam off each column top, check the column core and its bearing; new column caps / saddles per the engineer, then the beams land on them."]
              if s.framing.existing_posts else
-             [f"{s.framing.post_size} posts on the bases; cut so the beam top lands at the joist bottom (drop beam) or the joist top (flush beam): " + " / ".join(f"{bl.label} posts {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
+             [f"{s.framing.post_size} posts on the bases; cut so the beam top lands at "
+              + {frozenset({"drop"}): "the joist bottom (drop beams)", frozenset({"flush"}): "the joist top (flush beams)"}.get(
+                  frozenset(b_.kind for b_ in s.framing.beams), "the joist bottom (drop beam) or the joist top (flush beam)")
+              + ": " + " / ".join(f"{bl.label} posts {ftin(bl.post_len)}" for bl in L.beam_lines) + " — field-measure each.",
               "Plumb both ways, brace, then the caps go on with the beams."] + (["Seal every cut end before it goes up."] if timber and s.framing.end_grain_seal else [])),
         check=["Posts plumb to a string; tops on the beam line", "Every cut end sealed" if timber else "No post in ground contact without a standoff"]))
     if s.extras.stone_bases:
@@ -81,7 +84,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                if any(parse_beam(bl.size)[0] == 2 and parse_beam(bl.size)[1].startswith("4x") for bl in L.beam_lines) else [])
             + ([f"Knee braces once the beam is capped: 4x4 at 45°, {ftin(s.framing.knee_leg_in)} legs, one along the beam toward mid-span and one toward the house up to a {s.framing.joist_size} block between two joists (set the block with the frame) — 1/2\" through-bolt each end, then pull the temporary bracing."]
                if s.framing.knee_braces else []),
-        check=["Beam top = joist bottom (drop) / joist top (flush)", "Splices land on a post; caps fully fastened"] + (["Every knee brace bolted both ends; posts still plumb"] if s.framing.knee_braces else [])))
+        check=[{frozenset({"drop"}): "Beam top = joist bottom (drop beams), crown up", frozenset({"flush"}): "Beam top = joist top (flush beams), crown up"}.get(
+                   frozenset(b_.kind for b_ in s.framing.beams), "Beam top = joist bottom (drop) / joist top (flush)"), "Splices land on a post; caps fully fastened"] + (["Every knee brace bolted both ends; posts still plumb"] if s.framing.knee_braces else [])))
     if s.framing.knee_braces:
         steps[-1]["goes_in"] = steps[-1]["goes_in"] + items(lambda l: "knee brace" in l.item or "1/2\" x 8\"" in l.item)
     if s.framing.system == "steel":
@@ -117,7 +121,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
         goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
         how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else []),
-        check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—", "Cables tensioned / balusters under 4\" clear", "End of construction"]))
+        check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—",
+               "Cables tensioned, no 4\" sphere passes" if RAIL_SYSTEMS.get(s.railing.system, {}).get("cable") else "Balusters under 4\" clear"]))
     # stairs and the box step (their own crew day), then the built-ins — the order lines that go in with each
     from .takeoff import inches_frac
     if s.stairs and L.stairs:
@@ -173,6 +178,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             check=["Ledger flashed and counterflashed — hose test before the ceiling closes", "Posts plumb over blocking, beam level, rafters tied",
                    "Panels straight, seams engaged full length, no oil-canning; snow bar continuous" if ss else "Shingles straight, ridge cap sealed",
                    "Gutter falls to the outlets, downspouts discharge away from the footings" if s.extras.cover_gutters else "Water sheds clear of the deck edge"]))
+    steps[-1]["check"] = steps[-1]["check"] + ["End of construction"]     # on whichever step is built last
     for i, st_ in enumerate(steps):          # numbered as built: the phase numbers skip (no stone bases, no cover)
         st_["n"], st_["code"] = i + 1, f"T-4{i:02d}"
     return steps
