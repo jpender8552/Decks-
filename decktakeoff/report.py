@@ -190,7 +190,8 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"## {s.job}")
     fr_txt = (f"CEMCO cold-formed steel frame, all G90 — {s.framing.steel_joist} C-joists at {fr.spacing:g}\" OC, {s.framing.steel_track} track rims, boxed {s.framing.steel_joist} beams" if s.framing.system == "steel" else None) or (f"{s.framing.joist_species} #1 timber frame — {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, "
               f"{s.framing.joist_size} joists at {fr.spacing:g}\"" if s.is_timber else
-              f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", {s.framing.beams[0].size if s.framing.beams else ''} beam, {s.framing.post_size} posts")
+              f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", " + (f"{' / '.join(sorted({b.size for b in s.framing.beams}))} beam{'s' if len(s.framing.beams) > 1 else ''}, " if s.framing.beams else "")
+              + f"{s.framing.post_size} posts")
     n_posts = L.n_footings
     foot = {"caisson": f"{n_posts} caissons", "diamond_pier": f"{n_posts} Diamond Pier footings", "concrete": f"{n_posts} concrete piers",
             "existing": (f"the {n_posts} existing columns and caissons" if s.framing.existing_posts else f"the {n_posts} existing caissons")}[s.framing.footing_type]
