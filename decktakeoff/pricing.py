@@ -105,7 +105,7 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         if t.order_ref:   # the owner's quoted order governs: every pier on it gets set
             q = sum(l.order for l in t.lines if "diamond pier" in l.item.lower())
             n_piers = int(q) if q else n_posts
-        lab.append(("Diamond Pier install (replaces caisson)", n_piers, "pier", lr["diamond_pier_each"], "rate card" + (" · count from the quoted order" if n_piers != n_posts else "")))
+        lab.append(("Diamond Pier install", n_piers, "pier", lr["diamond_pier_each"], "rate card" + (" · count from the quoted order" if n_piers != n_posts else "")))
     elif ft == "caisson":
         lab.append((f"Caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' (frost {s.site.frost_depth_in:g}\")", n_posts, "hole", lr["caisson_each"], "base rate"))
         if L.frame.footing_dia_in >= 20:
@@ -138,10 +138,12 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     if timber and s.framing.finish == "oil":
         lab.append(("Timber oil — pre-oil the 4x10 joists / rims / ledgers on horses, coat 1 all faces", round(t.joist_lf), "LF", lr["oil_pre_oil_per_lf"], "EST — no rate-card line"))
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
-    for st in L.stairs:
-        lab.append((f"Stairs ({st.side})" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
+    import re as _re
+    for ss_, st in zip(list(s.stairs) + [None] * len(L.stairs), L.stairs):       # the stair by its name, else by the side it leaves
+        nm_ = getattr(ss_, "name", None) or _re.sub(r"\bedge:(\d+)", r"side \1", f"Stairs ({st.side})")
+        lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
         if st.landing_rail_lf:
-            lab.append((f"Landing guard rail ({st.side} stair)", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
+            lab.append((f"Landing guard rail ({nm_})", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
     for ss in s.stairs:
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144
