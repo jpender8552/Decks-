@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 include = ["decktakeoff*"]
 
 [tool.setuptools.package-data]
-decktakeoff = ["data/*.json"]
+decktakeoff = ["data/*.json", "data/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

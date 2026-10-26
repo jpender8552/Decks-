@@ -30,7 +30,7 @@ def test_internal_and_customer_pages_same_template(tmp_path):
         txt = re.sub(r"<script.*?</script>", "", html, flags=re.S)
         for bad in ("internal", "rate card", "GM", "Jade", "STOP", "ENGINEER"):
             assert bad not in txt, (job, bad)
-        assert 'class="cover"' in html and "Prepared for" in html
+        assert 'class="manifest"' in html and "Prepared for" in html          # the launch-manifest cover
 
 
 def test_switchback_stair_flights():

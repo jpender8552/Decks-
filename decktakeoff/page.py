@@ -18,6 +18,7 @@ from .units import ftin
 from .takeoff import CATEGORIES, inches_frac
 from .catalog import rail_name, beam_words, beam_species_words
 from .pricing import gc_name
+from . import proposal_look as PL
 
 E = html.escape
 CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
@@ -468,9 +469,13 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
         w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
         w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
-        w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
-        q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
-        w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
+        if spec.extras.price_breakdown:
+            nxt = re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):])
+            w(PL.wheel(spec, p, _options_table(p, opts), md_to_html(nxt)).replace('<section class="invest"', '<section class="invest" id="g-investment"', 1))
+        else:
+            w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
+            q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
+            w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
         w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
         w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     elif customer:
@@ -563,13 +568,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  '<div><span class="sl">Financed</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
                  % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gp / p.sell, money(p.retail), L.deck_sf))
     if customer:
-        who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "") + f" · {today}"
-        head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name)}</h1><p class="who">{E(who)}</p>'
-                + ((f'<div class="pricebar"><div><span class="l">Check or ACH</span><span class="v">{money(p.sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(p.retail)}</span><span class="s">no money down</span></div>'
-                    f'<div><span class="l">Monthly</span><span class="v">{money(p.monthly)}</span><span class="s">6.99% · 10 years</span></div></div>') if spec.extras.show_financing else
-                   f'<div class="pricebar"><div><span class="l">Price · check or ACH</span><span class="v">{money(p.sell)}</span></div></div>')
-                + (f'<img class="herofig" src="r/{key}-{hero}.jpg" alt="rendering">' if hero in have else "")
-                + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
+        who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
+        head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers)
         body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
         title = f"{name} — Proposal"
     elif supplier:
@@ -607,8 +607,9 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                    f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else ""))
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
-    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}</head><body>"
-            + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script></body></html>\n")
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
+            + (PL.FONT + PL.CSS if customer else "") + "</head>" + ('<body class="proposal">' if customer else "<body>")
+            + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
     page = page.replace(CDN, "", 1)
     scripts = re.findall(r"<script>\n\(function\(\)\{\nconst D = .*?\n\}\)\(\);\n</script>", page, flags=re.S)
@@ -645,7 +646,7 @@ def render_pdf(page: str, files: Dict[str, str], pdf_path: str, key: str, hero: 
     m = re.search(r'<h2 class="kicker"[^>]*>3D model.*?(?=<footer)', p, flags=re.S)
     if m:
         p = p[:m.start()] + f'<h2 class="kicker">3D model</h2><figure><img src="r/{key}-{hero}.jpg" alt="3D"><figcaption>The interactive 3D model lives at the online version of this document.</figcaption></figure>' + p[m.end():]
-    p = p.replace("<details", "<details open").replace("</head>", PRINT_CSS + "</head>")
+    p = p.replace("<details", "<details open").replace("</head>", PRINT_CSS + PL.PRINT_CSS + "</head>")
     (out / "_print.html").write_text(p)
     with sync_playwright() as pw:
         b = pw.chromium.launch(executable_path=_chromium(), args=["--no-sandbox"])
