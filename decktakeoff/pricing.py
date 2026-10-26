@@ -202,6 +202,11 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     return lab
 
 
+def gc_name(gc_lines, default: str) -> str:
+    """The at-cost bucket named for what is in it when it is one owner-set item (e.g. the dumpster + toilet), else the generic name."""
+    return gc_lines[0][0] if len(gc_lines) == 1 and gc_lines[0][0] != "General conditions" else default
+
+
 def gc_lines_for(t: Takeoff) -> Tuple[List[Tuple[str, float, str]], float, List[Tuple[str, float]]]:
     s, L = t.spec, t.layout
     if s.extras.no_general_conditions:
@@ -362,7 +367,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     for cat, label, n, sv in bsell:        # owner-priced built-ins at their section price
         alloc.append((label, round(sv)))
     if gc:
-        alloc.append(("Site & project services", round(gc)))
+        alloc.append((gc_name(gc_lines, "Site & project services"), round(gc)))
     if s.extras.sell_override:        # scale every component to the set price, then true up the rounding
         tot = sum(a[1] for a in alloc) or 1
         alloc = [(k, round(v * sell / tot)) for k, v in alloc]

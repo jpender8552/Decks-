@@ -2225,7 +2225,7 @@
    {
     "severity": "CHECK",
     "topic": "grade",
-    "text": "Left octagon beam line (posts at 2'-11\" and 7'-7\" from the left end): the flush beam's bottom is 10-3/4\" above the stair-landing grade and the left side stands ~5-7\" higher, so only ~4-6\" remain \u2014 no room for a pier head + ABA66 + post. Bear the beam directly on those Diamond Piers (DP beam bracket, no post), heads set at grade in a gravel pocket, or carry the left-side regrade under the lobe. Field-verify the grade before cutting posts.",
+    "text": "Left octagon beam line (posts at 2'-11\" and 7'-7\" from the left end): the flush beam's bottom is 10-3/4\" above the stair-landing grade and the left side stands ~5-7\" higher, so only ~4-6\" remain \u2014 no room for a pier head + ABA66RZ base + post. Bear the beam directly on those Diamond Piers (DP beam bracket, no post), heads set at grade in a gravel pocket, or carry the left-side regrade under the lobe. Field-verify the grade before cutting posts.",
     "ref": "field"
    },
    {

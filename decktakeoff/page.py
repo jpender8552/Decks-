@@ -17,6 +17,7 @@ from .report import quote_markdown
 from .units import ftin
 from .takeoff import CATEGORIES
 from .catalog import rail_name, beam_words, beam_species_words
+from .pricing import gc_name
 
 E = html.escape
 CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
@@ -257,7 +258,7 @@ def _stack(p, sold: float = None):
     out = ['<h2 class="kicker" id="g-stack">' + (f"The stack — cost + margin <span class=\"tag\">sold at {money(sold)} · internal</span>" if sold else 'The stack <span class="tag">internal</span>') + '</h2>']
     stack = [("Materials (raw)", money(p.materials, True)), (f"Materials × {p.material_factor:g}", money(p.materials_factored, True)),
              (f"Sales tax {p.tax_rate:.2%}" + (" on factored materials" if p.material_factor != 1 else ""), money(p.tax, True)), ("Labor (rate card)", money(p.labor, True)),
-             ("Work — carries the margin", money(p.work, True)), ("General conditions at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
+             ("Work — carries the margin", money(p.work, True)), (gc_name(p.gc_lines, "General conditions") + " at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
              (f"Sell — check or ACH at {p.gm:.1%} GM" + (f" ({p.rail_note})" if p.rail_note else ""), f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor" + (" (the deck at 40%, rail at its rate)" if p.rail_note else ""), money(p.sell_floor)),
              ("Financed", f"<b>{money(p.retail)}</b> · {money(p.monthly)}/mo at 6.99% × 10 yr"), ("Gross profit", money(p.gp))]
     if sold:
@@ -272,7 +273,7 @@ def _stack(p, sold: float = None):
     out.append("<h3>Labor</h3>")
     out.append(table(["Line", "Qty", "Unit", "Rate", "Ext"], [[E(i), qfmt(q), E(u), money(r, True), money(e, True)] for i, q, u, r, e in p.labor_lines], "", ["l", "r", "l", "r", "r"]))
     if p.gc_lines:
-        out.append("<h3>General conditions — at cost, no margin</h3>")
+        out.append(f"<h3>{E(gc_name(p.gc_lines, 'General conditions'))} — at cost, no margin</h3>")
         out.append(table(["Item", "Amount", "Why"], [[E(i), money(a), E(why)] for i, a, why in p.gc_lines], "", ["l", "r", "l"]))
     out.append("<h3>What the price includes — sell values</h3>")
     out.append(table(["Item", "Value"], [[E(k), money(v)] for k, v in p.allocation] + [["<b>Total, check or ACH</b>", f"<b>{money(p.sell)}</b>"], ["<b>Total, financed</b>", f"<b>{money(p.retail)}</b>"]], "", ["l", "r"]))
@@ -288,7 +289,7 @@ def _cost_stack(p, t):
     total = round(p.materials + tax_raw + p.labor + p.gc, 2)
     out = ['<h2 class="kicker">Cost to build <span class="tag">materials at invoice · labor at the rate card · site services at cost</span></h2>']
     rows = [("Materials — every line of the order", money(p.materials, True)), (f"Sales tax {p.tax_rate:.2%} on materials", money(tax_raw, True)),
-            ("Labor", money(p.labor, True)), ("Site & project services at cost", money(p.gc, True)), ("<b>Total cost to build</b>", f"<b>{money(total, True)}</b>")]
+            ("Labor", money(p.labor, True)), (gc_name(p.gc_lines, "Site & project services") + " at cost", money(p.gc, True)), ("<b>Total cost to build</b>", f"<b>{money(total, True)}</b>")]
     out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in rows) + "</tbody></table></div>")
     cats = t.by_category()
     out.append("<h3>Materials by category</h3>")
@@ -296,7 +297,7 @@ def _cost_stack(p, t):
     out.append("<h3>Labor</h3>")
     out.append(table(["Line", "Qty", "Unit", "Rate", "Ext"], [[E(i), qfmt(q), E(u), money(r, True), money(e, True)] for i, q, u, r, e in p.labor_lines] + [["<b>Labor</b>", "", "", "", f"<b>{money(p.labor, True)}</b>"]], "", ["l", "r", "l", "r", "r"]))
     if p.gc_lines:
-        out.append("<h3>Site & project services — at cost</h3>")
+        out.append(f"<h3>{E(gc_name(p.gc_lines, 'Site & project services'))} — at cost</h3>")
         out.append(table(["Item", "Amount", "Why"], [[E(i), money(a), E(why)] for i, a, why in p.gc_lines], "", ["l", "r", "l"]))
     if p.engineering:
         out.append(f"<p><b>Engineering and permit</b> — {money(p.engineering[0])} to {money(p.engineering[1])}, billed at cost on top of the above.</p>")
@@ -595,7 +596,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                 f'<p>{E(sub or addr)}</p></div></header>')
         gm_note = (f"sold at {money(p.sell)} · {p.gp / p.sell:.1%} margin on the sold price ({p.gm:.1%} on the work)" if spec.extras.sell_override else
                    f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else ""))
-        body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · GC at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
+        body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}</head><body>"
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script></body></html>\n")

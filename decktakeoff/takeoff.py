@@ -293,8 +293,6 @@ def _accumulate_field_plan(Q_: Q, spec: DeckSpec, L: Layout) -> None:
         Q_.cuts.append(CutPiece(f"Field boards panel {pi + 1}" + (" (rip)" if rip else ""), f"{spec.decking.collection} {spec.decking.color}", float(ln), n,
                                 "one board wall to border, no joints" + ("; ripped to fit the border / the house" if rip else "")))
     Q_.field_rows += P.n_rows
-    if P.dropped:
-        Q_.cuts.append(CutPiece("Slivers under 6\" (not laid)", f"{spec.decking.collection} {spec.decking.color}", 0.0, P.dropped, "beside the breakers at the bay — the breaker / border covers"))
 
 
 def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None:
@@ -970,7 +968,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if uc == 0.0:
             lf, src = _price("decking", f"{brand}|{coll}|per_lf"); uc = round(lf * 12, 2)
         lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x12 Square Edge — treads ({st.side} stair)", nb, nb + 1, "ea",
-                          f"+1  ({st.geo.treads} treads x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
+                          f"+1  ({st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
         if st.riser_pieces:
             nr = int(math.ceil(st.riser_pieces / per_board))
             uc, src = _price("decking", f"{brand}|{coll}|riser")
@@ -1142,7 +1140,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         tot = face + stair_face
         boxes = max(1, int(math.ceil(tot / d["count"])))
         lines.append(Line("Fasteners", f"Starborn Cap-Tor xd 2-3/4\" Epoxy {color} 350 ct", boxes, boxes, "box",
-                          f"{tot} screws needed  (first row {Qz.first_row} · border {0 if (spec.decking.border_fastener or '') == 'Cortex' else Qz.border_screws} · fascia {Qz.fascia_screws}" + (f" · stairs {stair_face}" if stair_face else "") + ")", d["each"], d["source"]))
+                          f"{tot} screws needed  (" + " · ".join(f"{k_} {v_}" for k_, v_ in (("first row", Qz.first_row), ("border", 0 if (spec.decking.border_fastener or '') == 'Cortex' else Qz.border_screws),
+                                                                         ("fascia", Qz.fascia_screws), ("stairs", stair_face)) if v_) + ")", d["each"], d["source"]))
         cx_b = (spec.decking.border_fastener or "") == "Cortex"
         sched["Face screws"] = ("Cap-Tor xd color-matched ONLY at: first row 1 per joist on the house edge · " + ("" if cx_b else "borders 2 per bearing point @ 16\" · ")
                                 + "fascia 2 at each board end then alternate top/bottom every 12\", pre-drilled" + (" · stair treads 2 per stringer per board" if stairs and not cx_b else ""))

@@ -8,7 +8,7 @@ from dataclasses import asdict
 from typing import List, Optional
 
 from .flags import Flag, run_flags
-from .pricing import Pricing
+from .pricing import Pricing, gc_name
 from .takeoff import Takeoff, CATEGORIES
 from .units import ftin
 from .catalog import rail_name
@@ -84,7 +84,7 @@ def takeoff_markdown(t: Takeoff, flags: Optional[List[Flag]] = None, pricing: Op
         w(f"| Sales tax {pricing.tax_rate:.2%} on factored materials | ${pricing.tax:,.2f} |")
         w(f"| Labor (rate card) | ${pricing.labor:,.2f} |")
         w(f"| Work (carries the margin) | ${pricing.work:,.2f} |")
-        w(f"| General conditions at cost | ${pricing.gc:,.2f} |")
+        w(f"| {gc_name(pricing.gc_lines, 'General conditions')} at cost | ${pricing.gc:,.2f} |")
         w(f"| Cost | ${pricing.cost:,.2f} |")
         w(f"| **Sell — check or ACH** at {pricing.gm:.1%} GM" + (f" ({pricing.rail_note})" if pricing.rail_note else "") + f" | **${pricing.sell:,.0f}** (${pricing.sell_per_sf:,.2f}/SF) |")
         w(f"| Sell at the 40% floor | ${pricing.sell_floor:,.0f} |")

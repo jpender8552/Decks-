@@ -1132,7 +1132,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         box = (s.build or "stringers") == "box"
         if box:
             notes = [n for n in notes if "stringer" not in n]
-            notes.append(f"box step: {geo.treads} framed 2x6 box{'es' if geo.treads > 1 else ''} {s.width_in:.0f}\" wide on a 4\" compacted 3/4\" base, fastened to the rim — no stringers;"
+            notes.append(f"{geo.treads} framed 2x6 box{'es' if geo.treads > 1 else ''} {s.width_in:.0f}\" wide on a 4\" compacted 3/4\" base, fastened to the rim — no stringers;"
                          " fascia on the front and both ends, decked in the field board")
         elif s.skirts:
             notes.append("fascia skirts on both sides of the stair, stepped under each tread — the stringers never show")
@@ -1495,7 +1495,7 @@ def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -
                 if math.hypot(x1 - x0, y1 - y0) > 0.5:
                     plan.borders.append((x0, y0, x1, y1, "border"))
     if plan.dropped:
-        plan.notes.append(f"{plan.dropped} slivers under 6\" beside the breakers / bay are not laid as boards (the border or breaker covers)")
+        plan.notes.append(f"{plan.dropped} sliver{'s' if plan.dropped != 1 else ''} under 6\" beside the breakers / bay {'are' if plan.dropped != 1 else 'is'} not laid as {'boards' if plan.dropped != 1 else 'a board'} (the border or breaker covers)")
     return plan
 
 

@@ -189,7 +189,8 @@ def run_flags(L: Layout) -> List[Flag]:
         for n in st.notes:
             sev = "CODE" if "handrail" in n or "minimum" in n or "exceeds" in n else ("INFO" if n.startswith("flights:") else "CHECK")
             add(sev, "stairs", f"{st.side} stair: {n}", "IRC R311.7")
-        add("INFO", "stairs", f"{st.side} stair: {st.geo.risers} risers @ {st.geo.riser_in:.2f}\" · {st.geo.treads} treads @ {st.geo.tread_in:.2f}\" · run {ftin(st.geo.total_run_in)} · stringers {st.stringers} @ 12\" OC (composite treads)"
+        add("INFO", "stairs", f"{st.side} stair: {st.geo.risers} risers @ {st.geo.riser_in:.2f}\" · {st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} @ {st.geo.tread_in:.2f}\" · run {ftin(st.geo.total_run_in)} · "
+            + ("framed 2x6 box, no stringers" if getattr(st, "build", "") == "box" else f"stringers {st.stringers} @ 12\" OC (composite treads)")
             + ("  — " + " then ".join(f"{fg.risers} risers (run {ftin(fg.run_in)})" for fg in st.geo.flights) + " with a landing between" if len(st.geo.flights) > 1 else ""), "IRC R311.7.5 / TimberTech")
         if len(st.geo.flights) > 1:
             add("CODE", "stairs", f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair; guard on every open side over 30\" ({st.landing_rail_lf:g} LF counted)" if st.landing_rail_lf else f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair", "IRC R311.7.6 / R312.1")
