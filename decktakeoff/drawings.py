@@ -28,6 +28,9 @@ def esc(t): return _html.escape(str(t), quote=True)
 def T(x, y, s, size=11, w=600, anchor="start", fill=INK, rot=0):
     tr = f' transform="rotate({rot} {x:.1f} {y:.1f})"' if rot else ""
     return f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{w}" text-anchor="{anchor}" fill="{fill}"{tr}>{esc(s)}</text>'
+def TH(*a, halo=CREAM, **k):
+    """T() with a paper-colored halo, for a label that crosses linework."""
+    return T(*a, **k).replace("<text ", f'<text stroke="{halo}" stroke-width="2.4" stroke-linejoin="round" paint-order="stroke" ', 1)
 def R(x, y, w, h, fill, stroke=INK, sw=0.8, extra=""):
     return f'<rect x="{x:.1f}" y="{y:.1f}" width="{max(w, 0):.1f}" height="{max(h, 0):.1f}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>'
 def LN(x0, y0, x1, y1, stroke=INK, sw=0.8, dash=""):
@@ -41,6 +44,7 @@ def PG(pts, fill, stroke=INK, sw=0.8):
 
 
 def sheet(num: str, title: str, sub: str, body: List[str], scale_note: str, meta: dict) -> str:
+    body = list(body) + _PANEL.pop("labels", [])     # callout words still pending from the last detail panel
     hdr = [R(0, 0, W_, 46, INK, "none", 0), T(18, 30, num, 22, 900, fill=GOLD), T(110, 22, title.upper(), 15, 900, fill="#f3ead9"),
            T(110, 39, textwrap.shorten(sub, 110, placeholder="…"), 9.5, 400, fill="#d8cfbf"),
            T(W_ - 18, 20, textwrap.shorten(meta["job_line"], 70, placeholder="…"), 9.5, 700, "end", "#d8cfbf"),
@@ -287,7 +291,7 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
         o.append(T(X(cx_), Y(cy_) - 12, f"P{n}", 8, 800, "middle"))
         rows.append((f"P{n}", ftin(cx_ * 12), ftin(cy_ * 12), "stair", "landing"))
     for bl in L.beam_lines:                 # beam lines are in inches; the plan transform takes feet
-        o.append(T(X(bl.x0 * IN) + 4, Y(bl.y * IN) - 6, bl.label, 7.5, 800, fill=MUTE))
+        o.append(TH(X(bl.x0 * IN) + 4, Y(bl.y * IN) - 6, bl.label, 7.5, 800, fill=MUTE))
     # dims: beam lines from the front, zone widths
     zs = S.meta["zones"]
     dim_h(o, X, Y(S.y_front) + 16, zs[0]["x0"], zs[-1]["x0"] + zs[-1]["W"], ftin(S.W * 12) + " along the house", up=False)
@@ -352,7 +356,7 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
             pass
     for bl in L.beam_lines:
         suf = "" if bl.label.upper().startswith(("FLUSH", "DROP")) else (" (below)" if bl.kind == "drop" else " (flush)")
-        o.append(T(X(bl.x0 * IN) + 6, Y(bl.y * IN) - 5, bl.label + suf, 7.5, 800, fill="#3f5d8a"))
+        o.append(TH(X(bl.x0 * IN) + 6, Y(bl.y * IN) - 5, bl.label + suf, 7.5, 800, fill="#3f5d8a"))
     zs = S.meta["zones"]
     jlab = L.spec.framing.steel_joist if L.spec.framing.system == "steel" else L.frame.joist_size
     for zl, z in zip(L.zones, zs):
@@ -368,7 +372,7 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
     o.append(T(nx, 24, "FRAMING NOTES", 9, 800, fill=GOLD))
     bls_ = L.beam_lines or []
     beams_ = (f"{len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in bls_}))}: "
-              + "; ".join(f"{b_.label.split()[-1]} {ftin(b_.length)}, {len(b_.posts_x)} posts" for b_ in bls_)) if len(bls_) > 2 else "; ".join(t.summary["beams"])
+              + "; ".join(f"{_bl_short(b_)} {ftin(b_.length)}, {len(b_.posts_x)} posts" for b_ in bls_)) if len(bls_) > 2 else "; ".join(t.summary["beams"])
     notes = [t.summary["joists"], t.summary["rims"], t.schedule.get("Ledger", ""), t.schedule.get("Blocking", "blocking one row over the beam, staggered"),
              t.schedule.get("Joist tape", ""), beams_]
     hw = [f"{l.item}: {l.net:g}" for l in t.lines if l.category == "Hardware" and l.unit == "ea"][:8]
@@ -564,23 +568,23 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     def note(x, y, w, txt):
         yy = y
         for ln in textwrap.wrap(txt, int(w / 4.6)):
-            o.append(T(x, yy, ln, 7.2, 400)); yy += 9.5
+            o.append(TH(x, yy, ln, 7.2, 400, halo="#fff")); yy += 9.5
         return yy
     # 1 ledger
     frame_(20, 20, 300, 290, "1", "LEDGER AT THE HOUSE")
     o.append(R(40, 60, 40, 200, FILL["house"], INK, 1.0)); o.append(T(60, 165, "house rim", 7, 700, "middle", MUTE, rot=-90))
-    o.append(R(80, 80, 6, 160, "#3f5d8a", "none", 0)); o.append(T(83, 76, "membrane 12\" up the wall", 6.5, 600, "middle"))
+    o.append(R(80, 80, 6, 160, "#3f5d8a", "none", 0)); o.append(TH(83, 76, "membrane 12\" up the wall", 6.5, 600, "middle", halo="#fff"))
     o.append(R(86, 100, 22, 60, FILL["timber"], INK, 0.8)); o.append(T(97, 132, "ledger", 6.5, 700, "middle", INK, rot=-90))
     o.append(R(108, 100, 120, 60, FILL["timber"], INK, 0.6)); o.append(T(168, 133, f"{L.frame.joist_size} joist in {('LUS' + ('410Z' if timber else '28Z'))}", 7, 700, "middle"))
-    o.append(R(86, 92, 150, 6, FILL["deck"], INK, 0.5)); o.append(T(160, 89, "decking", 6.5, 600, "middle"))
-    o.append(LN(80, 100, 112, 100, GOLD, 2)); o.append(T(120, 98, "flashing over the ledger, under the cladding", 6.5, 600))
+    o.append(R(86, 92, 150, 6, FILL["deck"], INK, 0.5)); o.append(TH(140, 89, "decking", 6.5, 600, "middle", halo="#fff"))
+    o.append(LN(80, 100, 112, 100, GOLD, 2)); o.append(LN(112, 100, 196, 80, INK, 0.5)); o.append(TH(198, 82, "flashing over the ledger,", 6.5, 600, halo="#fff")); o.append(TH(198, 90, "under the cladding", 6.5, 600, halo="#fff"))
     for yy in (112, 148):
         o.append(LN(58, yy, 108, yy, INK, 1.4)); o.append(C(108, yy, 2.2, INK))
     note(40, 275, 270, t.schedule.get("Ledger", "") + (" · 26 ga wall flashing (WUI)" if s.site.wui_fire_zone else ""))
     # 2 post / beam / cap
     frame_(340, 20, 300, 290, "2", "POST · BEAM · CAP")
     bl = L.beam_lines[0] if L.beam_lines else None
-    o.append(R(470, 120, 40, 150, FILL["timber"], INK, 0.9)); o.append(T(490, 200, f"{s.framing.post_size} post", 7, 700, "middle", INK, rot=-90))
+    o.append(R(470, 120, 40, 138, FILL["timber"], INK, 0.9)); o.append(T(490, 195, f"{s.framing.post_size} post", 7, 700, "middle", INK, rot=-90))
     o.append(R(400, 70, 180, 50, FILL["timber_dk"], INK, 0.9)); o.append(T(490, 100, f"{bl.size if bl else ''} {'drop' if (bl and bl.kind == 'drop') else 'flush'} beam", 7.5, 700, "middle"))
     o.append(R(462, 112, 56, 16, FILL["steel"], INK, 0.6)); o.append(T(530, 126, (bl.cap_end if bl else "cap") + (" black" if s.framing.hardware_finish == "black" else ""), 6.5, 600))
     if bl and bl.kind == "drop":
@@ -608,7 +612,7 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
         if s.extras.stone_bases:
             o.append(R(770, 110, 100, 80, "none", "#7a7267", 1.0, 'stroke-dasharray="4 3"')); o.append(T(880, 150, "stone veneer 2'x2' x 3' + cap", 6.5, 600))
     elif ft == "diamond_pier":
-        o.append(R(800, 190, 40, 14, FILL["concrete"], INK, 0.9)); o.append(T(852, 200, "Diamond Pier head", 6.5, 600))
+        o.append(R(800, 190, 40, 14, FILL["concrete"], INK, 0.9)); o.append(T(852, 212, "Diamond Pier head", 6.5, 600))
         for dx, dy in ((-1, 1), (1, 1), (-0.5, 1), (0.5, 1)):
             o.append(LN(820, 204, 820 + dx * 60, 204 + 90, INK, 1.2))
         o.append(T(852, 240, f"4 x 50\" pins · {L.frame.footing_model}", 6.5, 600)); o.append(R(806, 180, 28, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{post_base_sku(s)} on the pier bolt", 6.5, 600))
@@ -633,14 +637,14 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     note(40, 560, 270, t.schedule.get("Rail", ""))
     # 5 decking edge
     frame_(340, 330, 300, 270, "5", "DECK EDGE · BORDER")
-    o.append(R(360, 470, 240, 30, FILL["timber"], INK, 0.6)); o.append(T(480, 488, "rim", 7, 700, "middle"))
-    o.append(R(352, 456, 60, 14, FILL["border"], INK, 0.5)); o.append(T(382, 452, "border", 6.5, 600, "middle"))
+    o.append(R(405, 470, 215, 30, FILL["timber"], INK, 0.6)); o.append(T(512, 488, "rim", 7, 700, "middle"))
+    o.append(R(397, 456, 60, 14, FILL["border"], INK, 0.5)); o.append(T(427, 452, "border", 6.5, 600, "middle"))
     for k in range(3):
-        o.append(R(416 + k * 62, 456, 58, 14, FILL["deck"], INK, 0.4))
-    o.append(T(500, 452, f"field · {ftin(s.deck_gap)} gaps", 6.5, 600, "middle"))
-    o.append(LN(352, 470, 352, 500, GOLD, 1.5)); o.append(T(348, 520, f"overhang {ftin(S.meta['edge'] * 12)}" + ("" if s.decking.fascia else " — no fascia"), 6.5, 600, "end"))
+        o.append(R(461 + k * 54, 456, 50, 14, FILL["deck"], INK, 0.4))
+    o.append(T(540, 452, f"field · {ftin(s.deck_gap)} gaps", 6.5, 600, "middle"))
+    o.append(LN(397, 470, 397, 500, GOLD, 1.5)); o.append(T(393, 520, f"overhang {ftin(S.meta['edge'] * 12)}" + ("" if s.decking.fascia else " — no fascia"), 6.5, 600, "end"))
     if s.decking.fascia:
-        o.append(R(354, 470, 6, 30, FILL["fascia"], INK, 0.5)); o.append(T(348, 490, "fascia", 6.5, 600, "end"))
+        o.append(R(399, 470, 6, 30, FILL["fascia"], INK, 0.5)); o.append(T(393, 490, "fascia", 6.5, 600, "end"))
     note(360, 560, 270, t.schedule.get("Field", "")[:160] + (" · Cortex screws + plugs on the borders and dividers (2 per bearing) and the stair treads"
                                                           if (s.decking.border_fastener or "").lower().startswith("cortex") else ""))
     # 6 zone-specific
@@ -1042,6 +1046,12 @@ def inch(v: float, frac: int = 8) -> str:
         return f'{sgn}{whole}"'
     g = math.gcd(rem, frac)
     return f'{sgn}{whole} {rem // g}/{frac // g}"' if whole else f'{sgn}{rem // g}/{frac // g}"'
+
+
+def _bl_short(b_):
+    """A beam line's name without its type and size: the zones and any position word ("R (front)")."""
+    z = "+".join(b_.zones)
+    return b_.label[b_.label.rfind(" " + z) + 1:] if z and (" " + z) in b_.label else b_.label.split()[-1]
 
 
 def chain_labels(pts, frac: int = 8) -> List[str]:
@@ -1571,11 +1581,12 @@ def _lead(o, ax, ay, tx, ty, txt, size=6.6, anchor_="start", w_=600):
     """A leader from (ax, ay) to a label at (tx, ty); the label wraps to stay inside the current detail panel."""
     o.append(LN(ax, ay, tx, ty - 2, INK, 0.5)); o.append(C(ax, ay, 1.3, INK, "none", 0))
     room = max(14, min(34, int((_PANEL["r"] - 6 - tx) / (size * 0.52))))
-    for j, ln in enumerate(textwrap.wrap(txt, room)):
-        o.append(T(tx + (2 if anchor_ == "start" else -2), ty + j * 8, ln, size, w_, anchor_))
+    for j, ln in enumerate(textwrap.wrap(txt, room)):    # the words go on top of everything in the panel (see _panel / sheet)
+        _PANEL.setdefault("labels", []).append(TH(tx + (2 if anchor_ == "start" else -2), ty + j * 8, ln, size, w_, anchor_, halo="#fff"))
 
 
 def _panel(o, x, y, w, h, num, title):
+    o.extend(_PANEL.pop("labels", []))           # the previous panel's callout words, last, so no line crosses them
     _PANEL["r"] = x + w
     o.append(R(x, y, w, h, "#fff", INK, 0.8)); o.append(R(x, y, w, 17, INK, "none", 0))
     o.append(T(x + 8, y + 12.5, f"{num}  {title}", 8.6, 800, fill=GOLD))

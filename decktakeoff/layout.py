@@ -1239,6 +1239,13 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             lines.append(BeamLine(b.kind, b.size, b.species, plies, bw, bd, key[3],
                                   x0, x1, [m[2].name for m in members], posts, pz, loads, b.post_len, pieces, cap_mid, cap_end,
                                   label=f"{'DROP' if b.kind == 'drop' else 'FLUSH'} {b.size} {b.species} " + "+".join(m[2].name for m in members)))
+    # two beam lines in the same zone(s) would read the same on every sheet and in the quote: name them from the house out
+    from collections import Counter
+    for lab, n in Counter(ln.label for ln in lines).items():
+        if n > 1:
+            same = sorted((ln for ln in lines if ln.label == lab), key=lambda q: q.y)
+            for i, ln in enumerate(same):
+                ln.label += (" (house side)" if i == 0 else " (front)") if n == 2 else f" ({i + 1} of {n} from the house)"
     # write the line results back onto the zone frames (posts, worst load) so per-zone sums stay right
     for z in zl:
         z.frame.n_posts = 0
