@@ -17,6 +17,7 @@ const STILL = q.get('still') === '1';
 const VIEW0 = q.get('view') || 'yard';
 const PHASE0 = parseInt(q.get('phase') || '8', 10);
 const EXPLODE0 = q.get('explode') === '1';
+const TECH = EXPLODE0 || PHASE0 < 8 || q.get('notrees') === '1' || ['plan', 'under', 'underiso'].includes(VIEW0);   // technical stills: generic cameras, no trees
 const root = document.getElementById('__UID__');
 const W = root.clientWidth || window.innerWidth, H = root.clientHeight || window.innerHeight;
 const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
@@ -178,15 +179,18 @@ for (const b of D.boxes) {
   mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }
   scene.add(mesh); if (b.phase > 0) phased.push(mesh);
-  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree') ctx.push(mesh);
+  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree' || b.kind === 'fence') ctx.push(mesh);
 }
+const HIDE_TECH = new Set(['tree', 'fence']);          // trees and lot fences never stand in front of a technical still
+function ctxShown(o, on) { const k = o.userData.kind; if (HIDE_TECH.has(k)) return !on && !TECH; return k === 'roof' ? !on : true; }
+if (TECH) for (const o of ctx) if (HIDE_TECH.has(o.userData.kind)) o.visible = false;
 const GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23};
 function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; }
 function explode(on) {
   for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) + o.userData.xg : 0);
   explodeCtx(on);
 }
-function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof' || o.userData.kind === 'tree') o.visible = !on; else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
+function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof' || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
 function explodedTop() { let t = 0; for (const o of phased) if (o.visible) { o.geometry.computeBoundingBox(); t = Math.max(t, o.position.y + o.geometry.boundingBox.max.y); } return t; }
 // camera + orbit
 const persp = new THREE.PerspectiveCamera(40, W / H, 0.5, 2000);
@@ -209,6 +213,8 @@ const VIEWS = {
   isolow: {pos: [cx + span * 0.85, zt + 2.2, D.y_front + span * 0.95], at: [cx, zt - 1.2, cy]},
   underiso: {pos: [cx - span * 0.55, Math.max(1.2, zt * 0.25), D.y_front + span * 0.7], at: [cx, zt - 2.2, cy - 2]},
 };
+// technical stills (build steps, explosions, structure, plan, under) frame the deck with the generic cameras and no trees
+const GVIEWS = Object.assign({}, VIEWS);
 // a measured site's own camera stations (plan feet: x along the wall, y into the yard, z up) replace the generic ones
 if (D.meta && D.meta.cameras) for (const [k, c] of Object.entries(D.meta.cameras)) VIEWS[k] = {pos: [c.pos[0], c.pos[2], c.pos[1]], at: [c.at[0], c.at[2], c.at[1]], fov: c.fov};
 // ?cam=x,y,z&at=x,y,z in plan feet (x along the wall, y into the yard, z up): a free camera for close checks
@@ -227,13 +233,13 @@ if (q.get('cam') && q.get('at')) { const c_ = q.get('cam').split(',').map(Number
 })();
 function planMode(on) {
   if (renderer.shadowMap.enabled === on) { renderer.shadowMap.enabled = !on; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }   // a plan has no cast shadows
-  for (const o of ctx) { o.castShadow = !on && o.userData.kind !== 'glass'; if (o.userData.kind === 'roof' || o.userData.kind === 'tree') o.visible = !on; else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.28, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } }
+  for (const o of ctx) { o.castShadow = !on && o.userData.kind !== 'glass'; if (o.userData.kind === 'roof' || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.28, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } }
 }
 let target = new THREE.Vector3(), sph = new THREE.Spherical();
 let curView = VIEW0;
 function setView(name) {
   curView = name;
-  const v = VIEWS[name] || VIEWS.yard; cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
+  const v = (TECH && GVIEWS[name]) ? GVIEWS[name] : (VIEWS[name] || VIEWS.yard); cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
   if (!v.ortho) { const f_ = q.get('fov') ? parseFloat(q.get('fov')) : (v.fov || 40); if (persp.fov !== f_) { persp.fov = f_; persp.updateProjectionMatrix(); } }
   cam.up.set(...(v.up || [0, 1, 0]));
   cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target));

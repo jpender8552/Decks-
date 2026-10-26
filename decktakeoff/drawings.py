@@ -693,21 +693,27 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
     if ref.get("rear") and sp.get("setback_offset"):     # the rear setback as an offset of the rear lot line (a sloped / jogged rear line)
         cxp, cyp = sum(xs) / len(xs), sum(ys) / len(ys)
         rear_edges = [(a, b) for a, b in zip(par, par[1:] + par[:1]) if a[1] > 0 and b[1] > 0 and abs(b[0] - a[0]) > abs(b[1] - a[1]) and math.hypot(b[0] - a[0], b[1] - a[1]) > 1.0]
-        best = None
-        for a, b in rear_edges:
-            ln_ = math.hypot(b[0] - a[0], b[1] - a[1]); nx_, ny_ = -(b[1] - a[1]) / ln_, (b[0] - a[0]) / ln_
-            if (cxp - a[0]) * nx_ + (cyp - a[1]) * ny_ < 0:
-                nx_, ny_ = -nx_, -ny_
-            d = ref["rear"]
-            p0, p1 = (a[0] + nx_ * d, a[1] + ny_ * d), (b[0] + nx_ * d, b[1] + ny_ * d)
-            o.append(LN(X(p0[0]), Y(p0[1]), X(p1[0]), Y(p1[1]), "#8a6d2a", 0.9, "6 4"))
-            if best is None or ln_ > best[0]:
-                best = (ln_, p0, p1)
-        if best:
-            _, p0, p1 = best
-            ang = math.degrees(math.atan2(-(Y(p1[1]) - Y(p0[1])), X(p1[0]) - X(p0[0])))
-            mx_, my_ = X(p0[0]) + (X(p1[0]) - X(p0[0])) * 0.16, Y(p0[1]) + (Y(p1[1]) - Y(p0[1])) * 0.16 + 22
-            o.append(f'<g transform="rotate({-ang if abs(ang) < 90 else 180 - ang:.1f} {mx_:.1f} {my_:.1f})">' + T(mx_, my_, ref.get("rear_label") or f"{ref['rear']}' rear setback", 6.8, 700, "middle", "#8a6d2a") + "</g>")
+        lines_ = [(ref["rear"], ref.get("rear_label") or f"{ref['rear']}' rear setback", "#8a6d2a", "6 4")]
+        if ref.get("rear_deck"):            # where a low deck may reach (a projection allowance into the rear setback)
+            lines_.append((ref["rear_deck"], ref.get("rear_deck_label") or f"{ref['rear_deck']}' — deck projection limit", "#b3261e", "2 3"))
+        t_lab = float(sp.get("rear_label_t", 0.16))
+        for d, lab_, col_, dash_ in lines_:
+            best = None
+            for a, b in rear_edges:
+                ln_ = math.hypot(b[0] - a[0], b[1] - a[1]); nx_, ny_ = -(b[1] - a[1]) / ln_, (b[0] - a[0]) / ln_
+                if (cxp - a[0]) * nx_ + (cyp - a[1]) * ny_ < 0:
+                    nx_, ny_ = -nx_, -ny_
+                p0, p1 = (a[0] + nx_ * d, a[1] + ny_ * d), (b[0] + nx_ * d, b[1] + ny_ * d)
+                o.append(LN(X(p0[0]), Y(p0[1]), X(p1[0]), Y(p1[1]), col_, 0.9, dash_))
+                if best is None or ln_ > best[0]:
+                    best = (ln_, p0, p1)
+            if best:
+                _, p0, p1 = best
+                ang = math.degrees(math.atan2(-(Y(p1[1]) - Y(p0[1])), X(p1[0]) - X(p0[0])))
+                # one line: its label 22 px into the lot (as before); two lines: the setback's above it, the projection limit's below
+                dy_ = (22 if len(lines_) == 1 else -5) if col_ == "#8a6d2a" else 11
+                mx_, my_ = X(p0[0]) + (X(p1[0]) - X(p0[0])) * t_lab, Y(p0[1]) + (Y(p1[1]) - Y(p0[1])) * t_lab + dy_
+                o.append(f'<g transform="rotate({-ang if abs(ang) < 90 else 180 - ang:.1f} {mx_:.1f} {my_:.1f})">' + T(mx_, my_, lab_, 6.8, 700, "middle", col_) + "</g>")
     elif ref.get("rear"):
         o.append(LN(X(min(xs)), Y(rear_y - ref["rear"]), X(max(xs)), Y(rear_y - ref["rear"]), "#8a6d2a", 0.9, "6 4"))
         o.append(T(X(max(xs)) - 4, Y(rear_y - ref["rear"]) - 4, ref.get("rear_label") or f"{ref['rear']}' R-L rear setback (reference)", 7.5, 700, "end", "#8a6d2a"))
@@ -721,7 +727,11 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
     # decks
     out = deck_outline(S)
     o.append(PG([(X(x), Y(y)) for x, y in out], FILL["deck"], INK, 1.2))
-    if sp.get("deck_label"):          # one label for the whole deck, below its front edge
+    if sp.get("deck_label") and sp.get("deck_label_inside"):     # inside the deck (a setback line runs under its front)
+        cxd, cyd = sum(q[0] for q in out) / len(out), sum(q[1] for q in out) / len(out)
+        for k_, ln_ in enumerate(textwrap.wrap(sp["deck_label"], 34)[:3]):
+            o.append(T(X(cxd), Y(cyd) - 4 + k_ * 9, ln_, 7, 900, "middle", INK))
+    elif sp.get("deck_label"):          # one label for the whole deck, below its front edge
         o.append(T(X(sum(q[0] for q in out) / len(out)), Y(max(q[1] for q in out)) + 12, sp["deck_label"], 7.2, 900, "middle", INK))
     else:
         for z in S.meta["zones"]:
@@ -774,7 +784,9 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
     deck_front = max(p[1] for p in out)
     xf = [p[0] for p in out if abs(p[1] - deck_front) < 0.01]
     if not covers_of(s):
-        probes.append((("deck edge", (min(xf) + max(xf)) / 2 + 2.0, deck_front), rear_pred))
+        # the outline corner nearest the rear line (a shaped deck's front-edge midpoint can sit off the deck)
+        best_v = min(out, key=lambda q: (nearest(q[0], q[1], rear_pred) or (9e9, None))[0])
+        probes.append((("deck edge", best_v[0], best_v[1]), rear_pred))
     lx_, rx_ = min(p[0] for p in out), max(p[0] for p in out)
     probes.append((("deck edge", lx_, max(p[1] for p in out if abs(p[0] - lx_) < 0.01) / 2), lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 < lx_))
     probes.append((("deck edge", rx_, max(p[1] for p in out if abs(p[0] - rx_) < 0.01) / 2), lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 > rx_))

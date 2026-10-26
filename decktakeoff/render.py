@@ -16,7 +16,7 @@ STILLS = [("yard", dict(view="yard")), ("corner", dict(view="corner")), ("ondeck
           ("iso2", dict(view="iso2")), ("isolow", dict(view="isolow")), ("underiso", dict(view="underiso")),
           ("exploded2", dict(view="iso2", explode="1")), ("exploded-corner", dict(view="corner", explode="1")), ("exploded-low", dict(view="isolow", explode="1")),
           ("frame-iso2", dict(view="iso2", phase="5")), ("rail-iso2", dict(view="iso2", phase="7")), ("structure-underiso", dict(view="underiso", phase="4"))] + \
-         [(f"step{n}", dict(view="iso", phase=str(n))) for n in range(1, 9)]
+         [(f"step{n}", dict(view="iso", phase=str(n), notrees="1")) for n in range(1, 9)]
 
 
 def _chromium() -> Optional[str]:

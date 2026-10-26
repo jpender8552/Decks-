@@ -20,14 +20,244 @@
   "sun_when": "2026-09-15T12:00",
   "tax_rate": 0.0675,
   "rear_setback_required_ft": 17.0,
-  "deck_to_rear_line_ft": 17.1,
-  "deck_to_side_line_ft": 18.3,
+  "deck_to_rear_line_ft": 17.2,
+  "deck_to_side_line_ft": 18.7,
   "plan_fit": {
    "x0_ft": 0.82,
    "y0_ft": -2.0,
    "rot_deg": 1.96,
    "frame": "research plan frame: x = N - 1651370.00, y = E - 3207228.02 (EPSG:2232 US ft); deck frame u,v -> x = x0 + u cos - v sin, y = y0 + u sin + v cos",
    "basis": "least-squares fit of the field outline to the existing rail caps in the county orthos 2016 / 2018 / 2022 / 2024 (rms 0.09-0.22 ft)"
+  },
+  "plan": {
+   "parcel": [
+    [
+     -19.21,
+     33.04
+    ],
+    [
+     -32.33,
+     33.5
+    ],
+    [
+     -31.99,
+     31.28
+    ],
+    [
+     -16.58,
+     -67.59
+    ],
+    [
+     -16.4,
+     -68.74
+    ],
+    [
+     -16.38,
+     -68.88
+    ],
+    [
+     -8.47,
+     -67.81
+    ],
+    [
+     4.71,
+     -67.21
+    ],
+    [
+     17.61,
+     -67.8
+    ],
+    [
+     17.9,
+     -67.81
+    ],
+    [
+     46.88,
+     -70.1
+    ],
+    [
+     47.09,
+     -67.44
+    ],
+    [
+     54.69,
+     28.53
+    ],
+    [
+     54.85,
+     30.5
+    ],
+    [
+     36.53,
+     31.13
+    ],
+    [
+     34.36,
+     31.2
+    ],
+    [
+     -15.44,
+     32.91
+    ],
+    [
+     -19.21,
+     33.04
+    ]
+   ],
+   "footprint": [
+    [
+     -4.27,
+     -45.77
+    ],
+    [
+     15.09,
+     -46.05
+    ],
+    [
+     32.74,
+     -46.32
+    ],
+    [
+     32.83,
+     -40.03
+    ],
+    [
+     42.71,
+     -40.17
+    ],
+    [
+     42.74,
+     -38.23
+    ],
+    [
+     44.48,
+     -38.25
+    ],
+    [
+     45.08,
+     2.08
+    ],
+    [
+     34.39,
+     2.25
+    ],
+    [
+     34.45,
+     7.11
+    ],
+    [
+     19.55,
+     7.34
+    ],
+    [
+     19.52,
+     5.2
+    ],
+    [
+     15.12,
+     5.27
+    ],
+    [
+     15.09,
+     3.14
+    ],
+    [
+     -2.67,
+     3.39
+    ],
+    [
+     -2.92,
+     -13.95
+    ],
+    [
+     -0.17,
+     -13.99
+    ],
+    [
+     -0.21,
+     -17.24
+    ],
+    [
+     -13.55,
+     -17.05
+    ],
+    [
+     -13.95,
+     -44.17
+    ],
+    [
+     -11.46,
+     -44.2
+    ],
+    [
+     -4.25,
+     -44.31
+    ],
+    [
+     -4.27,
+     -45.77
+    ]
+   ],
+   "street": "E PRENTICE CIR (front, west)",
+   "street_side": "top",
+   "lot_lines": {
+    "rear": "REAR (EAST) LOT LINE",
+    "left": "SIDE LOT LINE (SOUTH)",
+    "right": "SIDE LOT LINE (NORTH)"
+   },
+   "house_label": "two storey (1993) \u2014 roof outline incl. eaves, county GIS (no work)",
+   "deck_label": "NEW DECK \u2014 same footprint, 34'-6\" x 14'-2\", 21\" above grade",
+   "info": [
+    "AIN 2073-15-2-12-013 \u00b7 PIN 033418221",
+    "Lot 12, Block 1, Jackson Farm Subdivision 3rd Filing (plat 92148400)",
+    "City of Centennial \u00b7 zoning NC6 (Neighborhood Conservation) \u00b7 flood zone X \u00b7 not in the WUI",
+    "Lot 7,549 SF (GIS) \u00b7 rear faces east (90.5 deg)",
+    "House 1993, 2 storey, 2,525 SF above grade + 993 SF basement + 573 SF garage (assessor)",
+    "No deck permit on record (City permit history: re-roofs 2009 / 2018 / 2023, HVAC + alterations 2015)"
+   ],
+   "coverage": [
+    [
+     "Lot area",
+     "7,549 SF"
+    ],
+    [
+     "Building coverage limit (NC6)",
+     "37% \u2014 the deck is not building coverage below 30\""
+    ],
+    [
+     "Existing deck",
+     "same footprint (~410 SF), removed"
+    ],
+    [
+     "New deck",
+     "410 SF of deck surface, 21\" above grade at the stair"
+    ]
+   ],
+   "setback_ref": {
+    "rear": 20,
+    "side": 5,
+    "rear_label": "20' NC6 rear setback",
+    "label": "NC6: rear 20', side 5' (12' total); a deck under 4' above grade may project 3' into the rear setback \u2014 17' to the rear line (LDC Table 12-3-601 / 12-3-604; confirm with Planning)",
+    "rear_deck": 17,
+    "rear_deck_label": "17' \u2014 a deck under 4' may project 3' into the rear setback"
+   },
+   "setback_offset": true,
+   "rear_label_dy": 18,
+   "setback_notes": [
+    "Nearest point: the right octagon's front corner, ~17.2' from the rear lot line (GIS +/- 0.3' to 2') against the 17' allowed \u2014 at the line; verify by tape from the rear fence pins or an ILC before submittal",
+    "Left octagon front corner ~18.1' from the rear line; north side line ~18.7'; south side line ~26'",
+    "The deck replaces the existing deck in the same footprint and at the same height; no increase toward any lot line"
+   ],
+   "site_work": [
+    "Remove the existing deck, benches and planter; haul off",
+    "11 Diamond Pier DP-50/50 foundations (no excavation spoils); 6x6 DF #1 posts",
+    "Lower the grade ~5\" along the open left side for the 2x10 frame; the brick border there is reset (see the decision log)",
+    "No change to the downspouts, the retaining wall, the beds or the drainage",
+    "Call 811 before the piers; protect the lawn, the beds and the window well"
+   ],
+   "source": "Arapahoe County GIS (address point layer 2, parcel layer 279, 2022 roof prints layer 66, 2016-2024 orthos), City of Centennial GIS (NC6 zoning, permit history), assessor record and sketch; the deck placed by a least-squares fit of the field outline to the existing rails in the orthos (rms 0.09-0.22 ft). GIS lines are not a survey \u2014 an ILC governs.",
+   "deck_label_inside": true,
+   "rear_label_t": 0.82
   }
  },
  "geometry": {
@@ -1376,14 +1606,14 @@
      "tiers": 6
     },
     {
-     "name": "spruce",
+     "name": "spruce in the NE corner (aerials show evergreen mass; size estimated)",
      "type": "spruce",
      "at": [
-      45.0,
-      27.0
+      48.0,
+      28.5
      ],
-     "height": 22,
-     "radius": 5.5,
+     "height": 17,
+     "radius": 4.5,
      "tiers": 6
     },
     {
@@ -1749,16 +1979,16 @@
     },
     "corner": {
      "pos": [
-      44.0,
-      24.5,
-      6.0
+      40.5,
+      22.0,
+      5.8
      ],
      "at": [
       19.0,
-      5.0,
+      5.5,
       3.0
      ],
-     "fov": 52
+     "fov": 54
     },
     "corner2": {
      "pos": [
@@ -1788,22 +2018,22 @@
     },
     "isolow": {
      "pos": [
-      46.0,
-      22.0,
-      3.6
+      41.0,
+      20.5,
+      3.4
      ],
      "at": [
       17.0,
       6.0,
       1.2
      ],
-     "fov": 50
+     "fov": 52
     },
     "underiso": {
      "pos": [
-      -8.0,
-      24.0,
-      1.7
+      -6.0,
+      18.0,
+      1.6
      ],
      "at": [
       17.0,
@@ -1814,29 +2044,29 @@
     },
     "iso": {
      "pos": [
-      58.0,
-      46.0,
-      36.0
+      56.0,
+      50.0,
+      38.0
      ],
      "at": [
       17.0,
       5.0,
-      2.0
+      1.5
      ],
-     "fov": 38
+     "fov": 40
     },
     "iso2": {
      "pos": [
-      -28.0,
-      50.0,
-      34.0
+      -24.0,
+      14.0,
+      36.0
      ],
      "at": [
       17.0,
       6.0,
-      2.0
+      1.5
      ],
-     "fov": 38
+     "fov": 42
     }
    },
    "colors": {
