@@ -130,6 +130,11 @@
       "source": "est.",
       "desc": "Simpson ABA66Z adjustable post base 6x6"
     },
+    "ABA66RZ": {
+      "each": 18.0,
+      "source": "est.",
+      "desc": "Simpson ABA66RZ adjustable post base, rough 6x6"
+    },
     "ABU66Z": {
       "each": 22.0,
       "source": "est.",

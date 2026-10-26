@@ -128,7 +128,7 @@ DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ21
 TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
 POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"}}
-POST_BASE_SCREWS = {"ABA66Z": 12, "ABU66Z": 12, "ABA44Z": 8}
+POST_BASE_SCREWS = {"ABA66Z": 12, "ABA66RZ": 12, "ABU66Z": 12, "ABA44Z": 8}
 POST_CAP_SCREWS = {"CCQ76SDS2.5": 0, "BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8}
 FOOTING_CAPACITY_LB = {"DP-50/50": 3300, "DP-75/63": 6000}
 

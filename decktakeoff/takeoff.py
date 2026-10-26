@@ -648,7 +648,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
-        desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}"
+        desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}" + (" rough" if spec.framing.post_rough and not timber else "")
         lens = sorted(set(ftin(bl.post_len) for bl in L.beam_lines))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if knee:
@@ -688,6 +688,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Footings", _desc("footings", model, f"Diamond Pier {model}"), n_posts, n_posts, "ea", "exact — confirm stock", uc, src, model,
                           f"{worst_load:,.0f} lb per post vs {fr0.footing_capacity_lb:,.0f} lb allowable"))
         base = POST_BASE.get(spec.framing.post_size, {}).get("diamond_pier", "ABA66Z")
+        if base == "ABA66Z" and spec.framing.post_rough:
+            base = "ABA66RZ"                # a rough-sawn 6x6 is a full 6": the R base, as every drawing calls it
         uc, src = _price("footings", base)
         lines.append(Line("Footings", _desc("footings", base, base) + " on the pier bolt", n_posts, n_posts, "ea", "exact", uc, src, base))
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
