@@ -312,7 +312,8 @@ def _steps(key, steps, cap, customer):
     out = []
     for st in steps:
         title = f"Step {st['n']} · {E(st['title'])}" if customer else f"{st['code']} · Step {st['n']} · {E(st['title'])}"
-        out.append(f'<div class="step"><figure><img src="r/{key}-{st["still"]}.jpg" alt="step {st["n"]}" loading="lazy"><figcaption>{E(cap[st["still"]])}</figcaption></figure>'
+        fc = re.sub(r"^Step \d+ · ", f"Step {st['n']} · ", cap[st["still"]])     # the model's phase number -> the step as built (phases skip)
+        out.append(f'<div class="step"><figure><img src="r/{key}-{st["still"]}.jpg" alt="step {st["n"]}" loading="lazy"><figcaption>{E(fc)}</figcaption></figure>'
                    f'<div><h3>{title}</h3><h4>Goes in</h4><ul>' + "".join(f"<li>{E(g)}</li>" for g in st["goes_in"]) + "</ul>"
                    + '<h4>How</h4><ul>' + "".join(f"<li>{E(h)}</li>" for h in st["how"] if h) + "</ul><h4>Check</h4><ul>" + "".join(f"<li>{E(c)}</li>" for c in st["check"]) + "</ul></div></div>")
     return "".join(out)

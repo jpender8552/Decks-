@@ -34,7 +34,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     steps = []
     # 1 footings
     steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
-        goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item),
+        goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),   # the bases go in with the posts
         how=[f"Call 811 and locate before any hole or pin. Strip the existing deck first." if s.extras.demo_existing else "Call 811 and locate before any hole or pin.",
              "Pull the beam lines from the house wall: " + "; ".join(f"{bl.label} at {ftin(bl.y)} from the reference wall, posts at " + " / ".join(ftin(x) for x in bl.posts_x) for bl in L.beam_lines) + ".",
              {"caisson": f"Auger {n_posts} holes {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
