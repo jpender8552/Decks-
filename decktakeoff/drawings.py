@@ -1538,7 +1538,8 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
                 marks.append((f"{c['name'].split()[0].upper()} CLEAR @ HOUSE {c['clear_high_in']:g}\"", zt + float(c["clear_high_in"]) / 12))
         if az == 0:
             y = to_sheet((0, 0, zt))[1]
-            o.append(LN(hx - 40, y, hx, y, "#b3261e", 0.9, "3 2")); o.append(R(hx - 96, y - 11, 54, 10, CREAM, "#b3261e", 0.5)); o.append(T(hx - 44, y - 3, f"DECK · {ftin(zt * 12)} AFG", 6.4, 800, "end", "#b3261e"))
+            dk_ = f"DECK · {ftin(zt * 12)} AFG"; wt_ = len(dk_) * 3.9 + 8          # the tag sized to its words
+            o.append(LN(hx - 40, y, hx, y, "#b3261e", 0.9, "3 2")); o.append(R(hx - 40 - wt_, y - 11, wt_, 10, CREAM, "#b3261e", 0.5)); o.append(T(hx - 44, y - 3, dk_, 6.4, 800, "end", "#b3261e"))
             for c in covers_of(s):
                 if c.get("clear_low_in") is None:
                     continue
@@ -1560,17 +1561,23 @@ def sheet_elevations(L: Layout, S: Scene, t, meta) -> str:
     if s.framing.system == "steel":
         notes.append("Deck frame: CEMCO cold-formed steel; HardieTrim skirt covers the track rims")
     else:
-        bl_ = L.beam_lines[0] if L.beam_lines else None
-        notes.append(f"Deck frame: {s.framing.joist_size} {s.framing.joist_grade} @ {L.frame.spacing:g}\" OC" + (f" on a {bl_.size} {bl_.species.replace('DF#1', 'DF #1')} drop beam, {bl_.n_posts} posts" if bl_ else "")
+        bls_ = L.beam_lines or []
+        bl_ = bls_[0] if bls_ else None
+        notes.append(f"Deck frame: {s.framing.joist_size} {s.framing.joist_grade} @ {L.frame.spacing:g}\" OC"
+                     + ((f" on {len(bls_)} {' / '.join(sorted({b_.kind for b_ in bls_}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species.replace('DF#1', 'DF #1') for b_ in bls_}))}, "
+                         f"{sum(b_.n_posts for b_ in bls_)} posts (S-100 / S-101)") if len(bls_) > 1 else
+                        (f" on a {bl_.size} {bl_.species.replace('DF#1', 'DF #1')} {bl_.kind} beam, {bl_.n_posts} posts" if bl_ else ""))
                      + (" with 4x4 knee braces both ways" if s.framing.knee_braces else ""))
-    if L.rail:
+    if L.rail and s.geometry.height_in > 30:
         notes.append(f"Guard {L.rail.height:g}\" min. on every open side — the surface is {ftin(s.geometry.height_in)} above grade (IRC R312.1)")
+    elif L.rail:
+        notes.append(f"No guard required (IRC R312.1: the surface is {ftin(s.geometry.height_in)} above grade, under 30\"); {L.rail.system} {L.rail.height:g}\" rail on the sides the owner chose")
     else:
         notes.append("No guard required: every walking surface is under 30\" above grade (IRC R312.1)")
     yy = 358
     for n_ in notes:
         o.append(T(20, yy, "· " + n_, 7.6, 500)); yy += 12
-    return sheet("A-202", "Elevations", "Front from the yard and both ends, drawn from the model — deck and roof-cover heights", o, "Elevations · orthographic · not to scale · heights govern", meta)
+    return sheet("A-202", "Elevations", "Front from the yard and both ends, drawn from the model — deck" + (" and roof-cover heights" if _cov(s) else " heights"), o, "Elevations · orthographic · not to scale · heights govern", meta)
 
 
 # ------------------------------------------------------------------ connection details (permit set)
