@@ -476,8 +476,13 @@ def build_scene(L) -> Scene:
     else:
         # boards from the outline plan: one piece per row segment, borders along every exposed edge (the curve in mitred segments), breakers
         P = L.plan
-        for r in P.rows:
-            add("board", r.x0 * IN, r.x1 * IN, r.y0 * IN, r.y1 * IN, zt - bt, zt, "deck", 6, tag="pf field" + (" rip" if r.rip else ""), tone=tone())
+        # A row is cut square at its centre crossing of the frame line: on a 45-degree side that leaves a 2.7" gap at one
+        # corner and a 2.7" overlap at the other. In the model each end runs half a board under the frame or breaker it
+        # butts, and the frame sits 1/32" proud, so the frame covers the end as the mitred cut does (the cut list keeps
+        # the true lengths).
+        ext, lift = bw / 2, 1 / 384
+        for r in P.rows:                 # (an end against a house wall runs into the wall the same way, as a scribed cut)
+            add("board", r.x0 * IN - ext, r.x1 * IN + ext, r.y0 * IN, r.y1 * IN, zt - bt, zt, "deck", 6, tag="pf field" + (" rip" if r.rip else ""), tone=tone())
         from .layout import _poly_orient
         poly_in = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
         sgn = _poly_orient(poly_in)
@@ -488,14 +493,14 @@ def build_scene(L) -> Scene:
             off = bw / 2 - edge                                  # the border's centre line: half a board in from the overhang
             cx, cy = (x0_ + x1_) / 2 * IN + nx * off, (y0_ + y1_) / 2 * IN + ny * off
             if abs(y1_ - y0_) < 0.5:
-                add("border", cx - L_e / 2 - bw / 2, cx + L_e / 2 + bw / 2, cy - bw / 2, cy + bw / 2, zt - bt, zt, "border", 6, tag="pf border", tone=tone())
+                add("border", cx - L_e / 2 - bw / 2, cx + L_e / 2 + bw / 2, cy - bw / 2, cy + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border", tone=tone())
             elif abs(x1_ - x0_) < 0.5:
-                add("border", cx - bw / 2, cx + bw / 2, cy - L_e / 2 - bw / 2, cy + L_e / 2 + bw / 2, zt - bt, zt, "border", 6, tag="pf border", tone=tone())
+                add("border", cx - bw / 2, cx + bw / 2, cy - L_e / 2 - bw / 2, cy + L_e / 2 + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border", tone=tone())
             else:
                 phi = math.atan2(y1_ - y0_, x1_ - x0_)
-                add("border", cx - L_e / 2 - 0.1, cx + L_e / 2 + 0.1, cy - bw / 2, cy + bw / 2, zt - bt, zt, "border", 6, tag="pf border (mitred)", rot=phi, rot_axis="z", tone=tone())
+                add("border", cx - L_e / 2 - 0.1, cx + L_e / 2 + 0.1, cy - bw / 2, cy + bw / 2, zt - bt + lift, zt + lift, "border", 6, tag="pf border (mitred)", rot=phi, rot_axis="z", tone=tone())
         for x, y_lo, y_hi, lab in P.dividers:
-            add("border", x * IN - bw / 2, x * IN + bw / 2, y_lo * IN, y_hi * IN, zt - bt, zt, "border", 6, tag=f"breaker {lab}", tone=tone())
+            add("border", x * IN - bw / 2, x * IN + bw / 2, y_lo * IN, y_hi * IN, zt - bt + lift, zt + lift, "border", 6, tag=f"breaker {lab}", tone=tone())
     fixed = B
 
     # ---------------- rail

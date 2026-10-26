@@ -386,7 +386,25 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
     X, Y, sc = plan_xform(x0, x1, y0 - 2, y1, 40, 24, 700, 560)
     house_outline(o, X, Y, sc, S)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("fascia",), "#777", 0.3)
-    draw_plan_boxes(o, X, Y, sc, S.boxes, ("board",), "#8f8f8c", 0.25)
+    if L.plan is not None:       # the field: an end that butts a frame board or a breaker runs under it (the frame, drawn over it,
+        from .scene import Box   # reads as the mitred cut); an end at a house wall stops at its cut length
+        P_ = L.plan
+        bw_in = decking_facts(L.spec.decking.collection)["width"]
+        def _seg_d(px, py, x0_, y0_, x1_, y1_):
+            dx, dy = x1_ - x0_, y1_ - y0_
+            tt = max(0.0, min(1.0, ((px - x0_) * dx + (py - y0_) * dy) / (dx * dx + dy * dy or 1.0)))
+            return math.hypot(x0_ + tt * dx - px, y0_ + tt * dy - py)
+        def _butts(xe, ym):
+            return (any(_seg_d(xe, ym, *b_[:4]) < 1.6 * bw_in for b_ in P_.borders)
+                    or any(abs(xe - x_) < 1.6 * bw_in and lo_ - 1 <= ym <= hi_ + 1 for x_, lo_, hi_, _ in P_.dividers))
+        field = []
+        for r in P_.rows:
+            ym = (r.y0 + r.y1) / 2
+            field.append(Box("board", (r.x0 - (bw_in / 2 if _butts(r.x0, ym) else 0)) * IN, (r.x1 + (bw_in / 2 if _butts(r.x1, ym) else 0)) * IN,
+                             r.y0 * IN, r.y1 * IN, 0.0, 0.0, "deck", 6))
+        draw_plan_boxes(o, X, Y, sc, field + [b for b in S.boxes if b.kind == "board" and not (b.tag or "").startswith("pf field")], ("board",), "#8f8f8c", 0.25)
+    else:
+        draw_plan_boxes(o, X, Y, sc, S.boxes, ("board",), "#8f8f8c", 0.25)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("border",), "#222", 0.3)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("railpost",), INK, 0.5)
     zs = S.meta["zones"]
