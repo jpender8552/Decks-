@@ -27,6 +27,8 @@ def run_flags(L: Layout) -> List[Flag]:
     g, site, ex = s.geometry, s.site, s.extras
     F: List[Flag] = []
     add = lambda sev, topic, text, ref="": F.append(Flag(sev, topic, text, ref))
+    for ff in (getattr(s.extras, "field_flags", None) or []):           # the job's own field reads
+        add(ff.get("severity", "CHECK"), ff.get("topic", "field"), ff["text"], ff.get("ref", ""))
 
     # ---------------- setbacks / zoning
     for side, req, have in (("rear", site.rear_setback_required_ft, site.deck_to_rear_line_ft),
@@ -270,6 +272,13 @@ def run_flags(L: Layout) -> List[Flag]:
     if not (site.rear_setback_required_ft or site.side_setback_required_ft) and not site.address:
         add("INFO", "setback", "no address on the spec — tax rate and jurisdiction defaults used")
 
+    import re as _re
+    for f in F:                          # named stairs read by name; outline sides by their A-100 number
+        for st_ in s.stairs:
+            if getattr(st_, "name", None):
+                f.text = f.text.replace(f"{st_.side} stair", st_.name)
+        if g.outline:
+            f.text = _re.sub(r"\bedge:(\d+)", r"side \1", f.text)
     seen, uniq = set(), []
     for f in F:
         if (f.severity, f.text) not in seen:

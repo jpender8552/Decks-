@@ -1370,6 +1370,20 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         summary["material_cost"] = round(sum(l.ext for l in lines), 2)
     # a stair off the step between two zones reads by name, not by the edge code
     for st_ in spec.stairs:
+        if getattr(st_, "name", None) and not st_.side.startswith("step:"):
+            # a named stair reads by its name everywhere (the supplier never sees "edge:6")
+            nm_ = st_.name
+            def _rn(txt, side=st_.side, nm=nm_):
+                # only the stair's own references: "(edge:6 stair)", "(edge:2 box step)", "(edge:6)", "(edge:6, stepped)"
+                for pat, rep in ((f"{side} stair", nm), (f"{side} box step", nm), (f"({side})", f"({nm})"), (f"({side},", f"({nm},")):
+                    txt = txt.replace(pat, rep)
+                return txt
+            for ln in lines:
+                ln.item, ln.why = _rn(ln.item), _rn(ln.why)
+            for c_ in cuts:
+                c_.member = _rn(c_.member)
+            notes[:] = [_rn(n_) for n_ in notes]
+            continue
         if st_.side.startswith("step:"):
             na, nb = st_.side.split(":")[1].split("-")
             zl = {z.name: (z.label.split(" — ")[0] if z.label else z.name) for z in spec.geometry.zones}
@@ -1379,6 +1393,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             for c_ in cuts:
                 c_.member = c_.member.replace(st_.side, pretty)
             summary["stairs"] = [x.replace(st_.side + ":", pretty + ":") for x in summary["stairs"]]
+    if spec.geometry.outline:            # outline sides read as the numbered sides of the A-100 dimension plan
+        import re as _re
+        _side = lambda txt: _re.sub(r"\bedge:(\d+)", r"side \1", txt)
+        for ln in lines:
+            ln.item, ln.why = _side(ln.item), _side(ln.why)
+        for c_ in cuts:
+            c_.member = _side(c_.member)
+        notes[:] = [_side(n_) for n_ in notes]
     t = Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
     if spec.framing.system == "steel":
         from .steel import steel_frame

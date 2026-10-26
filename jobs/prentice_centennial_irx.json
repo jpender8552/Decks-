@@ -2219,6 +2219,38 @@
   "builtin_sell": {
    "bench": 3000,
    "planter": 2500
-  }
+  },
+  "field_flags": [
+   {
+    "severity": "CHECK",
+    "topic": "grade",
+    "text": "Left octagon beam line (posts at 2'-11\" and 7'-7\" from the left end): the flush beam's bottom is 10-3/4\" above the stair-landing grade and the left side stands ~5-7\" higher, so only ~4-6\" remain \u2014 no room for a pier head + ABA66 + post. Bear the beam directly on those Diamond Piers (DP beam bracket, no post), heads set at grade in a gravel pocket, or carry the left-side regrade under the lobe. Field-verify the grade before cutting posts.",
+    "ref": "field"
+   },
+   {
+    "severity": "CHECK",
+    "topic": "fascia",
+    "text": "Sides 1-3 (open left side): rip the fascia to 11\" so it holds 1/2\" off the regraded brick border (a full 11.95\" fascia would sit in the grade).",
+    "ref": "field"
+   },
+   {
+    "severity": "CHECK",
+    "topic": "scope",
+    "text": "The brick paver border on sides 2-3 has to come up and be reset ~5\" lower for the new frame and the box step \u2014 NOT in the price. Add it, or have the owner's landscaper do it before the frame.",
+    "ref": "scope"
+   },
+   {
+    "severity": "INFO",
+    "topic": "dividers",
+    "text": "Dividers sit at the center-front corners (13'-4 15/16\" and 21'-2 15/16\" from the left end): the right one lands on the trim right of the door; the downspout is 2'-9\" right of the left one (on the downspout it would land in the stair opening).",
+    "ref": "design"
+   },
+   {
+    "severity": "INFO",
+    "topic": "shade",
+    "text": "The yard trees (big deciduous tree near the rear line, the spruces) shade the deck until ~11:30 in late summer \u2014 the renders are set at Sep 15, noon.",
+    "ref": "site"
+   }
+  ]
  }
 }
