@@ -489,7 +489,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     else:
         rear_auto = None
         if not ledger:
-            notes.append("freestanding zone framed on its declared beam; no ledger — lateral bracing per the engineer")
+            notes.append("freestanding zone framed on its declared beam; no ledger" + (" — lateral bracing per the engineer" if spec.extras.engineered else ""))
     # a front flush beam IS the front rim: the frame's front thickness is the beam's width (a 7" (2)4x, not the 3" rim)
     for b in declared:
         if b.kind == "flush" and not (b.setback_in or 0) and b.position_in is None and (not zone or not b.zones or zone in b.zones):
