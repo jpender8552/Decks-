@@ -1084,8 +1084,10 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
                 ya = y0 + (y1 - y0) * (a - x0) / (x1 - x0); yb = y0 + (y1 - y0) * (b - x0) / (x1 - x0)
                 of.blocks.append((a, ya, b, yb, f"PF block side {i + 1}"))
     n_sk = sum((ea in ("rim45", "bay45")) + (eb in ("rim45", "bay45")) for _, _, _, ea, eb, _ in of.joists)
+    n_bf = sum((ea == "ledger45") + (eb == "ledger45") for _, _, _, ea, eb, _ in of.joists)
     of.notes.append(f"outline frame: {len(of.joists)} joist pieces, {sum(b - a for _, a, b, *_ in of.joists) / 12:.0f} LF; "
-                    f"{n_sk} joist ends on 45-degree rims (skewed hangers); {len(of.blocks)} blocks under the angled borders")
+                    f"{n_sk} joist ends on 45-degree rims (skewed hangers)" + (f", {n_bf} on the bay faces (field-skewable hangers)" if n_bf else "")
+                    + f"; {len(of.blocks)} blocks under the angled borders")
     return of
 
 
