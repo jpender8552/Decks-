@@ -980,6 +980,13 @@ def inch(v: float, frac: int = 8) -> str:
     return f'{sgn}{whole} {rem // g}/{frac // g}"' if whole else f'{sgn}{rem // g}/{frac // g}"'
 
 
+def chain_labels(pts, frac: int = 8) -> List[str]:
+    """Labels for a chain of dimensions that add up: every point rounded from the chain's start, then differenced, as a
+    tape read from one end — the segments always sum to the overall (rounding each segment alone can drift 1/8\")."""
+    q = [round((p - pts[0]) * frac) / frac for p in pts]
+    return [inch(b - a, frac) for a, b in zip(q, q[1:])]
+
+
 def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
     """A-100: the deck outline with every side in inches, chain dimensions along the house and the front, the depths,
     the stairs, built-ins and dividers — inches throughout, the overall width in feet and inches."""
@@ -1063,12 +1070,12 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
     fx = sorted(set(round(x, 2) for x, y in P if y > max(ys) - 40 or x in (min(xs), max(xs))))
     hx = sorted(set(round(x, 2) for x, y in P if abs(y) < 0.5) | {round(min(xs), 2), round(max(xs), 2)})
     yb = Y(max(ys)) + 40
-    for xa, xb in zip(fx, fx[1:]):
-        dim_h(o, X, yb, xa, xb, inch(xb - xa), 8, up=True)
+    for (xa, xb), lab in zip(zip(fx, fx[1:]), chain_labels(fx)):
+        dim_h(o, X, yb, xa, xb, lab, 8, up=True)
     dim_h(o, X, yb + 30, min(xs), max(xs), f"{inch(Wd)} = {ftin(Wd)} overall", 10.5, up=False)
     yt = Y(0) - 26
-    for xa, xb in zip(hx, hx[1:]):
-        dim_h(o, X, yt, xa, xb, inch(xb - xa), 8, up=True)
+    for (xa, xb), lab in zip(zip(hx, hx[1:]), chain_labels(hx)):
+        dim_h(o, X, yt, xa, xb, lab, 8, up=True)
     # the bay (house sides off the wall line): its corners along x, and how far it stands out
     bay = [(x, y) for x, y in P if 0.5 < y < 60 and any(abs(y - y2) < 0.5 and abs(x - x2) > 1 for x2, y2 in P)]
     hpts = [(x, y) for x, y in P if abs(y) < 0.5]
@@ -1078,8 +1085,8 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         x_l = max((x for x, y in hpts if x < bxs[0]), default=None); x_r = min((x for x, y in hpts if x > bxs[-1]), default=None)
         if x_l is not None and x_r is not None:
             chain = [x_l] + bxs + [x_r]
-            for xa, xb in zip(chain, chain[1:]):
-                dim_h(o, X, Y(by_) + 16, xa, xb, inch(xb - xa), 7, up=False)
+            for (xa, xb), lab in zip(zip(chain, chain[1:]), chain_labels(chain)):
+                dim_h(o, X, Y(by_) + 16, xa, xb, lab, 7, up=False)
             dim_v(o, Y, X(bxs[0]) + 10, 0, by_, inch(by_), 6.5, left=False)
             o.append(T((X(x_l) + X(x_r)) / 2, Y(by_) + 40, "BOX BAY (house) — deck runs around it", 7, 800, "middle", "#8a8172"))
     # depths: the left end, the deepest corners, the centre front
@@ -1089,11 +1096,11 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
     zfront = sorted(set(round(y, 2) for x, y in P))
     dim_v(o, Y, X(min(xs)) - 78, 0, max(ys), f"{inch(max(ys))} deep", 9, left=True)
     left_pts = sorted(set(round(y, 2) for x, y in P if abs(x - min(xs)) < 0.5) | {0.0, round(max(ys), 2)})
-    for ya, yb_ in zip(left_pts, left_pts[1:]):
-        dim_v(o, Y, X(min(xs)) - 22, ya, yb_, inch(yb_ - ya), 7.5, left=True)
+    for (ya, yb_), lab in zip(zip(left_pts, left_pts[1:]), chain_labels(left_pts)):
+        dim_v(o, Y, X(min(xs)) - 22, ya, yb_, lab, 7.5, left=True)
     right_pts = sorted(set(round(y, 2) for x, y in P if abs(x - max(xs)) < 0.5) | {0.0, round(max(ys), 2)})
-    for ya, yb_ in zip(right_pts, right_pts[1:]):
-        dim_v(o, Y, X(max(xs)) + 16, ya, yb_, inch(yb_ - ya), 7.5, left=False)
+    for (ya, yb_), lab in zip(zip(right_pts, right_pts[1:]), chain_labels(right_pts)):
+        dim_v(o, Y, X(max(xs)) + 16, ya, yb_, lab, 7.5, left=False)
     # the centre notch depth
     notch = [(x, y) for x, y in P if 0.5 < y < max(ys) - 0.5 and min(xs) + 1 < x < max(xs) - 1]
     if notch:
@@ -1122,15 +1129,15 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         if abs(e.y1 - e.y0) < 0.5:          # a front side: chain under it
             xa_, xb_ = min(e.x0, e.x1), max(e.x0, e.x1)
             yy_ = Y(e.y0) + 14
-            for a_, b_ in ((xa_, xa_ + p0), (xa_ + p0, xa_ + p1), (xa_ + p1, xb_)):
-                if b_ - a_ > 0.5:
-                    dim_h(o, X, yy_, a_, b_, inch(b_ - a_), 7, up=False)
+            pts_ = [xa_] + [v for v in (xa_ + p0, xa_ + p1) if xa_ + 0.5 < v < xb_ - 0.5] + [xb_]
+            for (a_, b_), lab in zip(zip(pts_, pts_[1:]), chain_labels(pts_)):
+                dim_h(o, X, yy_, a_, b_, lab, 7, up=False)
         elif abs(e.x1 - e.x0) < 0.5:        # a side wall: chain beside it
             ya_, yb_ = min(e.y0, e.y1), max(e.y0, e.y1)
             xx_ = X(e.x0) - 46
-            for a_, b_ in ((ya_, ya_ + p0), (ya_ + p0, ya_ + p1), (ya_ + p1, yb_)):
-                if b_ - a_ > 0.5:
-                    dim_v(o, Y, xx_, a_, b_, inch(b_ - a_), 7, left=True)
+            pts_ = [ya_] + [v for v in (ya_ + p0, ya_ + p1) if ya_ + 0.5 < v < yb_ - 0.5] + [yb_]
+            for (a_, b_), lab in zip(zip(pts_, pts_[1:]), chain_labels(pts_)):
+                dim_v(o, Y, xx_, a_, b_, lab, 7, left=True)
     for st, sl in zip(s.stairs, L.stairs):
         g = sl.geo
         lab = (f"{'BOX STEP' if getattr(sl, 'build', '') == 'box' else 'STAIR'} {inch(st.width_in)} wide · {g.risers} risers @ {inch(g.riser_in, 16)} · "
