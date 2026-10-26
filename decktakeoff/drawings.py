@@ -398,8 +398,10 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
             rows_p = [r for r in L.plan.rows if r.panel == i]
             ymid = (min(r.y0 for r in rows_p) + max(r.y1 for r in rows_p)) / 2 * IN if rows_p else y_top * IN / 2
             o.append(T(X((a + b) / 2 * IN), Y(ymid), f"panel {i + 1} · {n} rows", 9, 800, "middle", "#fff"))
-        for x, y_lo, y_hi, lab in L.plan.dividers:
-            o.append(T(X(x * IN), Y(y_hi * IN) + 8, f"breaker {lab} · {ftin(y_hi - y_lo)}", 6.5, 700, "middle", MUTE))
+        xm_ = (min(d_[0] for d_ in L.plan.dividers) + max(d_[0] for d_ in L.plan.dividers)) / 2 if L.plan.dividers else 0
+        for x, y_lo, y_hi, lab in L.plan.dividers:          # inside the panel between the breakers, light on the boards
+            left_ = x <= xm_ and len(L.plan.dividers) > 1
+            o.append(T(X(x * IN) + (5 if left_ else -5), Y(y_hi * IN) - (14 if left_ else 25), f"breaker {lab} · {ftin(y_hi - y_lo)}", 6.5, 700, "start" if left_ else "end", "#f3ecdc"))
     dim_h(o, X, Y(S.y_front) + 22, -S.meta["edge"], S.W + S.meta["edge"], ftin((S.W + 2 * S.meta["edge"]) * 12) + " over the edge boards", up=False)
     nx = 760
     o.append(T(nx, 24, "DECKING", 9, 800, fill=GOLD))
@@ -408,12 +410,12 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
     notes = [f"Field: {s.decking.brand} {s.decking.collection} {s.decking.color}, {f['width']:g}\" x {f['thick']:g}\", {ftin(s.deck_gap)} gaps",
              f"Border{' & dividers' if L.divider_x else ''}: {s.decking.border_collection or s.decking.collection} {s.decking.border_color or s.decking.color}" if s.geometry.picture_frame else "No picture frame",
              f"Boards run {'parallel to' if s.geometry.board_direction == 'parallel' else 'out from'} the house; edge overhang {ftin(S.meta['edge'] * 12)}" + (" over the fascia" if s.decking.fascia else " — no fascia, rim exposed"),
-             t.schedule.get("Field", ""), t.schedule.get("Face screws", ""),
+             t.schedule.get("Field", ""), t.schedule.get("Picture frame + stairs", ""), t.schedule.get("Face screws", ""),
              (L.plan.summary() + " — every board one piece wall to border, no butt joints" if L.plan is not None else
               "Rows per zone: " + " · ".join(f"{z.name} {z.decking.rows}" for z in L.zones) + (" (rip at the house)" if any(z.decking.last_row_dev < -0.5 for z in L.zones) else " (no rips)"))]
     yy = 40
-    for n in notes:
-        for ln in textwrap.wrap(n, 40)[:4]:
+    for n in [n_ for n_ in notes if n_]:
+        for ln in textwrap.wrap(n, 40)[:8]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
         yy += 3
     return sheet("A-101", "Decking plan", "Every board, border and divider as it lays; rail posts shown for the pockets", o, "Plan · not to scale · house at the top · dimensions govern", meta)
@@ -427,10 +429,16 @@ def sheet_rail(L: Layout, S: Scene, t, meta) -> str:
     o.append(PG([(X(x), Y(y)) for x, y in deck_outline(S)], FILL["deck"], INK, 1.0))
     house_outline(o, X, Y, sc, S)
     if rl:
+        placed = []                         # posts 18" apart beside a stair: the second label steps down a line
         for i, p in enumerate(rl.posts):
             x, y = p.x * IN, p.y * IN
             o.append(R(X(x) - 3, Y(y) - 3, 6, 6, INK, INK, 0.5))
-            o.append(T(X(x), Y(y) + 14 if y > (S.y_min + S.y_front) / 2 else Y(y) - 6, f"RP{i + 1} {p.kind[0]}", 6.5, 800, "middle"))
+            below = y > (S.y_min + S.y_front) / 2
+            lx, ly = X(x), (Y(y) + 14 if below else Y(y) - 6)
+            while any(abs(lx - a_) < 30 and abs(ly - b_) < 8 for a_, b_ in placed):
+                ly += 9 if below else -9
+            placed.append((lx, ly))
+            o.append(T(lx, ly, f"RP{i + 1} {p.kind[0]}", 6.5, 800, "middle"))
         for sec in rl.sections:
             pass
     # elevation of the outer edge (x-z), rail only
@@ -449,7 +457,8 @@ def sheet_rail(L: Layout, S: Scene, t, meta) -> str:
     yy = 40
     notes = [t.summary["rail"], t.schedule.get("Rail", "")]
     if rl:
-        notes.append("Bays: " + " · ".join(f"{s_.side} {ftin(s_.ctc)}" for s_ in rl.sections[:12]))
+        side_ = lambda v: re.sub(r"^edge:(\d+)$", r"side \1", v)          # outline sides read as A-100 numbers them
+        notes.append("Bays: " + " · ".join(f"{side_(s_.side)} {ftin(s_.ctc)}" for s_ in rl.sections[:12]) + (" (sides as numbered on A-100)" if any(s_.side.startswith("edge:") for s_ in rl.sections) else ""))
         notes.append("Guard 36\" min above the deck; openings under 4\" (IRC R312). Rail LF for labor = deck-edge LF of actual rail.")
     for n in notes:
         for ln in textwrap.wrap(n, 40)[:6]:
@@ -476,7 +485,7 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
             cut = [b for b in S.boxes if b.x0 <= xc <= b.x1 or b.kind in ("post", "footing", "stone", "cap", "base", "railpost", "brace")]
     o.append(R(Yv(deep.wall_y * IN - 3.0), Z(0), (S.y_front + 7.0 - deep.wall_y * IN) * sc, (max(4.0, L.frame.footing_depth_in / 12 + 1)) * sc, "#e0d7c2", "none", 0))
     o.append(LN(Yv(deep.wall_y * IN - 3.0), Z(0), Yv(S.y_front + 4.0), Z(0), INK, 1.0))
-    o.append(T(Yv(S.y_front + 3.5), Z(0) + 10, "grade", 7.5, 700, "end", MUTE))
+    o.append(T(Yv(deep.wall_y * IN - 2.6), Z(0) + 10, "grade", 7.5, 700, "start", MUTE))
     o.append(LN(Yv(deep.wall_y * IN - 3.0), Z(-s.site.frost_depth_in / 12), Yv(S.y_front + 4.0), Z(-s.site.frost_depth_in / 12), "#3f5d8a", 0.8, "4 3"))
     o.append(T(Yv(S.y_front + 3.5), Z(-s.site.frost_depth_in / 12) - 3, f"frost {ftin(s.site.frost_depth_in)}", 7.5, 700, "end", "#3f5d8a"))
     house = [b for b in S.boxes if b.kind == "house" and b.x0 <= xc <= b.x1]
@@ -491,7 +500,7 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
         cy_, cz_ = Yv((b.y0 + b.y1) / 2), Z((b.z0 + b.z1) / 2)
         o.append(f'<g transform="rotate({math.degrees(b.rot):.2f} {cy_:.1f} {cz_:.1f})">' + R(Yv(b.y0), Z(b.z1), (b.y1 - b.y0) * sc, (b.z1 - b.z0) * sc, fill_for(b), INK, 0.5) + "</g>")
         o.append(T(cy_ - 8, cz_ + 22, "4x4 knee brace", 6.8, 700, "end"))
-    dim_v(o, Z, Yv(S.y_front + 2.6), 0, S.deck_top, f"{ftin(s.geometry.height_in)} to the deck surface", left=False)
+    dim_v(o, Z, Yv(S.y_front + 2.6), 0, S.deck_top, f"{ftin(s.geometry.height_in)} deck", left=False)      # short labels: the two dims stack
     if L.rail:
         dim_v(o, Z, Yv(S.y_front + 2.6), S.deck_top, S.deck_top + L.rail.height * IN, f"guard {L.rail.height:g}\"", left=False)
     for bl in L.beam_lines:
@@ -500,17 +509,22 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
     o.append(T(Yv(deep.wall_y * IN - 1.5), Z(S.deck_top + 3.5), f"SECTION through zone {deep.name} at {ftin(deep.W / 2)} — looking toward the left end", 8.5, 800))
     # front elevation (x-z) in the right panel
     Xe, Ze, sce = elev_xform(-4.0, S.W + 4.0, -1.0, S.deck_top + 12.0, 620, 60, 370, 300)
+    el = []                                 # clipped to its own frame: a measured two-storey house is wider and taller than the deck
+    draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("house", "wall", "privacy", "roof", "glass"), INK, 0.5)
+    draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("footing", "stone", "stonecap", "base", "post", "brace", "cap", "beam", "rim", "fascia", "joist", "ledger", "cpost", "cbeam", "hardie", "ssroof"), INK, 0.35)
+    draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("board", "border", "railpost", "toprail", "cable", "baluster", "botrail", "drink", "railcap"), "none", 0)
+    o.append('<defs><clipPath id="a301el"><rect x="610" y="52" width="390" height="318"/></clipPath></defs>')
+    o.append('<g clip-path="url(#a301el)">' + "".join(el) + "</g>")
     o.append(T(620, 44, "FRONT ELEVATION — from the yard", 8.5, 800))
-    draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("house", "wall", "privacy", "roof", "glass"), INK, 0.5)
-    draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("footing", "stone", "stonecap", "base", "post", "brace", "cap", "beam", "rim", "fascia", "joist", "ledger", "cpost", "cbeam", "hardie", "ssroof"), INK, 0.35)
-    draw_elev_boxes(o, Xe, Ze, sce, S.boxes, ("board", "border", "railpost", "toprail", "cable", "baluster", "botrail", "drink", "railcap"), "none", 0)
     o.append(LN(Xe(-4), Ze(0), Xe(S.W + 4), Ze(0), INK, 1.0))
     dim_h(o, Xe, Ze(0) + 16, 0, S.W, ftin(S.W * 12), 7.5, up=False)
     nx = 620
     o.append(T(nx, 400, "SECTION NOTES", 9, 800, fill=GOLD))
     yy = 416
     notes = [f"Deck surface {ftin(s.geometry.height_in)} above grade; guard {L.rail.height:g}\" where the drop exceeds 30\"" if L.rail else f"Deck surface {ftin(s.geometry.height_in)} above grade",
-             "; ".join(t.summary["beams"]), f"Posts {t.summary['posts']}", t.schedule.get("Ledger", ""), t.schedule.get("Joist tape", "")]
+             (f"{len(L.beam_lines)} {' / '.join(sorted({b_.kind for b_ in L.beam_lines}))} beam lines, {' / '.join(sorted({b_.size + ' ' + b_.species for b_ in L.beam_lines}))} — every line on S-100 / S-101"
+              if len(L.beam_lines or []) > 2 else "; ".join(t.summary["beams"])),
+             f"Posts {t.summary['posts']}", t.schedule.get("Ledger", ""), t.schedule.get("Joist tape", "")]
     for n in notes:
         for ln in textwrap.wrap(n, 62)[:3]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
