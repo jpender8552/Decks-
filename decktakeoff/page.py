@@ -395,7 +395,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     rd = Path(renders_dir) if renders_dir else (out / "buildset" / "renders")
     have = {q.stem for q in rd.glob("*.jpg")}
     if spec.geometry.height_in < 30:         # a deck near grade: the views from under it show a rim at the lawn and nothing else
-        have -= {"under", "underiso"}
+        have -= {"under", "underiso", "structure-underiso"}
     files = {f"r/{key}-{n_}.jpg": str(rd / f"{n_}.jpg") for n_ in have}
     sun_names = sorted(n_ for n_ in have if n_.startswith("sun-"))
     CAP.clear(); CAP.update(CAP0)                # this job's captions only
