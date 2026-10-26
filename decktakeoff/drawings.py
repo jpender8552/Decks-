@@ -8,6 +8,7 @@ import html as _html
 import math
 import re
 import textwrap
+from .catalog import HANGER_FOR_JOIST
 from datetime import date
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -593,7 +594,7 @@ def sheet_details(L: Layout, S: Scene, t, meta) -> str:
     o.append(R(40, 60, 40, 200, FILL["house"], INK, 1.0)); o.append(T(60, 165, "house rim", 7, 700, "middle", MUTE, rot=-90))
     o.append(R(80, 80, 6, 160, "#3f5d8a", "none", 0)); o.append(TH(83, 76, "membrane 12\" up the wall", 6.5, 600, "middle", halo="#fff"))
     o.append(R(86, 100, 22, 60, FILL["timber"], INK, 0.8)); o.append(T(97, 132, "ledger", 6.5, 700, "middle", INK, rot=-90))
-    o.append(R(108, 100, 120, 60, FILL["timber"], INK, 0.6)); o.append(T(168, 133, f"{L.frame.joist_size} joist in {('LUS' + ('410Z' if timber else '28Z'))}", 7, 700, "middle"))
+    o.append(R(108, 100, 120, 60, FILL["timber"], INK, 0.6)); o.append(T(168, 133, f"{L.frame.joist_size} joist in {'LUS410Z' if timber else (L.spec.framing.hanger or HANGER_FOR_JOIST.get(L.frame.joist_size, 'LUS210Z'))}", 7, 700, "middle"))
     o.append(R(86, 92, 150, 6, FILL["deck"], INK, 0.5)); o.append(TH(140, 89, "decking", 6.5, 600, "middle", halo="#fff"))
     o.append(LN(80, 100, 112, 100, GOLD, 2)); o.append(LN(112, 100, 196, 80, INK, 0.5)); o.append(TH(198, 82, "flashing over the ledger,", 6.5, 600, halo="#fff")); o.append(TH(198, 90, "under the cladding", 6.5, 600, halo="#fff"))
     for yy in (112, 148):
@@ -1837,7 +1838,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
     o.append(R(x + 28, y + 56, 20, 11, "#5b6166", INK, 0.6))
     o.append(LN(x + 46, y + 150, x + 56, y + 150, "#b3261e", 0.8)); o.append(T(x + 51, y + 146, "1-1/2\"", 6.2, 800, "middle", "#b3261e"))
     o.append(LN(x + 123, y + 140, x + 183, y + 140, "#b3261e", 0.8)); o.append(T(x + 153, y + 136, f"{fr.spacing:g}\" OC", 6.6, 800, "middle", "#b3261e"))
-    hs = "LUS28Z" if js in ("2x8", "2x10") else "LUS210Z"
+    hs = L.spec.framing.hanger or HANGER_FOR_JOIST.get(js, "LUS210Z")
     items = " ".join(ln.item for ln in getattr(t, "lines", []))
     js_ = js.replace('x', '')
     rim_h = [w_ for k_, w_ in (("HUCQ", f"HUCQ{js_}-2-SDS concealed-flange"), (f"SUR{js_}-2Z", f"SUR/SUL{js_}-2Z skewed (45°)"),
@@ -1866,7 +1867,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
         o.append(T(x + W3 / 2, y + 36, "FRONT OF THE DECK — the doubled rim on the edge posts", 6.6, 800, "middle", MUTE))
         _wood(o, x + 30, y + 214, 120, 46); _wood(o, x + 150, y + 216, 10, 42, dark=True); o.append(R(x + 150, y + 236, 12, 22, "#7b8186", INK, 0.6))
         o.append(R(x + 30, y + 207, 250, 7, FILL["deck"], INK, 0.5)); _wood(o, x + 160, y + 216, 120, 42, dark=True)
-        _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson LUS28Z every joist off the rim's inside face, 10d HDG every hole")
+        _lead(o, x + 40, y + 70, x + 170, y + 100, f"Simpson {hs} every joist off the rim's inside face, 10d HDG every hole")
         _lead(o, x + 60, y + 238, x + 24, y + 192, f"{rimsz} = the flush beam; plies RSS-screwed 2 rows @ 12\"")
         _lead(o, x + 210, y + 236, x + 236, y + 180, f"{js} joist, top flush with the rim")
         o.append(T(x + 24, y + 278, f"Joists span ledger to rim at {fr.spacing:g}\" OC; the rim spans post to post — no cantilever", 6.6, 700))
@@ -2112,7 +2113,7 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     kinds = {b.kind for b in bls}
     two_by = any(b.size.startswith(("(2)2x", "(3)2x")) for b in bls)
     four_by = any(b.size.startswith("(2)4x") for b in bls)
-    hang = "LUS28Z" if js in ("2x8", "2x10") else "LUS210Z"
+    hang = s.framing.hanger or HANGER_FOR_JOIST.get(js, "LUS210Z")
     cap = bls[0].cap_mid if bls else "BC46Z"
     cortex = (s.decking.border_fastener or "").lower().startswith("cortex")
     rows = [("Ledger to house", "LedgerLOK 3-5/8\", 2 rows staggered 12\" OC" + (" — engineer" if s.extras.ledger_on_cantilevered_floor else "")),

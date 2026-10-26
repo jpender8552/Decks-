@@ -151,6 +151,7 @@ class Framing:
     rim_plies: int = 2                   # double rims everywhere (GSX standard). Never 3 or 4.
     ledger_size: Optional[str] = None    # None -> same as joist
     ledger_fastener: str = "LedgerLOK"   # "LedgerLOK" | "1/2 lag" | "1/2 bolt"
+    hanger: str = ""                     # joist face-mount hanger SKU; "" = the one sized to the joist (2x10 -> LUS210Z)
     beams: List[Beam] = field(default_factory=lambda: [Beam()])
     edge_posts_ft: List[List[float]] = field(default_factory=list)   # outline plans: posts under the rims at these outline points ([x, y] ft;
                                          # a corner snaps to the vertex, else to the side) — the doubled rim spans post to post as a

@@ -27,6 +27,7 @@
   },
   "framing": {
     "joist_size": "2x10",
+    "hanger": "LUS28Z",
     "joist_species": "SYP",
     "rim_plies": 2,
     "ledger_fastener": "LedgerLOK",

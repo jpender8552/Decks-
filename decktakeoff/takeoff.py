@@ -797,7 +797,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Stairs", f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color} 1x6x12 — landing {li + 1} decking ({sf_l:.0f} SF)", nb, nb, "ea", "+10% cuts", *_price("decking", f"{spec.decking.brand}|{spec.decking.collection}|12|{spec.decking.profile}")))
 
     # ================= HARDWARE / CONNECTORS
-    hanger = HANGER_FOR_JOIST.get(jsize, "LUS28Z")
+    hanger = spec.framing.hanger or HANGER_FOR_JOIST.get(jsize, "LUS210Z")
     d_, uc, src, sku = _hw(hanger, black)
     n_flush = sum(1 for bl in L.beam_lines if bl.kind == "flush" and not bl.label.startswith("FRONT"))
     why = (f"exact  (joists at the ledgers + rim ends" + (f" + both faces of the flush beam" if n_flush else "") + ")") if timber \

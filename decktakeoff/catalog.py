@@ -117,7 +117,7 @@ def parse_beam(size: str):
 
 
 # ---------------------------------------------------------------- connectors
-HANGER_FOR_JOIST = {"2x6": "LUS26Z", "2x8": "LUS28Z", "2x10": "LUS28Z", "2x12": "LUS210Z",
+HANGER_FOR_JOIST = {"2x6": "LUS26Z", "2x8": "LUS28Z", "2x10": "LUS210Z", "2x12": "LUS210Z",
                     "4x8": "LUS48Z", "4x10": "LUS410Z", "4x12": "LUS410Z"}
 HANGER_NAILS = {"LUS26Z": (4, 4), "LUS28Z": (6, 4), "LUS210Z": (8, 6),        # (10d 3" into header, 10d x 1-1/2" into joist)
                 "LUS48Z": (6, 4), "LUS410Z": (8, 6)}
