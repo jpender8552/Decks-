@@ -1000,7 +1000,7 @@ var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.
   var R = 11.5, mn = function (a) { return Math.min.apply(null, a); }, mx = function (a) { return Math.max.apply(null, a); };
   FXU.fxBox.value.set(mn(xs) - R, mx(xs) + R, mn(ys) - R, mx(ys) + R); FXU.fxY.value.set(mn(zs) - R, mx(zs) + 2.0);
 })();
-var FX_GAIN = [7.0, 2.6, 0.9];        // a riser spot, a post-cap lantern, an LED strip (its nearest point)
+var FX_GAIN = [7.0, 6.0, 3.2];        // a riser spot, a post-cap lantern, an LED strip (its nearest point) — owner: the post and roof lights must read
 var FX_CHUNK = [
   '#define FX_N ' + FXN,
   'uniform vec4 fxA[FX_N]; uniform vec4 fxB[FX_N]; uniform vec3 fxCol; uniform float fxGain; uniform vec4 fxBox; uniform vec2 fxY;',
@@ -1385,7 +1385,7 @@ function applySun() {
 function applyGlow() {
   var lit = NIGHT;
   FXU.fxGain.value = lit;
-  LED_M.forEach(function (m) { m.emissiveIntensity = 0.1 + 2.6 * lit; });
+  LED_M.forEach(function (m) { m.emissiveIntensity = 0.1 + 4.5 * lit; });
   GLASS_M.forEach(function (m) { m.emissiveIntensity = 0.38 * lit; m.opacity = m.userData.op0 + (Math.min(0.92, m.userData.op0 + 0.6) - m.userData.op0) * lit; });
   if (HALO) HALO.material.uniforms.uGlow.value = lit;
 }
