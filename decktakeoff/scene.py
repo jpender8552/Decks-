@@ -728,31 +728,27 @@ def build_scene(L) -> Scene:
             bx("riser", (k - 1) * run_, (k - 1) * run_ + r_t, va, vb, -k * r_, -(k - 1) * r_ - bt_in, "fascia", 6, tag=f"riser {k} {st.side}", tone_=tone())
             if k <= T:
                 bx("tread", (k - 1) * run_ + r_t, k * run_ + r_t + NOSE, va, vb, -k * r_ - bt_in, -k * r_, "deck", 6, tag=f"tread {k} {st.side}", tone_=tone())
-        # stringers: their top edge under the back of every tread, hung on the trimmer, the foot cut level onto the carrier
+        # stringers: their top edge under the back of every tread, hung on the trimmer, the heels cut level onto the base ledger
         th = math.atan2(r_, run_)
         dep = 11.25
-        c_top = nt["carrier_top"]
+        l_top = nt["ledger_top"]
         z_edge = lambda u: -r_ - bt_in - 0.25 - (u - r_t) * math.tan(th)
-        u_end = min(T * run_, r_t + (-r_ - bt_in - 0.25 - (c_top - jd_in) - dep / math.cos(th)) / math.tan(th))
+        u_end = min(T * run_, r_t + (-r_ - bt_in - 0.25 - (l_top - 5.5) - dep / math.cos(th)) / math.tan(th))
         Ls, uc = u_end / math.cos(th), u_end / 2
         zc = z_edge(uc) - (dep / 2) / math.cos(th)
         n_s = max(2, st.stringers)
         for i in range(n_s):
             v = va + 0.75 + (vb - va - 1.5) * i / (n_s - 1)
             bx("stringer", uc - Ls / 2, uc + Ls / 2, v - 0.75, v + 0.75, zc - dep / 2, zc + dep / 2, "timber", 5, tag=f"stringer {st.side}", rot=th)
-        # the foot carrier between the notch posts, and the posts on their footings
-        u_c = sgn * (face - nt["post_line"])
-        bx("beam", u_c - 1.5, u_c + 1.5, nt["lo"], nt["hi"], c_top - jd_in, c_top, "timber", 4, tag=f"stair foot carrier {st.side}")
+        # the stair base ledger (2-ply PT 2x6 bolted to the lower level's rim face, top flush with it) and the two short PT posts
+        # on it under the header / rim corners (structure.md §5.2)
+        u_f = nt["depth"]                                                # the face the notch is cut in
+        bx("beam", u_f - 3.0, u_f, nt["ledger_lo"], nt["ledger_hi"], l_top - 5.5, l_top, "timber", 4, tag=f"stair base ledger {st.side}")
+        pbn, pdn = [v_ * IN for v_ in actual(nt["post_size"])]
         for px, py in nt["posts"]:
             x, y = px * IN, py * IN
-            if ft == "diamond_pier":
-                add("footing", x - 0.45, x + 0.45, y - 0.45, y + 0.45, -0.2, 0.3, "concrete", 1, tag="Diamond Pier"); base_top = 0.3
-            elif ft in ("caisson", "existing"):
-                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, 0.5, "concrete", 1, tag="caisson", shape="cyl"); base_top = 0.5
-            else:
-                add("footing", x - 0.6, x + 0.6, y - 0.6, y + 0.6, -1.0, 0.15, "concrete", 1, shape="cyl"); base_top = 0.15
-            add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
-            add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, jbot, "timber", 2, tag=f"stair notch post {st.side}")
+            hx, hy = (pbn / 2, pdn / 2) if ax == "x" else (pdn / 2, pbn / 2)
+            add("post", x - hx, x + hx, y - hy, y + hy, zt + l_top * IN, jbot, "timber", 2, tag=f"stair notch post {st.side}")
         # the graspable handrail: 34-38" over the nosing line (36"), from above the top riser to above the bottom riser, on
         # brackets off the guard posts along the cheek on its side going down
         if getattr(st, "handrail", "") == "guard posts" and L.rail:

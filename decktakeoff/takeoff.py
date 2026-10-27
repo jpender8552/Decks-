@@ -631,12 +631,16 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                                  f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
             Qz.lumber += [("2x6", st.width + 3, "stair kicker/hanger board")] * 2
         if getattr(st, "inset", False) and st.notch:
-            # the inset stair's foot: a doubled carrier between the notch posts, the stringer feet bear on it (A35Z each)
-            cl_ = st.notch["carrier_len"]
-            Qz.lumber += [(jsize, cl_, "stair foot carrier")] * 2
-            cuts.append(CutPiece(f"Stair foot carrier ({st.side})", jsize, cl_, 2, "2-ply, laminated; hung between the notch posts in double hangers, top at the lower level's joist tops — the stringer feet bear on it"))
-            Qz.hangers_double += 2
-            Qz.notch_dh = getattr(Qz, "notch_dh", 0) + 6           # trimmer ends 2 + headers 2 + the foot carrier 2
+            # the inset stair's foot (structure.md §5.2): a doubled PT 2x6 base ledger through-bolted to the lower level's rim, the
+            # stringer heels on it (A35Z each); two short PT posts on it carry the header ends (A35Z both ways)
+            nt_ = st.notch
+            bl_ = round(nt_["ledger_hi"] - nt_["ledger_lo"], 2)
+            Qz.lumber += [("2x6", bl_, "stair base ledger")] * 2 + [(nt_["post_size"], round(st.notch_post_len + 1.0, 2), "stair notch post")] * st.notch_posts
+            cuts.append(CutPiece(f"Stair base ledger ({st.side})", "2x6", bl_, 2,
+                                 f"2-ply PT, on the lower level's rim face under the notch, top flush with the rim; 1/2\" bolts @ 12\" staggered ({nt_['ledger_bolts']})"))
+            cuts.append(CutPiece(f"Stair notch posts ({st.side})", nt_["post_size"], st.notch_post_len, st.notch_posts,
+                                 "PT, on the base ledger under the header / rim corners; (2) 1/2\" through-bolts each to the lower rim, A35Z at the top — field-measure"))
+            Qz.notch_dh = getattr(Qz, "notch_dh", 0) + 4           # trimmer ends 2 + headers on the trimmer 2
             Qz.a35_stair = getattr(Qz, "a35_stair", 0) + 2 * st.notch_posts + st.stringers
     # the step-face skirt: 2x4 nailers hung below the rim (studs at 16" + blocking rows) behind the vertical panels
     skirt = None
@@ -675,6 +679,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             desc = f"{nom}x{st} {SPECIES_NAMES.get(jsp, jsp)}"
         elif nom == "2x4":          # the step-skirt nailers (D&D: 2x4 #1 KDAT ground contact)
             desc = f"{nom}x{st} #1 KDAT GC"
+        elif nom == "4x4":          # an inset stair's notch posts
+            desc = f"{nom}x{st} #2 GC PT"
         else:
             desc = f"{nom}x{st}"
         lines.append(Line("Lumber", desc, n, n + 1, "ea", f"+1 cull  ({_summarize_labels(labels)})", uc, src))
@@ -724,11 +730,6 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _lumber_price(car, 12, timber)
             lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at each carrier ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
                               3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
-    for st_ in L.stairs:
-        if getattr(st_, "notch_posts", 0):       # an inset stair: posts at the notch's outer corners (header ends + the foot carrier)
-            post_pieces += [(spec.framing.post_size, st_.notch_post_len + 1.0, "stair notch post")] * st_.notch_posts
-            cuts.append(CutPiece(f"Stair notch posts ({st_.side})", spec.framing.post_size, st_.notch_post_len, st_.notch_posts,
-                                 "at the notch's outer corners under the rim / header corner (A35Z both ways) — field-measure; the foot carrier hangs between them"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
@@ -736,8 +737,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             desc = f"{nom}x{st} Douglas Fir #1 rough, full dimension (end grain sealed)" if (df1_post or nom.startswith('8x')) else f"{nom}x{st} #2 GC rough"
         else:
             desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}"
-        lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])
-                          + [ftin(s_.notch_post_len) for s_ in L.stairs if getattr(s_, "notch_posts", 0)]))
+        lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if knee:
         lg = spec.framing.knee_leg_in
@@ -871,7 +871,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d_, uc, src, sku = _hw(dh, black)
         lines.append(Line("Hardware", d_, Qz.hangers_double, Qz.hangers_double, "ea",
                           "exact  (doubled joists under the dividers, hung rims at the flush beam)" if timber else
-                          ("exact  (the doubled rims hung square on the ledger" + (f" · stair notch: trimmer ends 2, headers 2, foot carrier 2" if getattr(Qz, "notch_dh", 0) else "")
+                          ("exact  (the doubled rims hung square on the ledger" + (f" · stair notch: the trimmer's 2 ends, the 2 headers on the trimmer" if getattr(Qz, "notch_dh", 0) else "")
                            + ") — confirm stock") if getattr(Qz, "outline_ledgers", None) is not None else "exact  (2 side rims x 2 ends) — confirm stock", uc, src, sku))
     if Qz.hangers_skew:
         lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}Z / SUL{jsize.replace('2x', '2')}Z skewed 45-degree hanger (right / left as the angle runs)", Qz.hangers_skew, Qz.hangers_skew + 2, "ea",
@@ -1017,8 +1017,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if getattr(st, "inset", False) and st.notch:
             n_a = 2 * st.notch_posts + st.stringers
             d_, uc, src, sku = _hw("A35Z", black)
-            lines.append(Line("Hardware", f"Simpson A35Z framing angle — inset stair: the notch posts to the rim and header corners, the stringer feet to the foot carrier",
-                              n_a, n_a + 2, "ea", f"+2  ({st.notch_posts} posts x 2 + {st.stringers} stringer feet)", uc, src, sku))
+            lines.append(Line("Hardware", f"Simpson A35Z framing angle — inset stair: the notch posts to the rim and header corners, the stringer heels to the base ledger",
+                              n_a, n_a + 2, "ea", f"+2  ({st.notch_posts} posts x 2 + {st.stringers} stringer heels)", uc, src, sku))
+            n_b = st.notch["ledger_bolts"] + 2 * st.notch_posts
+            d_, uc, src = _item("hardware", "bolt_1/2x8")
+            lines.append(Line("Hardware", d_ + " — inset stair: the base ledger and the notch posts through the lower level's rim", n_b, n_b + 2, "ea",
+                              f"+2  ({st.notch['ledger_bolts']} in the base ledger @ 12\" staggered + {st.notch_posts} posts x 2)", uc, src))
     if skirt and any(f_.studs for f_ in skirt.faces):
         n_a = sum(len(f_.studs) for f_ in skirt.faces)
         d_, uc, src, sku = _hw("A35Z", black)

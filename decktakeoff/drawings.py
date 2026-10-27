@@ -264,29 +264,33 @@ def _design_criteria(L) -> List[Tuple[str, str]]:
     (site.design_criteria, or site.plan["design_criteria"]: [[label, text], ...]) replace the engine's row of the same
     label (matched on the words before any parenthesis) or are added."""
     s = L.spec
-    rows = _design_criteria_engine(L)
-    if __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(s) and not (s.geometry.cover or s.geometry.covers):
+    rows = list(_design_criteria_engine(L))
+    key = lambda k: str(k).split(" (")[0].strip().lower()
+    roof = __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(s) and not (s.geometry.cover or s.geometry.covers)
+    if hasattr(L, "parts") and s.framing.footing_type == "diamond_pier":          # the head sits in a dug hole (ESR-1895 4.2)
+        rows = [(k, ftin(s.site.frost_depth_in) + " (Diamond Piers: frost protection by the pin design per ICC-ES ESR-1895; the head sits in a dug hole on "
+                 "undisturbed soil)") if k == "Frost depth" else (k, v) for k, v in rows]
+    for lab, txt in (getattr(s.site, "design_criteria", None) or (s.site.plan or {}).get("design_criteria") or []):
+        if key(lab) == "roof snow" and not (roof or s.geometry.cover or s.geometry.covers):
+            continue                                                  # a roof-snow row prints only when the set has a roof
+        hit = next((i for i, (k, _) in enumerate(rows) if key(k) == key(lab)), None)
+        if hit is not None:
+            rows[hit] = (str(lab), str(txt))
+        else:
+            after = next((i for i, (k, _) in enumerate(rows) if key(k) == "dead load"), None) if key(lab) == "roof snow" else None
+            rows.insert(after + 1 if after is not None else len(rows), (str(lab), str(txt)))
+    if roof:                                                          # a louvered roof built into the set
         out = []
         for k, v in rows:
-            if k == "Dead load":
+            if key(k) == "dead load" and "louvered" not in v:
                 v += " · louvered roof dead load and post reactions per the roof engineer, carried on the deck posts and piers"
-            if k == "Design total":
+            if key(k) == "design total" and "roof post" not in v:
                 v += " · the roof posts add snow + dead + wind uplift to the deck frame and piers (engineered)"
             out.append((k, v))
-            if k == "Dead load":
+            if key(k) == "dead load" and not any(key(k2) == "roof snow" for k2, _ in rows):
                 out.append(("Roof snow (louvered roof)", f"{s.site.ground_snow_psf:g} psf non-reducible roof snow + sliding snow off the house roof and drift at the wall "
                                                          "(ASCE 7-16 Ch. 7) — louvered roof, engineered"))
         rows = out
-    own = getattr(s.site, "design_criteria", None) or (s.site.plan or {}).get("design_criteria") or []
-    if own:
-        key = lambda k: str(k).split(" (")[0].strip().lower()
-        rows = list(rows)
-        for lab, txt in own:
-            hit = next((i for i, (k, _) in enumerate(rows) if key(k) == key(lab)), None)
-            if hit is None:
-                rows.append((str(lab), str(txt)))
-            else:
-                rows[hit] = (str(lab), str(txt))
     return rows
 
 
@@ -646,9 +650,10 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
     return sheet("A-301", "Section + front elevation", "Cut through the deepest zone; heights to grade, frost line" + (", cantilever" if any(b_.cantilever > 0.5 for z in L.zones if z.frame for b_ in z.frame.beams) else "") + (", guard" if L.rail else ""), o, "Section left · elevation right · not to a common scale", meta)
 
 
-def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Callable]] = None) -> str:
+def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Callable]] = None, base: Optional[str] = None) -> str:
     """Schematic details drawn from the job's own parameters. panel6 = (title, draw(o, note)): the caller's own special
-    condition in panel 6 (a composite deck's step between its levels); None -> hot-tub bay / flush beam / blocking."""
+    condition in panel 6 (a composite deck's step between its levels); None -> hot-tub bay / flush beam / blocking.
+    base = the post base the order carries (the composite passes it; None -> post_base_sku)."""
     o = []
     s = L.spec
     timber = s.is_timber
@@ -718,7 +723,11 @@ def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Call
         o.append(R(800, 190, 40, 14, FILL["concrete"], INK, 0.9)); o.append(T(852, 212, "Diamond Pier head", 6.5, 600))
         for dx, dy in ((-1, 1), (1, 1), (-0.5, 1), (0.5, 1)):
             o.append(LN(820, 204, 820 + dx * 60, 204 + 90, INK, 1.2))
-        o.append(T(852, 240, f"4 x 50\" pins · {L.frame.footing_model}", 6.5, 600)); o.append(R(806, 180, 28, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{post_base_sku(s)} on the pier bolt", 6.5, 600))
+        o.append(T(852, 240, f"4 x 50\" pins · {L.frame.footing_model}", 6.5, 600)); o.append(R(806, 180, 28, 10, FILL["steel"], INK, 0.6))
+        if base and base.startswith("ABU88"):            # the ABU88's second 5/8" anchor goes into the pier head
+            o.append(T(852, 176, f"{base} on the pier bolt", 6.5, 600)); o.append(T(852, 185, "+ a 5/8\" anchor into the head", 6.5, 600))
+        else:
+            o.append(T(852, 188, f"{base or post_base_sku(s)} on the pier bolt", 6.5, 600))
     else:
         o.append(R(790, 200, 60, 90, FILL["concrete"], INK, 0.9)); o.append(T(852, 240, f"{int(L.frame.footing_dia_in)}\" pier x {ftin(L.frame.footing_depth_in)}", 6.5, 600))
     o.append(R(806, 90, 28, 90, FILL["timber"], INK, 0.8)); o.append(T(820, 140, "post", 6.5, 700, "middle", INK, rot=-90))
@@ -3117,7 +3126,8 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
     _level_tags(o, X, Y, levels)
     ft = CL.frame
     desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, 5/8\" x 8\" cast-in anchor",
-            "diamond_pier": f"Diamond Pier {ft.footing_model}: precast head + 4 driven pins, no excavation; {_post_base_name(s, CL.parts[0].takeoff)} base on the pier bolt",
+            "diamond_pier": f"Diamond Pier {ft.footing_model}: precast head set in a dug hole on undisturbed soil + 4 driven pins (ICC-ES ESR-1895); {_post_base_name(s, CL.parts[0].takeoff)} base on the pier bolt"
+                            + (" + a 5/8\" anchor into the head" if _post_base_name(s, CL.parts[0].takeoff).startswith("ABU88") else ""),
             "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base",
             "existing": "Existing caissons stay — verify plumb, bearing and condition (engineer)"}[s.framing.footing_type]
     y0 = 384
@@ -3725,6 +3735,7 @@ def _composite_key(CL, S, t) -> list:
             lab = lab.replace("hidden fasteners", "Cortex face screws + color-matched plugs")
         if base != std:
             lab = lab.replace(f"{_a(std)} {std} standoff base", f"a {base} base").replace(std, base)
+        lab = lab.replace("head + 4 driven pins (frost-protected, no excavation)", "precast head in a dug hole + 4 driven pins (frost-protected)")
         out.append((lab, pred, where, pick))
     skirt = lambda b: (b.kind == "skirt" or "skirt" in (b.tag or "")) and "stair skirt" not in (b.tag or "")
     out.append((f"Step skirt — {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia boards installed vertically", skirt, (0.5, 0.5, 0.5), "mid"))
@@ -3830,6 +3841,9 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
     steps = _step_faces(levels)
     want = lambda n: only is None or n in only
     out = [("G-001", "General notes · design criteria", "")]
+    gn = sheet_general_notes(CL, meta) if want("G-002") else None           # the job's own numbered notes, when it has them
+    if gn:
+        out.append(("G-002", "General notes", gn))
     if want("C-100") and CL.spec.site.plan and CL.spec.site.plan.get("parcel"):
         site = sheet_site(CL, S, t, meta, outlines=[(lv.poly, f"{lv.name.upper()} {ftin(lv.h_in)}") for lv in levels])
         if site:
@@ -3871,7 +3885,7 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
             ms[k_] = re.sub(r"\s*\([^)]*\d[^)]*\)", "", ms.get(k_, ""))
         tm = _NS(schedule=ms, summary=t.summary, lines=t.lines)
         p6 = (("STEP BETWEEN THE LEVELS", lambda o_, note_: _panel_level_change(o_, note_, CL, levels, steps)) if steps else None)
-        out.append(("D-501", "Details", sheet_details(CL, _NS(meta=dict(edge=edge)), tm, meta, panel6=p6)))
+        out.append(("D-501", "Details", sheet_details(CL, _NS(meta=dict(edge=edge)), tm, meta, panel6=p6, base=_post_base_name(CL.spec, t))))
     index = [("G-001", "General notes · design criteria")]
     for num, ttl, _ in out[1:]:
         if num == "A-002":

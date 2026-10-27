@@ -388,10 +388,11 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
                         return f"option:{labels.get(x, x)}, replaced by {labels.get(y, y)}"
         return f"combinations {m:#x}"
     groups: Dict[str, int] = {}
+    mask_labels: Dict[int, str] = {}
     mism = []
     lab2key = {labels.get(n, n): n for n in names}
     for b, m in union.values():
-        g = describe(m)
+        g = mask_labels.setdefault(m, describe(m))
         groups[g] = groups.get(g, 0) + 1
         n_lo = lab2key.get(_layer_option(b))      # a box the engine marks as an option's must show only with that option on
         if n_lo is not None and m & ~with_(n_lo) and len(mism) < 12:
@@ -471,6 +472,7 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
             for n in names]
     addr = f"{spec0.site.address}, {spec0.site.city}".strip(", ") if spec0.site.address else spec0.job
     data = dict(title=title or (spec0.site.address or spec0.job or "Deck"), address=addr, options=opts, combos=valid, all_mask=all_mask,
+                mask_labels={str(k): v for k, v in sorted(mask_labels.items())},
                 default_on=[n for n in default_on if n in bits], mats=mats_out, mat_names=mat_names, kinds=kinds, layers=layers,
                 boxes=flat, stride=15, meshes=meshes, roofs=roofs_out, fixtures=fixtures, site=s, views=vws,
                 deck=dict(x0=bx0, x1=bx1, y0=by0, y1=by1, top=max(p["top"] for p in parts), z_max=ztop,
@@ -1418,7 +1420,7 @@ function step(dt) {
 }
 function loop(now) {
   requestAnimationFrame(loop);
-  var dt = Math.min(0.1, (now - last) / 1000); last = now;
+  var dt = Math.min(0.5, (now - last) / 1000); last = now;      // a slow frame still moves the louvers / screens / clock in real time
   if (step(dt)) dirty = true;
   if (!dirty) return;
   dirty = false;

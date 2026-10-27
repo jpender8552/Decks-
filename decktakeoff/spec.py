@@ -305,6 +305,8 @@ class Extras:
     cover_gutter_color: str = ""         # "" -> match the fascia / Timber Bark-compatible brown
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
     show_financing: bool = True          # proposal shows the financed price / monthly; False on a cash-only job (one-off)
+    brand: str = "gs"                    # whose name, logo and colors the client documents carry: "gs" (GS Exterior Experts) | "cde" (Colorado Deck Experts, a GS company) — proposal_look.BRANDS + data/brands/<key>/
+
     proposal_note: str = ""              # a closing paragraph on the proposal, under the next step (owner's terms / exclusions)
     price_breakdown: bool = True        # proposal shows a sell value per item; False -> the items listed, one total
     connection_details: bool = False    # permit set: add the wood-frame connection detail sheets (D-502 frame, D-504 edge / rail / lateral)

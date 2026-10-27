@@ -227,6 +227,71 @@ def logo_svg(height_class: str = "gslogo") -> str:
     return s.replace("<svg ", f'<svg class="{height_class}" role="img" aria-label="GS Exterior Experts" ', 1)
 
 
+# ================================================================== brands: whose name, logo and colors the client documents carry
+# extras.brand picks one. A brand's assets live in decktakeoff/data/brands/<key>/: brand.json {"name", "parent", "footer", "logo"
+# (a file in that folder: .svg inline, .png / .jpg embedded; a version that reads on black), "colors": {"accent_a", "accent_b"}}.
+# Without files a brand falls back to its name set in the display face and GS's gold. "gs" is the default and renders as always.
+BRANDS = {
+    "gs": dict(name="GS Exterior Experts", parent="", mission="Deck Division · Proposal", footer="GS Exterior Experts · Deck Division"),
+    "cde": dict(name="Colorado Deck Experts", parent="A GS Exterior Experts company", mission="Proposal",
+                footer="Colorado Deck Experts · a GS Exterior Experts company"),
+}
+
+
+def brand_of(spec_or_key) -> dict:
+    """The brand for a spec (extras.brand) or a key: the registry entry, then data/brands/<key>/brand.json over it."""
+    key = spec_or_key if isinstance(spec_or_key, str) else (getattr(getattr(spec_or_key, "extras", None), "brand", None) or "gs")
+    key = str(key or "gs").lower()
+    b = dict(BRANDS.get(key) or dict(BRANDS["gs"], name=key, footer=key), key=key)
+    d = Path(__file__).with_name("data") / "brands" / key
+    if (d / "brand.json").exists():
+        import json as _json
+        b.update(_json.load(open(d / "brand.json")))
+        b["dir"] = str(d)
+    return b
+
+
+def brand_logo(b: dict, height_class: str = "gslogo") -> str:
+    """The brand's logo for the black cover: GS's inline SVG; another brand's file (SVG inline, raster embedded); else its name."""
+    if b["key"] == "gs" and not b.get("logo"):
+        return logo_svg(height_class)
+    f = Path(b["dir"]) / b["logo"] if b.get("dir") and b.get("logo") else None
+    if f is not None and f.exists():
+        if f.suffix.lower() == ".svg":
+            s = re.sub(r"<\?xml[^>]*\?>\s*", "", f.read_text())
+            s = re.sub(r'id="([^"]+)"', lambda m: f'id="{b["key"]}-{m.group(1)}"', s)
+            s = re.sub(r"url\(#([^)]+)\)", lambda m: f'url(#{b["key"]}-{m.group(1)})', s)
+            return s.replace("<svg ", f'<svg class="{height_class}" role="img" aria-label="{E(b["name"])}" ', 1)
+        import base64
+        mime = "image/png" if f.suffix.lower() == ".png" else "image/jpeg"
+        return f'<img class="{height_class}" src="data:{mime};base64,{base64.b64encode(f.read_bytes()).decode()}" alt="{E(b["name"])}">'
+    return f'<span class="brandmark" role="img" aria-label="{E(b["name"])}">{E(b["name"])}</span>'
+
+
+def brand_mission(b: dict, today: str, doc: str = "Deck Division · Proposal") -> str:
+    """The top-right line of the cover (HTML): the document's name over the date; under another brand its parent line first."""
+    if b["key"] == "gs":
+        return f"{E(doc)}<br>{E(today)}"
+    return (f"{E(b['parent'])}<br>" if b.get("parent") else "") + f"{E(doc)} · {E(today)}"
+
+
+def brand_footer(spec_or_key) -> str:
+    return brand_of(spec_or_key).get("footer") or BRANDS["gs"]["footer"]
+
+
+def brand_css(spec_or_key) -> str:
+    """A brand's colors and its text mark (nothing for GS)."""
+    b = brand_of(spec_or_key)
+    if b["key"] == "gs" and not b.get("colors"):
+        return ""
+    c = b.get("colors") or {}
+    root = "".join(f"--{k}:{v};" for k, v in (("gold-a", c.get("accent_a")), ("gold-b", c.get("accent_b"))) if v)
+    return ("<style>" + (f":root{{{root}}}" if root else "")
+            + ".brandmark{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:#ffffff;"
+              "line-height:1.05;max-width:16ch;display:block;border-left:3px solid var(--gold-a);padding-left:10px;}"
+            + "</style>")
+
+
 def _title_parts(name: str, address: str):
     """'Deck Replacement · 19105 E Prentice Cir · White IRX option' -> ('19105 E Prentice Cir', 'Deck Replacement · White IRX option')."""
     if address and address in name:
@@ -255,6 +320,7 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
     title, eyebrow = _title_parts(name, spec.site.address)
     place = ", ".join(x for x in (spec.site.city, spec.site.state) if x)
     eyebrow = " · ".join(x for x in (eyebrow, place) if x)
+    br = brand_of(spec)
     fr = L.zones[0].frame
     flush = all(b.kind == "flush" for b in (L.beam_lines or []))
     tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
@@ -285,7 +351,8 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
         prices = f'<div class="prices one"><div class="lead"><span class="pl">Price · check or ACH</span><span class="pv">{money(p.sell)}</span></div></div>'
     img = (f'<img class="hero-img" src="r/{key}-{hero}.jpg" alt="Rendering of the finished deck">' if hero in have else "")
     return ('<header class="manifest"><div class="hero">' + img + '<div class="hero-shade"></div>'
-            f'<div class="hero-top"><div class="hin">{logo_svg()}<span class="mission">Deck Division · Proposal<br>{E(today)}</span></div></div>'
+            f'<div class="hero-top"><div class="hin">{brand_logo(br)}<span class="mission">'
+            + brand_mission(br, today, "Deck Division · Proposal" if br["key"] == "gs" else (br.get("mission") or "Proposal")) + '</span></div></div>'
             f'<div class="hero-title"><div class="hin">' + (f'<span class="eyebrow">{E(eyebrow)}</span>' if eyebrow else "")
             + f'<h1>{E(title)}</h1><p class="who">{E(who)}</p></div></div></div>'
             '<div class="launch"><div class="hin">'
@@ -343,15 +410,17 @@ LOUVER_FACTS = dict(
 )
 
 
-def addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission="Proposal") -> str:
+def addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission="Proposal", brand=None) -> str:
     """The launch-manifest cover for a separately sold item (the louvered roof's own document): the same look as the deck's
-    cover — hero render, title, the item's numbers, its price three ways (prices = [(label, value, sub)]), the materials."""
+    cover — hero render, title, the item's numbers, its price three ways (prices = [(label, value, sub)]), the materials.
+    brand: a brand_of() dict (default GS)."""
+    br = brand or brand_of("gs")
     lead = ' class="lead"'
     pr = ('<div class="prices' + (" one" if len(prices) == 1 else "") + '">'
           + "".join(f'<div{lead if i == 0 else ""}><span class="pl">{E(l_)}</span><span class="pv">{E(v_)}</span>'
                     + (f'<span class="ps">{E(s_)}</span>' if s_ else "") + "</div>" for i, (l_, v_, s_) in enumerate(prices)) + "</div>")
     return ('<header class="manifest"><div class="hero">' + hero_html + '<div class="hero-shade"></div>'
-            f'<div class="hero-top"><div class="hin">{logo_svg()}<span class="mission">{E(mission)}<br>{E(today)}</span></div></div>'
+            f'<div class="hero-top"><div class="hin">{brand_logo(br)}<span class="mission">{brand_mission(br, today, mission)}</span></div></div>'
             f'<div class="hero-title"><div class="hin">' + (f'<span class="eyebrow">{E(eyebrow)}</span>' if eyebrow else "")
             + f'<h1>{E(title)}</h1><p class="who">{E(who)}</p></div></div></div>'
             '<div class="launch"><div class="hin">'

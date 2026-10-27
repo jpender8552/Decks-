@@ -151,7 +151,7 @@ class RailPost:
     y: float
     kind: str      # END | LINE | CORNER | STAIR
     tag: str
-    # rail_layout_edges sets .roof = True (an attribute, not a field) where a louvered-roof post IS the rail post
+    # the rail layouts set .roof = (x, y) of the roof post (an attribute, not a field) where a louvered-roof post IS the rail post
 
 
 @dataclass

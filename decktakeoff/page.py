@@ -878,7 +878,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     if customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
         head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=t)
-        body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
+        body = head + '<main class="wrap">' + section + f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
         title = f"{name} — Proposal"
     elif supplier:
         strip = ('<div class="strip"><div><span class="sl">Square feet</span><span class="sv">%g</span></div><div><span class="sl">Footings</span><span class="sv">%d</span></div>'
@@ -916,7 +916,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
-            + (PL.FONT + PL.CSS if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
+            + (PL.FONT + PL.CSS + PL.brand_css(spec) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
             + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
             + "</head>" + ('<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
@@ -1065,7 +1065,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     chips.append((pal[len(pal) // 2] if pal else "#73624a", "On the deck", f"{spec.decking.brand} {spec.decking.collection} · {spec.decking.color}"))
     hero_html = f'<img class="hero-img" src="r/{key}-{hero}.jpg" alt="Rendering of the deck with the louvered roof">' if hero in have else ""
     who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
-    head = PL.addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission=f"{q['brand']} {q['product']} · Proposal")
+    head = PL.addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission=f"{q['brand']} {q['product']} · Proposal",
+                          brand=PL.brand_of(spec))
     o = []; w = o.append
     w(f'<section class="job" id="job-{key}">')
     # ---- what it is
@@ -1145,11 +1146,11 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if viewer_url is not None:
         w(_viewer_link(viewer_url, viewer_note))
     w("</section>")
-    body = head + '<main class="wrap">' + "".join(o) + ('<footer><span>GS Exterior Experts · Deck Division</span><span>Renders are design intent. '
+    body = head + '<main class="wrap">' + "".join(o) + (f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders are design intent. '
                                                        f'{E(q["brand"])} product details per the manufacturer. Numbers hold 30 days.</span></footer></main>')
     title_ = f"{name} — Proposal"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title_)}</title>{FONT}{CSS}"
-            + PL.FONT + PL.CSS + LEVELS_CSS + PL.OPTIONS_CSS + "</head><body class=\"proposal\">" + body + "</body></html>\n")
+            + PL.FONT + PL.CSS + PL.brand_css(spec) + LEVELS_CSS + PL.OPTIONS_CSS + "</head><body class=\"proposal\">" + body + "</body></html>\n")
     txt = re.sub(r"<(script|style)\b.*?</\1>", "", page, flags=re.S)
     for bad in ("internal", "INTERNAL", "rate card", "cost stack", "GM", "ESTIMATE", "estimate"):
         assert bad not in txt, f"roof document carries internal wording: {bad}"

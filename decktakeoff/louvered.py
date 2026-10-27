@@ -949,6 +949,9 @@ def sheet(L, S, t, meta) -> Optional[str]:
     rp = RAIL_POST_INSET * IN
     front_posts = sorted([pt for pt in q["posts"] if pt["y"] > (y0 + y1) / 2], key=lambda pt: pt["x"])
     jd = actual(spec.framing.joist_size)[1] * IN if spec.framing.joist_size else 9.25 * IN
+    fp0 = front_posts[0] if front_posts else None
+    ins = (fp0["edge_y"] - (fp0["y"] + p / 2)) if (fp0 and fp0.get("edge_y") is not None) else q["edge_clear"]   # the post's outer face inside the frame face
+    ins_txt = f"{ins * 12:.2g}\"" if abs(ins * 12 - round(ins * 12)) > 0.05 else f"{round(ins * 12):g}\""
 
     # ---------------------------------------------------------------- plan
     _panel(o, 14, 4, 560, 336, "PLAN", f"{q['brand'].upper()} LOUVERED ROOF OVER THE DECK")
@@ -1089,7 +1092,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
               (f"house-side {q['frame_label']} beam on flashed stand-offs @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters over solid blocking (roof-line mount)"
                if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing"), 6.2)
     _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.9), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
-    _lead(o, Xs(py), Zs(zd + 3.6), Xs(y0 + 3.4), Zs(zd + 3.5), f"{p * 12:g}x{p * 12:g} aluminum post, {q['edge_clear'] * 12:g}\" inside the deck edge: the rail post, downspout inside", 6.2)
+    _lead(o, Xs(py), Zs(zd + 3.6), Xs(y0 + 3.4), Zs(zd + 3.5), f"{p * 12:g}x{p * 12:g} aluminum post, {ins_txt} inside the frame face: the rail post, downspout inside", 6.2)
     _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.3), "rail (cut) ends into the post on wall-mount brackets", 6.2)
     _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck post + pier directly under the roof post (framing plan)", 6.2)
 
@@ -1135,7 +1138,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     def SX(v): return sx + v * k_
     def SZ(v): return sz - v * k_
     rp_in = rp * 12
-    pc_in = (q["edge_clear"] + p / 2) * 12        # the post centre, in from the frame face (its outer face edge_clear inside)
+    pc_in = (ins + p / 2) * 12                    # the post centre, in from the frame face
     o.append(T(SX(-30), 380, "SECTION", 6.6, 900, fill=MUTE))
     o.append(R(SX(-30), SZ(jd_in), 24.0 * k_, jd_in * k_, FILL["timber"], INK, 0.5, 'fill-opacity="0.55"'))
     o.append(R(SX(-6.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber_dk"], INK, 0.6))
@@ -1148,7 +1151,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     o.append(R(SX(-pc_in - p_in / 2), SZ(zbase + 28.0), p_in * k_, 27.5 * k_, BLACK, INK, 0.6))
     o.append(LN(SX(-rp_in), SZ(zbase + 30.0), SX(-rp_in), SZ(zbase + 1.0), GOLD, 1.2, "4 2"))
     o.append(T(SX(-18), SZ(jd_in / 2) + 2, "solid blocking", 5.8, 800, "middle"))
-    for d_, lab_, z_ in ((q["edge_clear"] * 12, f"{q['edge_clear'] * 12:g}\" post face", zbase + 31.0), (rp_in, f"{ftin(rp_in)} rail line", zbase + 34.5)):
+    for d_, lab_, z_ in ((ins * 12, f"{ins_txt} post face", zbase + 31.0), (rp_in, f"{ftin(rp_in)} rail line", zbase + 34.5)):
         o.append(LN(SX(0), SZ(z_), SX(-d_), SZ(z_), INK, 0.6)); o.append(LN(SX(0), SZ(z_ + 1.0), SX(0), SZ(z_ - 1.0), INK, 0.6))
         o.append(LN(SX(-d_), SZ(z_ + 1.0), SX(-d_), SZ(z_ - 1.0), INK, 0.6))
         o.append(T(SX(-d_) - 3, SZ(z_) + 3, lab_, 5.8, 800, "end"))
