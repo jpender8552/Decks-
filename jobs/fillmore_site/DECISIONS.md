@@ -75,8 +75,12 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
   priced, never in the drawings: teak frames with Pacific Fog Gray cushions. Lower level B: Teak L Sectional 4-Seat, Teak Coffee
   Table, 2 Teak Armchairs. Upper C: Teak + Aluminum Extendable Dining Table with 595 dining chairs (4 armless + 2 arm). Upper D:
   2 Teak Armchairs + Teak Side Table.
-- **Exterior color study** is a separate document (not the main proposal): dark gray / charcoal / black; recommended charcoal
-  (SW Iron Ore body + brick, Tricorn Black trim) with a TimberTech Vintage Mahogany deck.
+- **Exterior color study** is a separate document (not the main proposal). **Andie wants the house tan or cream** (owner 27 Oct),
+  so the study is tan and cream, in Sherwin-Williams colors, with the buff brick left unpainted in every palette: Cream (SW 7012
+  Creamy, body and trim), Light tan (SW 7036 Accessible Beige, SW 7008 Alabaster trim), Khaki (SW 6150 Universal Khaki, Creamy
+  trim); recommended Creamy with SW 6258 Tricorn Black fascia, gutters and downspouts, deck English Walnut as proposed (Vintage
+  Dark Hickory shown for comparison). The earlier dark study (gray / charcoal / black, recommended charcoal + Mahogany deck) is
+  superseded; it is in the color study page's version history. The main proposal still shows today's colors.
 
 ## Renders
 - Photoreal: the TimberTech skill's wire-brushed Vintage texture + greyscale relief maps; English Walnut from TimberTech's swatch;
