@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exterior Color Study, 7303 S Fillmore Cir (client document, GS Exterior Experts look; separate from the proposal).
 Reads the renders made by render_palettes.py (three.js, renders/<palette>/{yard,corner,upper}.jpg) and cycles_all.sh
-(photoreal, cycles/<palette>/yard.jpg, cycles/recommended_dh/yard.jpg, cycles/{recommended,recommended_dh}_up/upper_deck.jpg); writes page.html + r/ + files.json
+(photoreal, cycles/<palette>/{cs_front,cs_left,cs_right}.jpg, cycles/{existing,recommended_dh}/cs_front.jpg, cycles/{recommended,recommended_dh}_up/upper_deck.jpg); writes page.html + r/ + files.json
 and the Letter PDF.     python3 build_colorstudy.py [--no-pdf]"""
 import html
 import json
@@ -55,11 +55,14 @@ PALETTES = [
 REC = dict(key="recommended", n="Recommended", title="Cream with black fascia and gutters", body="creamy", trim="creamy",
            edge="tricorn", deck="English Walnut")
 CAP = {
+    "cs_front": "From the yard, raised: the whole back of the house",
+    "cs_left": "From the lawn at the arm end, raised",
+    "cs_right": "From the lawn at the right end, raised",
     "yard": "From the yard, in front of the lower level",
     "corner": "From the front corner",
     "upper": "On the upper level, looking back over the lower level",
 }
-PHOTO = "photoreal render, June 21, 10:30 AM"
+PHOTO = "photoreal render, June 21, 8:00 AM"     # owner 27 Oct: more sun, raised views (cycles_all.sh)
 MODEL = "3D model"
 
 
@@ -107,15 +110,15 @@ def copy_img(src: Path, name: str, files: dict) -> str:
 
 
 def views(key, files):
-    """(name, caption) of the palette's three views: yard (photoreal when rendered, else the 3D model), corner, upper."""
+    """(name, caption) of the palette's three views: the raised photoreal stations cs_front (big), cs_left and cs_right (owner
+    27 Oct: more sun, more views, not low); a missing photoreal still falls back to the 3D model's yard / corner / upper."""
     out = []
-    cy = RC / key / "yard.jpg"
-    if cy.exists():
-        out.append((copy_img(cy, f"cs-{key}-yard.jpg", files), f"{CAP['yard']} · {PHOTO}"))
-    else:
-        out.append((copy_img(R3 / key / "yard.jpg", f"cs-{key}-yard.jpg", files), f"{CAP['yard']} · {MODEL}"))
-    for v in ("corner", "upper"):
-        out.append((copy_img(R3 / key / f"{v}.jpg", f"cs-{key}-{v}.jpg", files), f"{CAP[v]} · {MODEL}"))
+    for st, short, fb in (("cs_front", "front", "yard"), ("cs_left", "left", "corner"), ("cs_right", "right", "upper")):
+        cy = RC / key / f"{st}.jpg"
+        if cy.exists():
+            out.append((copy_img(cy, f"cs-{key}-{short}.jpg", files), f"{CAP[st]} · {PHOTO}"))
+        else:
+            out.append((copy_img(R3 / key / f"{fb}.jpg", f"cs-{key}-{short}.jpg", files), f"{CAP[fb]} · {MODEL}"))
     return out
 
 
@@ -201,19 +204,19 @@ def main(argv):
         files[f"r/{nm}"] = str(RO / nm)
     pal_views = {p["key"]: views(p["key"], files) for p in PALETTES + [REC]}
     today = None
-    if (RC / "existing" / "yard.jpg").exists():
-        today = (copy_img(RC / "existing" / "yard.jpg", "cs-today-yard.jpg", files), f"{CAP['yard']} · {PHOTO}")
+    if (RC / "existing" / "cs_front.jpg").exists():
+        today = (copy_img(RC / "existing" / "cs_front.jpg", "cs-today-front.jpg", files), f"{CAP['cs_front']} · {PHOTO}")
     else:
-        today = (copy_img(R3 / "existing" / "yard.jpg", "cs-today-yard.jpg", files), f"{CAP['yard']} · {MODEL}")
+        today = (copy_img(R3 / "existing" / "yard.jpg", "cs-today-front.jpg", files), f"{CAP['yard']} · {MODEL}")
     up = {}
     for k, nm in (("recommended_up", "English Walnut"), ("recommended_dh_up", "Dark Hickory")):
         q = RC / k / "upper_deck.jpg"
         src = q if q.exists() else R3 / k[:-3] / "upper.jpg"
         up[nm] = (copy_img(src, f"cs-deck-{nm.lower().replace(' ', '-')}-upper.jpg", files),
                   f"{CAP['upper']} · {PHOTO if q.exists() else MODEL}")
-    q = RC / "recommended_dh" / "yard.jpg"
-    dh_yard = (copy_img(q if q.exists() else R3 / "recommended_dh" / "yard.jpg", "cs-recommended-dh-yard.jpg", files),
-               f"{CAP['yard']} · {PHOTO if q.exists() else MODEL}")
+    q = RC / "recommended_dh" / "cs_front.jpg"
+    dh_yard = (copy_img(q if q.exists() else R3 / "recommended_dh" / "yard.jpg", "cs-recommended-dh-front.jpg", files),
+               f"{CAP['cs_front'] if q.exists() else CAP['yard']} · {PHOTO if q.exists() else MODEL}")
     hero = pal_views["recommended"][0][0]
 
     o = []; w = o.append
@@ -282,7 +285,8 @@ def main(argv):
       "<li>LRV (light reflectance value) is the share of light a color reflects, from 0 (black) to 100 (white). A higher LRV is "
       "lighter and stays cooler in the sun</li>"
       "<li>The back of the house faces north-northeast: it gets direct sun only on summer mornings (on June 21, until about 10:50 AM). "
-      "The photoreal renders are at 10:30 AM on June 21, with the sun raking across the back</li>"
+      "The photoreal renders are at 8:00 AM on June 21, with the morning sun on the back walls; the rest of the day the back is in "
+      "shade, where every color reads a step darker than in these pictures</li>"
       "<li>The deck chip is the TimberTech board, rendered; its tone is approximate</li>"
       "<li>The furniture on the deck is Outer outdoor furniture: teak frames with Pacific Fog Gray cushions, and a dining set with "
       "charcoal frames and teak tops. It is shown for scale and is not part of the deck proposal</li>"

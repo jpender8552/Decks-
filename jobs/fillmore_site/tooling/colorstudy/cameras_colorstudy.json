@@ -1,0 +1,297 @@
+{
+ "yard": {
+  "pos": [
+   18.4,
+   25.2,
+   2.41
+  ],
+  "at": [
+   15.19,
+   0.48,
+   4.32
+  ],
+  "fov": 75,
+  "eye": 5.25,
+  "label": "From the yard, in front of the lower level",
+  "photo": "u01"
+ },
+ "yard_left": {
+  "pos": [
+   25.6,
+   25.5,
+   2.26
+  ],
+  "at": [
+   39.82,
+   5.35,
+   6.34
+  ],
+  "fov": 75,
+  "eye": 5.25,
+  "label": "From the yard, looking across to the upper level",
+  "photo": "u02"
+ },
+ "yard_along": {
+  "pos": [
+   17.0,
+   15.7,
+   4.18
+  ],
+  "at": [
+   38.99,
+   3.86,
+   5.36
+  ],
+  "fov": 72,
+  "eye": 5.25,
+  "label": "Along the deck from the lower level's front",
+  "photo": "u13"
+ },
+ "yard_center": {
+  "pos": [
+   33.5,
+   21.2,
+   3.26
+  ],
+  "at": [
+   27.03,
+   -2.95,
+   3.48
+  ],
+  "fov": 74,
+  "eye": 5.25,
+  "label": "From the yard at the step between the levels",
+  "photo": "u17"
+ },
+ "lower_deck": {
+  "pos": [
+   2.9,
+   9.0,
+   10.73
+  ],
+  "at": [
+   24.82,
+   -2.26,
+   6.52
+  ],
+  "fov": 70,
+  "eye": 5.25,
+  "label": "On the lower level at the arm, looking along it",
+  "photo": "u03"
+ },
+ "arm": {
+  "pos": [
+   7.0,
+   8.5,
+   10.73
+  ],
+  "at": [
+   2.11,
+   -14.71,
+   2.84
+  ],
+  "fov": 70,
+  "eye": 5.25,
+  "label": "On the lower level, looking down the arm to the door wall",
+  "photo": "u20"
+ },
+ "upper_deck": {
+  "pos": [
+   38.0,
+   7.5,
+   13.81
+  ],
+  "at": [
+   17.01,
+   -3.66,
+   6.09
+  ],
+  "fov": 70,
+  "eye": 5.25,
+  "label": "On the upper level, looking back over the lower level",
+  "photo": "u18"
+ },
+ "upper_rail": {
+  "pos": [
+   47.0,
+   6.5,
+   13.81
+  ],
+  "at": [
+   23.02,
+   6.0,
+   6.75
+  ],
+  "fov": 72,
+  "eye": 5.25,
+  "label": "On the upper level, along the rail",
+  "photo": "u06"
+ },
+ "high34": {
+  "pos": [
+   12.9,
+   50.2,
+   100.0
+  ],
+  "at": [
+   31.5,
+   -1.0,
+   5.0
+  ],
+  "fov": 34,
+  "label": "High three-quarter view from the yard"
+ },
+ "stair_yard": {
+  "pos": [
+   34.0,
+   25.5,
+   2.23
+  ],
+  "at": [
+   21.0,
+   13.0,
+   2.5
+  ],
+  "fov": 56,
+  "label": "The stairs to the yard, from the yard",
+  "eye": 5.25
+ },
+ "dusk": {
+  "pos": [
+   14.0,
+   21.0,
+   3.27
+  ],
+  "at": [
+   31.0,
+   6.0,
+   6.8
+  ],
+  "fov": 64,
+  "label": "Dusk: the riser lights and post accent lights on",
+  "eye": 5.25,
+  "mode": "dusk"
+ },
+ "dusk_deck": {
+  "pos": [
+   17.0,
+   6.5,
+   10.73
+  ],
+  "at": [
+   30.5,
+   7.0,
+   7.0
+  ],
+  "fov": 66,
+  "label": "Dusk on the lower level: the inset stair's riser lights",
+  "eye": 5.25,
+  "mode": "dusk"
+ },
+ "dusk_stair": {
+  "pos": [
+   33.5,
+   25.0,
+   2.4
+  ],
+  "at": [
+   21.0,
+   13.0,
+   3.0
+  ],
+  "fov": 56,
+  "label": "Dusk: the stairs to the yard lit",
+  "eye": 5.25,
+  "mode": "dusk"
+ },
+ "roof_yard": {
+  "pos": [
+   41.0,
+   24.0,
+   2.73
+  ],
+  "at": [
+   38.0,
+   4.0,
+   10.0
+  ],
+  "fov": 68,
+  "label": "The louvered roof from the yard",
+  "eye": 5.25
+ },
+ "roof_deck": {
+  "pos": [
+   55.0,
+   8.0,
+   13.81
+  ],
+  "at": [
+   36.0,
+   2.5,
+   9.3
+  ],
+  "fov": 72,
+  "label": "On the upper level under the louvered roof",
+  "eye": 5.25
+ },
+ "ondeck": {
+  "pos": [
+   3.5,
+   6.4,
+   10.48
+  ],
+  "at": [
+   -0.4,
+   10.3,
+   4.2
+  ],
+  "fov": 50,
+  "label": "On the lower level at its front corner: the boards up close",
+  "eye": 5.0
+ },
+ "cs_front": {
+  "pos": [
+   26.0,
+   46.0,
+   17.0
+  ],
+  "at": [
+   31.5,
+   0.0,
+   9.5
+  ],
+  "fov": 58,
+  "eye": null,
+  "label": "From the yard, raised: the whole back of the house"
+ },
+ "cs_left": {
+  "pos": [
+   11.0,
+   24.0,
+   14.0
+  ],
+  "at": [
+   36.0,
+   2.0,
+   8.5
+  ],
+  "fov": 62,
+  "eye": null,
+  "label": "From the lawn at the arm end, raised"
+ },
+ "cs_right": {
+  "pos": [
+   45.0,
+   23.0,
+   14.0
+  ],
+  "at": [
+   24.0,
+   2.0,
+   8.5
+  ],
+  "fov": 62,
+  "eye": null,
+  "label": "From the lawn at the right end, raised"
+ }
+}
