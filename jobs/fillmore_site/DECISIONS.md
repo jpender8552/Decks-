@@ -25,7 +25,8 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 ## Structure
 - **Ledgered** on all three walls (B/C ledger at the 2-ft cantilevered floor = engineer's detail), not free-standing.
 - **Max spans, fewest columns, larger caissons** (owner 27 Oct: "You have way too many post", "I'd rather make the caissons
-  larger for fewer post. Max spans"). 6x10 DF #1 drop beams on 8x8 DF rough columns, 2x10 TrueFrame @ 12" with joist tape.
+  larger for fewer post. Max spans"). **6x10 DF #1** drop beams on **8x8 DF #1 rough** columns (owner: "Yes use DF#1" — the calc
+  uses DF-L No.1, Fb 1,350 psi), 2x10 TrueFrame @ 12" with joist tape.
 - **The base is designed WITHOUT the roof; the roof has its own structure and its own document** (owner: "Do beams with and
   without roof cover... don't do the caissons or spans based on the roof for the base. I made that clear").
   - BASE, 8 columns on **24" x 42" caissons** (end bearing alone carries every column: max 4,179 lb vs 4,712):
@@ -46,6 +47,11 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - **12' grooved** is fine in the field under Cortex; **never 12' for the picture frame or dividers** (16/20' square edge).
 - Offcuts become stair treads. Fascia may be spliced. Cortex plugged through the face; TOPLoc on the fascia.
 - IRX black, vertical balusters, drink rail **over the posts**.
+
+## Site, demo and electrical (owner 27 Oct)
+- **Access is good**: no Bad Access line.
+- **Outdoor outlet is fine**: not in the price; the proposal's "still to confirm" line stays as worded.
+- **Old brick-column footings: the owner has a plan** — nothing priced or assumed for them (no break-out line).
 
 ## Options
 - **The base has only the stair between the levels (upper to lower) — never a stair to the ground.** Both yard stairs
