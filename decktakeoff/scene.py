@@ -1262,6 +1262,8 @@ def _rail_pairs(rl) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
 
 
 def step_captions(L: Layout) -> Dict[int, str]:
+    if hasattr(L, "parts"):                 # a composite deck (two levels): worded for the whole deck (buildset.composite_captions)
+        return __import__("decktakeoff.buildset", fromlist=["composite_captions"]).composite_captions(L)
     s = L.spec
     n_posts = L.n_footings
     ft = {"caisson": f"{n_posts} caissons {int(L.frame.footing_dia_in)}\" x {L.frame.footing_depth_in / 12:.1f}' below frost",

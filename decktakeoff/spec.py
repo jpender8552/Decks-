@@ -306,6 +306,7 @@ class Extras:
     cover_roof_panel: str = "snap-lock"  # "snap-lock" (3:12 min by most makers) | "mechanical" (double-lock seam, low-slope rated)
     show_financing: bool = True          # proposal shows the financed price / monthly; False on a cash-only job (one-off)
     brand: str = "gs"                    # whose name, logo and colors the client documents carry: "gs" (GS Exterior Experts) | "cde" (Colorado Deck Experts, a GS company) — proposal_look.BRANDS + data/brands/<key>/
+    timeline: Any = None                 # the job's own customer timeline instead of the generic day rates: a schedule model's customer block {title, precon, rows, schedule_lines}, or "schedule.json#Scenario" — report.timeline_of
 
     proposal_note: str = ""              # a closing paragraph on the proposal, under the next step (owner's terms / exclusions)
     price_breakdown: bool = True        # proposal shows a sell value per item; False -> the items listed, one total

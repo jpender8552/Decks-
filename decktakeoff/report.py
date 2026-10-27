@@ -514,8 +514,30 @@ def _span(a: int, b: int) -> str:
     return f"Day {a}" if a == b else f"Days {a}–{b}"
 
 
+def timeline_of(s) -> Optional[dict]:
+    """The job's own customer timeline (extras.timeline), or None: a schedule model's customer block — {title, precon {label,
+    weeks, text, gantt_x}, rows [{key, option, title, label, days, first_day, last_day, gantt_x}], schedule_lines} — given
+    inline, or as "path/to/schedule.json#Scenario" (that scenario's customer block; the first scenario without a name).
+    s is a spec, or such a value itself."""
+    tl = getattr(s.extras, "timeline", None) if hasattr(s, "extras") else s
+    if not tl:
+        return None
+    if isinstance(tl, str):
+        path, _, name = tl.partition("#")
+        with open(path) as fh:
+            d = json.load(fh)
+        if "scenarios" in d:
+            sc = d["scenarios"][name] if name else next(iter(d["scenarios"].values()))
+            d = sc.get("customer", sc)
+        tl = d
+    return tl if isinstance(tl, dict) else None
+
+
 def _schedule(t: Takeoff) -> List[str]:
     s, L = t.spec, t.layout
+    tl = timeline_of(s)
+    if tl and tl.get("schedule_lines"):        # the job's own timeline (a schedule model) instead of the generic day rates
+        return list(tl["schedule_lines"])
     days = []
     if s.extras.engineered:
         days.append("Engineering & ordering (2–3 weeks). Stamped drawings, materials ordered, samples approved.")

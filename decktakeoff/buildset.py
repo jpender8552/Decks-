@@ -227,6 +227,42 @@ def _lighting_step(t: Takeoff) -> Optional[dict]:
                 check=["Every light on at dusk and off on the timer", "No open splice; cable stapled clear of every decking screw", "Transformer on a GFCI outlet with an in-use cover"])
 
 
+def composite_captions(L) -> Dict[int, str]:
+    """scene.step_captions for a composite deck (two levels, a wrap): the 3D viewer's phase captions for the whole deck —
+    footings and posts per level, the beam lines by level, both frames and the rise between them, the decking as fastened,
+    the rail and the step guard, the louvered roof / lights in the finished deck."""
+    from .drawings import _comp_levels, _step_faces, _post_base_name, _lv_word
+    s = L.spec
+    fr = s.framing
+    levels = _comp_levels(L)
+    faces = _step_faces(levels)
+    per = lambda f: " · ".join(f"{_lv_word(lv)} {f(lv)}" for lv in levels)
+    n_lv = lambda lv: sum(len(b.posts) for b in lv.beams) + len(lv.eps)
+    ft = {"diamond_pier": f"Diamond Pier {L.frame.footing_model} footings", "caisson": "drilled caissons", "concrete": "concrete piers",
+          "existing": "existing caissons"}.get(fr.footing_type, "footings")
+    bls = [b for lv in levels for b in lv.beams]
+    fs = (s.decking.fastener_system or "").lower()
+    fast = "Cortex face screws + color-matched plugs" if fs.startswith("cortex") else ("face screws" if ("cap-tor" in fs or "screw" in fs) else "hidden fasteners")
+    rise = (faces[0][1].h_in - faces[0][0].h_in) if faces else 0.0
+    live = [ss for p in L.parts for ss in (p.spec.stairs or []) if not getattr(ss, "option", "")]
+    roof = __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(s)
+    lights = __import__("decktakeoff.lighting", fromlist=["lights_of"]).lights_of(s) is not None
+    rl = L.rail
+    return {1: f"Step 1 · Footings — {sum(n_lv(lv) for lv in levels)} {ft}: {per(n_lv)}",
+            2: f"Step 2 · Posts — {fr.post_size} {post_words(s)} columns on {_post_base_name(s, L.parts[0].takeoff)} bases: {per(lambda lv: sum(len(b.posts) for b in lv.beams))}",
+            3: "Step 3 · Stone column bases — 2'x2' x 3' ledgestone with 24\" caps" if s.extras.stone_bases else "Step 3 · (no stone bases)",
+            4: (f"Step 4 · Beams — {len(bls)} {' / '.join(sorted({b.size + ' ' + b.species for b in bls}))} {' / '.join(sorted({b.kind for b in bls}))} beam lines: "
+                + "; ".join(f"{_lv_word(lv)} " + ", ".join(b.short for b in lv.beams) for lv in levels if lv.beams)) if bls else "Step 4 · (no beams)",
+            5: f"Step 5 · Frame — {fr.joist_size} joists at {L.frame.spacing:g}\" OC on both levels, rims, ledgers"
+               + (f"; the {_lv_word(faces[0][1])} level {inch(rise)} above the {_lv_word(faces[0][0])}" if faces else "")
+               + ("; the stair notch framed" if any(getattr(ss, "inset", False) for ss in live) else ""),
+            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}, picture frame + breakers, {fast}"
+               + ("; the stair and the step skirt" if (faces and live) else "; the step skirt" if faces else "; the stairs" if live else ""),
+            7: ((f"Step 7 · Rail — {rl.system} {rl.height:g}\" {rl.color}" + (", drink rail on top" if s.railing.drink_rail else "")
+                 + ("; the step between the levels guarded except at the stair" if faces else "")) if rl else "Step 7 · (no rail)"),
+            8: "Step 8 · Your deck" + (" — the louvered roof" if roof else "") + (" and the lights" if (roof and lights) else " — the lights" if lights else "")}
+
+
 def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     """Build steps for a composite deck (two levels, a wrap): every phase once for the whole deck, each level's beam lines,
     posts and ledger named and placed in the deck's frame (x from its left end, y out from the main rear wall — the frame of
@@ -348,9 +384,10 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
                        + (", fascia skirts both sides stepped under each tread" if getattr(sl, "skirts", False) else "") + ", closed risers, treads Cortex 2 per stringer per board.")
         if faces:
             sk = skirt or {}
-            shw.append(f"Step skirt: the face between the levels in {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia boards cut to height and installed vertically, "
-                       f"{inch(float(sk.get('gap_in', 0.125)), 16)} gaps, on 2x4 furring @ {float(sk.get('stud_oc_in', 16)):g}\" OC fastened to the {lw(hi)}'s rim; 1/2\" off the {lw(lo)}'s decking, "
-                       f"the {lw(hi)}'s picture frame over its top.")
+            rule = next((p.takeoff.schedule["Step skirt"] for p in L.parts if (getattr(p.takeoff, "schedule", None) or {}).get("Step skirt")), "")   # the order's own rule
+            shw.append(f"Step skirt: the face between the levels in {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia — "
+                       + (rule if rule else f"boards cut to height and installed vertically, {inch(float(sk.get('gap_in', 0.125)), 16)} gaps, on 2x4 nailers @ "
+                          f"{float(sk.get('stud_oc_in', 16)):g}\" OC fastened to the {lw(hi)}'s rim, 1/2\" off the {lw(lo)}'s decking") + f"; the {lw(hi)}'s picture frame over its top.")
         if any(sl.landing == "grade" for p, ss, sl in stairs):
             shw.append("Each stair that lands on grade: 36\" of firm, level ground at the bottom, as wide as the stair (no pad in this scope).")
         steps.append(dict(n=8, code="T-407", title=("Stairs and the step skirt" if faces and stairs else "The step skirt" if faces else "Stairs"), still="yard",
@@ -358,7 +395,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
                           or (l.category == "Stairs" and "door step" not in l.item.lower()) or (l.category == "Hardware" and ("stair" in l.item.lower() or "box step" in l.item.lower()))
                           or (l.category in ("Fascia", "Stairs", "Lumber") and ("skirt" in l.item.lower() or "furring" in l.item.lower())), 14),
             how=shw,
-            check=["Risers within 3/8\" of each other; treads level, nosings straight", "Skirt boards plumb, gaps even, 1/2\" off the lower decking" if faces else "Landing at the bottom firm and level, 36\" deep",
+            check=["Risers within 3/8\" of each other; treads level, nosings straight", "Skirt boards plumb, gaps even, clear of the lower decking" if faces else "Landing at the bottom firm and level, 36\" deep",
                    "Plugs set flush"]))
     lt_ = _lighting_step(t)
     if lt_:

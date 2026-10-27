@@ -190,6 +190,17 @@ def pack_boards(pieces: List[Tuple[str, float]], stocks=(16, 20), kerf: float = 
     return out
 
 
+def site_lines(spec: DeckSpec, deck_sf: float) -> List[Line]:
+    """The job's site lines (demo, site extras) — once per job: a composite adds them once, not once per part."""
+    out = []
+    if spec.extras.demo_existing:
+        sf_demo = spec.extras.demo_sf or deck_sf
+        out.append(Line("Site", "Demo existing deck + haul-off", sf_demo, sf_demo, "SF", "labor line — field verify the existing deck", 0.0, "labor"))
+    for x in spec.extras.site_extras:
+        out.append(Line("Site", x.get("item", "site extra"), 1, 1, "ea", "at cost", float(x.get("cost", 0)), "at cost"))
+    return out
+
+
 def _summarize_labels(labels: List[str]) -> str:
     cnt = Counter(labels)
     return " · ".join(f"{v} {k}" if v > 1 else k for k, v in cnt.items())
@@ -843,13 +854,19 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _lumber_price(spec.framing.post_size, 8, timber or spec.framing.post_size.startswith("8x"))
             lines.append(Line("Stairs", f"{spec.framing.post_size}x8 — landing {li + 1} posts (4)", 4, 4, "ea", "exact", uc, src))
             if spec.framing.footing_type == "diamond_pier":     # the landing sits on the same footing the deck does
-                ucp, srcp = _price("footings", spec.framing.footing_model)
-                lines.append(Line("Stairs", f"Diamond Pier {spec.framing.footing_model} — landing {li + 1} footings", 4, 4, "ea", "exact  (one under each landing post)", ucp, srcp))
+                lm_ = spec.framing.footing_model if spec.framing.footing_model in PRICEBOOK["footings"] else fr0.footing_model   # an unpriced spec model: the pier the frame resolved to
+                ucp, srcp = _price("footings", lm_)
+                lines.append(Line("Stairs", f"Diamond Pier {lm_} — landing {li + 1} footings", 4, 4, "ea", "exact  (one under each landing post)", ucp, srcp))
                 lb_ = POST_BASE.get(spec.framing.post_size, {}).get("diamond_pier", "ABA44Z")
                 if lb_ == "ABA66Z" and spec.framing.post_rough:
                     lb_ = "ABA66RZ"
+                if lb_ == "ABU88Z" and spec.framing.post_rough:
+                    lb_ = "ABU88RZ"             # the same rough-8x8 base the deck posts take
                 ucb, srcb = _price("footings", lb_)
                 lines.append(Line("Stairs", f"{_desc('footings', lb_, 'Simpson ' + lb_)} on the pier bolt — landing {li + 1}", 4, 4, "ea", "exact", ucb, srcb))
+                if lb_.startswith("ABU88"):
+                    d_, uc_, src_ = _item("footings", "abu88_sds_anchor_set", "Simpson SDS 1/4\" x 3\" (8 per base) + 5/8\" x 6\" Titen HD (1 per base, the second anchor in the pier head)")
+                    lines.append(Line("Stairs", f"{d_} — landing {li + 1}", 4, 4, "set", "exact  (one set per ABU88 base)", uc_ or 18.0, src_ or "EST — SDS25300 x 8 + THD62600H x 1"))
             else:
                 uc, src = _price("footings", "concrete_pad")
                 lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
@@ -1241,8 +1258,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
 
     # ================= FASCIA
     if spec.decking.fascia and Qz.fascia_pieces:
-        packed_f = pack_lumber([("fascia", Lf, name) for name, Lf in Qz.fascia_pieces], kerf=0.125)
-        nf = sum(n for (_, s_), (n, _) in packed_f.items())
+        packed_f = pack_boards(list(Qz.fascia_pieces), stocks=(12,), kerf=0.125)     # fascia is sold 12': a longer run is 2+ pieces joined on a joist
+        nf = sum(len(b) for b in packed_f.values())
         uc, src = _price("decking", f"{brand}|{coll}|fascia")
         if uc == 0.0:
             lf, src = _price("decking", "generic_fascia_per_lf"); uc = round(lf * 12, 2)
@@ -1452,6 +1469,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                     item = (d_hr.replace("{color}", rl.color) if d_hr else f"{sysn} graspable handrail kit")
                     lines.append(Line("Stairs", item + f" ({st.side} stair" + (", one per flight" if hr_ == "each flight" else f", on the guard posts along the {st.handrail_side}-hand cheek") + ")",
                                       n_hr, n_hr, "ea", f"exact  (4+ risers — IRC R311.7.8; {st.handrail_lf:g}' of rail, 34–38\" over the nosings)", uc, src))
+                    # a flight's rail longer than the kit's 94" pipe takes an extension kit (pipe + splice) per extra length
+                    runs_ = ([math.hypot(fg.run_in, fg.rise_in - st.geo.riser_in) for fg, r_ in zip(st.geo.flights, st.flight_rails) if r_]
+                             if hr_ == "each flight" else [st.handrail_lf * 12.0])
+                    n_ext = sum(max(0, int(math.ceil(r_in / 94.0 - 1e-6)) - 1) for r_in in runs_)
+                    if n_ext and sysn.startswith("IRX"):
+                        d_x, uc_x, src_x = _item("rail", f"{sysn}|handrail_ext", f"TimberTech Impression aluminum ADA pipe rail extension kit, {rl.color}")
+                        lines.append(Line("Stairs", f"{d_x.replace('{color}', rl.color)} ({st.side} stair)", n_ext, n_ext, "ea",
+                                          "exact  (" + " · ".join(f"{r_in / 12:.1f}'" for r_in in runs_) + " of rail per flight, 94\" pipe per kit)",
+                                          uc_x or 193.48, src_x if uc_x else "D&D quote 979610 — AZTIXADAPREKB (pricebook IRX Baluster|handrail_kit note)"))
         if spec.railing.post_size_in and rl:
             ps = spec.railing.post_size_in
             for l in lines:
@@ -1547,11 +1573,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Flashing & waterproofing", "6-mil poly sheeting 10' x 100' — under the decks", rolls, rolls, "roll", f"{sf_g:.0f} SF with laps", 45.0, "est."))
         cy = sf_g * (2.0 / 12) / 27
         lines.append(Line("Flashing & waterproofing", "3/4\" washed gravel, 2\" over the poly — under the decks (delivered)", round(cy, 1), max(1.0, math.ceil(cy * 2) / 2), "CY", f"{sf_g:.0f} SF x 2\"", 85.0, "est."))
-    if spec.extras.demo_existing:
-        sf_demo = spec.extras.demo_sf or L.deck_sf
-        lines.append(Line("Site", "Demo existing deck + haul-off", sf_demo, sf_demo, "SF", "labor line — field verify the existing deck", 0.0, "labor"))
-    for x in spec.extras.site_extras:
-        lines.append(Line("Site", x.get("item", "site extra"), 1, 1, "ea", "at cost", float(x.get("cost", 0)), "at cost"))
+    lines += site_lines(spec, L.deck_sf)
 
     # ================= summary
     zones_txt = [f"{z.name} {z.label}: {ftin(z.W)} x {ftin(z.D)}" + (f", wall set back {ftin(-z.wall_y)}" if z.wall_y < 0 else "") + (" · hot tub" if z.hot_tub else "") for z in L.zones]

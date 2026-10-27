@@ -187,6 +187,34 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
 }
 </style>"""
 
+TIMELINE_CSS = """<style>
+/* The schedule: the job's own timeline (report.timeline_of) as a Gantt of working days — the time before day 1 in the first
+   column, then one bar per stretch of work. Added only to a page that has one. */
+.sched-title { font-family:var(--display); font-weight:800; text-transform:uppercase; letter-spacing:.02em; line-height:1.05; font-size:clamp(20px, 2.8vw, 28px); margin:4px 0 6px; }
+.gantt { list-style:none; margin:10px 0 8px; padding:0; }
+.gantt li { display:grid; grid-template-columns:minmax(0, 46%) minmax(0, 1fr); gap:6px 16px; align-items:center; padding:7px 0; border-top:1px solid var(--line); font-size:14px; line-height:1.35; }
+.gantt li.g-head { border-top:0; padding:0 0 4px; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:800; }
+.gantt .g-lab b { display:block; font-family:var(--display); font-weight:700; font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-ink); }
+.gantt .g-bar { position:relative; height:18px; background-image:linear-gradient(to right, var(--line) 1px, transparent 1px); background-size:calc(100% / var(--n)) 100%;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.gantt .g-bar i { position:absolute; top:3px; bottom:3px; border-radius:2px; background:linear-gradient(90deg, var(--gold-a), var(--gold-b)); }
+.gantt .g-bar i.pre { background:var(--ink-3); }
+.gantt .g-bar i.opt { background:var(--accent); }
+.gantt .g-ticks { position:relative; height:14px; display:block; }
+.gantt .g-ticks span { position:absolute; top:0; transform:translateX(-50%); font-variant-numeric:tabular-nums; letter-spacing:.04em; }
+@media (max-width:760px) {
+  .gantt li { grid-template-columns:minmax(0, 1fr); }
+  .gantt li.g-head > span:first-child { display:none; }
+}
+@media print {
+  .sched-title { font-size:20px; }
+  .gantt li { padding:4px 0; font-size:11px; break-inside:avoid; page-break-inside:avoid; }
+  .gantt .g-lab b { font-size:9.5px; }
+  .gantt .g-bar { height:14px; }
+  .sched-opts { font-size:11.5px; }
+}
+</style>"""
+
 JS = """<script>
 document.querySelectorAll('.inv-grid').forEach(function (g) {
   var v = g.querySelector('.wc-v'), l = g.querySelector('.wc-l');
@@ -385,8 +413,11 @@ LOUVER_FACTS = dict(
         "The downspouts can run hidden inside the posts",
         "The gutters are cleaned by hand or with a shop vacuum",
     ],
-    lights=[            # the LED light track
+    lights=[            # the LED light track (a roof that carries the strip: louvered_roofs[i].lights)
         "The gutter carries a light track and a wire chase for an LED light strip; pot, rope and track lights can be added",
+    ],
+    lights_option=[     # the same, listed with the maker's options when the roof does not carry the strip
+        "An LED light strip in the gutter's built-in light track and wire chase; pot, rope and track lights",
     ],
     accessories=[       # sensors and add-ons the maker offers (not in the price unless the job says so)
         "Rain and wind sensors can be built into the controls: rain closes the blades, and the screens can retract on their own in high wind",

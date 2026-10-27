@@ -72,6 +72,10 @@ def _used_keys(model: dict) -> set:
             keys.update(t.get("mats", ["spruce_pine", "spruce_pine2"]))
     for a in model.get("grade", {}).get("areas", []):
         keys.add(a.get("mat", "meadow"))
+    far = model.get("grade", {}).get("far")
+    if far:
+        keys.add(far.get("mat", "lawn"))
+        keys.update(a.get("mat", "lawn") for a in far.get("areas", []))
     return keys
 
 
@@ -293,6 +297,33 @@ class _Site:
         for a, t in zip(areas, atri):
             if t:
                 self.mesh("ground", t, a.get("mat", "meadow"), tag=a.get("name", "ground"))
+        if gm.get("far"):
+            self.lawn_far(gm["far"], (x0, x0 + nx * res, y0, y0 + ny * res))
+
+    def lawn_far(self, far: dict, inner):
+        """Coarse ground beyond the graded extent (the valley, the next yards) so the yard never ends at a cliff: cells of
+        `res` over far.extent that are not wholly inside the inner (fine) extent, `drop` below the grade so the fine lawn
+        covers the seam; each cell in the first of far.areas its centre falls in, else far.mat."""
+        fx0, fx1, fy0, fy1 = (float(v) for v in far["extent"])
+        res, drop = float(far.get("res", 20.0)), float(far.get("drop", 0.1))
+        ix0, ix1, iy0, iy1 = inner
+        nx, ny = int(math.ceil((fx1 - fx0) / res)), int(math.ceil((fy1 - fy0) / res))
+        xs, ys = [fx0 + i * res for i in range(nx + 1)], [fy0 + j * res for j in range(ny + 1)]
+        Z = self.g.grid(xs, ys)
+        areas = [(a.get("mat", "lawn"), [tuple(p[:2]) for p in a["poly"]]) for a in far.get("areas", [])]
+        tri: Dict[str, list] = {}
+        for j in range(ny):
+            for i in range(nx):
+                xa, xb, ya, yb = xs[i], xs[i + 1], ys[j], ys[j + 1]
+                if ix0 <= xa and xb <= ix1 and iy0 <= ya and yb <= iy1:
+                    continue
+                cx, cy = (xa + xb) / 2, (ya + yb) / 2
+                mat = next((m_ for m_, P in areas if _in_poly(cx, cy, P)), far.get("mat", "lawn"))
+                p00, p10, p11, p01 = ([xa, ya, Z[j][i] - drop], [xb, ya, Z[j][i + 1] - drop], [xb, yb, Z[j + 1][i + 1] - drop],
+                                      [xa, yb, Z[j + 1][i] - drop])
+                tri.setdefault(mat, []).extend([p00, p10, p11, p00, p11, p01])
+        for mat, t in tri.items():
+            self.mesh("ground", t, mat, tag=far.get("name", "ground beyond the yard"))
 
     # ---------------------------------------------------------- flat areas
     def flat(self, poly, z, mat, kind="ground", tag="", lift=0.0, follow=False):

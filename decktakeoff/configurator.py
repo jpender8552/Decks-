@@ -54,7 +54,7 @@ REQUIRES = {"screens": ["roof"]}
 LED_KEYS = ("led_riser", "led_cap")
 LIVE_KINDS = {"lvblade", "lvscreen"}                     # drawn live by the page (the blades turn, the screens run)
 NO_CAST_KINDS = {"ground", "gravel", "concrete_slab", "concrete_joint", "water", "lawn", "mulch", "soil", "groundcover"}
-ROLE_NOCAST, ROLE_GLASS, ROLE_LED, ROLE_LANTERN, ROLE_DOUBLE = 1, 2, 4, 8, 16
+ROLE_NOCAST, ROLE_GLASS, ROLE_LED, ROLE_LANTERN, ROLE_DOUBLE, ROLE_TREE = 1, 2, 4, 8, 16, 32
 SHAPES = {"box": 0, "cyl": 1, "sphere": 2, "cone": 3, "mesh": 4}
 AXES = {"y": 0, "x": 1, "z": 2}
 GLASS_MATS = {"hglass", "glass", "nglass"}
@@ -150,6 +150,8 @@ def _role(b, mats: dict) -> int:
         r |= ROLE_LANTERN
     if b.shape == "mesh":
         r |= ROLE_DOUBLE
+    if b.kind == "tree":                 # the yard's trees: the page can hide them (the Trees chip) and fades them near the camera
+        r |= ROLE_TREE
     return r
 
 
@@ -232,47 +234,102 @@ def _parts_of(L) -> List[dict]:
     return out
 
 
-def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade) -> List[dict]:
-    """Preset cameras (plan feet): the yard, the upper deck (under the roof when there is one), the lower deck, aerial.
-    A measured site's own "yard" station wins over the computed one."""
+def _occluders(boxes) -> list:
+    """Axis-aligned bounds of what blocks a view in the yard: tree crowns and trunks (shrunk a little: crowns are not solid
+    boxes), neighbouring houses and walls of the site layer."""
+    out = []
+    for b in boxes:
+        if (b.layer or "") != "site" or b.kind not in ("tree", "house", "wall"):
+            continue
+        k = 0.18 if b.kind == "tree" and b.shape in ("sphere", "cone", "mesh") else 0.0
+        dx, dy, dz = (b.x1 - b.x0) * k / 2, (b.y1 - b.y0) * k / 2, (b.z1 - b.z0) * k / 2
+        out.append((b.x0 + dx, b.x1 - dx, b.y0 + dy, b.y1 - dy, b.z0 + dz, b.z1 - dz))
+    return out
+
+
+def _clear(pos, targets, occ) -> float:
+    """The share of the sight lines from pos to the targets that no occluder cuts (slab test, numpy)."""
+    if not occ:
+        return 1.0
+    import numpy as np
+    O = np.array(occ, dtype=float)                       # (n, 6): x0 x1 y0 y1 z0 z1
+    lo, hi = O[:, [0, 2, 4]], O[:, [1, 3, 5]]
+    p = np.array(pos, dtype=float)
+    if np.any(np.all((p >= lo - 0.3) & (p <= hi + 0.3), axis=1)):
+        return 0.0                                        # standing inside a crown / a house
+    ok = 0
+    for t in targets:
+        d = np.array(t, dtype=float) - p
+        inv = 1.0 / np.where(np.abs(d) < 1e-9, 1e-9, d)
+        t0, t1 = (lo - p) * inv, (hi - p) * inv
+        tn = np.max(np.minimum(t0, t1), axis=1)
+        tf = np.min(np.maximum(t0, t1), axis=1)
+        ok += not np.any((tn <= tf) & (tf > 0.02) & (tn < 0.97))
+    return ok / max(1, len(targets))
+
+
+def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, occ=None) -> List[dict]:
+    """Preset cameras (plan feet): Yard, Upper deck (under the roof when there is one), Lower deck, Aerial. A measured site's
+    own camera stations (site_model.cameras) win: "yard", "roof_deck" / "upper_deck", "lower_deck", "high34" — they stand
+    where a person can stand (inside the lot, clear of the trees); otherwise the stations are computed from the layout."""
+    cams = cams or {}
     x0 = min(p["x0"] for p in parts); x1 = max(p["x1"] for p in parts)
     y0 = min(p["y0"] for p in parts); y1 = max(p["y1"] for p in parts)
     W = x1 - x0
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     top = max(p["top"] for p in parts)
     mid_top = sum(p["top"] for p in parts) / len(parts)
-    views = []
-    yc = (cams or {}).get("yard")
-    if yc:
-        views.append(dict(key="yard", label="Yard", pos=yc["pos"], at=yc["at"], fov=yc.get("fov", 50), fixed=True))
-    else:
-        d = max(36.0, min(90.0, W * 0.92))
-        zg = grade(cx, y1 + d)
-        views.append(dict(key="yard", label="Yard", pos=[cx + W * 0.05, y1 + d, zg + 5.6], at=[cx, cy, mid_top * 0.95], fov=44, fit=W + 16))
     hi = max(parts, key=lambda p: p["top"])
     lo = min(parts, key=lambda p: p["top"])
     roof = next((r for r in roofs if r.get("frame")), None)
-    if roof:                                 # under the roof: inside its outer corner, looking across the deck toward the house
+
+    occ = occ or []
+    deck_pts = [(x0 + (x1 - x0) * i / 6.0, y, hi["top"] if x0 + (x1 - x0) * i / 6.0 >= hi["x0"] - 0.5 else lo["top"])
+                for i in range(7) for y in (y1 - 0.5, (y0 + y1) / 2)]
+
+    def station(key, label, *names):
+        best = None
+        for i, n in enumerate(names):                    # the first listed station with the clearest view of the deck
+            c = cams.get(n)
+            if c and c.get("pos") and c.get("at"):
+                sc_ = _clear(c["pos"], deck_pts, occ) if key in ("yard", "aerial") else 1.0
+                if best is None or sc_ > best[0] + 0.15:
+                    best = (sc_, dict(key=key, label=label, pos=c["pos"], at=c["at"], fov=c.get("fov", 60), fixed=True, station=n))
+        return best[1] if best else None
+    views = []
+    v = station("yard", "Yard", "yard_center", "yard", "yard_left", "dusk")
+    if not v:
+        d = max(36.0, min(90.0, W * 0.92))
+        zg = grade(cx, y1 + d)
+        v = dict(key="yard", label="Yard", pos=[cx + W * 0.05, y1 + d, zg + 5.6], at=[cx, cy, mid_top * 0.95], fov=44, fit=W + 16)
+    views.append(v)
+    up_label = "Upper deck" if len(parts) > 1 else ("Under the roof" if roof else "On the deck")
+    v = station("upper", up_label, *(("roof_deck", "upper_deck", "upper_rail") if roof else ("upper_deck", "upper_rail")))
+    if not v and roof:                       # under the roof: inside its outer corner, looking across the deck toward the house
         f = roof["frame"]
         zd = float(roof.get("z_deck") or hi["top"])
         rx0, rx1, ry0, ry1 = f["x0"], f["x1"], f["y0"], f["y1"]
-        ex, tx = rx1 - 2.2, rx0 + (rx1 - rx0) * 0.25
-        views.append(dict(key="upper", label="Upper deck" if len(parts) > 1 else "Under the roof",
-                          pos=[ex, ry1 - 1.6, zd + 5.4], at=[tx, ry0 + (ry1 - ry0) * 0.35, zd + 3.4], fov=64))
-    else:
-        # stand at the part's end away from the deck's middle, near the front, look along it
+        v = dict(key="upper", label=up_label, pos=[rx1 - 2.2, ry1 - 1.6, zd + 5.4], at=[rx0 + (rx1 - rx0) * 0.25, ry0 + (ry1 - ry0) * 0.35, zd + 3.4], fov=64)
+    if not v:                                # stand at the part's end away from the deck's middle, near the front, look along it
         far = hi["x1"] if (hi["x0"] + hi["x1"]) / 2 >= cx else hi["x0"]
         nxt = hi["x0"] if far == hi["x1"] else hi["x1"]
         sg = -1 if far == hi["x1"] else 1
-        views.append(dict(key="upper", label="Upper deck" if len(parts) > 1 else "On the deck",
-                          pos=[far + sg * 2.5, hi["y1"] - 2.0, hi["top"] + 5.4], at=[nxt, (hi["y0"] + hi["y1"]) / 2, hi["top"] + 2.2], fov=60))
+        v = dict(key="upper", label=up_label, pos=[far + sg * 2.5, hi["y1"] - 2.0, hi["top"] + 5.4], at=[nxt, (hi["y0"] + hi["y1"]) / 2, hi["top"] + 2.2], fov=60)
+    views.append(v)
     if len(parts) > 1:
-        far = lo["x1"] if (lo["x0"] + lo["x1"]) / 2 >= cx else lo["x0"]
-        sg = -1 if far == lo["x1"] else 1
-        tgt_x = hi["x0"] + 6 if hi["x0"] >= lo["x1"] - 1 else hi["x1"] - 6
-        views.append(dict(key="lower", label="Lower deck", pos=[far + sg * 2.5, lo["y1"] - 2.0, lo["top"] + 5.4],
-                          at=[tgt_x, (lo["y0"] + lo["y1"]) / 2, lo["top"] + 3.0], fov=60))
-    views.append(dict(key="aerial", label="Aerial", pos=[cx + W * 0.42, y1 + W * 0.78, top + W * 0.62], at=[cx, cy - 1, mid_top * 0.5], fov=40, fit=W + 14))
+        v = station("lower", "Lower deck", "lower_deck")
+        if not v:
+            far = lo["x1"] if (lo["x0"] + lo["x1"]) / 2 >= cx else lo["x0"]
+            sg = -1 if far == lo["x1"] else 1
+            tgt_x = hi["x0"] + 6 if hi["x0"] >= lo["x1"] - 1 else hi["x1"] - 6
+            v = dict(key="lower", label="Lower deck", pos=[far + sg * 2.5, lo["y1"] - 2.0, lo["top"] + 5.4], at=[tgt_x, (lo["y0"] + lo["y1"]) / 2, lo["top"] + 3.0], fov=60)
+        views.append(v)
+    # aerial: high over the yard, a little to the right of straight out, looking down ~62 deg at the whole deck (a tree crown
+    # in the way is cut away by the page)
+    at = [cx, cy - 1, mid_top * 0.5]
+    R, e, a_ = max(70.0, W * 1.25), math.radians(62), math.radians(10)
+    views.append(dict(key="aerial", label="Aerial", pos=[at[0] + R * math.cos(e) * math.sin(a_), at[1] + R * math.cos(e) * math.cos(a_), at[2] + R * math.sin(e)],
+                      at=at, fov=40, fit=W + 14))
     return [dict(v, pos=[round(float(q), 2) for q in v["pos"]], at=[round(float(q), 2) for q in v["at"]]) for v in views]
 
 
@@ -466,7 +523,7 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
             grade = lambda x, y: 0.0
     else:
         grade = lambda x, y: 0.0
-    vws = views or _views(parts, list(roofs.values()), (meta0 or {}).get("cameras"), grade)
+    vws = views or _views(parts, list(roofs.values()), (meta0 or {}).get("cameras"), grade, _occluders(b for b, _m in union.values()))
     bx0 = min(p["x0"] for p in parts); bx1 = max(p["x1"] for p in parts)
     by0 = min(p["y0"] for p in parts); by1 = max(p["y1"] for p in parts)
     ztop = max([p["top"] for p in parts] + [float((r.get("frame") or {}).get("z_top", 0.0)) for r in roofs.values()])
@@ -684,7 +741,7 @@ function comboOf(on) { var c = 0; OPT.forEach(function (o) { if (on[o.key]) c |=
 function shows(mask, c) { return ((mask >>> c) & 1) === 1; }
 
 // ------------------------------------------------------------------ state (+ URL)
-var S = { on: {}, date: SITE.date, min: SITE.minutes, view: D.views[0].key, louver: 0, louverGoal: null, scr: {}, scrGoal: {}, sel: {}, playing: false };
+var S = { on: {}, date: SITE.date, min: SITE.minutes, view: D.views[0].key, louver: 0, louverGoal: null, scr: {}, scrGoal: {}, sel: {}, playing: false, trees: Q.get('trees') !== '0' };
 (D.default_on || []).forEach(function (k) { S.on[k] = true; });
 var qo = Q.get('opts');
 if (qo !== null) { S.on = {}; if (qo === 'all') OPT.forEach(function (o) { S.on[o.key] = true; }); else qo.split(',').forEach(function (k) { if (OBYKEY[k]) S.on[k] = true; }); }
@@ -820,6 +877,7 @@ var FX = D.fixtures.slice(0, FXN);
 var fxA = [], fxB = [];
 for (var fi = 0; fi < FXN; fi++) { fxA.push(new THREE.Vector4()); fxB.push(new THREE.Vector4()); }
 var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.Color(1.0, 0.72, 0.45) }, fxGain: { value: 0 },
+  fxFocus: { value: new THREE.Vector3() }, fxCut: { value: Math.min(26, 0.42 * (D.deck.x1 - D.deck.x0)) },
   fxBox: { value: new THREE.Vector4(0, 0, 0, 0) }, fxY: { value: new THREE.Vector2(0, 0) } };
 (function () {                                   // where any light can reach: fragments outside skip the loop
   if (!D.fixtures.length) return;
@@ -853,7 +911,7 @@ var FX_CHUNK = [
   '  }',
   '  return acc * fxCol * fxGain;',
   '}'].join('\n');
-function addFx(mat) {
+function addFx(mat, fade) {
   mat.onBeforeCompile = function (sh) {
     sh.uniforms.fxA = FXU.fxA; sh.uniforms.fxB = FXU.fxB; sh.uniforms.fxCol = FXU.fxCol; sh.uniforms.fxGain = FXU.fxGain;
     sh.uniforms.fxBox = FXU.fxBox; sh.uniforms.fxY = FXU.fxY;
@@ -862,11 +920,20 @@ function addFx(mat) {
       'vec4 fxw = vec4(transformed, 1.0); vec3 fxn = objectNormal;',
       '#ifdef USE_INSTANCING', 'fxw = instanceMatrix * fxw; fxn = mat3(instanceMatrix) * fxn;', '#endif',
       'vFxW = (modelMatrix * fxw).xyz; vFxN = normalize(mat3(modelMatrix) * fxn);'].join('\n'));
-    sh.fragmentShader = FX_CHUNK + '\n' + sh.fragmentShader.replace('gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+    var fs = sh.fragmentShader;
+    if (fade) {      // the trees: a crown the camera is in, or the part of one between the camera and what it looks at, is cut away
+      sh.uniforms.fxFocus = FXU.fxFocus; sh.uniforms.fxCut = FXU.fxCut;
+      fs = 'uniform vec3 fxFocus; uniform float fxCut;\n' + fs.replace('void main() {', [
+        'void main() {',
+        '  vec3 fxSeg = fxFocus - cameraPosition; float fxT = clamp(dot(vFxW - cameraPosition, fxSeg) / max(dot(fxSeg, fxSeg), 1.0), 0.0, 1.0);',
+        '  float fxR = distance(vFxW, cameraPosition + fxSeg * fxT);',
+        '  if (distance(vFxW, cameraPosition) < ' + fade.toFixed(1) + ' || (fxT < 0.75 && fxR < max(2.5, fxCut * fxT))) discard;'].join('\n'));
+    }
+    sh.fragmentShader = FX_CHUNK + '\n' + fs.replace('gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
       'if (fxGain > 0.0) { vec3 fxN = normalize(vFxN) * (gl_FrontFacing ? 1.0 : -1.0); outgoingLight += diffuseColor.rgb * fxLight(vFxW, fxN); }\n' +
       'gl_FragColor = vec4( outgoingLight, diffuseColor.a );');
   };
-  mat.customProgramCacheKey = function () { return 'fx' + FXN; };
+  mat.customProgramCacheKey = function () { return 'fx' + FXN + (fade ? 'fade' : ''); };
 }
 
 // ------------------------------------------------------------------ materials
@@ -888,17 +955,17 @@ function matFor(key, side, opts2) {
   mm.userData = { key: key, op0: o.opacity == null ? 1 : o.opacity };
   if (m.emit) { mm.emissive = new THREE.Color(m.emit).convertSRGBToLinear(); mm.emissiveIntensity = 0; mm.userData.led = true; LED_M.push(mm); }
   if (opts2 === 'glass') { mm.emissive = ROOM.clone().convertSRGBToLinear(); mm.emissiveIntensity = 0; GLASS_M.push(mm); }
-  addFx(mm);
+  addFx(mm, opts2 === 'tree' ? 9.0 : 0);
   MATS[k] = mm; return mm;
 }
 
 // ------------------------------------------------------------------ geometry: boxes merged by material x option mask
 var GROUPS = {};
 function grp(matKey, mask, role) {
-  var dbl = (role & 16) ? 'd' : 'f', glass = (role & 2) ? 'glass' : '', cast = (role & 1) ? 0 : 1;
-  var k = matKey + '|' + mask + '|' + dbl + '|' + glass + '|' + cast;
+  var dbl = (role & 16) ? 'd' : 'f', variant = (role & 2) ? 'glass' : ((role & 32) ? 'tree' : ''), cast = (role & 1) ? 0 : 1;
+  var k = matKey + '|' + mask + '|' + dbl + '|' + variant + '|' + cast;
   var g = GROUPS[k];
-  if (!g) g = GROUPS[k] = { mat: matKey, mask: mask, side: dbl, glass: glass, cast: cast, P: [], N: [], U: [], C: [] };
+  if (!g) g = GROUPS[k] = { mat: matKey, mask: mask, side: dbl, variant: variant, cast: cast, P: [], N: [], U: [], C: [] };
   return g;
 }
 var _v = new THREE.Vector3(), _n = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _m3 = new THREE.Matrix3();
@@ -983,8 +1050,8 @@ Object.keys(GROUPS).forEach(function (k) {
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.U, 2));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(g.C, 3));
   geo.computeBoundingSphere();
-  var mesh = new THREE.Mesh(geo, matFor(g.mat, g.side, g.glass));
-  mesh.castShadow = !!g.cast && !mesh.material.transparent; mesh.receiveShadow = true; mesh.userData.mask = g.mask;
+  var mesh = new THREE.Mesh(geo, matFor(g.mat, g.side, g.variant));
+  mesh.castShadow = !!g.cast && !mesh.material.transparent; mesh.receiveShadow = true; mesh.userData.mask = g.mask; mesh.userData.tree = g.variant === 'tree';
   if (mesh.material.transparent) mesh.renderOrder = 2;
   scene.add(mesh); GMESH.push(mesh);
   g.P = g.N = g.U = g.C = null;
@@ -1212,7 +1279,7 @@ function applyGlow() {
 function applyOptions() {
   fixRequires();
   var c = comboOf(S.on);
-  GMESH.forEach(function (m) { m.visible = shows(m.userData.mask, c); });
+  GMESH.forEach(function (m) { m.visible = shows(m.userData.mask, c) && (S.trees || !m.userData.tree); });
   BLADES.forEach(function (B) { B.mesh.visible = shows(B.roof.mask, c); });
   SCR.forEach(function (o) { o.vis = shows(o.s.mask, c); placeScreen(o, S.scr[o.s.id]); });
   for (var i = 0; i < FXN; i++) {
@@ -1240,12 +1307,16 @@ var stageW = 1, stageH = 1;
 var cam = new THREE.PerspectiveCamera(50, 1, 0.3, 4000);
 var tgt = new THREE.Vector3(), sph = new THREE.Spherical(30, 1, 0), FOV = 50;
 var VIEWS = {}; D.views.forEach(function (v) { VIEWS[v.key] = v; });
+if (Q.get('cam') && Q.get('at')) {                 // ?cam=x,y,z&at=x,y,z (plan feet) [&fov=]: a custom view, e.g. a link to one spot
+  VIEWS.custom = { key: 'custom', label: 'Custom', pos: Q.get('cam').split(',').map(Number), at: Q.get('at').split(',').map(Number), fov: +(Q.get('fov') || 55), fixed: true };
+  S.view = 'custom';
+}
 function viewPose(v) {
   var pos = P3(v.pos[0], v.pos[1], v.pos[2]), at = P3(v.at[0], v.at[1], v.at[2]), fov = v.fov || 50;
   var asp = stageW / Math.max(1, stageH);
-  // a view is framed for a 3:2 screen: on a narrower one keep its width by opening the lens (a measured station stays put)
-  var hh = Math.atan(Math.tan(fov * RAD / 2) * 1.5), need = 2 * Math.atan(Math.tan(hh) / asp) / RAD;
-  if (need > fov) fov = Math.min(v.fixed ? 82 : 72, need);
+  // a view is framed for a 1.4:1 screen: on a narrower one keep its width by opening the lens (a measured station stays put)
+  var hh = Math.atan(Math.tan(fov * RAD / 2) * 1.4), need = 2 * Math.atan(Math.tan(hh) / asp) / RAD;
+  if (need > fov) fov = Math.min(v.fixed ? 80 : 72, need);
   if (v.fit && !v.fixed) {                           // still too narrow: step back until the deck's width fits
     var d = pos.distanceTo(at), hx = Math.atan(Math.tan(fov * RAD / 2) * asp), dd = (v.fit / 2) / Math.tan(hx);
     if (dd > d) { var k = Math.min(1.8, dd / d); pos = at.clone().add(pos.clone().sub(at).multiplyScalar(k)); }
@@ -1258,6 +1329,7 @@ function updCam() {
   cam.position.copy(tgt).add(new THREE.Vector3().setFromSpherical(sph));
   if (cam.position.y < -1.5) cam.position.y = -1.5;
   cam.fov = FOV; cam.aspect = stageW / Math.max(1, stageH); cam.updateProjectionMatrix(); cam.lookAt(tgt);
+  FXU.fxFocus.value.copy(tgt);
   if (HALO) HALO.material.uniforms.uScale.value = stageH * DPR / (2 * Math.tan(FOV * RAD / 2));
   invalidate();
 }
@@ -1360,6 +1432,10 @@ D.views.forEach(function (v) {
   [vwrap, vbar].forEach(function (host, hi) { var b = el('button', { type: 'button', class: 'btn', 'data-view': v.key, id: (hi ? 'vb-' : 'view-') + v.key }, v.label);
     b.addEventListener('click', function () { goView(v.key); }); host.appendChild(b); });
 });
+var HAS_TREES = GMESH.some(function (m) { return m.userData.tree; });
+if (HAS_TREES) [vwrap, vbar].forEach(function (host, hi) {
+  var b = el('button', { type: 'button', class: 'btn trees', id: hi ? 'vb-trees' : 'trees', 'aria-pressed': 'true' }, 'Trees');
+  b.addEventListener('click', function () { S.trees = !S.trees; applyOptions(); writeURL(); }); host.appendChild(b); });
 var panel = $('panel'), fold = $('fold');
 fold.addEventListener('click', function () { var f = panel.classList.toggle('folded'); fold.setAttribute('aria-expanded', f ? 'false' : 'true');
   fold.setAttribute('aria-label', f ? 'Show the controls' : 'Hide the controls'); $('foldlab').textContent = f ? 'Show controls' : 'Hide controls';
@@ -1387,6 +1463,7 @@ function syncUI() {
   $('sclab').textContent = Math.round(avg * 100) + '% down';
   SIDES.forEach(function (sd) { var b = $('side-' + sd); if (b) b.setAttribute('aria-pressed', S.sel[sd] ? 'true' : 'false'); });
   document.querySelectorAll('[data-view]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-view') === S.view); });
+  document.querySelectorAll('.btn.trees').forEach(function (b) { b.setAttribute('aria-pressed', S.trees ? 'true' : 'false'); b.classList.toggle('on', S.trees); });
   $('state').textContent = onLabel() + ' · ' + dateLabel(S.date) + ', ' + clock(S.min) + ' · ' + sunWords(s);
 }
 var urlTimer = null;
@@ -1399,6 +1476,7 @@ function writeURL() {
     if (on.length) p.set('opts', on.join(',')); else p.delete('opts');
     p.set('date', S.date); p.set('t', Math.floor(S.min / 60) + ':' + ('0' + Math.round(S.min % 60)).slice(-2));
     if (ROOF) p.set('louver', Math.round(S.louver)); p.set('view', S.view);
+    if (!S.trees) p.set('trees', '0'); else p.delete('trees');
     history.replaceState(null, '', location.pathname + '?' + p.toString() + location.hash);
   } catch (e) { /* a sandboxed frame: the state stays in the page */ }
 }

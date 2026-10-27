@@ -498,6 +498,8 @@ class Mats:
                 nt.links.new(nz.outputs["Fac"], bmp.inputs["Height"]); nt.links.new(bev.outputs["Normal"], bmp.inputs["Normal"])
                 nt.links.new(bmp.outputs["Normal"], bsdf.inputs["Normal"])
                 bsdf.inputs["Roughness"].default_value = 0.95
+            elif key == "dftimber" or md.get("rough_sawn"):
+                self._rough_sawn(nt, bsdf, col)
             elif md.get("grain"):
                 # wood without a TimberTech texture (framing lumber, cedar fence): a wave-grain procedural
                 wv = nt.nodes.new("ShaderNodeTexWave"); wv.wave_type = "BANDS"; wv.inputs["Scale"].default_value = 2.5
@@ -565,6 +567,53 @@ class Mats:
         LIGHTS["emitters"].append(bsdf)
         self.cache[key] = m
         return m
+
+    def _rough_sawn(self, nt, bsdf, col):
+        """Unfinished rough-sawn Douglas fir (8x8 columns, 6x10 beams): warm tan, matte, a low-contrast flat-sawn grain along
+        the member, faint band-saw marks across it, mill-to-mill tone mottling and fibre fuzz. The box UVs run along the
+        member (U, in 20 ft) and across the face (V, 0..1), so the grain follows posts and beams alike."""
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["UV"], sep.inputs[0])
+        cmb = nt.nodes.new("ShaderNodeCombineXYZ")
+        mu = nt.nodes.new("ShaderNodeMath"); mu.operation = "MULTIPLY"; mu.inputs[1].default_value = 20.0   # along: ft
+        mv = nt.nodes.new("ShaderNodeMath"); mv.operation = "MULTIPLY"; mv.inputs[1].default_value = 0.65   # across: ~ft
+        nt.links.new(sep.outputs["X"], mu.inputs[0]); nt.links.new(sep.outputs["Y"], mv.inputs[0])
+        nt.links.new(mu.outputs[0], cmb.inputs["X"]); nt.links.new(mv.outputs[0], cmb.inputs["Y"])
+        ft = cmb.outputs[0]
+        # grain: bands across the face (varying with V), wandering slowly along the member
+        mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (0.12, 1.0, 1.0)
+        nt.links.new(ft, mp.inputs[0])
+        gr = nt.nodes.new("ShaderNodeTexWave"); gr.wave_type = "BANDS"; gr.bands_direction = "Y"
+        gr.inputs["Scale"].default_value = 3.2; gr.inputs["Distortion"].default_value = 5.0
+        gr.inputs["Detail"].default_value = 2.5; gr.inputs["Detail Scale"].default_value = 1.2
+        nt.links.new(mp.outputs[0], gr.inputs["Vector"])
+        # band-saw marks: fine bands across the member (varying along it), about 3/4" apart
+        sm = nt.nodes.new("ShaderNodeTexWave"); sm.wave_type = "BANDS"; sm.bands_direction = "X"
+        sm.inputs["Scale"].default_value = 10.0; sm.inputs["Distortion"].default_value = 1.5; sm.inputs["Detail"].default_value = 1.0
+        nt.links.new(ft, sm.inputs["Vector"])
+        # mottling (board-to-board, end-to-end tone) and fibre fuzz
+        mo = nt.nodes.new("ShaderNodeTexNoise"); mo.inputs["Scale"].default_value = 0.9; mo.inputs["Detail"].default_value = 3.0
+        nt.links.new(ft, mo.inputs["Vector"])
+        fz = nt.nodes.new("ShaderNodeTexNoise"); fz.inputs["Scale"].default_value = 140.0; fz.inputs["Detail"].default_value = 6.0
+        nt.links.new(ft, fz.inputs["Vector"])
+        ramp = nt.nodes.new("ShaderNodeValToRGB")                 # early / late wood
+        ramp.color_ramp.elements[0].position = 0.35; ramp.color_ramp.elements[1].position = 0.9
+        ramp.color_ramp.elements[0].color = tuple(min(1, c * 1.06) for c in col) + (1,)
+        ramp.color_ramp.elements[1].color = (col[0] * 0.80, col[1] * 0.76, col[2] * 0.72, 1)
+        nt.links.new(gr.outputs["Fac"], ramp.inputs[0])
+        mot = nt.nodes.new("ShaderNodeMapRange"); mot.inputs["To Min"].default_value = 0.88; mot.inputs["To Max"].default_value = 1.10
+        nt.links.new(mo.outputs["Fac"], mot.inputs["Value"])
+        mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"
+        sock = lambda coll, ident: next(x for x in coll if x.identifier == ident)
+        sock(mx.inputs, "Factor_Float").default_value = 1.0
+        nt.links.new(ramp.outputs[0], sock(mx.inputs, "A_Color")); nt.links.new(mot.outputs[0], sock(mx.inputs, "B_Color"))
+        self._tint(nt, sock(mx.outputs, "Result_Color"), bsdf)
+        h = nt.nodes.new("ShaderNodeMath"); h.operation = "MULTIPLY_ADD"     # height: saw marks + a little fuzz
+        h.inputs[1].default_value = 0.6
+        nt.links.new(sm.outputs["Fac"], h.inputs[0]); nt.links.new(fz.outputs["Fac"], h.inputs[2])
+        self._bump(nt, bsdf, h.outputs[0], 0.18, 0.004)
+        bsdf.inputs["Roughness"].default_value = 0.9
+        bsdf.inputs["Specular IOR Level"].default_value = 0.3
 
     def screen(self, key: str, md: dict) -> bpy.types.Material:
         """A motorized screen's fabric (Phifer PVC-coated polyester mesh / clear vinyl): `openness` of it is open weave
@@ -825,12 +874,16 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
         tint = (1, 1, 1, 1)
         if mk.startswith("wblock") or mk == "cedar":
             v = float(rng.uniform(0.93, 1.06)); tint = (v, v * float(rng.uniform(0.98, 1.02)), v * float(rng.uniform(0.97, 1.01)), 1)
+        sawn = mk == "dftimber" or bool(md.get("rough_sawn"))       # rough-sawn timbers: grain along the member, a tone per piece
+        if sawn:
+            v = float(rng.uniform(0.92, 1.07)); tint = (v, v * float(rng.uniform(0.97, 1.02)), v * float(rng.uniform(0.95, 1.02)), 1)
         if shape == "mesh":
             add_tris(G(mk), b["pts"], tile=tile, tint=tint)
         elif shape == "cyl":
             add_cyl(G(mk), b, tint=tint)
         else:
-            add_box(G(mk), b, "tile" if (pat or md.get("grain")) else "none", tile=tile, tint=tint)
+            add_box(G(mk), b, "board" if sawn else ("tile" if (pat or md.get("grain")) else "none"), tile=tile, tint=tint,
+                    u_off=float(rng.uniform(0, 0.9)) if sawn else 0.0)
     for key, g in groups.items():
         if "#" in key:
             base, k = key.split("#")

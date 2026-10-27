@@ -225,7 +225,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     q.update({k: v for k, v in (r or {}).items() if v is not None})
     x0, x1 = sorted((float(q["x0"]), float(q["x1"])))
     y0, y1 = sorted((float(q["y0"]), float(q["y1"])))
-    W_nom, D_nom = (float(q["nominal"][0]), float(q["nominal"][1])) if q.get("nominal") else (x1 - x0, y1 - y0)   # the size as sold
+    W_nom, D_nom = sold_size(q)              # the size as sold (customer wording); the built frame goes in the notes
     notes: List[str] = []
     p = float(q["post_in"]) * IN
     rp = RAIL_POST_INSET * IN
@@ -786,8 +786,8 @@ def takeoff_hook(t) -> None:
         if isinstance(p_.roof, tuple):
             off = max(abs(p_.x - p_.roof[0]), abs(p_.y - p_.roof[1])) - 3.0
             if off > 0.25:
-                t.notes.append(f"louvered roof: the rail run ({p_.tag.rsplit(' ', 1)[0]}) ends {ftin(off)} off the roof post's face at {ftin(p_.roof[0])}, "
-                               f"{ftin(p_.roof[1])} — its wall-mount bracket takes a filler block to reach the post")
+                t.notes.append(f"louvered roof: the rail run ({p_.tag.rsplit(' ', 1)[0]}) passes {ftin(off)} outside the roof post's face at {ftin(p_.roof[0])}, "
+                               f"{ftin(p_.roof[1])} — its last panel's wall-mount bracket goes on a filler block fixed to the post")
     # a rail post left standing next to a roof post: its surface base must clear the roof post's base plate
     try:
         surf = zone_surfaces(t.layout.zones, t.spec.geometry.height_in)
@@ -815,11 +815,26 @@ def rail_base_in(system: str) -> float:
 
 
 # ================================================================== prices (sell = check / ACH)
-def roof_area_sf(r: dict) -> float:
-    """The area the roof is sold by: `nominal` [W, D] (ft) when set, else the frame rectangle."""
+def sold_size(r: dict) -> Tuple[float, float]:
+    """(W, D) ft the roof is sold as: `nominal` [W, D] when set; else, when the owner set both `price` and `price_per_sf`,
+    the whole-foot size (each side the frame's rounded down or up, nearest the frame) whose area is price / price_per_sf
+    (a 20'-7 5/8" x 9'-9 1/2" frame sold at 200 SF x $175 reads 20' x 10'); else the frame rectangle."""
+    W_f, D_f = abs(float(r["x1"]) - float(r["x0"])), abs(float(r["y1"]) - float(r["y0"]))
     if r.get("nominal"):
-        return float(r["nominal"][0]) * float(r["nominal"][1])
-    return abs(float(r["x1"]) - float(r["x0"])) * abs(float(r["y1"]) - float(r["y0"]))
+        return float(r["nominal"][0]), float(r["nominal"][1])
+    if r.get("price") is not None and r.get("price_per_sf"):
+        sold = float(r["price"]) / float(r["price_per_sf"])
+        fits = [(float(a), float(b)) for a in {math.floor(W_f), math.ceil(W_f)} for b in {math.floor(D_f), math.ceil(D_f)}
+                if a > 0 and b > 0 and abs(a * b - sold) < 0.5]
+        if fits:
+            return min(fits, key=lambda ab: abs(ab[0] - W_f) + abs(ab[1] - D_f))
+    return W_f, D_f
+
+
+def roof_area_sf(r: dict) -> float:
+    """The area the roof is sold by (sold_size): `nominal` when set, else the frame rectangle."""
+    w, d = sold_size(r)
+    return w * d
 
 
 def roof_sell(r: dict) -> float:

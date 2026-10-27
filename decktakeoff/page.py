@@ -13,7 +13,7 @@ import html, json, math, re, shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from .spec import DeckSpec
-from .report import quote_markdown
+from .report import quote_markdown, timeline_of
 from .units import ftin
 from .takeoff import CATEGORIES, inches_frac
 from .catalog import rail_name, beam_words, beam_species_words
@@ -460,21 +460,36 @@ def _sign(v) -> str:
     return ("+" if v >= 0 else "−") + money(abs(v))
 
 
+def _caps_file(p: Path) -> Dict[str, str]:
+    """A renders folder's captions.json as {name: caption}: keys with or without ".jpg"; each value the caption, or a dict
+    carrying one (the photoreal set's format: {"caption": ..., "view": ...})."""
+    if not p.exists():
+        return {}
+    out = {}
+    for k, v in json.load(open(p)).items():
+        v = (v.get("caption") or v.get("view") or "") if isinstance(v, dict) else v
+        if isinstance(v, str):
+            out[k[:-4] if k.lower().endswith(".jpg") else k] = v
+    return out
+
+
 def _render_figs(o: dict, rd: Path, key: str, ok: str, files: dict) -> list:
     """The figures for an option's (or add-on's) own renders: o["renders"] = [name | (name, caption)] — stills in
-    o["renders_dir"] (default: the page's renders), captions from that folder's captions.json; each file goes in files.json
-    as r/<key>-<option>-<name>.jpg."""
+    o["renders_dir"] (default: the page's renders); a name may run into a subfolder ("roof_closed/roof_yard_1600"), its
+    caption then from that folder's captions.json; each file goes in files.json as r/<key>-<option>-<name>.jpg."""
     rdir = Path(o["renders_dir"]) if o.get("renders_dir") else rd
     caps = dict(CAP)
-    if (rdir / "captions.json").exists():
-        caps.update(json.load(open(rdir / "captions.json")))
+    caps.update(_caps_file(rdir / "captions.json"))
     figs = []
     for r_ in o.get("renders") or []:
         nm, cp = (r_[0], r_[1]) if isinstance(r_, (list, tuple)) else (r_, None)
-        if not (rdir / f"{nm}.jpg").exists():
+        f_ = rdir / f"{nm}.jpg"
+        if not f_.exists():
             continue
-        fn = f"r/{key}-{ok}-{nm}.jpg"
-        files[fn] = str(rdir / f"{nm}.jpg")
+        fn = f"r/{key}-{ok}-{re.sub(r'[^A-Za-z0-9_-]+', '-', nm).strip('-')}.jpg"
+        files[fn] = str(f_)
+        if not cp and f_.parent != rdir:
+            cp = _caps_file(f_.parent / "captions.json").get(f_.stem)
         cp = cp or caps.get(nm, nm)
         figs.append(f'<figure><img src="{fn}" alt="{E(cp)}" loading="lazy"><figcaption>{E(cp)}</figcaption></figure>')
     return figs
@@ -548,14 +563,16 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             elif a.get("price") is not None:     # a set price
                 ca, fa, ma = fixed_terms(spec, a["price"])
             elif a.get("screens") and o.get("roof") is not None:     # the roof's screens: the louvered engine's price for them
-                from .louvered import roof_pricing
+                from .louvered import roof_pricing, roofs_of, resolve, surfaces_of
                 rs = o.get("roof_spec") or spec
-                rows_ = roof_pricing(rs, t.layout if rs is spec else run(rs)[0].layout)["roofs"]
+                Lr = t.layout if rs is spec else run(rs)[0].layout
+                rows_ = roof_pricing(rs, Lr)["roofs"]
                 rr = rows_[o["roof"] if isinstance(o["roof"], int) else 0]
                 if not rr.get("screens_sell"):
                     raise ValueError("screens add-on: the roof has no screens (louvered_roofs[i].screens)")
                 ca, fa, ma = fixed_terms(spec, rr["screens_sell"])
-                note = note or "; ".join(x["words"] for x in rr.get("screens") or [])
+                sl = _screen_lines(resolve(roofs_of(rs)[o["roof"]] if isinstance(o["roof"], int) else o["roof"], surfaces_of(Lr)), a.get("open_note"))
+                note = note or (". ".join(sl) + "." if sl else "; ".join(x["words"] for x in rr.get("screens") or []))
                 ab = _screens_basis(rr)
             else:
                 raise ValueError(f"add-on {a.get('label')!r}: give spec + against, price, or screens (on a roof option)")
@@ -636,6 +653,87 @@ def _viewer_link(url: str, note: Optional[str] = None) -> str:
             f'<a class="v3d-btn" href="{E(url)}">Open the interactive 3D model</a><span class="v3d-url">{E(url)}</span></div>')
 
 
+# words a homeowner's timeline never carries (the schedule model scrubs its customer rows; this keeps it that way)
+_NOT_FOR_CLIENT = re.compile(r"\b(permits?|permitted|inspect\w*|AHJ|HOA|ACC|811|city|county|building department|engineer of record|Suncoast|"
+                             r"dealer\w*|vendor\w*|supplier\w*|D&D|Decks & Docks)\b", re.I)      # "weather permitting" is fine
+
+
+def _timeline_days(tl: dict) -> int:
+    """Working days on site in a customer timeline: its last row's last day, else the number in its title."""
+    last = [int(r.get("last_day") or 0) for r in tl.get("rows") or []]
+    if last and max(last):
+        return max(last)
+    m = re.search(r"(\d+)\s+working day", tl.get("title") or "")
+    return int(m.group(1)) if m else 0
+
+
+def _timeline(tl: dict, opts: Optional[list] = None) -> str:
+    """The proposal's Schedule from the job's own timeline (report.timeline_of): the time before day 1 and a bar per stretch
+    of work on the working days it takes (column 0 is before day 1; day d spans [d, d+1)), then what each option does to it
+    (opts = [(label, the option's timeline | None, note)]). A line with permit / inspection / vendor words stops the build."""
+    rows = list(tl.get("rows") or [])
+    pre = tl.get("precon") or None
+    said = ([pre.get("text", "")] if pre else []) + [r.get("title") or r.get("label") or "" for r in rows] + [tl.get("title") or ""]
+    said += [x for _l, o_, n_ in (opts or []) for x in [n_ or ""] + [r.get("title") or r.get("label") or "" for r in ((o_ or {}).get("rows") or [])]]
+    for x in said:
+        if x and _NOT_FOR_CLIENT.search(x):
+            raise ValueError(f"the customer timeline carries permit / inspection / vendor wording: {x!r}")
+    nd = _timeline_days(tl)
+    xs = [float(v) for r in rows for v in (r.get("gantt_x") or [])] + ([float(v) for v in (pre.get("gantt_x") or [])] if pre else [])
+    n = max(int(math.ceil(max(xs) - 1e-9)) if xs else 0, nd + 1)
+
+    def bar(x0, x1, cls=""):
+        return f'<i class="{cls}" style="left:{100 * x0 / n:.3f}%;width:{max(0.6, 100 * (x1 - x0) / n):.3f}%"></i>'
+    ticks = sorted({1} | set(range(5, n, 5)) | ({nd} if nd % 5 >= 3 else set()))
+    items = ['<li class="g-head" aria-hidden="true"><span>Working day</span><span class="g-ticks">'
+             + "".join(f'<span style="left:{100 * (d + 0.5) / n:.3f}%">{d}</span>' for d in ticks if 0 < d < n) + "</span></li>"]
+    if pre:
+        g = pre.get("gantt_x") or [0, 1]
+        items.append(f'<li><span class="g-lab"><b>Before day 1</b>{E(pre.get("text", ""))}</span><span class="g-bar">{bar(float(g[0]), float(g[1]), "pre")}</span></li>')
+    for r in rows:
+        g = r.get("gantt_x") or [r.get("first_day", 1), (r.get("last_day") or r.get("first_day", 1)) + 1]
+        items.append(f'<li><span class="g-lab"><b>{E(r.get("days", ""))}</b>{E(r.get("title") or r.get("label") or "")}</span>'
+                     f'<span class="g-bar">{bar(float(g[0]), float(g[1]), "" if r.get("option", "base") == "base" else "opt")}</span></li>')
+    h = ['<h2 class="kicker pb" id="g-schedule">Schedule <span class="tag">working days on site · the deck as proposed</span></h2>',
+         f'<p class="sched-title">{E(tl.get("title") or f"{nd} working days on site, weather permitting")}</p>',
+         f'<ol class="gantt" style="--n:{n}">' + "".join(items) + "</ol>"]
+    ol = []
+    for lab, o_, note in opts or []:
+        txt = ""
+        if o_:
+            n2 = _timeline_days(o_)
+            add = [r for r in o_.get("rows") or [] if r.get("option", "base") != "base"]
+            txt = ((f"{n2} working days on site, {n2 - nd} more" if n2 > nd else f"the deck's {nd} working days stay the same" if n2 == nd else f"{n2} working days on site")
+                   + "".join(f"; {r.get('days', '')} — {r.get('label') or r.get('title') or ''}" for r in add))
+        txt = "; ".join(x for x in (txt, note) if x)
+        if txt:
+            ol.append(f"<li><b>{E(lab)}:</b> {E(txt)}</li>")
+    if ol:
+        h.append('<h3>With the options</h3><ul class="opt-scope sched-opts">' + "".join(ol) + "</ul>")
+    return "".join(h)
+
+
+def _option_timelines(spec, tl: dict, blocks) -> list:
+    """Each option block's line for the Schedule: [(label, its timeline | None, note)]. An option's timeline is its own
+    "timeline" key (a customer block or "schedule.json#Scenario"), else its spec's extras.timeline when that is not the
+    deck's; "timeline_note" adds words (the roof: when it goes up). An add-on gets a line only with its own timeline or note
+    ("timeline_label" names it, e.g. "Options 1 and 2 together")."""
+    out, later = [], []                      # the options in order, then the add-ons (they combine options)
+    for i, o in enumerate(blocks or [], 1):
+        mine = timeline_of(o["timeline"]) if o.get("timeline") else None
+        if mine is None:
+            sp = o.get("spec") if o.get("spec") is not None else o.get("roof_spec")
+            cand = timeline_of(sp) if sp is not None and sp is not spec else None
+            mine = cand if cand and cand != tl else None
+        if mine or o.get("timeline_note"):
+            out.append((f"{o.get('number') or f'Option {i}'} — {o.get('title') or ''}".rstrip(" —"), mine, o.get("timeline_note") or ""))
+        for a in o.get("addons") or []:
+            at = timeline_of(a["timeline"]) if a.get("timeline") else None
+            if at or a.get("timeline_note"):
+                later.append((a.get("timeline_label") or a.get("label") or "Add-on", at, a.get("timeline_note") or ""))
+    return out + later
+
+
 def _options_table(p, options):
     """Full installed deltas against this proposal: [(label, other pricing)]."""
     if not options:
@@ -695,8 +793,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         CAP.update(CAP_NO_BEAM)
     if (rd / "sun.json").exists():
         CAP.update(json.load(open(rd / "sun.json")))
-    if (rd / "captions.json").exists():          # a job's own captions (its camera stations, option renders)
-        CAP.update(json.load(open(rd / "captions.json")))
+    CAP.update(_caps_file(rd / "captions.json"))  # a job's own captions (its camera stations, option renders)
     alt_names = sorted(n_ for n_ in have if n_.startswith("alt-"))
     alt_html = (f'<h2 class="kicker pb" id="g-alt">The option, rendered <span class="tag">{E(alt_tag or "same deck, the optional rail")}</span></h2>'
                 + _gallery(key, alt_names, have)) if alt_names else ""
@@ -765,6 +862,9 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         ob = _option_blocks(spec, t, p, blocks, key, rd, files) if blocks else None
         if ob:
             w(ob["html"])
+        tl = timeline_of(spec)
+        if tl:                               # the job's own timeline (a schedule model); a job without one shows none, as before
+            w(_timeline(tl, _option_timelines(spec, tl, blocks)))
         opt_html = _options_table(p, opts) + (_options_summary(ob) if ob else "")
         if spec.extras.price_breakdown:
             nxt = re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):])
@@ -918,6 +1018,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
             + (PL.FONT + PL.CSS + PL.brand_css(spec) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
             + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
+            + (PL.TIMELINE_CSS if proposal and timeline_of(spec) else "")
             + "</head>" + ('<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
@@ -1002,8 +1103,9 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     terms, the link to the interactive 3D page. The roof is louvered.roofs_of(spec)[roof]; its price is its own (price, or
     price_per_sf x its area), financed and monthly the way the deck's price gets them; nothing here touches the deck's price.
     addon (all optional): renders [name | (name, caption)] (default: every roof-*.jpg in renders_dir), screens dict(price,
-    renders, words, label) (price overrides the engine's estimate), facts {section: [lines]} over PL.LOUVER_FACTS, schedule
-    [lines], exclusions [lines], deck_note (a line on the deck the roof goes on). Returns {"html", "files", "pdf"?, "pricing"}."""
+    renders, words, label, open_note) (price overrides the engine's estimate; words default to the engine's screens; open_note
+    says why an open side stays open), facts {section: [lines]} over PL.LOUVER_FACTS, schedule [lines], exclusions [lines],
+    deck_note (a line on the deck the roof goes on). Returns {"html", "files", "pdf"?, "pricing"}."""
     from . import run
     from .louvered import roofs_of, resolve, surfaces_of, roof_pricing, scope_words, ANGLE_RANGE
     from .pricing import fixed_terms, price_louvered
@@ -1029,8 +1131,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     have = {x.stem for x in rd.glob("*.jpg")} if rd.exists() else set()
     files = {f"r/{key}-{n_}.jpg": str(rd / f"{n_}.jpg") for n_ in have}
     CAP.clear(); CAP.update(CAP0)
-    if (rd / "captions.json").exists():
-        CAP.update(json.load(open(rd / "captions.json")))
+    CAP.update(_caps_file(rd / "captions.json"))
     today = date_line or date.today().strftime("%B %d, %Y")
     addr = ", ".join(x for x in (spec.site.address, spec.site.city, f"{spec.site.state} {spec.site.zip}".strip()) if x)
     name = name or f"{q['name']} · {spec.site.address}".strip(" ·")
@@ -1075,19 +1176,21 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
         w("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in facts["what"]) + "</ul>")
     w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in _roof_scope(q, rp)) + "</ul>")
     # ---- controls, motor, gutters, lights (the product, with what it is: page 2 of the PDF)
+    # the LED strip is the roof's when the roof carries it (louvered_roofs[i].lights); otherwise it is one of the maker's options
     groups = [("Controls and motor", facts.get("controls")), ("Gutters and drainage", facts.get("gutters")), ("Lights", facts.get("lights") if q["lights"] else None),
-              ("Sensors and add-ons Suncoast offers", facts.get("accessories"))]
+              (f"Options {q['brand']} offers", list(facts.get("accessories") or []) + ([] if q["lights"] else list(facts.get("lights_option") or [])))]
     groups = [(h_, v_) for h_, v_ in groups if v_]
     if groups:
-        w('<h2 class="kicker" id="g-controls">Controls, motor, gutters, lights</h2><div class="facts-cols">'
+        w('<h2 class="kicker" id="g-controls">Controls, gutters' + (", lights" if q["lights"] else "") + ' and options</h2><div class="facts-cols">'
           + "".join(f"<div><h3>{E(h_)}</h3><ul>" + "".join(f"<li>{E(x)}</li>" for x in v_) + "</ul></div>" for h_, v_ in groups) + "</div>")
     # ---- size and placement
     under = sorted({f"{b[0]} {b[1]}" for b in _plan_boxes(L) if min(q["x1"], b[3]) - max(q["x0"], b[2]) > 0.5 and min(q["y1"], b[5]) - max(q["y0"], b[4]) > 0.5})
     w('<h2 class="kicker pb" id="g-size">Size and placement <span class="tag">plan · house at the top</span></h2>')
     w(f'<figure class="plan-fig">{_roof_plan_svg(L, q, (Wp, Dp, Ap))}<figcaption>The roof (hatched) and its posts over the deck; the darker the deck, the higher the level.</figcaption></figure>')
     reads = [("Size", f"{ftin(Wp * 12)} along the house x {ftin(Dp * 12)} out from it, {Ap:g} SF"),
-             ("Over", (", ".join(under) if under else "the deck") + (f" — {ftin(q['z_deck'] * 12)} above grade" if q["z_deck"] else "")),
-             ("House side", "attached to the house at the soffit / roof line — no posts at the house" if q["attach"] == "house" else "freestanding, posts at every corner"),
+             ("Over", (" and ".join(dict.fromkeys(("the deck" if u.split(" ")[0] == "Deck" else "the " + u.rsplit(" ", 1)[0].lower()) for u in under)) if under else "the deck")
+              + (f" — {ftin(q['z_deck'] * 12)} above grade" if q["z_deck"] else "")),
+             ("House side", _house_side(q, short=True)),
              ("Height", f"top of the frame {ftin((q['z_top'] - q['z_deck']) * 12)} above the deck; {ftin(q['clear_ft'] * 12)} clear under the beams")]
     if a.get("deck_note"):
         reads.append(("The deck", a["deck_note"]))
@@ -1097,7 +1200,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     st = [("Posts", f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
            + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} there — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else "")),
           ("Frame", f"{q['beam_label']} aluminum perimeter beams with the gutter built in" + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else "")),
-          ("House side", "the house-side beam is carried on brackets at the soffit / roof line" if q["attach"] == "house" else "posts at every corner")]
+          ("House side", _house_side(q))]
     over = _posts_over_columns(L, q)
     if over is not None:
         st.append(("Under the posts", over))
@@ -1107,7 +1210,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if has_screens:
         figs = _render_figs(dict(renders=sa.get("renders") or sorted(n_ for n_ in have if n_.startswith("screens-")), renders_dir=sa.get("renders_dir") or str(rd)),
                             rd, key, "screens", files)
-        words = sa.get("words") or ([x["words"] for x in scr] if scr else [])
+        words = sa.get("words") or _screen_lines(q, sa.get("open_note")) or ([x["words"] for x in scr] if scr else [])
         w('<section class="optblock" id="g-screens" aria-labelledby="oh-screens"><div class="opt-head"><div class="opt-title">'
           f'<span class="eyebrow">Add-on</span><h3 id="oh-screens">{E(sa.get("label") or "Motorized screens")}</h3></div>{_price_trio(sc_c, sc_f, sc_m, show_fin)}</div><div class="opt-body">'
           + (f'<p class="opt-blurb">{E(sa["blurb"])}</p>' if sa.get("blurb") else "")
@@ -1174,6 +1277,55 @@ def _roof_scope(q, rp: Optional[dict] = None) -> list:
         sold = f"{ftin(float(rp['width_ft']) * 12)} x {ftin(float(rp['depth_ft']) * 12)} ({float(rp['area_sf']):g} SF)"
         lines = [x.replace(built, sold) for x in lines]
     return lines
+
+
+def _house_side(q: dict, short: bool = False) -> str:
+    """How the roof meets the house, by the louvered engine's house_mount: the roof line (flashed stand-offs on the existing
+    roof, above the soffit), the wall under the soffit, or the fascia line. short: the size-and-placement read."""
+    if q["attach"] != "house":
+        return "freestanding, posts at every corner" if short else "posts at every corner"
+    m = q.get("house_mount") or "roof"
+    if short:
+        return {"roof": "attached at the roof line, on flashed stand-off brackets on the existing roof — no posts at the house",
+                "wall": "attached to the house wall under the soffit — no posts at the house",
+                "fascia": "attached at the fascia line — no posts at the house"}.get(m, "attached to the house — no posts at the house")
+    try:
+        from .louvered import BRACKET_OC_FT
+        oc = f" about every {BRACKET_OC_FT * 12:g}\""
+    except Exception:
+        oc = ""
+    return {"roof": f"the house-side beam bears on flashed stand-off brackets{oc} on the existing roof over the wall line, each lagged into a rafter over solid blocking",
+            "wall": "the house-side beam is carried on brackets on the house wall under the soffit",
+            "fascia": "the house-side beam hangs at the fascia line"}.get(m, "the house-side beam is carried on brackets at the house")
+
+
+def _screen_lines(q: dict, open_note=None) -> list:
+    """The roof's screens in the homeowner's words, from the louvered engine's resolved screens (q["screens"]): where each
+    runs and its size, the track post and fixed panel at the eave, the mesh and housing; then each open side of an attached
+    roof (open_note: why — a string for every open side, or {side: words})."""
+    scr = q.get("screens") or []
+    if not scr:
+        return []
+    on_rail = any(p_.get("on_rail") for p_ in q["posts"])
+    out = []
+    for sc in scr:
+        size = f"{ftin(sc['width'] * 12)} wide with a {ftin(sc['max_drop'] * 12)} drop"
+        onto = "onto the deck" if abs(float(sc["z_bottom"]) - float(q["z_deck"])) < 0.1 else "to the level below"
+        if sc["side"] == "front":
+            where = ((("on the house side of the rail" if on_rail else "inside the posts") + (", between the two posts" if len(q["posts"]) == 2 else ""))
+                     if sc["mount"] == "inside" else "outside the front beam")
+            txt = f"Front: one screen, {size}, {where}; it comes down {onto}"
+        else:
+            txt = (f"{sc['side'].capitalize()} end: {size}" + (", from the front post back to a slim track post at the eave" if sc.get("track_post") else "")
+                   + f"; it comes down {onto}" + ("; a fixed screen panel closes the strip under the eave" if sc.get("fixed_panel") else ""))
+        fab = "clear vinyl" if sc["fabric"] == "vinyl" else f"{str(sc['color']).lower()} mesh"
+        out.append(f"{txt} — {fab}, {sc['housing'] * 12:g}\" housing")
+    if q["attach"] == "house":
+        have_ = {sc["side"] for sc in scr}
+        for s_ in (x for x in ("front", "left", "right") if x not in have_):
+            why = open_note.get(s_) if isinstance(open_note, dict) else open_note
+            out.append(f"The {s_ if s_ == 'front' else s_ + ' end'} stays open" + (f": {why}" if why else ""))
+    return out
 
 
 def _posts_over_columns(L, q) -> Optional[str]:
