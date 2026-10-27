@@ -1114,6 +1114,7 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
                     continue
                 ya = y0 + (y1 - y0) * (a - x0) / (x1 - x0); yb = y0 + (y1 - y0) * (b - x0) / (x1 - x0)
                 of.blocks.append((a, ya, b, yb, f"PF block side {i + 1}"))
+    _frame_notches(spec, of, poly, ins, jb, plies)        # inset stairs: trimmer, headers, PF joist in the notch they sit in
     n_sk = sum((ea in ("rim45", "bay45")) + (eb in ("rim45", "bay45")) for _, _, _, ea, eb, _ in of.joists)
     n_bf = sum((ea == "ledger45") + (eb == "ledger45") for _, _, _, ea, eb, _ in of.joists)
     of.notes.append(f"outline frame: {len(of.joists)} joist pieces, {sum(b - a for _, a, b, *_ in of.joists) / 12:.0f} LF; "

@@ -494,16 +494,20 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
         if o.get("spec") is not None:            # the deck with this option: an engine delta (on a per-SF deck: cost math at the job margin)
             t2, _, p2 = run(o["spec"])
             c, f, m = option_delta(p, p2)
+            basis = f"engine delta: work {p2.work - p.work:+,.0f}" + (f" at the job margin {p.options_gm:.1%} (the deck sells per SF)" if getattr(p, "per_sf", 0)
+                                                                      else f", the deck's {p.gm:.1%} margin")
         elif o.get("roof") is not None:          # a louvered roof: its own price per SF x its area (or a set price), outside the deck's margin
             from .louvered import roofs_of, resolve, surfaces_of, scope_words
             rs = o.get("roof_spec") or spec      # the spec that carries the roof (the deck's, or a copy with the roof on it)
             roof = roofs_of(rs)[o["roof"]] if isinstance(o["roof"], int) else o["roof"]
             ap = price_louvered(rs, roof)
             c, f, m = ap.sell, ap.retail, ap.monthly
+            basis = f"owner-set: {ap.basis}, sold on its own (outside the deck's cost and margin)"
             if o.get("facts") is None:
                 o = dict(o, facts=scope_words(resolve(roof, surfaces_of(t.layout if rs is spec else run(rs)[0].layout))))
         elif o.get("price") is not None:         # a price the owner set outright
             c, f, m = fixed_terms(spec, o["price"])
+            basis = "owner-set price"
         else:
             raise ValueError(f"option {title!r}: give spec, roof or price")
         facts = o.get("facts")
@@ -512,11 +516,13 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
         adds = []
         for ai, a in enumerate(o.get("addons") or [], 1):
             note = a.get("note", "")
+            ab = "owner-set price"
             if a.get("spec") is not None:       # rides with another option (the lights on the yard stair): the extra over both alone
                 ta, _, pa = run(a["spec"])
                 tb, _, pb = run(a["against"])
                 ca, fa, ma = option_delta(pb, pa)
                 ca, fa, ma = ca - c, fa - f, ma - m
+                ab = f"engine delta: the two options together, less each alone (work {(pa.work - pb.work) - ((p2.work - p.work) if t2 is not None else 0):+,.0f})"
                 if not note and t2 is not None:
                     la, lb, lo, l0 = lights_of(ta), lights_of(tb), lights_of(t2), lights_of(t)
                     xr, xp = (la["riser"] - lb["riser"]) - (lo["riser"] - l0["riser"]), (la["post_cap"] - lb["post_cap"]) - (lo["post_cap"] - l0["post_cap"])
@@ -533,9 +539,10 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
                     raise ValueError("screens add-on: the roof has no screens (louvered_roofs[i].screens)")
                 ca, fa, ma = fixed_terms(spec, rr["screens_sell"])
                 note = note or "; ".join(x["words"] for x in rr.get("screens") or [])
+                ab = _screens_basis(rr)
             else:
                 raise ValueError(f"add-on {a.get('label')!r}: give spec + against, price, or screens (on a roof option)")
-            adds.append((a.get("label") or "Add-on", ca, fa, ma, note, _render_figs(a, rd, key, f"{ok}-a{ai}", files)))
+            adds.append((a.get("label") or "Add-on", ca, fa, ma, note, _render_figs(a, rd, key, f"{ok}-a{ai}", files), ab))
         imgs = _render_figs(o, rd, key, ok, files)
         h = [f'<section class="optblock" id="g-opt-{ok}" aria-labelledby="oh-{ok}"><div class="opt-head"><div class="opt-title">'
              f'<span class="eyebrow">{E(num)}</span><h3 id="oh-{ok}">{E(title)}</h3></div>{_price_trio(c, f, m, show_fin)}</div><div class="opt-body">']

@@ -61,7 +61,7 @@ PRODUCTS: Dict[str, dict] = {
     "AZTDL100TRAN": dict(desc="TimberTech 100W 12V transformer with photocell + timer", each=135.15, watts=100.0, watts_max=90.0,
                          photocell=True, timer=True, dimmer=False,
                          source="EST — Lumbermens list eff. 1 Jun 2026 (The Deck Store $137.99); 90 W max load, 60 W max per run (TimberTech metal-rail guide)"),
-    "AZTDL150PPR": dict(desc="TimberTech 150W PowerPack with dimmer, remote, timer and photo eye", each=373.95, watts=150.0, watts_max=135.0,
+    "AZTDL150PPR": dict(desc="TimberTech 150W PowerPack 12V transformer with photocell (photo eye), timer, dimmer and remote", each=373.95, watts=150.0, watts_max=135.0,
                         photocell=True, timer=True, dimmer=True,
                         source="EST — Lumbermens list eff. 1 Jun 2026 (The Deck Store $301.99); planned at 135 W max (90%); needs a GFCI in-use receptacle"),
     "LV12-2-250": dict(desc="12/2 stranded copper low-voltage landscape lighting cable, 250' (Southwire 55213444)", each=119.77, lf=250,
@@ -626,8 +626,9 @@ def _riser_face(b, risers, treads, decks) -> Optional[Tuple[str, int]]:
 
 def scene_lights(boxes: list, spec) -> list:
     """New boxes: on the showing face of every riser box, a matte-black faceplate with a warm lens (led_riser) centred on the
-    riser below the nosing (one per riser on a 4'-wide stair); on every rail-post box, a lantern cap (black collar, lens band
-    led_cap, black top) on whatever caps the post — its flat cap, or the drink-rail board where the rail carries one."""
+    riser below the nosing (one per riser on a 4'-wide stair); on every rail-post box, a lantern cap (collar and top in the
+    rail's finish, a lens band led_cap between) on whatever caps the post — its flat cap, or the drink-rail board where the
+    rail carries one (the drink rail runs between the posts when they carry cap lights). Two posts drawn at one spot take one."""
     cfg = lights_of(spec)
     if cfg is None:
         return []
