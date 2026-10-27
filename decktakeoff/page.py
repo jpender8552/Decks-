@@ -808,16 +808,21 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
         w('<details><summary>Cut list</summary>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]) + "</details>")
+        blocks = [o_ for o_ in (options or []) if isinstance(o_, dict)]      # the proposal's option blocks: how each is priced, estimates called out
         if cost_only and not spec.extras.sell_override:      # a bid: the cost stack with its margin (a sold job gets cost-to-build only)
             w(_stack(p, None))
             cats = t.by_category()
             w("<h3>Materials by category</h3>")
             w(table(["Category", "Lines", "Cost"], [[E(c), str(len(ls)), money(sum(l.ext for l in ls), True)] for c, ls in cats.items()] + [["<b>Materials (raw)</b>", "", f"<b>{money(p.materials, True)}</b>"]], "", ["l", "r", "r"]))
+            if blocks:
+                w(_options_internal(_option_blocks(spec, t, p, blocks, key, rd, {})))
         elif cost_only:
             cost_html, cost_total, tax_raw = _cost_stack(p, t)
             w(cost_html)
         else:
             w(_stack(p, spec.extras.sell_override))
+            if blocks:
+                w(_options_internal(_option_blocks(spec, t, p, blocks, key, rd, {})))
             w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
@@ -1081,8 +1086,11 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
           + (f'<p class="opt-blurb">{E(sa["blurb"])}</p>' if sa.get("blurb") else "")
           + ("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in list(words) + list(facts.get("screens") or [])) + "</ul>" if (words or facts.get("screens")) else "")
           + ('<div class="gal">' + "".join(figs) + "</div>" if figs else "") + "</div></section>")
-    # ---- the roof rendered
-    rn = a.get("renders") or sorted(n_ for n_ in have if n_.startswith("roof-"))
+    # ---- the roof rendered (default: every roof-* still, by the time in its name, open before closed)
+    def _ord(n_):
+        tm = re.findall(r"\d{3,4}", n_)
+        return (int(tm[-1]) if tm else 0, 0 if "open" in n_ else 1, n_)
+    rn = a.get("renders") or sorted((n_ for n_ in have if n_.startswith("roof-")), key=_ord)
     figs = _render_figs(dict(renders=rn, renders_dir=str(rd)), rd, key, "roof", files)
     if figs:
         w('<h2 class="kicker pb" id="g-renders">The roof, rendered <span class="tag">louvers open and closed through the day · design intent</span></h2>')
