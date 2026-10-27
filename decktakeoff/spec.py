@@ -260,12 +260,15 @@ class Stair:
                                          # "guard posts": an inset stair's handrail, bracketed to the deck guard's posts along one cheek
     handrail_side: str = "right"         # the side the handrail is on, going down ("right" | "left")
     option: str = ""                     # the option this stair belongs to ("Stairs to the yard"): its 3D boxes carry layer "option:<name>"
+    landing_footing: str = ""            # "" -> each landing's 4 posts and footings are their own stair lines | "deck": they stand on the deck's
+                                         # footing type (caisson / pier / Diamond Pier, the deck's bases), counted and installed with the deck's posts
 
 
 @dataclass
 class Extras:
     demo_existing: bool = False
     demo_sf: Optional[float] = None
+    demo_columns: List[dict] = field(default_factory=list)   # masonry columns out [{"what": "brick columns (9)", "lf": 55}] -> the card's stone / stucco column demo per LF
     hot_tub: bool = False
     roof_over: bool = False
     ledger_on_brick_veneer: bool = False

@@ -45,12 +45,20 @@ DEFAULTS = dict(
     x0=None, x1=None, y0=None, y1=None,     # ft, plan frame: the outside faces of the perimeter frame (the price's area)
     attach="house",                         # "house" (no posts at the house) | "freestanding" (posts all round); "house_roofline" / "house_wall"
                                             #   / "house_fascia" also set house_mount
-    house_mount="roof",                     # "roof": the house-side beam bears on flashed stand-off brackets @ 24" on the existing roof over the
-                                            #   wall line, lagged into the rafters (research: the eave over C is too low for a wall ledger) |
+    house_mount="roof",                     # "roof" (the default for a low eave): the house-side beam on flashed riser brackets @ 24" through the
+                                            #   shingles over the wall line, lagged into the rafters, the frame above the existing gutter |
                                             #   "wall": wall brackets under the soffit | "fascia": hung at the fascia line (set y0 there)
-    clear_ft=8.333,                         # the frame's underside above the deck (8'-4"); z_attach / z_top override it
+    clear_ft=8.917,                         # the frame's underside above the deck when soffit_z is not given (8'-11": the roof-line mount over a
+                                            #   soffit 7'-11" over the deck, 5:12, 0.8' overhang — Fillmore's measured eave); z_attach / z_top override
     z_attach=None,                          # ft above grade: top of the house-side beam (an attached roof's frame top)
     z_top=None,                             # ft above grade: top of the (level) frame
+    soffit_z=None,                          # ft above grade: the existing soffit's underside at the house wall (measured). Given, the frame's
+                                            #   height follows from the eave: "roof" mount = the roof surface over the wall line + riser_in + the
+                                            #   house beam; "wall" / "fascia" = the frame's top at the soffit. z_attach / z_top still override
+    overhang_ft=0.8,                        # the eave: wall line (y0) to the fascia's outer face
+    roof_pitch=5.0,                         # the house roof's rise per 12 at the eave
+    fascia_in=6.0,                          # soffit underside to the roof surface at the fascia face
+    riser_in=2.0,                           # roof-line mount: the house beam's underside this far over the shingles at its up-slope face
     louver_dir=None,                        # blade long axis "x" (parallel to the house) | "y"; None -> "x" attached, the short side freestanding
     blade_in=8.0, spacing_in=8.0,           # blade width and centre-to-centre spacing
     blade_t_in=1.5, motor_t_in=2.25,        # blade / motor-blade thickness
@@ -301,14 +309,41 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     w_f, h_f, w_b, h_b = fw_in * IN, fh_in * IN, bw_in * IN, bh_in * IN
     hmax = max(h_f, h_b)
 
+    # ---- the existing eave: the roof surface over the wall line, the gutter under the frame (measured: soffit_z)
+    riser = _num(q.get("riser_in"), 2.0) * IN
+    ov, pit, fas = _num(q.get("overhang_ft"), 0.8), _num(q.get("roof_pitch"), 5.0) / 12.0, _num(q.get("fascia_in"), 6.0) * IN
+
+    def eave_at(sof, measured):
+        z_edge = sof + fas
+        return dict(soffit_z=sof, y_fascia=y0 + ov, z_edge=z_edge, pitch=pit, z_wall=z_edge + ov * pit,
+                    gutter_top=z_edge - 0.5 * IN, y_lip=y0 + ov + 5.0 * IN, measured=measured)
+    eave = eave_at(float(q["soffit_z"]), True) if (house and q.get("soffit_z") is not None) else None
+
     # ---- heights: the frame is level
     if q.get("z_top") is not None:
         z_top = float(q["z_top"])
     elif house and q.get("z_attach") is not None:
         z_top = float(q["z_attach"])
+    elif eave is not None and mount == "roof":           # on riser brackets: riser_in over the shingles at the house beam's up-slope face
+        z_top = eave["z_wall"] + riser + h_b
+    elif eave is not None:                               # on the wall / at the fascia: the frame's top at the soffit
+        z_top = eave["soffit_z"]
     else:
-        z_top = z_deck + float(q.get("clear_ft") or 8.333) + hmax
+        z_top = z_deck + float(q.get("clear_ft") or DEFAULTS["clear_ft"]) + hmax
     z_bot = z_top - hmax                     # the frame's underside (its deepest beam)
+    if house and eave is None:               # no measurement: the eave this frame would sit over (drawn, for the section and the risers)
+        eave = eave_at((z_top - h_b - riser - fas - ov * pit) if mount == "roof" else z_top, False)
+    elif eave is not None:
+        if mount == "roof":
+            gap = (z_top - h_b) - eave["z_wall"]
+            if gap < 1.0 * IN - 1e-6:
+                notes.append(f"the house beam's underside is {ftin(gap * 12)} over the shingles at the wall line: the riser brackets need at least 1\" (raise z_attach)")
+            if (z_top - h_b) - eave["gutter_top"] < 3.0 * IN:
+                notes.append(f"the frame's side beams clear the existing gutter by only {ftin(((z_top - h_b) - eave['gutter_top']) * 12)}")
+        elif eave["soffit_z"] < z_top - 0.5 * IN:
+            notes.append(f"the frame's top ({ftin((z_top - z_deck) * 12)} over the deck) is above the soffit ({ftin((eave['soffit_z'] - z_deck) * 12)}): it cannot hang under it")
+    if z_bot - z_deck < 7.0 - 1e-6:
+        notes.append(f"only {ftin((z_bot - z_deck) * 12)} clear under the beams (under 7'-0\")")
     z_piv = z_top - float(q.get("pivot_drop_in") or 3.0) * IN
 
     # ---- motor zones and blades (blade ends over the gutters, blades stacked between the gutters)
@@ -361,7 +396,8 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     clear = z_bot - z_deck
     brackets = [x0 + 0.5 + k * BRACKET_OC_FT for k in range(int((W - 1.0) / BRACKET_OC_FT) + 1)] if house else []
     hc = q.get("house_clear_ft")
-    hc = float(hc) if hc is not None else (y0 + 1.4 if (house and mount in ("roof", "fascia")) else y0 + w_b)
+    hc = float(hc) if hc is not None else ((eave["y_lip"] + 2.0 * IN) if (eave is not None and mount in ("roof", "fascia")) else
+                                           y0 + 1.4 if (house and mount in ("roof", "fascia")) else y0 + w_b)
     res = dict(src=r, name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], hex=HEX.get(str(q["color"]).lower(), "#141416"),
                x0=x0, x1=x1, y0=y0, y1=y1, W=W, D=D, area=round(area, 2), shift=shift, attach="house" if house else "freestanding",
                house_mount=mount if house else None, W_nom=W_nom, D_nom=D_nom, area_nom=round(W_nom * D_nom, 2),
@@ -370,7 +406,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
                louver_dir=ldir, blade_w=bwid, blade_t=float(q["blade_t_in"]) * IN, motor_t=float(q["motor_t_in"]) * IN, spacing=sp,
                angle_deg=ang, zones=cells, n_zones=len(cells), xs=xs, ys=ys, blades=blades, posts=pts, post=p, edge_clear=ec,
                plate=float(q["plate_in"]) * IN, gutter=bool(q["gutter"]), lights=bool(q["lights"]), downspouts=str(q.get("downspouts") or "none"),
-               brackets=brackets, house_clear=hc, notes=notes, price=q.get("price"), price_per_sf=q.get("price_per_sf"), priced=str(q.get("priced") or "own"),
+               brackets=brackets, house_clear=hc, eave=eave, riser=riser, notes=notes, price=q.get("price"), price_per_sf=q.get("price_per_sf"), priced=str(q.get("priced") or "own"),
                option_name=q.get("option_name"), note=q.get("note", ""), global_=bool(r.get("_global")))
     res["screens"] = _screens(res, q.get("screens") or [], surfaces)
     res["screens_priced"] = str(q.get("screens_priced") or res["priced"])
@@ -453,7 +489,7 @@ def _screens(q: dict, screens: List[dict], surfaces: List[dict]) -> List[dict]:
                         z_top=zh0, z_bottom=bottom, max_drop=zh0 - bottom, drop=drop,
                         cassette=dict(x0=cass[0], x1=cass[1], y0=cass[2], y1=cass[3], z0=zh0, z1=zh1), housing=hs,
                         track_post=(list(tp) if tp else None), track_post_top=(zb_bot if plane == "x" else zf_bot),
-                        fixed_panel=(list(fp) if fp else None), fixed_top=q["z_deck"] + max(6.5, q["clear_ft"] - 1.0),
+                        fixed_panel=(list(fp) if fp else None), fixed_top=(q["eave"]["soffit_z"] if q.get("eave") else q["z_deck"] + max(6.5, q["clear_ft"] - 1.0)),
                         fabric=fab, density=float(sd.get("density") or 90), color=str(sd["color"]),
                         name=sd.get("name") or f"{side} screen", sell=round(sell, 2), estimate=not price_known, rate=rate))
     return out
@@ -536,7 +572,7 @@ def draw_roof(add, q: dict) -> None:
     house = q["attach"] == "house"
     mount = q.get("house_mount") or "roof"
     # the beams: the house-side and front beams run the full length; the sides and dividers fit between them
-    A("lvbeam", x0, x1, y0, y0 + wb, zbb, zt, tag=((f"house-side {bl} beam on flashed stand-off brackets on the existing roof (roof-line mount)" if mount == "roof" else
+    A("lvbeam", x0, x1, y0, y0 + wb, zbb, zt, tag=((f"house-side {bl} beam on flashed riser brackets on the existing roof over the wall line (roof-line mount)" if mount == "roof" else
                                                     f"house-side {bl} beam on wall brackets under the soffit" if mount == "wall" else f"house-side {bl} beam hung at the fascia line")
                                                    if house else f"rear {bl} beam"))
     A("lvbeam", x0, x1, y1 - wf, y1, zbf, zt, tag=f"front {fl} beam, integrated gutter, on {len([p_ for p_ in q['posts'] if p_['y'] > (y0 + y1) / 2])} posts")
@@ -589,11 +625,13 @@ def draw_roof(add, q: dict) -> None:
             ya, yb_ = sorted((yo, yo + out_y * 0.21))
             A("lvdown", px - 0.12, px + 0.12, ya, yb_, zd + 0.35, top + 0.15, tag="2x3 downspout on the post")
             A("lvdown", px - 0.12, px + 0.12, min(yb_, yb_ + out_y * 0.35), max(yb_, yb_ + out_y * 0.35) if out_y > 0 else ya, zd + 0.12, zd + 0.35, tag="downspout kick-out")
-    # the house side: stand-offs on the roof (roof-line mount) or brackets on the wall / fascia
+    # the house side: riser brackets on the roof (roof-line mount) or brackets on the wall / fascia
+    ev = q.get("eave")
+    zr_ = (ev["z_edge"] + (ev["y_fascia"] - (y0 + wb / 2)) * ev["pitch"]) if ev else zbb - 0.42     # the shingles under the bracket
     for bx in q["brackets"]:
         if mount == "roof":
-            A("lvbracket", bx - 0.09, bx + 0.09, y0 + wb / 2 - 0.09, y0 + wb / 2 + 0.09, zbb - 0.42, zbb, tag="stand-off bracket, lagged into a rafter over solid blocking")
-            A("lvbracket", bx - 0.22, bx + 0.22, y0 + wb / 2 - 0.22, y0 + wb / 2 + 0.22, zbb - 0.45, zbb - 0.42, tag="stand-off flashing boot")
+            A("lvbracket", bx - 0.09, bx + 0.09, y0 + wb / 2 - 0.09, y0 + wb / 2 + 0.09, min(zr_, zbb - 0.05), zbb, tag="riser bracket through the shingles, lagged into a rafter over solid blocking")
+            A("lvbracket", bx - 0.22, bx + 0.22, y0 + wb / 2 - 0.22, y0 + wb / 2 + 0.22, min(zr_, zbb - 0.05) - 0.03, min(zr_, zbb - 0.05), tag="riser flashing boot")
         else:
             A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + 0.03, zbb - 0.45, zbb, tag="wall bracket (into the wall framing)")
             A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + wb - 0.02, zbb - 0.03, zbb, tag="wall bracket seat")
@@ -748,6 +786,13 @@ def takeoff_hook(t) -> None:
         if "post kit" in low:
             ln.net, ln.order = max(0, ln.net - n), max(0, ln.order - n)
             ln.why = f"{ln.why}; {words} (Suncoast 6x6 aluminum)"
+        elif "post insert" in low:                  # drink rail over the posts: no insert where the board butts a roof post
+            import re
+            m_ = re.match(r"(\d+) posts", ln.why)
+            if m_:
+                n_ins = max(0, int(m_.group(1)) - n)
+                ln.net = ln.order = int(math.ceil(n_ins / 8.0))
+                ln.why = f"{n_ins} posts" + ln.why[m_.end():] + f"; {words}: the board butts the roof post"
         else:
             for kind, k in pk.items():
                 if f" {kind.lower()} post " in low:
@@ -865,7 +910,7 @@ def scope_words(q: dict) -> List[str]:
            f"(one Gaposa motor blade each); the blades turn from closed to {ANGLE_RANGE[1]:g} degrees open by remote or app",
            f"Aluminum frame with the integrated gutter round every zone: {q['beam_label']} front beam, {q['frame_label']} house, side" + (" and divider" if q["xs"] or q["ys"] else "") + " beams"
            + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else ""),
-           ((f"House side: the beam bears on flashed stand-off brackets on the existing roof over the wall line, lagged into the rafters — no posts at the house"
+           ((f"House side: the beam sits on flashed riser brackets through the shingles over the wall line, lagged into the rafters, with the frame above the existing gutter — no posts at the house"
              if q["house_mount"] == "roof" else "House side: the beam hangs on brackets on the house wall under the soffit — no posts at the house"
              if q["house_mount"] == "wall" else "House side: the beam hangs at the fascia line — no posts at the house")
             if q["attach"] == "house" else "Freestanding on posts at every corner"),
@@ -1026,7 +1071,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
         cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
         o.append(TH(X(cx_), Y(cy_) - 4, f"ZONE {zi + 1}", 8.4, 900, "middle", halo="#fff"))
         o.append(TH(X(cx_), Y(cy_) + 8, f"{c['n_blades']} blades · 1 motor blade (heavy line)", 6.6, 700, "middle", halo="#fff"))
-    o.append(TH(X(x0) + 8, Y(y0 + w) + 11, ((f"house-side {q['frame_label']} beam on stand-offs on the roof @ {BRACKET_OC_FT * 12:g}\" OC (roof-line mount) — no posts at the house"
+    o.append(TH(X(x0) + 8, Y(y0 + w) + 11, ((f"house-side {q['frame_label']} beam on riser brackets on the roof @ {BRACKET_OC_FT * 12:g}\" OC (roof-line mount) — no posts at the house"
                                               if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house")
                                              if q["attach"] == "house" else f"rear {q['frame_label']} beam"), 6.6, 700, halo="#fff"))
     o.append(TH(X(x0) + 8, Y(y1 - wf) - 6, f"front {q['beam_label']} beam · {q['frame_label']} sides" + (" + divider" if q["xs"] else "") + " · gutter + LED all round", 6.6, 700, halo="#fff"))
@@ -1059,16 +1104,21 @@ def sheet(L, S, t, meta) -> Optional[str]:
     sy0, sy1 = y0 - 2.4, y1 + 4.6
     z_lo, z_hi = zd - 3.2, zt + 3.4
     Xs, Zs, scs = elev_xform(sy0, sy1, z_lo, z_hi, 596, 26, 330, 304)
-    z_sof = zd + max(6.67, q["clear_ft"] - 1.08)          # the existing soffit (research: about 7'-3" above the deck; field verify)
-    pitch = 4.0 / 12
-    eave_y = y0 + 1.5
-    z_eave = z_sof + 0.35
+    ev = q.get("eave")
+    if ev:                                                 # the measured eave (soffit_z): fascia face, roof edge, pitch
+        z_sof, pitch, eave_y, z_eave, z_gut = ev["soffit_z"], ev["pitch"], ev["y_fascia"], ev["z_edge"], ev["gutter_top"]
+    else:                                                  # no measurement: a typical low eave a foot under the frame
+        z_sof = zd + max(6.67, q["clear_ft"] - 1.08)
+        pitch = 4.0 / 12
+        eave_y = y0 + 1.5
+        z_eave = z_sof + 0.35
+        z_gut = z_eave + 0.05
     def roof_z(yy):
         return z_eave + (eave_y - yy) * pitch
     o.append(R(Xs(sy0), Zs(z_sof), (y0 - sy0) * scs, (z_sof - z_lo) * scs, HOUSE, INK, 0.9))
     o.append(T(Xs((sy0 + y0) / 2) + 3, Zs((zd + z_sof) / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
     o.append(PG([(Xs(sy0), Zs(roof_z(sy0))), (Xs(eave_y), Zs(z_eave)), (Xs(eave_y), Zs(z_sof)), (Xs(sy0), Zs(z_sof))], "#cfc6b4", INK, 0.7))
-    o.append(R(Xs(eave_y), Zs(z_eave + 0.05), 0.42 * scs, 0.45 * scs, "#9a948b", INK, 0.5))       # the existing gutter
+    o.append(R(Xs(eave_y), Zs(z_gut), 0.42 * scs, 0.42 * scs, "#9a948b", INK, 0.5))       # the existing gutter
     yf = max((s_["y1"] for s_ in surf if abs(s_["z"] - zd) < 0.01 and s_["x0"] - 0.1 <= (x0 + x1) / 2 <= s_["x1"] + 0.1), default=y1 + q["edge_clear"])
     o.append(R(Xs(y0), Zs(zd), (yf - y0 + 0.08) * scs, 0.1 * scs, DECK, INK, 0.7))
     o.append(R(Xs(y0), Zs(zd - 0.1), (yf - y0) * scs, jd * scs, FILL["timber"], INK, 0.6))
@@ -1077,7 +1127,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     o.append(R(Xs(y0), Zs(zt), wb * scs, hb * scs, BLACK, INK, 0.5))
     o.append(R(Xs(y1 - wf), Zs(zt), wf * scs, hf * scs, BLACK, INK, 0.5))
     zbb = zt - hb
-    if q["attach"] == "house" and mount == "roof":           # stand-off brackets from the house roof up to the house beam
+    if q["attach"] == "house" and mount == "roof":           # riser brackets from the house roof up to the house beam
         ys_ = y0 + wb / 2
         o.append(R(Xs(ys_ - 0.08), Zs(zbb), 0.16 * scs, max(1.0, (zbb - roof_z(ys_)) * scs), BLACK, INK, 0.4))
         o.append(LN(Xs(ys_ - 0.25), Zs(roof_z(ys_ - 0.25)), Xs(ys_ + 0.25), Zs(roof_z(ys_ + 0.25)), INK, 2.2))
@@ -1115,15 +1165,18 @@ def sheet(L, S, t, meta) -> Optional[str]:
     o.append(T(Xs(y1) + 8, Zs(zt) + 9, f"TOP OF FRAME {ftin(zt * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) - 4, f"DECK {ftin(zd * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) + 6, "above the patio" if zd > 3 else "above grade", 6.0, 600, "start", MUTE))
-    _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.6), Zs(zt + 3.15), "existing eave + gutter, soffit ~7'-3\" over the deck: field verify", 6.2)
+    _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.6), Zs(zt + 3.15),
+          (f"existing eave + gutter{'' if ev.get('measured') else ' (assumed)'}: soffit {ftin((z_sof - zd) * 12)} over the deck, {pitch * 12:g}:12 roof"
+           + (f", the frame {ftin(((zt - hb) - z_gut) * 12)} over the gutter" if (ev and mount == "roof") else "") + " — field verify"
+           if ev else "existing eave + gutter, soffit ~7'-3\" over the deck: field verify"), 6.2)
     if q["attach"] == "house":
         _lead(o, Xs(y0 + wb / 2), Zs(zbb - 0.12), Xs(y0 + 1.2), Zs(zb - 1.1),
-              (f"house-side {q['frame_label']} beam on flashed stand-offs @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters over solid blocking (roof-line mount)"
+              (f"house-side {q['frame_label']} beam on flashed riser brackets @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters (roof-line mount)"
                if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing"), 6.2)
-    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.9), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
+    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 3.3), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
     _lead(o, Xs(py), Zs(zd + 3.6), Xs(y0 + 3.4), Zs(zd + 3.5), f"{p * 12:g}x{p * 12:g} aluminum post, {ins_txt} inside the frame face: the rail post, downspout inside", 6.2)
     _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.3), "rail (cut) ends into the post on wall-mount brackets", 6.2)
-    _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck post + pier directly under the roof post (framing plan)", 6.2)
+    _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck column + caisson under the roof post (framing plan)", 6.2)
 
     # ---------------------------------------------------------------- detail 1: the post on the deck edge
     _panel(o, 584, 346, 402, 260, "1", "THE ROOF POST ON THE DECK EDGE — IT IS THE RAIL POST")

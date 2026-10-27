@@ -250,7 +250,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         lo, hi = p.engineering
         w(f"**Engineering — ${lo:,.0f} to ${hi:,.0f}.** Stamped drawings by a Colorado engineer ({s.site.ground_snow_psf:g} psf snow"
           + (", timber frame" if s.is_timber else "") + (", caissons" if s.framing.footing_type == "caisson" else "") + (", hot-tub bay" if s.extras.hot_tub else "")
-          + "). GSX provides the engineer and bills the engineering at cost, with no markup. You own the stamped set. It is separate from the deck price above.")
+          + f"). {_company(s)} provides the engineer and bills the engineering at cost, with no markup. You own the stamped set. It is separate from the deck price above.")
         w("")
     w("## INCLUDED — what it is")
     w("| Element | Selection |")
@@ -374,9 +374,10 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
             w("")
             w(s.extras.proposal_note)
     elif s.extras.engineered:
+        co = _company(s)
         w("Engineering first. This is a quote: the numbers depend on the stamped engineering, so the first step is engineering. "
-          "GSX provides the Colorado engineer and supplies the design package; you pay GSX the engineer's cost at no markup and you own the stamped set. "
-          "When the stamped set is in hand, GSX issues a fixed-price proposal on these numbers with the payment terms.")
+          f"{co} provides the Colorado engineer and supplies the design package; you pay {co} the engineer's cost at no markup and you own the stamped set. "
+          f"When the stamped set is in hand, {co} issues a fixed-price proposal on these numbers with the payment terms.")
         w("")
         w("Quote, not a contract: a fixed-price proposal follows the stamped engineering. Quote numbers hold 30 days. Renders and plan are design intent; the stamped engineering set governs structure, dimensions and locations.")
     else:
@@ -512,6 +513,16 @@ def composite_frame_words(t) -> str:
 
 def _span(a: int, b: int) -> str:
     return f"Day {a}" if a == b else f"Days {a}–{b}"
+
+
+def _company(s) -> str:
+    """Who the client documents say does the work: "GSX", or under another brand (extras.brand) that brand's name."""
+    key = str(getattr(s.extras, "brand", "gs") or "gs").lower()
+    if key == "gs":
+        return "GSX"
+    from .proposal_look import brand_of
+    b = brand_of(key)
+    return b.get("short") or b.get("name") or "GSX"
 
 
 def timeline_of(s) -> Optional[dict]:

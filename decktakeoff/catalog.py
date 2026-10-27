@@ -231,7 +231,7 @@ BOARDS_PALETTE = {
     ("Vintage", "Cypress"): ["#5c3324", "#74432f", "#89523b", "#9b6147", "#ad7256", "#bd8567", "#cc9979"],
     ("Vintage", "Coastline"): ["#5f5e5b", "#6f6e6c", "#7e7d7b", "#8b8a88", "#979694", "#a3a2a0", "#afaeac"],
     ("Vintage", "Mahogany"): ["#4f3325", "#664434", "#7b5541", "#8e654e", "#a0775d", "#b18a6f", "#c19c81"],
-    ("Vintage", "English Walnut"): ["#2f2019", "#40302a", "#54413a", "#68524a", "#7c6357", "#8f7565", "#a08874"],
+    ("Vintage", "English Walnut"): ["#402e20", "#4f3a2b", "#5a4537", "#634e3e", "#6f5647", "#7e6554", "#917766"],   # swatch-sampled 27 Oct 2026 (median #614b3c); the description-only palette read rosy-mauve
     ("Vintage", "Dark Hickory"): ["#2c2a29", "#333234", "#3a3a3c", "#454546", "#525253", "#5e5e5f", "#6a6a6b"],
     ("Landmark", "French White Oak"): ["#8f8168", "#a89a80", "#b8aa8f", "#c7b99f", "#d5c9b1", "#e2d8c3"],
     ("Landmark", "American Walnut"): ["#211610", "#2e1f16", "#3b2a1e", "#493627", "#574232", "#66503e"],

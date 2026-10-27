@@ -505,10 +505,11 @@ class _Site:
             H = float(t.get("height", 28)); R = float(t.get("radius", 7))
             self.tube([x, y, z0 - 0.2], [x, y, z0 + H * 0.9], 0.45, 0.08, "bark", tag="spruce trunk")
             n = int(t.get("tiers", 6))
+            cb = float(t.get("crown_base", 1.0))          # the lowest branches (a spruce limbed up over a lawn)
             for i in range(n):
-                zb = z0 + 1.0 + i * (H - 2.0) / n * 0.95
+                zb = z0 + cb + i * (H - cb - 1.0) / n * 0.95
                 r = R * (1.0 - i / (n + 0.6)) * self.rng.uniform(0.94, 1.04)
-                h = (H - 1.0) / n * 1.9
+                h = (H - cb) / n * 1.9
                 self.add("tree", x - r, x + r, y - r, y + r, zb, zb + h, "spruce" if i % 2 else "spruce2", 0, tag="spruce", shape="cone")
             return
         if kind == "shrub":

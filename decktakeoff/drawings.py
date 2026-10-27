@@ -51,7 +51,12 @@ def sheet(num: str, title: str, sub: str, body: List[str], scale_note: str, meta
            T(110, 39, textwrap.shorten(sub, 110, placeholder="…"), 9.5, 400, fill="#d8cfbf"),
            T(W_ - 18, 20, textwrap.shorten(meta["job_line"], 70, placeholder="…"), 9.5, 700, "end", "#d8cfbf"),
            T(W_ - 18, 36, meta["rev_line"], 8.5, 400, "end", "#b8b0a2")]
-    ftr = [LN(0, H_ - 34, W_, H_ - 34, GOLD, 2), T(18, H_ - 14, scale_note, 9.5, 600, fill=MUTE),
+    room, sn = W_ - 60 - len(meta["footer"]) * 8.6 * 0.5, 9.5          # a long scale note never runs into the footer: smaller, then shortened
+    if len(scale_note) * sn * 0.52 > room:
+        sn = max(7.0, room / (len(scale_note) * 0.52))
+        if len(scale_note) * sn * 0.52 > room:
+            scale_note = textwrap.shorten(scale_note, max(20, int(room / (sn * 0.52))), placeholder="…")
+    ftr = [LN(0, H_ - 34, W_, H_ - 34, GOLD, 2), T(18, H_ - 14, scale_note, round(sn, 1), 600, fill=MUTE),
            T(W_ - 18, H_ - 14, meta["footer"], 8.6, 400, "end", MUTE)]
     cid = f"clip{num.replace('-', '')}"
     return (f'<svg viewBox="0 0 {W_} {H_}" xmlns="http://www.w3.org/2000/svg" font-family="Nunito Sans, -apple-system, Helvetica, Arial, sans-serif">'
@@ -2768,12 +2773,17 @@ def _notes_cols(o, x, y, w, items, size=7.4, lh=10.0, gap=3.0, ymax=606.0, cols=
     return ybot
 
 
+def _nb(text: str) -> str:
+    """Non-breaking spaces inside a measure ("46 5/8", "@ 7 3/8") so a wrapped label never splits it."""
+    return re.sub(r"(?<=[@\d]) (?=\d)", " ", text)
+
+
 def _leaders(o, items, x_col, anchor="start", y_min=6.0, y_max=600.0, lh=8.6, size=6.6, chars=38, gap=4.0):
     """Labels stacked in a column at x_col, each on a leader to its anchor point, top to bottom without overlaps.
     items = [(ax, ay, text)]."""
     rows = []
     for ax, ay, txt in sorted(items, key=lambda q: q[1]):
-        lines = textwrap.wrap(re.sub(r"(\d) (\d+/\d+)", "\\1\u00a0\\2", txt), chars) or [""]     # a measure (46 5/8") stays on one line
+        lines = textwrap.wrap(_nb(txt), chars) or [""]          # a measure (46 5/8", @ 7 3/8") stays on one line
         rows.append([max(ay, y_min), lines, ax, ay])
     for i in range(1, len(rows)):
         prev = rows[i - 1]
@@ -3076,7 +3086,7 @@ def sheet_dimensions_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
         open_left = not any(abs(a[0] - b[0]) < 0.02 and abs(a[0] - nb[0]) < 0.05 for _, a, b, _ in sides)
         g = next((g for g in groups if g.lv is lv and g.inset and nb[0] - 0.3 <= (g.fp[0] + g.fp[1]) / 2 <= nb[1] + 0.3), None)
         txt = [f"{ids[0]}-{ids[-1]}: NOTCH {inch(w_in)} wide x {inch(d_in)} deep"] + (
-            textwrap.wrap(re.sub(r"(@|\d) (\d)", "\\1\u00a0\\2", _stair_words(g).replace(": ", " — ", 1)), 52) + ["cut into the " + lv.name.lower()] if g else [])
+            textwrap.wrap(_nb(_stair_words(g).replace(": ", " — ", 1)), 52) + ["cut into the " + lv.name.lower()] if g else [])
         xa = X(nb[0]) - 10 if open_left else X(nb[1]) + 10
         ya = Y((nb[2] + nb[3]) / 2) - 4
         o.append(LN(xa + (6 if open_left else -6), ya + 2, X(nb[0] if open_left else nb[1]) + (2 if open_left else -2), Y((nb[2] + nb[3]) / 2), BROWN, 0.6))
@@ -3085,7 +3095,7 @@ def sheet_dimensions_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
     yf = max(p[1] for lv in levels for p in lv.poly)
     allx = sorted({round(v, 4) for lv in levels for z in lv.zones for v in (z.x0, z.x1)})
     ybase = max([Y(yf)] + [Y(g.fp[3]) for g in groups if g.fp[3] > yf + 0.1])
-    yb = ybase + 34
+    yb = ybase + 34 + (6 if any(not g.inset and g.fp[3] > yf + 0.1 for g in groups) else 0)
     for (a_, b_), lab in zip(zip(allx, allx[1:]), chain_labels([v * 12 for v in allx])):
         dim_h(o, X, yb, a_, b_, lab, 8, up=True)
     dim_h(o, X, yb + 26, allx[0], allx[-1], f"{inch((allx[-1] - allx[0]) * 12)} = {ftin((allx[-1] - allx[0]) * 12)} overall", 10, up=False)
@@ -3126,9 +3136,14 @@ def sheet_dimensions_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
             pts = [ea] + op + [eb]
             far = y1_ if abs(a[1] - y0_) < abs(a[1] - y1_) else y0_
             yy_ = Y(far) + 14 if far > a[1] else Y(far) - 14
-            _chain(o, X, yy_, pts, 6.8, horiz=True, up=far < a[1])
+            _chain(o, X, yy_, pts, 6.8, horiz=True, up=True)       # its words between the stair and the line, clear of the zone chain
             dim_v(o, Y, X(x1_) + 12, min(a[1], far), max(a[1], far), f"{inch(abs(far - a[1]) * 12)} out", 6.8, left=False)
-            top.append(TH((X(x0_) + X(x1_)) / 2, yy_ + (12 if far > a[1] else -10), words, 6.6, 800, "middle", BROWN))
+            wl = textwrap.wrap(_nb(words), 46)                  # beside the stair, clear of the chains under it
+            right_ = X(x1_) + 30 + 46 * 3.6 < 745
+            tx_ = X(x1_) + 30 if right_ else X(x0_) - 14
+            ty_ = (Y(min(a[1], far)) + Y(max(a[1], far))) / 2 - (len(wl) - 1) * 4.5
+            for j, w in enumerate(wl):
+                top.append(TH(tx_, ty_ + j * 9, w, 6.6, 800 if j == 0 else 600, "start" if right_ else "end", BROWN))
         else:
             ea, eb = sorted((a[1], b[1]))
             op = [v for v in (y0_, y1_) if ea + 0.05 < v < eb - 0.05]
@@ -3189,10 +3204,52 @@ def _post_rows(levels, boxes) -> list:
     return rows
 
 
+def _footing_words(s, CL, t=None, short: bool = False) -> str:
+    """The footing as this job builds it, read from the spec (framing.footing_type, the frame's diameter / depth / model) with
+    the post base the order carries: short = the name ('20" x 3'-6" drilled caisson'), else the full description."""
+    fr, ft = s.framing, CL.frame
+    base = _post_base_name(s, t if t is not None else CL.parts[0].takeoff)
+    if fr.footing_type == "diamond_pier":
+        return (f"Diamond Pier {ft.footing_model}" if short else
+                f"Diamond Pier {ft.footing_model}: precast head set in a dug hole on undisturbed soil + 4 driven pins (ICC-ES ESR-1895); {base} base on the pier bolt"
+                + (" + a 5/8\" anchor into the head" if base.startswith("ABU88") else ""))
+    if fr.footing_type == "caisson":
+        return (f"{int(ft.footing_dia_in)}\" x {ftin(ft.footing_depth_in)} drilled caisson" if short else
+                f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}) + 6\" above grade, (4) #4 verticals + #3 ties, "
+                f"5/8\" cast-in anchor; {base} base on the anchor")
+    if fr.footing_type == "concrete":
+        return f"{int(ft.footing_dia_in)}\" concrete pier" if short else f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set {base} base"
+    return "existing caisson" if short else "Existing caissons stay — verify plumb, bearing and condition (engineer)"
+
+
+def _slab_posts(s, rows) -> Tuple[List[str], str]:
+    """The footings that land in a concrete slab of the yard model (geometry.site_model beds of kind "slab", plan feet; a
+    curb is not one): their schedule IDs and the slab's name — they go through saw-cut openings."""
+    sm = getattr(s.geometry, "site_model", None) or {}
+    slabs = [b for b in (sm.get("beds") or []) if str(b.get("kind", "")) == "slab" and len(b.get("poly") or []) >= 3
+             and "curb" not in str(b.get("name", "")).lower()]
+    ids, name = [], ""
+    for r in rows:
+        hit = next((b for b in slabs if _inside_poly([tuple(q) for q in b["poly"]], r.x, r.y)), None)
+        if hit is not None:
+            ids.append(r.id)
+            name = name or str(hit.get("name") or "slab").split(" (")[0]
+    return ids, name
+
+
+def _id_run(ids: List[str]) -> str:
+    """'P7-P12' for a consecutive run of schedule IDs, else 'P1, P3, P5'."""
+    nums = [int(i[1:]) for i in ids if i[:1] == "P" and i[1:].isdigit()]
+    if len(nums) == len(ids) and len(ids) > 2 and nums == list(range(nums[0], nums[0] + len(nums))):
+        return f"{ids[0]}-{ids[-1]}"
+    return ", ".join(ids)
+
+
 def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> str:
     s = CL.spec
     o = []
-    win = _cwindow(levels, S, back_pad=3.0, front_pad=3.0)
+    optb = [b for b in (boxes_all or []) if (getattr(b, "layer", "") or "").startswith("option:")]
+    win = _cwindow(levels, S, back_pad=3.0, front_pad=3.0, boxes=list(S.boxes) + optb)     # an option's stair and its footings in view
     X, Y, sc = _cxform(win, 30, 4, 940, 360)
     house = _draw_house(o, X, Y, sc, S, levels, win, "hhS100")
     _draw_levels(o, X, Y, levels, fills={lv.i: "#f3ecdf" for lv in levels}, sw=1.2)
@@ -3203,6 +3260,11 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
     _cdraw(o, X, Y, sc, S.boxes, ("post",), INK, 0.7)
     opt = [b for b in (boxes_all or []) if (getattr(b, "layer", "") or "").startswith("option:") and b.kind in ("footing", "post")]
     _cdraw(o, X, Y, sc, opt, ("footing", "post"), BROWN, 0.6, "2 2", fill="none")
+    for ly_ in sorted({b.layer for b in opt}):                     # each option's footings named under them
+        fb = [b for b in opt if b.layer == ly_ and b.kind == "footing"]
+        if fb:
+            o.append(TH(X((min(b.x0 for b in fb) + max(b.x1 for b in fb)) / 2), Y(max(b.y1 for b in fb)) + 12,
+                        f"OPTION — {ly_[7:]}: {len(fb)} footing{'s' if len(fb) != 1 else ''}", 6.6, 800, "middle", BROWN))
     rows = _post_rows(levels, S.boxes)
     for r in rows:
         o.append(TH(X(r.x), Y(r.y) - 9, r.id, 7.4, 800, "middle", fill=(BLUE if r.kind == "edge" else INK)))
@@ -3210,15 +3272,10 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
         for bm in lv.beams:
             o.append(TH(X(min(bm.a[0], bm.b[0])) + 3, Y(bm.a[1]) + 13, f"{bm.short} · {bm.size} {bm.kind}", 6.4, 800, fill=MUTE))
     _level_tags(o, X, Y, levels)
-    ft = CL.frame
-    desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, 5/8\" x 8\" cast-in anchor",
-            "diamond_pier": f"Diamond Pier {ft.footing_model}: precast head set in a dug hole on undisturbed soil + 4 driven pins (ICC-ES ESR-1895); {_post_base_name(s, CL.parts[0].takeoff)} base on the pier bolt"
-                            + (" + a 5/8\" anchor into the head" if _post_base_name(s, CL.parts[0].takeoff).startswith("ABU88") else ""),
-            "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base",
-            "existing": "Existing caissons stay — verify plumb, bearing and condition (engineer)"}[s.framing.footing_type]
+    desc = _footing_words(s, CL)                                    # read from the spec: Diamond Pier, caisson, concrete pier, existing
     y0 = 384
     o.append(T(30, y0, "FOOTING + POST SCHEDULE", 9, 800, fill=GOLD))
-    o.append(T(200, y0, textwrap.shorten(desc.split(":")[0] + (f" · {_post_base_name(s, CL.parts[0].takeoff)} post bases" if s.framing.footing_type == "diamond_pier" else ""), 140, placeholder="…"), 7.4, 600))
+    o.append(T(200, y0, textwrap.shorten(f"Footing: {_footing_words(s, CL, short=True)} · post base: {_post_base_name(s, CL.parts[0].takeoff)}", 140, placeholder="…"), 7.4, 600))
     hdr = ("ID", "level", "line", "x", "y", "post", "load")
     cols = [0, 28, 74, 150, 206, 262, 310]
     per = 17
@@ -3239,6 +3296,10 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
              f"{len(rows)} footings: " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)
              + (f" · stairs {sum(1 for r in rows if r.kind == 'stair')}" if any(r.kind == "stair" for r in rows) else ""),
              f"Frost {ftin(s.site.frost_depth_in)} · soil {s.site.soil_bearing_psf:,.0f} psf presumptive · worst post {max((r.load or 0) for r in rows):,.0f} lb."]
+    sl_ids, sl_name = _slab_posts(s, rows)
+    if sl_ids:
+        notes.append(f"{_id_run(sl_ids)} stand in the {sl_name.lower()}: " + ("each caisson drilled through a saw-cut opening in the slab." if s.framing.footing_type == "caisson"
+                     else "each footing set in a saw-cut opening in the slab."))
     if opt:
         notes.append("Dashed brown: the option's footings and posts (not in this scope unless the option is taken).")
     _notes_cols(o, 790, y0 - 2, 190, notes, size=7.2, lh=9.6)
@@ -3467,7 +3528,10 @@ def sheet_rail_composite(CL, S, t, levels, steps, meta) -> str:
         items.append("Guard 36\" min. above each walking surface on every open side — both levels stand over 30\" above grade, and the step between them is guarded "
                      "except at the stair; openings under 4\" (IRC R312). Rail LF for labor = deck-edge LF of actual rail.")
         if s.railing.drink_rail:
-            items.append(f"Drink rail: {getattr(s.railing, 'drink_rail_collection', '') or s.decking.collection} {getattr(s.railing, 'drink_rail_color', '') or s.decking.color} on drink-rail brackets, mitred at every turn.")
+            over = str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over"
+            items.append(f"Drink rail: {getattr(s.railing, 'drink_rail_collection', '') or s.decking.collection} {getattr(s.railing, 'drink_rail_color', '') or s.decking.color} "
+                         + ("board over the posts on the drink-rail clips (universal panel covers, post inserts), mitred at every turn." if over
+                            else "on drink-rail brackets, mitred at every turn."))
     _notes_cols(o, 30, 470, 940, items, size=7.1, lh=9.4, cols=2)
     return sheet("A-201", "Railing plan + elevation", "Both levels: post IDs and types (E end · L line · C corner), the runs, the front at both heights", o,
                  "Plan above · elevation of the front below · not to scale", meta)
@@ -3655,7 +3719,7 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
     jn = max(js, key=lambda b: b.x1) if js else None
     xc = (jn.x0 + jn.x1) / 2 if jn else xs_ - 0.6
     ys = [p[1] for lv in levels for p in lv.poly]
-    u0, u1 = -4.0, max(ys) + 2.5
+    u0, u1 = -4.0, max(ys) + 4.5               # room past the deck front for the height dims, clear of the label column
     scA = min(fr[2] / (u1 - u0), fr[3] / (zmax - v0))
     oxA = fr[0] + (fr[2] - (u1 - u0) * scA) / 2
     U = lambda y: oxA + (y - u0) * scA
@@ -3672,7 +3736,7 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
     o.append(LN(fr[0], V(0), fr[0] + fr[2], V(0), INK, 1.0)); o.append(T(fr[0] + fr[2] - 4, V(0) + 10, "grade", 6.6, 700, "end", MUTE))
     o.append(TH(U(-0.3), V(zmax) + 12, "HOUSE", 7.6, 900, "end", "#8a8172", halo="#efe8da")); o.append(T(U(u1) - 4, V(zmax) + 12, "YARD", 7.6, 900, "end", "#8a8172"))
     for k_, lv in enumerate(sorted(levels, key=lambda q: q.top)):
-        dim_v(o, V, U(u1) - 10 - 20 * k_, 0, lv.top, f"{ftin(lv.h_in)}", 6.6, left=True)
+        dim_v(o, V, U(max(ys)) + 14 + 16 * k_, 0, lv.top, f"{ftin(lv.h_in)}", 6.6, left=False)
     items = []
     def at(b, fu=0.5, fz=0.5):
         from .axo import corners
@@ -3715,7 +3779,7 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
     _leaders(o, LA, fr[0] + 4, "start", y_min=fr[1] + 22, y_max=V(lo.top) - 4, chars=30)
     _leaders(o, RA, fr[0] + fr[2] - 4, "end", y_min=fr[1] + 22, y_max=V(0) - 8, chars=30)
     if st:
-        dim_v(o, V, U(u0) + 14, lo.top, hi.top, f"{inch(hi.h_in - lo.h_in)}", 6.6, left=False)
+        dim_v(o, V, U(0) + 10, lo.top, hi.top, f"{inch(hi.h_in - lo.h_in)}", 6.6, left=False)     # off the house wall, clear of the labels
     # ---- SECTION B: x-z through the stair, looking toward the yard (+y; x runs right to left)
     frB = (600, 18, 384, 356)
     yc = ((gs.fp[2] + gs.fp[3]) / 2) if gs else (max(ys) - 3.0)
@@ -3854,7 +3918,8 @@ def sheet_iso_assembled_composite(CL, S, t, meta) -> str:
     hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "stepbase", "sheath", "underlay")
     key = [k for k in _composite_key(CL, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
     return _axo_sheet("A-002", "Isometric — assembled, labeled", "Both levels, everything you see: piers, columns, decking, picture frame, step skirt, stair, rail", CL, S, t, meta, bx,
-                      fit=fit, key=key, note="House shown for context only (the deck work only). The frame under the decking is called out on S-102 and A-003.")
+                      fit=fit, key=key, note=("House shown for context only (the deck work only). " if any(_house(b) for b in bx) else "")
+                      + "The frame under the decking is called out on S-102 and A-003.")
 
 
 def sheet_iso_exploded_composite(CL, S, t, meta) -> str:

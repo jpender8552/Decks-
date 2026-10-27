@@ -121,10 +121,12 @@ def _scene(d: dict):
 
 # ================================================================== boxes
 def _key(b) -> tuple:
+    """A box's identity across the option scenes: kind, material, shape and its bounds to 1/1000 ft (a mesh: its vertices,
+    which the scene already rounds to 1/1000 ft)."""
     r = lambda v: round(float(v), 3)
     k = (b.kind, b.mat, b.shape, r(b.x0), r(b.x1), r(b.y0), r(b.y1), r(b.z0), r(b.z1), round(float(b.rot or 0.0), 4), b.rot_axis if b.rot else "")
     if b.shape == "mesh" and b.pts:
-        k += (tuple(r(v) for q in b.pts for v in q),)
+        k += (tuple(map(tuple, b.pts)),)
     return k
 
 
@@ -248,30 +250,34 @@ def _occluders(boxes) -> list:
 
 
 def _clear(pos, targets, occ) -> float:
-    """The share of the sight lines from pos to the targets that no occluder cuts (slab test, numpy)."""
+    """The share of the sight lines from pos to the targets that no occluder cuts (slab test; plain Python, no numpy)."""
     if not occ:
         return 1.0
-    import numpy as np
-    O = np.array(occ, dtype=float)                       # (n, 6): x0 x1 y0 y1 z0 z1
-    lo, hi = O[:, [0, 2, 4]], O[:, [1, 3, 5]]
-    p = np.array(pos, dtype=float)
-    if np.any(np.all((p >= lo - 0.3) & (p <= hi + 0.3), axis=1)):
+    if any(all(o[2 * k] - 0.3 <= pos[k] <= o[2 * k + 1] + 0.3 for k in range(3)) for o in occ):
         return 0.0                                        # standing inside a crown / a house
     ok = 0
     for t in targets:
-        d = np.array(t, dtype=float) - p
-        inv = 1.0 / np.where(np.abs(d) < 1e-9, 1e-9, d)
-        t0, t1 = (lo - p) * inv, (hi - p) * inv
-        tn = np.max(np.minimum(t0, t1), axis=1)
-        tf = np.min(np.maximum(t0, t1), axis=1)
-        ok += not np.any((tn <= tf) & (tf > 0.02) & (tn < 0.97))
+        d = [t[k] - pos[k] for k in range(3)]
+        inv = [1.0 / (v if abs(v) > 1e-9 else 1e-9) for v in d]
+        hit = False
+        for o in occ:
+            tn, tf = -1e18, 1e18
+            for k in range(3):
+                a_, b_ = (o[2 * k] - pos[k]) * inv[k], (o[2 * k + 1] - pos[k]) * inv[k]
+                tn, tf = max(tn, min(a_, b_)), min(tf, max(a_, b_))
+            if tn <= tf and tf > 0.02 and tn < 0.97:
+                hit = True
+                break
+        ok += not hit
     return ok / max(1, len(targets))
 
 
 def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, occ=None) -> List[dict]:
     """Preset cameras (plan feet): Yard, Upper deck (under the roof when there is one), Lower deck, Aerial. A measured site's
-    own camera stations (site_model.cameras) win: "yard", "roof_deck" / "upper_deck", "lower_deck", "high34" — they stand
-    where a person can stand (inside the lot, clear of the trees); otherwise the stations are computed from the layout."""
+    own camera stations (site_model.cameras) win for the first three — Yard: "yard_center" / "yard" / "yard_left" / "dusk"
+    (the one with the clearest view of the deck past the trees), Upper deck: "roof_deck" / "upper_deck" / "upper_rail",
+    Lower deck: "lower_deck"; they stand where a person can stand. Otherwise, and for the aerial, the stations come from
+    the layout (the page cuts away a tree crown between the camera and the deck)."""
     cams = cams or {}
     x0 = min(p["x0"] for p in parts); x1 = max(p["x1"] for p in parts)
     y0 = min(p["y0"] for p in parts); y1 = max(p["y1"] for p in parts)
@@ -673,8 +679,8 @@ input[type=date] { font: 600 13px var(--body); color: var(--ink); background: va
   #g-view { display: none; }
   .vbar:not([hidden]) { display: flex; }
 }
-.vbar { display: none; position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; gap: 6px; overflow-x: auto; }
-.vbar .btn { background: rgba(14, 16, 20, .78); min-height: 34px; font-size: 12.5px; white-space: nowrap; flex: 0 0 auto; }
+.vbar { display: none; position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; gap: 5px; overflow-x: auto; }
+.vbar .btn { background: rgba(14, 16, 20, .78); min-height: 34px; padding: 0 8px; font-size: 12px; white-space: nowrap; flex: 0 0 auto; }
 .vbar .btn.on { background: var(--gold); }
 @media (max-height: 520px) and (orientation: landscape) {
   #panel { flex-basis: 300px; width: 300px; gap: 10px; }
@@ -779,6 +785,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;        // orbiting / zooming re-renders the view only, not the shadow map
 stage.insertBefore(renderer.domElement, stage.firstChild);
 renderer.domElement.setAttribute('role', 'img');
 renderer.domElement.setAttribute('aria-label', '3D view of the deck, the house and the yard');
@@ -804,7 +811,7 @@ var sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 40, 20), new THREE.Shade
     ' c += uSunCol * uDisc * smoothstep(0.99994, 0.99998, cs);',
     ' gl_FragColor = vec4(c, 1.0); }'].join('\n')
 }));
-sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
+sky.renderOrder = 20; sky.frustumCulled = false; scene.add(sky);      // drawn after the opaque scene at the far plane: it shades only the pixels nothing covers
 var stars = (function () {
   var n = 700, pos = new Float32Array(n * 3), s = 12345;
   var rnd = function () { s = (s * 16807) % 2147483647; return s / 2147483647; };
@@ -812,7 +819,7 @@ var stars = (function () {
     pos[i * 3] = Math.cos(u) * r * 1400; pos[i * 3 + 1] = v * 1400; pos[i * 3 + 2] = Math.sin(u) * r * 1400; }
   var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   var m = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6 * DPR, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false });
-  var p = new THREE.Points(g, m); p.frustumCulled = false; p.renderOrder = -9; scene.add(p); return p;
+  var p = new THREE.Points(g, m); p.frustumCulled = false; p.renderOrder = 21; scene.add(p); return p;
 })();
 scene.fog = new THREE.Fog(0xcfd9e3, 300, 2200);
 
@@ -1064,7 +1071,7 @@ Object.keys(GROUPS).forEach(function (k) {
   for (var i = 0; i < P.count; i++) uv.setXY(i, P.getX(i) / per, P.getZ(i) / per);
   g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(P.count * 3).fill(1), 3));
   var m = new THREE.Mesh(g, matFor(D.ground.mat, 'f'));
-  m.position.set(CX, D.ground.z - 0.04, CY); m.receiveShadow = true; m.renderOrder = -1; scene.add(m);
+  m.position.set(CX, D.ground.z - 0.25, CY); m.receiveShadow = true; m.renderOrder = 10; scene.add(m);   // after the yard: the depth test skips what the lawn covers
 })();
 
 // ------------------------------------------------------------------ louvered roofs: instanced blades turning about their own axes
@@ -1262,8 +1269,8 @@ function applySun() {
       mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x); mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y); mnz = Math.min(mnz, p.z); mxz = Math.max(mxz, p.z); }); }); });
     cam.left = mnx - 1; cam.right = mxx + 1; cam.bottom = mny - 1; cam.top = mxy + 1; cam.near = Math.max(1, -mxz - 220); cam.far = -mnz + 8;
     cam.updateProjectionMatrix();
-    renderer.shadowMap.autoUpdate = true;
-  } else { renderer.shadowMap.autoUpdate = false; }
+  }
+  renderer.shadowMap.needsUpdate = true;      // the shadows re-render only when something that casts or lights them changes
   applyGlow();
   invalidate();
 }
@@ -1525,8 +1532,9 @@ window.cfg = {
     if (o.screens != null) SCR.forEach(function (s) { S.scr[s.s.id] = o.screens; S.scrGoal[s.s.id] = null; });
     applyOptions(); applySun(); if (o.view) goView(o.view, true); syncUI(); renderer.render(scene, cam); },
   render: function () { renderer.render(scene, cam); },
-  timeFrames: function (n) { var px = new Uint8Array(4); renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    var t0 = performance.now(); for (var i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); }
+  timeFrames: function (n, shadows) {     // ms per frame; shadows: re-render the shadow map each frame too (a sun / louver change)
+    var px = new Uint8Array(4); renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var t0 = performance.now(); for (var i = 0; i < n; i++) { if (shadows) renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); }
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return (performance.now() - t0) / n; },
   info: function () { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes: GMESH.length, fixtures: FX.length, fxn: FXN, maxFragmentUniforms: maxFU }; },
   camera: function () { return { pos: cam.position.toArray(), target: tgt.toArray(), fov: cam.fov }; }

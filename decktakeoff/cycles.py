@@ -926,10 +926,20 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
             P = np.stack([cx + rr * np.cos(a), cy + rr * np.sin(a), b["z0"] + t * h * 0.98 - rng.uniform(0, 0.3, n)], 1)
             add_cards(vg.setdefault("twig_" + mk, Geo()), P, 1.1, rng, up_bias=-0.2, aspect=2.0)
             _cone(core, b, 0.86)
+    def lighter(hexc, f=0.2):
+        r, g_, b_ = _srgb255(hexc)
+        return "#%02x%02x%02x" % tuple(min(255, int(round(v * (1 + f)))) for v in (r, g_, b_))
     for key, g in vg.items():
         base = key.split("_", 1)[1]
-        c1, c2 = leaf_cols.get(base, ("#5f7f2c", "#86a03a"))
-        build_object(key, g, mats.leaf(base, c1, c2, twig=key.startswith("twig")), col)
+        mc = (D["materials"].get(base) or {}).get("color")
+        if mc and (base not in leaf_cols or base == "leaf2"):
+            # the yard model's own colour (a key with no stock pair - ivy, the pines - or the second canopy colour, e.g. the
+            # cottonwoods' autumn yellow): c2 a fifth lighter; the colour in the card's name so a cached texture never lies
+            c1, c2, nm = mc, lighter(mc), f"{base}_{mc.strip('#')}"
+        else:
+            c1, c2 = leaf_cols.get(base, ("#5f7f2c", "#86a03a"))
+            nm = base
+        build_object(key, g, mats.leaf(nm, c1, c2, twig=key.startswith("twig")), col)
     if core.f:
         cm, cnt, cb, _ = Mats._new("crown_core")
         cb.inputs["Base Color"].default_value = _hex("#22301a") + (1,)

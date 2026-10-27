@@ -184,6 +184,15 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
   .facts-cols > div { break-inside:avoid; page-break-inside:avoid; }
   .facts-cols, .opt-scope { font-size:12.5px; }
   .plan-fig { break-inside:avoid; page-break-inside:avoid; }
+  /* the investment carries the options table too: keep it on one page */
+  body.proposal .invest { gap:14px; padding-top:0.22in; padding-bottom:0.22in; }
+  body.proposal .invest .inv-head h3 { font-size:26px; }
+  body.proposal .invest .inv-grid { gap:20px; grid-template-columns:minmax(0, 2.3in) minmax(0, 1fr); }
+  body.proposal .invest .wheel svg { max-width:2.3in; }
+  body.proposal .invest .legend li { padding:4px; font-size:11.5px; }
+  body.proposal .invest .terms > div { padding:8px 12px; }
+  body.proposal .invest table.optsum td, body.proposal .invest table.optsum th { padding-top:3px; padding-bottom:3px; font-size:11px; }
+  body.proposal .invest p { font-size:11.5px; line-height:1.45; }
 }
 </style>"""
 
@@ -192,12 +201,13 @@ TIMELINE_CSS = """<style>
    column, then one bar per stretch of work. Added only to a page that has one. */
 .sched-title { font-family:var(--display); font-weight:800; text-transform:uppercase; letter-spacing:.02em; line-height:1.05; font-size:clamp(20px, 2.8vw, 28px); margin:4px 0 6px; }
 .gantt { list-style:none; margin:10px 0 8px; padding:0; }
-.gantt li { display:grid; grid-template-columns:minmax(0, 46%) minmax(0, 1fr); gap:6px 16px; align-items:center; padding:7px 0; border-top:1px solid var(--line); font-size:14px; line-height:1.35; }
+.gantt li { display:grid; grid-template-columns:minmax(0, 46%) minmax(0, 1fr); gap:0 16px; align-items:stretch; border-top:1px solid var(--line); font-size:14px; line-height:1.35; }
 .gantt li.g-head { border-top:0; padding:0 0 4px; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:800; }
+.gantt .g-lab { padding:7px 0; }
 .gantt .g-lab b { display:block; font-family:var(--display); font-weight:700; font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-ink); }
-.gantt .g-bar { position:relative; height:18px; background-image:linear-gradient(to right, var(--line) 1px, transparent 1px); background-size:calc(100% / var(--n)) 100%;
+.gantt .g-bar { position:relative; min-height:18px; background-image:linear-gradient(to right, var(--line) 1px, transparent 1px); background-size:calc(100% / var(--n)) 100%;
   -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-.gantt .g-bar i { position:absolute; top:3px; bottom:3px; border-radius:2px; background:linear-gradient(90deg, var(--gold-a), var(--gold-b)); }
+.gantt .g-bar i { position:absolute; top:50%; height:12px; margin-top:-6px; border-radius:2px; background:linear-gradient(90deg, var(--gold-a), var(--gold-b)); }
 .gantt .g-bar i.pre { background:var(--ink-3); }
 .gantt .g-bar i.opt { background:var(--accent); }
 .gantt .g-ticks { position:relative; height:14px; display:block; }
@@ -208,9 +218,10 @@ TIMELINE_CSS = """<style>
 }
 @media print {
   .sched-title { font-size:20px; }
-  .gantt li { padding:4px 0; font-size:11px; break-inside:avoid; page-break-inside:avoid; }
+  .gantt li { font-size:11px; break-inside:avoid; page-break-inside:avoid; }
+  .gantt .g-lab { padding:4px 0; }
   .gantt .g-lab b { font-size:9.5px; }
-  .gantt .g-bar { height:14px; }
+  .gantt .g-bar i { height:10px; margin-top:-5px; }
   .sched-opts { font-size:11.5px; }
 }
 </style>"""
@@ -256,12 +267,13 @@ def logo_svg(height_class: str = "gslogo") -> str:
 
 
 # ================================================================== brands: whose name, logo and colors the client documents carry
-# extras.brand picks one. A brand's assets live in decktakeoff/data/brands/<key>/: brand.json {"name", "parent", "footer", "logo"
-# (a file in that folder: .svg inline, .png / .jpg embedded; a version that reads on black), "colors": {"accent_a", "accent_b"}}.
-# Without files a brand falls back to its name set in the display face and GS's gold. "gs" is the default and renders as always.
+# extras.brand picks one. A brand's assets live in decktakeoff/data/brands/<key>/: brand.json {"name", "short" (who the quote's
+# words say does the work: "GSX"), "parent", "footer", "logo" (a file in that folder: .svg inline, .png / .jpg embedded; a
+# version that reads on black), "colors": {"accent_a", "accent_b"}}. Without files a brand falls back to its name set in the
+# display face and GS's gold. "gs" is the default and renders as always.
 BRANDS = {
-    "gs": dict(name="GS Exterior Experts", parent="", mission="Deck Division · Proposal", footer="GS Exterior Experts · Deck Division"),
-    "cde": dict(name="Colorado Deck Experts", parent="A GS Exterior Experts company", mission="Proposal",
+    "gs": dict(name="GS Exterior Experts", short="GSX", parent="", mission="Deck Division · Proposal", footer="GS Exterior Experts · Deck Division"),
+    "cde": dict(name="Colorado Deck Experts", short="Colorado Deck Experts", parent="A GS Exterior Experts company", mission="Proposal",
                 footer="Colorado Deck Experts · a GS Exterior Experts company"),
 }
 
@@ -314,7 +326,11 @@ def brand_css(spec_or_key) -> str:
         return ""
     c = b.get("colors") or {}
     root = "".join(f"--{k}:{v};" for k, v in (("gold-a", c.get("accent_a")), ("gold-b", c.get("accent_b"))) if v)
-    return ("<style>" + (f":root{{{root}}}" if root else "")
+    lp = float(b.get("logo_px") or 72)          # a wordmark logo reads larger than GS's emblem (brand.json "logo_px")
+    sel = ".hero-top img.gslogo,.hero-top svg.gslogo"
+    logo = (f"{sel}{{height:{lp:g}px;width:auto;}}@media (max-width:760px){{{sel}{{height:{round(lp * 0.72)}px;}}.mission{{letter-spacing:.1em;font-size:10px;}}}}"
+            f"@media print{{body.proposal .hero-top img.gslogo,body.proposal .hero-top svg.gslogo{{height:{lp / 96 * 1.15:.2f}in;}}}}") if b.get("logo") else ""
+    return ("<style>" + (f":root{{{root}}}" if root else "") + logo
             + ".brandmark{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:#ffffff;"
               "line-height:1.05;max-width:16ch;display:block;border-left:3px solid var(--gold-a);padding-left:10px;}"
             + "</style>")

@@ -1033,6 +1033,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             assert bad not in txt, f"supplier sheet carries pricing wording: {bad}"
     if customer:
         txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+        txt = re.sub(r"data:[a-z]+/[a-z+.-]+;base64,[A-Za-z0-9+/=]+", "", txt)     # an embedded logo's bytes are not words
         for bad in ("internal", "INTERNAL", "owner-directed", "rate card", "cost stack", "GM"):
             assert bad not in txt, f"customer page carries internal wording: {bad}"
     (out / "page.html").write_text(page)
@@ -1255,6 +1256,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title_)}</title>{FONT}{CSS}"
             + PL.FONT + PL.CSS + PL.brand_css(spec) + LEVELS_CSS + PL.OPTIONS_CSS + "</head><body class=\"proposal\">" + body + "</body></html>\n")
     txt = re.sub(r"<(script|style)\b.*?</\1>", "", page, flags=re.S)
+    txt = re.sub(r"data:[a-z]+/[a-z+.-]+;base64,[A-Za-z0-9+/=]+", "", txt)        # an embedded logo's bytes are not words
     for bad in ("internal", "INTERNAL", "rate card", "cost stack", "GM", "ESTIMATE", "estimate"):
         assert bad not in txt, f"roof document carries internal wording: {bad}"
     (out / "page.html").write_text(page)
@@ -1286,9 +1288,17 @@ def _house_side(q: dict, short: bool = False) -> str:
         return "freestanding, posts at every corner" if short else "posts at every corner"
     m = q.get("house_mount") or "roof"
     if short:
-        return {"roof": "attached at the roof line, on flashed stand-off brackets on the existing roof — no posts at the house",
+        return {"roof": "attached at the roof line, above the soffit — no posts at the house",
                 "wall": "attached to the house wall under the soffit — no posts at the house",
                 "fascia": "attached at the fascia line — no posts at the house"}.get(m, "attached to the house — no posts at the house")
+    try:                                     # the louvered engine's own sentence for how this roof meets the house, when it has one
+        from .louvered import scope_words
+        hs = next((x[len("House side: "):] for x in scope_words(q) if x.startswith("House side: ")), "")
+        if hs:
+            hs = re.sub(r"\s+—\s+no posts at the house$", "", hs)
+            return hs[0].lower() + hs[1:]
+    except Exception:
+        pass
     try:
         from .louvered import BRACKET_OC_FT
         oc = f" about every {BRACKET_OC_FT * 12:g}\""

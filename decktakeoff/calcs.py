@@ -485,7 +485,7 @@ class Check:
     @property
     def ratio(self) -> float:
         if not self.capacity:
-            return 0.0 if not self.demand else 9.99
+            return 0.0 if (not self.demand or self.status in ("INFO", "REVIEW")) else 9.99
         return abs(self.demand) / abs(self.capacity)
 
     @property
@@ -717,8 +717,8 @@ def flexure_checks(r: Run, cid: str, group: str, member: str, scope: str, code_b
             worst_t = (dt / limt, dt, limt, ("overhang " if ovh else "span ") + _ftin(span), i)
     if worst_l[2]:
         out.append(Check(f"{cid}.3", group, member, f"Deflection, live (L/{defl_live:g})", worst_l[1], worst_l[2], "in", "IRC Table R301.7; NDS 3.5",
-                         f"Δ live = {worst_l[1]:.3f}\" ({worst_l[3]}, worst live pattern{', + roof snow' if 'S' in r.other else ''}) · limit {worst_l[3].split()[0]} " +
-                         ("2 x overhang" if worst_l[3].startswith("overhang") else "span") + f"/{defl_live:g} = {worst_l[2]:.3f}\" · E' = {sec.E():,.0f} psi, I = {sec.I:.1f} in4",
+                         f"Δ live = {worst_l[1]:.3f}\" ({worst_l[3]}, worst live pattern{', + roof snow' if 'S' in r.other else ''}) · limit " +
+                         ("2 x " if worst_l[3].startswith("overhang") else "") + f"{worst_l[3].split(' ', 1)[1]}/{defl_live:g} = {worst_l[2]:.3f}\" · E' = {sec.E():,.0f} psi, I = {sec.I:.1f} in4",
                          scope=scope, tags=tags))
     if worst_t[2]:
         out.append(Check(f"{cid}.4", group, member, f"Deflection, total (L/{defl_total:g})", worst_t[1], worst_t[2], "in", "IRC Table R301.7; NDS 3.5.2 (Kcr 2.0 wet)",
@@ -779,9 +779,11 @@ class Calc:
         self.assumptions: List[str] = []
         self.review: List[str] = []
         self.beam_pts: Dict[Tuple[int, int], List[Tuple[float, Dict[str, float], str]]] = {}
+        self.beam_corr: Dict[Tuple[int, int], List[Tuple[float, float, float, float, str]]] = {}
         self.joist_R: Dict[Tuple[int, str], dict] = {}
         self.post_comp: Dict[Tuple[int, int, int], Dict[str, List[float]]] = {}
         self.roofs: List[dict] = []
+        self.extra_lat: Dict[int, List[float]] = {}         # part -> [Hx, Hy] ASD lateral the roof posts bring to the deck
         self._build()
 
     # -------------------------------------------------------------- the model
@@ -863,7 +865,7 @@ class Calc:
         member = f"Zone {z.name} ({P.name}): {sec.label} @ {s:g}\" — spans {desc}"
         cks = []
         for how, r in runs:
-            for ck in flexure_checks(r, f"J-{tag}", "Joists & cantilevers", member, self.scope, note=how):
+            for ck in flexure_checks(r, f"J-{tag}", "Joists & cantilevers", member, self.scope):
                 ck.basis = (f"[{how}] " if len(runs) > 1 else "") + ck.basis
                 cks.append(ck)
         best: Dict[str, Check] = {}
@@ -946,11 +948,17 @@ class Calc:
                            "the spec says the ledger bears on brick veneer: not permitted — freestanding beam or engineered support", status="FAIL"))
 
     # -------------------------------------------------------------- beam lines
+    def line_tag(self, P: _Part, li: int) -> str:
+        """Beam lines numbered from the yard in: 1 = the front-most line of the part (structure.md's L1 / U1)."""
+        order = sorted(range(len(P.L.beam_lines)), key=lambda i: (-P.L.beam_lines[i].y, P.L.beam_lines[i].x0))
+        return f"{P.tag}{order.index(li) + 1}"
+
     def line_loads(self, P: _Part, li: int, ln) -> Tuple[list, list, List[str]]:
-        """Dead and live uniform loads (lb/in) along the beam line from the joists of every zone it carries."""
+        """Dead and live uniform loads (lb/in) along the beam line from the joists of every zone it carries, with the
+        corrections a stair notch makes (short tail joists instead of full joists over the notch's width)."""
         c = self.c
         dead, live, notes = [], [], []
-        sec_b = section(ln.size, ln.species, "No.1")
+        sec_b = section(ln.size, ln.species, ln.species)
         zmap = {z.name: z for z in P.L.zones}
         for zn in ln.zones:
             z = zmap.get(zn)
@@ -972,26 +980,27 @@ class Calc:
             trib = bl.trib_depth if bl else 48.0
             dead.append(("u", a, b, c.dead_psf * trib / 144.0)); live.append(("u", a, b, c.deck_live_psf * trib / 144.0))
             notes.append(f"zone {zn}: tributary {trib:.0f}\" (no joist support matched)")
+        for a, b, dD, dL, why in self.beam_corr.get((P.idx, li), []):
+            a, b = max(ln.x0, a), min(ln.x1, b)
+            if b > a:
+                dead.append(("u", a, b, dD)); live.append(("u", a, b, dL))
+                notes.append(why)
         dead.append(("u", ln.x0, ln.x1, sec_b.weight_plf / 12.0))
         return dead, live, notes
 
     def beam_lines(self, P: _Part):
         for li, ln in enumerate(P.L.beam_lines):
-            sec_b = section(ln.size, ln.species, "No.1")
+            sec_b = section(ln.size, ln.species, ln.species)
             dead, live, notes = self.line_loads(P, li, ln)
             pts = self.beam_pts.get((P.idx, li), [])
-            tag = f"{P.tag}{li + 1}"
+            tag = self.line_tag(P, li)
             name = ln.label.replace("DROP ", "").replace("FLUSH ", "flush ")
             spans = [b - a for a, b in zip(ln.posts_x, ln.posts_x[1:])]
+            splices = [round(b, 1) for (a, b) in ln.pieces[:-1]]
             member = (f"Beam {tag} {sec_b.label} ({name}): {_ftin(ln.x1 - ln.x0)} on {len(ln.posts_x)} posts, spans "
-                      + " · ".join(_ftin(sv) for sv in spans) + (f" · {len(ln.pieces)} pieces" if len(ln.pieces) > 1 else ""))
-            cks: List[Check] = []
-            for pi, (a, b) in enumerate(ln.pieces):
-                posts = [px for px in ln.posts_x if a - 0.6 <= px <= b + 0.6]
-                if len(posts) < 2:
-                    self.add(Check(f"B-{tag}.p{pi + 1}", "Beams", member, "Piece on one post", 0, 0, "-", "IRC R507.5",
-                                   f"piece {_ftin(a)}-{_ftin(b)} has {len(posts)} post(s): a cantilevered piece — detail the splice", status="REVIEW"))
-                    continue
+                      + " · ".join(_ftin(sv) for sv in spans) + (f" · spliced at {', '.join(_ftin(x) for x in splices)}" if splices else ""))
+
+            def piece_loads(a, b):
                 dl = [(ld[0], max(a, ld[1]), min(b, ld[2]), ld[3]) for ld in dead if min(b, ld[2]) > max(a, ld[1])]
                 lv = [(ld[0], max(a, ld[1]), min(b, ld[2]), ld[3]) for ld in live if min(b, ld[2]) > max(a, ld[1])]
                 other: Dict[str, list] = {}
@@ -1006,6 +1015,16 @@ class Calc:
                     for k in ("S", "Wd", "Wu"):
                         if comp.get(k):
                             other.setdefault(k, []).append(("p", xx, comp[k]))
+                return dl, lv, other
+
+            cks: List[Check] = []
+            for pi, (a, b) in enumerate(ln.pieces):
+                posts = [px for px in ln.posts_x if a - 0.6 <= px <= b + 0.6]
+                if len(posts) < 2:
+                    self.add(Check(f"B-{tag}.p{pi + 1}", "Beams", member, "Piece on one post", 0, 0, "-", "IRC R507.5",
+                                   f"piece {_ftin(a)}-{_ftin(b)} has {len(posts)} post(s): a cantilevered piece — detail the splice", status="REVIEW"))
+                    continue
+                dl, lv, other = piece_loads(a, b)
                 r = run_member(sec_b, a, b, posts, dl, lv, other or None)
                 for ck in flexure_checks(r, f"B-{tag}", "Beams", member, self.scope):
                     cks.append(ck)
@@ -1019,6 +1038,22 @@ class Calc:
                     acc["pieces"][0] += 1
                     end_here = abs(px - a) < 1.0 or abs(px - b) < 1.0
                     acc["pieces"][1] += 1 if end_here else 0
+                # an interior column of a continuous piece takes ~1.25 wL: what it would carry with the splice over it
+                for k in range(1, len(posts) - 1):
+                    px = posts[k]
+                    tot = [0.0, 0.0]
+                    for (aa, bb) in ((a, px), (px, b)):
+                        ps = [q for q in posts if aa - 0.6 <= q <= bb + 0.6]
+                        if len(ps) < 2:
+                            tot = None
+                            break
+                        d2, l2, o2 = piece_loads(aa, bb)
+                        r2 = run_member(sec_b, aa, bb, ps, d2, l2, None, mesh=6.0)
+                        kk = min(range(len(r2.supports)), key=lambda q: abs(r2.supports[q] - px))
+                        tot[0] += r2.dead.R[kk]; tot[1] += sum(max(0.0, l.R[kk]) for l in r2.lives)
+                    if tot:
+                        j = min(range(len(ln.posts_x)), key=lambda q: abs(ln.posts_x[q] - px))
+                        self.post_comp[(P.idx, li, j)]["alt"] = tot
             best: Dict[str, Check] = {}
             for ck in cks:
                 if ck.id not in best or ck.ratio > best[ck.id].ratio:
@@ -1046,6 +1081,7 @@ class Calc:
                                f"overhang {ov:.1f}\" vs adjacent span {adj:.1f}\"/4 = {adj / 4:.1f}\" (strength and deflection of the overhang are in the rows above)")
                     if ck.ratio > 1.0:
                         ck.status = "REVIEW"
+                        ck.note = "beyond the prescriptive span/4: the bending, shear and overhang deflection rows govern; engineer accepts"
                     self.add(ck)
             # columns under this line
             for j, px in enumerate(ln.posts_x):
@@ -1056,9 +1092,9 @@ class Calc:
                 gx, gy = self.gxy(P, px, ln.y)
                 self.cols.append(dict(id=f"{tag}-{j + 1}", part=P.idx, part_name=P.name, line=li, j=j, kind="beam", x=px, y=ln.y, gx=gx, gy=gy,
                                       zone=zone, height=float(ln.post_len), comp={k: list(v) for k, v in comp.items() if k in ("D", "L", "S", "W")},
-                                      pieces=comp["pieces"], label=f"{name} post {j + 1}", line_label=name,
+                                      pieces=comp["pieces"], label=f"beam {tag} post {j + 1} ({name})", line_label=name,
                                       end_post=j in (0, len(ln.posts_x) - 1), cap_mid=ln.cap_mid, cap_end=ln.cap_end, Vb=0.0, braced=False,
-                                      on_footing=True, size=P.spec.framing.post_size))
+                                      on_footing=True, size=P.spec.framing.post_size, alt=comp.get("alt"), line_tag=tag))
 
     # -------------------------------------------------------------- columns, caps, bases, footings
     def col_section(self, col: dict) -> Section:
@@ -1078,6 +1114,7 @@ class Calc:
 
     def columns(self):
         from .engineering import POST_MAX_HEIGHT
+        c = self.c
         heights_done = set()
         for col in self.cols:
             sec = self.col_section(col)
@@ -1097,13 +1134,47 @@ class Calc:
                        f"Fc* = {sec.factors_text('Fc', cdv)} = {sec.Fc_star(cdv):,.0f} psi · FcE = 0.822 Emin'/(le/d)² = {FcE:,.0f} psi · Cp = {cp:.3f} · F'c = {capP / sec.A:,.0f} psi")
             self.add(ck)
             col["P_max"], col["P_combo"] = P, nm
+            if col["kind"] == "beam":
+                P_ = self.parts[col["part"]]
+                lat = getattr(P_, "lat", None)
+                if lat:
+                    w = 0.6 * lat["qz"] * c.G * 2.0 * sec.d / 12.0 / 12.0          # lb/in on the column face (ASD wind), Cf 2.0
+                    Mw = w * le * le / 8.0
+                    worst = None
+                    for nm2, kP, kM in (("D + 0.6W", dict(D=1.0), 1.0), ("D + 0.75L + 0.75(0.6W)", dict(D=1.0, L=0.75), 0.75)):
+                        Pq = sum(k_ * comp.get(t_, (0.0, 0.0))[0] for t_, k_ in kP.items())
+                        cpq, FcEq = sec.Cp(le, 1.6)
+                        fc, fb = Pq / sec.A, kM * Mw / sec.S
+                        inter = (fc / (sec.Fc_star(1.6) * cpq)) ** 2 + fb / (sec.Fb(1.6) * (1 - fc / FcEq))
+                        if worst is None or inter > worst[0]:
+                            worst = (inter, nm2, fc, fb)
+                    col["wind_inter"] = worst
             hkey = (col["size"], round(le))
             if col["kind"] == "beam" and hkey not in heights_done:
                 heights_done.add(hkey)
                 mx = POST_MAX_HEIGHT.get(col["size"], 0)
                 if mx:
-                    self.add(Check(f"C-H{col['part']}{col['line'] + 1}", "Columns", f"{col['size']} columns under {col['line_label']}", "Height vs IRC Table R507.4",
+                    self.add(Check(f"C-H{col.get('line_tag', col['line'] + 1)}", "Columns", f"{col['size']} columns under beam {col.get('line_tag', '')} ({col['line_label']})", "Height vs IRC Table R507.4",
                                    le, mx, "in", "IRC Table R507.4", f"column {_ftin(le)} (top of footing to the underside of the beam) vs {_ftin(mx)} for {col['size']}"))
+
+    def column_wind_rows(self):
+        """Per beam line, its worst column: axial + bending from wind on the column itself (pinned both ends)."""
+        c = self.c
+        by_line: Dict[Tuple[int, int], dict] = {}
+        for col in self.cols:
+            wi = col.get("wind_inter")
+            if not wi:
+                continue
+            key = (col["part"], col["line"])
+            if key not in by_line or wi[0] > by_line[key]["wind_inter"][0]:
+                by_line[key] = col
+        for (pi, li), col in by_line.items():
+            inter, nm, fc, fb = col["wind_inter"]
+            P_ = self.parts[pi]
+            self.add(Check(f"C-W{col.get('line_tag', li + 1)}", "Columns", f"Column {col['id']} (worst under beam {col.get('line_tag', '')}), {_ftin(col['height'])}, wind on its face",
+                           f"Axial + wind bending ({nm})", inter, 1.0, "-", "NDS 2018 3.9.2 (Eq. 3.9-3); ASCE 7-16 Ch. 29",
+                           f"w = 0.6 qz G Cf b = 0.6 x {P_.lat['qz']:.1f} x {c.G:g} x 2.0 x 7.5\"/12 per ft · M = wL²/8 · fc = {fc:,.0f} psi, fb = {fb:,.0f} psi · "
+                           f"(fc/F'c)² + fb/(F'b(1 - fc/FcE)) = {inter:.2f} (pinned ends: the joists brace the top, the base is a pin)"))
 
     def caps_and_bases(self):
         base_req: Dict[Tuple[str, str], dict] = {}
@@ -1139,7 +1210,7 @@ class Calc:
                 b["ids"].append(col["id"])
         from .catalog import POST_BASE
         for (size, ftype), b in base_req.items():
-            sku = POST_BASE.get(size, {}).get(ftype, "")
+            sku = POST_BASE.get(size, {}).get("concrete" if ftype in ("caisson", "existing", "concrete") else ftype, "")
             pr = PRODUCTS.get(sku)
             lab = f"{size} column base on {ftype.replace('_', ' ')} ({len(b['ids'])} columns)"
             if pr is None:
@@ -1149,57 +1220,161 @@ class Calc:
                                f"No Simpson 8x8 base takes the pier's single cast-in bolt (ABU88 / APB88 / CPT88 need two anchors): an engineer-detailed "
                                f"HDG standoff base on the pier bolt, or a tenoned foot in an ABU66Z / ABW66RZ", status="REVIEW"))
             else:
+                if self.spec.framing.post_rough and sku.endswith("Z") and (sku[:-1] + "RZ") in PRODUCTS:
+                    sku = sku[:-1] + "RZ"
+                    pr = PRODUCTS[sku]
                 r_d, r_u = b["down"] / pr["down"], (b["up"] / pr["up"] if b["up"] else 0.0)
-                self.add(Check(f"K-BASE-{size}", "Caps & bases", lab, f"Post base {sku}", max(b["down"], b["up"]) if r_u <= r_d else b["up"],
-                               pr["down"] if r_u <= r_d else pr["up"], "lb", pr["src"], f"down {b['down']:,.0f} / {pr['down']:,} lb · uplift {b['up']:,.0f} / {pr['up']:,} lb"))
+                two = sku.startswith(("ABU88", "APB88", "CPT88"))
+                on_dp = ftype == "diamond_pier"
+                self.add(Check(f"K-BASE-{size}", "Caps & bases", lab, f"Post base {sku}", b["down"] if r_u <= r_d else b["up"],
+                               pr["down"] if r_u <= r_d else pr["up"], "lb", pr["src"],
+                               f"down {b['down']:,.0f} / {pr['down']:,} lb · uplift {b['up']:,.0f} / {pr['up']:,} lb · lateral {b['lat']:,.0f} lb"
+                               + (" · two 5/8\" anchors: the cast-in pier bolt + one drilled into the pier head (owner 27 Oct)" if two and on_dp else "")
+                               + (f" · anchors cast in the {ftype} (standard catalog condition), 1\" standoff" if not on_dp else ""),
+                               status="REVIEW" if (two and on_dp) else "",
+                               note=("the second anchor in the 5-5/8\" pier plinth (edge distance, the head's concrete limit) is not a catalog condition: "
+                                     "Pin Foundations and the engineer confirm; the pier's own uplift (chart) governs uplift" if two and on_dp else "")))
+
+    def footing_info(self, col: dict) -> dict:
+        """The footing under a column, from the layout: type, model / diameter, depth, capacity (the engine's numbers)."""
+        P_ = self.parts[col["part"]]
+        zm = {z.name: z for z in P_.L.zones}
+        z = zm.get(col.get("zone"))
+        fr = z.frame if z is not None else P_.L.zones[0].frame
+        fsp = P_.spec.framing
+        ftype = (fr.footing_type if z is not None else fsp.footing_type) or fsp.footing_type
+        info = dict(type=ftype)
+        if ftype == "diamond_pier":
+            info["model"] = col.get("model") or (fr.footing_model if z is not None else fsp.footing_model)
+        elif ftype in ("caisson", "existing", "concrete"):
+            dia = float(fr.footing_dia_in or 0) or float(getattr(fsp, "caisson_dia_in", 0) or 0) or 20.0
+            depth = float(fr.footing_depth_in or 0) or float(getattr(fsp, "caisson_depth_in", 0) or 0) or (self.c.frost_in + 2.0)
+            end_b = math.pi * (dia / 24.0) ** 2 * self.c.soil_psf
+            cap = float(fr.footing_capacity_lb or 0) if ftype != "concrete" else 0.0
+            if not cap:
+                cap = end_b + (math.pi * dia / 12.0 * depth / 12.0 * CAISSON_SKIN_PSF if ftype != "concrete" else 0.0)
+            info.update(model=f"{dia:g}\" x {depth:g}\" {'caisson' if ftype != 'concrete' else 'pier'}", dia=dia, depth=depth, cap=cap, end=end_b,
+                        weight=math.pi * (dia / 24.0) ** 2 * depth / 12.0 * CONCRETE_PCF)
+        return info
 
     def footings(self):
+        c = self.c
+        fcols = [col for col in self.cols if col.get("on_footing")]
+        kinds = set()
+        for col in fcols:
+            fi = self.footing_info(col)
+            col["ftype"] = fi["type"]
+            kinds.add(fi["type"])
+            if fi["type"] == "diamond_pier":
+                self.pier_rows(col, fi)
+            elif fi["type"] in ("caisson", "existing", "concrete"):
+                self.caisson_rows(col, fi)
+            else:
+                self.add(Check(f"F-{col['id']}", "Footings", f"Column {col['id']} footing ({fi['type']})", "Footing", col["down"], 0, "lb", "IRC R403 / R507.3",
+                               f"P = {col['down']:,.0f} lb on a {fi['type']} footing — size by the soil bearing ({c.soil_psf:,.0f} psf)", status="REVIEW"))
+        self.footing_once_rows(fcols, kinds)
+
+    def _over_note(self, col: dict, cap: float, what: str, bigger: str = "") -> str:
+        down = col["down"]
+        if down <= cap:
+            return ""
+        alt = col.get("alt")
+        altP = (alt[0] + alt[1] + (down - col["comp"]["D"][0] - col["comp"]["L"][0])) if alt else None
+        return (f"over the {what}: " + (f"{bigger}; " if bigger else "")
+                + (f"with the beam spliced over this column it drops to about {altP:,.0f} lb; " if altP and altP < down - 1 else "")
+                + "or add a column / shorten the spans")
+
+    def pier_rows(self, col: dict, fi: dict):
         from .catalog import pier_capacity_lb
         c = self.c
-        ftype = self.spec.framing.footing_type
-        models_used = set()
-        fcols = [col for col in self.cols if col.get("on_footing")]
-        for col in fcols:
-            P_ = self.parts[col["part"]]
-            zm = {z.name: z for z in P_.L.zones}
-            z = zm.get(col.get("zone"))
-            model = col.get("model") or (z.frame.footing_model if z is not None else self.spec.framing.footing_model)
-            col["model"] = model
-            down = col["down"] + 0.0
-            if ftype != "diamond_pier":
-                self.add(Check(f"F-{col['id']}", "Footings", f"Column {col['id']} footing ({ftype})", "Footing", down, 0, "lb", "IRC R403 / R507.3",
-                               f"P = {down:,.0f} lb on a {ftype} footing — size by the soil bearing ({c.soil_psf:,.0f} psf)", status="REVIEW"))
-                continue
-            capb = pier_capacity_lb(model, c.soil_psf)
-            pr = PIER.get(model)
-            need = next((m for m in ("DP-50/50", "DP-75/63") if down <= pier_capacity_lb(m, c.soil_psf) and col["up"] <= PIER[m]["up"]), None)
-            col["need"] = need or "over DP-75/63"
-            models_used.add(model)
-            lab = f"Column {col['id']} on {model} ({col['part_name']}, x {col['gx']:.2f}', y {col['gy']:.2f}')"
-            if not capb or pr is None:
-                self.add(Check(f"F-{col['id']}", "Footings", lab, "Pier bearing", down, 0, "lb", PIER_SRC, f"{model}: no chart value on file", status="REVIEW"))
-                continue
-            self.add(Check(f"F-{col['id']}", "Footings", lab, "Pier bearing (ASD)", down, capb, "lb", f"{PIER_SRC}; IRC R507.3",
-                           f"P = {down:,.0f} lb ({col.get('P_combo', 'governing')}) + base vs {model} {capb:,.0f} lb at {c.soil_psf:,.0f} psf · smallest pier that works: {col['need']}"))
-            if col["up"] > 0:
-                ck = self.add(Check(f"F-{col['id']}u", "Footings", lab, "Pier uplift", col["up"], pr["up"], "lb", "Pin Foundations DOC0008 (tested; ESR-1895 §5.6 does not evaluate uplift)",
-                                    f"net uplift {col['up']:,.0f} lb vs {pr['up']:,} lb", note="PE accepts the chart uplift value"))
-            if col.get("Vb", 0.0) > 0:
-                self.add(Check(f"F-{col['id']}l", "Footings", lab, "Pier lateral", col["Vb"], pr["lat"], "lb",
-                               "Pin Foundations DOC0008 (tested; not ESR-evaluated)", f"base shear {col['Vb']:,.0f} lb (knee-braced column) vs {pr['lat']} lb"))
-        for m in sorted(models_used):
-            pr = PIER.get(m)
-            if pr:
-                self.add(Check(f"F-frost-{m}", "Footings", f"{m} frost rating", "Frost depth", c.frost_in, pr["frost"], "in", "IRC R403.1.4.1 / R507.3.3; ESR-1895 §5.3",
-                               f"site frost line {c.frost_in:g}\" vs the pier's frost-zone rating {pr['frost']}\" (code official approves per R507.3.3)"))
-        # spacing: PFI / ESR-1895 3'-0" minimum centre to centre
-        for i, a in enumerate(fcols):
-            for b in fcols[i + 1:]:
-                d = math.hypot(a["gx"] - b["gx"], a["gy"] - b["gy"]) * 12.0
-                if d < 36.0:
-                    self.add(Check(f"F-sp-{a['id']}-{b['id']}", "Footings", f"Piers under {a['id']} and {b['id']}", "Pier spacing (3'-0\" min.)", 36.0, d, "in",
-                                   "ICC-ES ESR-1895; Pin Foundations installation manual", f"centre to centre {d:.1f}\" < 36\": merge the columns or move one (each closer pier loses about 13%)",
-                                   status="FAIL"))
+        model = fi["model"]
+        col["model"] = model
+        down = col["down"]
+        capb = pier_capacity_lb(model, c.soil_psf)
+        pr = PIER.get(model)
+        need = next((m for m in ("DP-50/50", "DP-75/63") if down <= pier_capacity_lb(m, c.soil_psf) and col["up"] <= PIER[m]["up"]), None)
+        col["need"] = need or "over DP-75/63"
+        where = "" if col["gx"] != col["gx"] else f", x {col['gx']:.2f}', y {col['gy']:.2f}'"
+        lab = f"Column {col['id']} on {model} ({col['part_name']}{where})"
+        if not capb or pr is None:
+            self.add(Check(f"F-{col['id']}", "Footings", lab, "Pier bearing", down, 0, "lb", PIER_SRC, f"{model}: no chart value on file", status="REVIEW"))
+            return
+        col["fcap"] = capb
+        self.add(Check(f"F-{col['id']}", "Footings", lab, "Pier bearing (ASD)", down, capb, "lb", f"{PIER_SRC}; IRC R507.3",
+                       f"P = {down:,.0f} lb ({col.get('P_combo', 'governing')}, incl. column + base) vs {model} {capb:,.0f} lb at {c.soil_psf:,.0f} psf · smallest pier that works: {col['need']}",
+                       note=self._over_note(col, capb, f"specified {model}", f"a {need} carries it" if need and need != model else "")))
+        if col["up"] > 0:
+            self.add(Check(f"F-{col['id']}u", "Footings", lab, "Pier uplift", col["up"], pr["up"], "lb", "Pin Foundations DOC0008 (tested; ESR-1895 §5.6 does not evaluate uplift)",
+                           f"net uplift {col['up']:,.0f} lb vs {pr['up']:,} lb", note="PE accepts the chart uplift value"))
+        if col.get("Vb", 0.0) > 0:
+            self.add(Check(f"F-{col['id']}l", "Footings", lab, "Pier lateral", col["Vb"], pr["lat"], "lb",
+                           "Pin Foundations DOC0008 (tested; not ESR-evaluated)", f"base shear {col['Vb']:,.0f} lb (with the knee brace) vs {pr['lat']} lb"))
+
+    def caisson_rows(self, col: dict, fi: dict):
+        c = self.c
+        down = col["down"]
+        col["model"] = fi["model"]
+        d_req = math.sqrt(4.0 * down / (math.pi * c.soil_psf)) * 12.0
+        d_req = max(12.0, math.ceil(d_req / 2.0) * 2.0)
+        col["need"] = f"{d_req:g}\" end bearing"
+        where = "" if col["gx"] != col["gx"] else f", x {col['gx']:.2f}', y {col['gy']:.2f}'"
+        lab = f"Column {col['id']} on a {fi['model']} ({col['part_name']}{where})"
+        skin = fi["cap"] - fi["end"]
+        col["fcap"] = fi["cap"]
+        note = self._over_note(col, fi["cap"], f"{fi['model']}", "a larger diameter or a deeper shaft")
+        if not note and down > fi["end"]:
+            note = f"carries more than end bearing alone ({fi['end']:,.0f} lb): the skin-friction share is an estimate — the engineer confirms (soils report if Centennial R401.2 applies)"
+        self.add(Check(f"F-{col['id']}", "Footings", lab, "Caisson bearing (ASD)", down, fi["cap"], "lb", "IRC R403.1, Table R401.4.1, R507.3; engine estimate",
+                       f"P = {down:,.0f} lb ({col.get('P_combo', 'governing')}, incl. column + base) · end bearing π(d/2)² q = π x ({fi['dia']:g}/24)² x {c.soil_psf:,.0f} = {fi['end']:,.0f} lb "
+                       f"+ skin friction ≈ {CAISSON_SKIN_PSF:g} psf x π d L = {skin:,.0f} lb = {fi['cap']:,.0f} lb · end bearing alone needs a {d_req:g}\" shaft", note=note))
+        if col["up"] > 0:
+            res = 0.6 * fi["weight"]
+            self.add(Check(f"F-{col['id']}u", "Footings", lab, "Caisson uplift (0.6 x its weight)", col["up"], res, "lb", "ASCE 7-16 2.4.1 (0.6D); IRC R507.3",
+                           f"net uplift {col['up']:,.0f} lb vs 0.6 x {fi['weight']:,.0f} lb of concrete ({CONCRETE_PCF:g} pcf) — skin friction in uplift adds to it (not counted)"))
+        if col.get("Vb", 0.0) > 0:
+            dreq = pole_embedment(col["Vb"], 0.5, fi["dia"] / 12.0)
+            self.add(Check(f"F-{col['id']}l", "Footings", lab, "Caisson lateral embedment (IBC 1807.3.2.1)", dreq * 12.0, fi["depth"], "in",
+                           "IBC 2021 Eq. 18-1, Table 1806.2 (100 psf/ft, x2 isolated)",
+                           f"base shear {col['Vb']:,.0f} lb (with the knee brace) at 6\" above grade on a {fi['dia']:g}\" shaft: required embedment {dreq * 12:.1f}\" vs {fi['depth']:g}\""))
+
+    def footing_once_rows(self, fcols: List[dict], kinds: set):
+        c = self.c
+        if "diamond_pier" in kinds:
+            for m in sorted({col.get("model") for col in fcols if col.get("ftype") == "diamond_pier"}):
+                pr = PIER.get(m)
+                if pr:
+                    self.add(Check(f"F-frost-{m}", "Footings", f"{m} frost rating", "Frost depth", c.frost_in, pr["frost"], "in", "IRC R403.1.4.1 / R507.3.3; ESR-1895 §5.3",
+                                   f"site frost line {c.frost_in:g}\" vs the pier's frost-zone rating {pr['frost']}\" (code official approves per R507.3.3)"))
+            piers = [q for q in fcols if q.get("ftype") == "diamond_pier" and q["gx"] == q["gx"]]
+            for i, a in enumerate(piers):
+                for b in piers[i + 1:]:
+                    d = math.hypot(a["gx"] - b["gx"], a["gy"] - b["gy"]) * 12.0
+                    if d < 36.0:
+                        self.add(Check(f"F-sp-{a['id']}-{b['id']}", "Footings", f"Piers under {a['id']} and {b['id']}", "Pier spacing (3'-0\" min.)", 36.0, d, "in",
+                                       "ICC-ES ESR-1895; Pin Foundations installation manual", f"centre to centre {d:.1f}\" < 36\": merge the columns or move one (each closer pier loses about 13%)",
+                                       status="FAIL"))
+        cais = [q for q in fcols if q.get("ftype") in ("caisson", "existing", "concrete")]
+        if cais:
+            seen = set()
+            for q in cais:
+                fi = self.footing_info(q)
+                key = (fi["dia"], fi["depth"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                self.add(Check(f"F-frost-{fi['dia']:g}x{fi['depth']:g}", "Footings", f"{fi['model']} (bottom of the shaft)", "Below the frost line", c.frost_in, fi["depth"], "in",
+                               "IRC R403.1.4.1, R507.3.2; Centennial Table R301.2(1)",
+                               f"shaft depth {fi['depth']:g}\" vs frost line {c.frost_in:g}\" (and 12\" min. below undisturbed grade)"))
+            pts = [q for q in cais if q["gx"] == q["gx"]]
+            for i, a in enumerate(pts):
+                for b in pts[i + 1:]:
+                    d = math.hypot(a["gx"] - b["gx"], a["gy"] - b["gy"]) * 12.0
+                    lim = self.footing_info(a)["dia"] + self.footing_info(b)["dia"]
+                    if d < lim:
+                        self.add(Check(f"F-sp-{a['id']}-{b['id']}", "Footings", f"Caissons under {a['id']} and {b['id']}", "Shaft spacing (2 diameters)", lim, d, "in",
+                                       "drilled-shaft practice", f"centre to centre {d:.1f}\" < {lim:g}\": the holes run together — one footing under both or move a column",
+                                       status="REVIEW"))
+
 
     # -------------------------------------------------------------- lateral
     def lateral(self):
@@ -1234,15 +1409,22 @@ class Calc:
                 + sum(self.col_section(q).weight_plf * q["height"] / 24.0 for q in mycols)
             Cs = c.sds / (c.R / c.Ie)
             E = Cs * W_seis
+            ex = self.extra_lat.get(P.idx, [0.0, 0.0])
             HX = max(0.6 * Fx, 0.7 * E); HY = max(0.6 * Fy, 0.7 * E)
+            if any(ex):          # screens down only up to 65 mph (they retract above it): a separate case at 65 mph
+                k65 = (SCREEN_V_MPH / c.wind_mph) ** 2
+                HX = max(HX, k65 * 0.6 * Fx + ex[0]); HY = max(HY, k65 * 0.6 * Fy + ex[1])
             gx = "wind" if 0.6 * Fx >= 0.7 * E else "seismic"; gy = "wind" if 0.6 * Fy >= 0.7 * E else "seismic"
             P.lat = dict(Fx=Fx, Fy=Fy, E=E, HX=HX, HY=HY, qz=qz, Kz=Kz, W=W_seis, Cs=Cs, area=area, band=band)
             tag = P.tag or "D"
             basis_w = (f"qz = 0.00256 Kz Kzt Kd Ke V² = 0.00256 x {Kz:.2f} x {c.Kzt:g} x {c.Kd:g} x {c.Ke:g} x {c.wind_mph:g}² = {qz:.1f} psf (Exp. {c.exposure}, z = {(h_deck + rail_h) / 12:.1f}') · "
                        f"F = qz G Σ Cf A (G {c.G:g}; band {band:.1f}\" Cf 1.8, rail x {c.rail_solidity:g} and columns Cf 2.0)")
             basis_e = f"seismic SDC {c.sdc}: Cs = SDS/(R/Ie) = {c.sds:g}/({c.R:g}/{c.Ie:g}) = {Cs:.3f} · W = {W_seis:,.0f} lb · E = {E:,.0f} lb"
+            if any(ex):
+                basis_w += (f" · screens-down case at {SCREEN_V_MPH:g} mph: ({SCREEN_V_MPH:g}/{c.wind_mph:g})² of the deck wind + the roof posts' base shear "
+                            f"{ex[0]:,.0f} lb x / {ex[1]:,.0f} lb y — the larger case governs")
             # Y: the house takes it through the joists; pull-away by the R507.9.2 hold-downs
-            ties = int(getattr(spec.framing, "lateral_ties", 4) or 0)
+            ties = int(spec.framing.lateral_ties if spec.framing.lateral_ties is not None else _framing_default("lateral_ties", 4))
             dev = "DTT2Z" if any("DTT2Z" in (ln.item or "") or getattr(ln, "sku", "") == "DTT2Z" for ln in P.t.lines) else "DTT1Z"
             capd = PRODUCTS[dev]["tension"]
             self.add(Check(f"LT-{tag}.1", "Lateral system", f"{P.name}: house attachment, perpendicular to the house", f"Pull-away vs {ties} x {dev} hold-downs ({gy} governs)",
@@ -1273,7 +1455,7 @@ class Calc:
             for li, ln in enumerate(lines):
                 H = HX * share_beam * (ln.x1 - ln.x0) / tot_len
                 nj = max(1, int((ln.x1 - ln.x0) / max(1.0, P.L.zones[0].frame.spacing)))
-                ltag = f"{P.tag}{li + 1}"
+                ltag = self.line_tag(P, li)
                 self.add(Check(f"LT-{ltag}.4", "Lateral system", f"Beam {ltag} line to the joists (diaphragm path)", "H2.5AZ ties, lateral", H / nj, PRODUCTS["H2.5AZ"]["lat"], "lb",
                                PRODUCTS["H2.5AZ"]["src"], f"line share {H:,.0f} lb over {nj} joist ties = {H / nj:,.0f} lb each; the deck boards and joists carry it to the ledger "
                                "(columns pinned at both ends: Simpson bases are not moment connections, the joists brace the column tops)"))
@@ -1283,7 +1465,7 @@ class Calc:
         """Knee braces at the line's two end columns, in the plane of the beam (AWC DCA6 FAQ: corners only) — checked as a
         path that can carry the line's whole share if the deck diaphragm is not relied on."""
         spec = P.spec
-        a = float(getattr(spec.framing, "knee_leg_in", 30.0) or 30.0)
+        a = float(spec.framing.knee_leg_in or _framing_default("knee_leg_in", 30.0))
         cols = sorted([q for q in self.cols if q["part"] == P.idx and q["line"] == li and q["kind"] == "beam"], key=lambda q: q["x"])
         if len(cols) < 2:
             return
@@ -1296,7 +1478,7 @@ class Calc:
         Fh = Vb * Lp / a
         Fb_ = Fh * math.sqrt(2.0)
         lb = a * math.sqrt(2.0)
-        ltag = f"{P.tag}{li + 1}"
+        ltag = self.line_tag(P, li)
         note = "" if in_spec else "knee braces are not in the spec: add them at these two columns (recommended), or the engineer relies on the house attachment alone"
         cp, FcE = brace.Cp(lb, 1.6)
         capB = brace.Fc_star(1.6) * cp * brace.A
@@ -1332,16 +1514,46 @@ class Calc:
                            f"(fc/F'c)² + fb/(F'b(1 - fc/FcE)) = {worst[0]:.2f}", status="" if in_spec else "REVIEW", note=note))
 
 
-def bolt_Z(D: float, ls: float, lm: float, Gs: float, Gm: float, theta_s: float = 0.0, theta_m: float = 0.0, Fyb: float = 45000.0) -> float:
-    """NDS 2018 Table 12.3.1A single-shear bolt reference lateral design value Z (lb): the least of the yield modes."""
+def pole_embedment(P: float, h: float, b: float, s_lat: float = 100.0, iso: float = 2.0) -> float:
+    """IBC 2021 1807.3.2.1 (nonconstrained, Eq. 18-1): embedment d (ft) for a lateral load P (lb) at h (ft) above grade on a
+    shaft b (ft) wide; S1 = the lateral bearing (psf/ft, Table 1806.2) at d/3, doubled for an isolated pole (1806.3.4)."""
+    d = 2.0
+    for _ in range(60):
+        S1 = iso * s_lat * d / 3.0
+        A = 2.34 * P / (S1 * b)
+        d_new = 0.5 * A * (1 + math.sqrt(1 + 4.36 * h / A))
+        if abs(d_new - d) < 1e-4:
+            break
+        d = 0.5 * (d + d_new)
+    return d
+
+
+CONCRETE_PCF = 150.0
+CAISSON_SKIN_PSF = 400.0      # the engine's skin-friction estimate (layout.frame_layout) — the engineer sizes the shaft
+
+
+def _framing_default(name: str, fallback):
+    try:
+        from .spec import Framing
+        return getattr(Framing(), name)
+    except Exception:
+        return fallback
+
+
+def bolt_Z(D: float, ls: float, lm: float, Gs: float, Gm: float, theta_s: float = 0.0, theta_m: float = 0.0, Fyb: float = 45000.0,
+           Fes: Optional[float] = None) -> float:
+    """NDS 2018 Table 12.3.1A single-shear bolt reference lateral design value Z (lb): the least of the yield modes.
+    Fes: dowel bearing strength of a metal side plate (NDS 12.3.4: 1.5 Fu for steel), else the wood side member's."""
     def fe(G, th):
         fpar = 11200.0 * G
         fper = 6100.0 * G ** 1.45 / math.sqrt(D)
         t = math.radians(th)
         return fpar * fper / (fpar * math.sin(t) ** 2 + fper * math.cos(t) ** 2)
-    Fes, Fem = fe(Gs, theta_s), fe(Gm, theta_m)
+    metal = Fes is not None
+    Fem = fe(Gm, theta_m)
+    Fes = Fes if metal else fe(Gs, theta_s)
     Re, Rt = Fem / Fes, lm / ls
-    Kth = 1 + 0.25 * (max(theta_s, theta_m) / 90.0)
+    Kth = 1 + 0.25 * (max(0.0 if metal else theta_s, theta_m) / 90.0)
     k1 = (math.sqrt(Re + 2 * Re ** 2 * (1 + Rt + Rt ** 2) + Rt ** 2 * Re ** 3) - Re * (1 + Rt)) / (1 + Re)
     k2 = -1 + math.sqrt(2 * (1 + Re) + 2 * Fyb * (1 + 2 * Re) * D ** 2 / (3 * Fem * lm ** 2))
     k3 = -1 + math.sqrt(2 * (1 + Re) / Re + 2 * Fyb * (2 + Re) * D ** 2 / (3 * Fem * ls ** 2))
@@ -1459,6 +1671,20 @@ class _CalcMore(Calc):
                                status="REVIEW" if cant > back / 4 else "", note="the cantilever is over L/4 of the back-span: the outer header must hold the tails down — move the beam out under the rim (structure.md U1) or detail the uplift", tags=tags))
             for ck in flexure_checks(rf, f"{tag}.TF", grp, mem, self.scope, tags=tags):
                 self.add(ck)
+            # over the notch's width the beam carries these short tails, not full joists: correct the beam line's uniform load
+            jr = self.joist_R.get((P.idx, z.name))
+            xa_, xb_ = sorted((out, face))
+            for k in range(1, len(ft_sup)):
+                yb = ft_sup[k] + z.wall_y
+                li = next((i for i, ln in enumerate(P.L.beam_lines) if abs(ln.y - yb) < 1.5), None)
+                if li is None or not jr:
+                    continue
+                typ = jr["R"].get(round(ft_sup[k], 2))
+                if typ is None:
+                    continue
+                td = rf.dead.R[k]; tl = sum(max(0.0, l.R[k]) for l in rf.lives)
+                self.beam_corr.setdefault((P.idx, li), []).append((xa_, xb_, (td - typ[0]) / s, (tl - typ[1]) / s,
+                                                                    f"over the stair notch ({_ftin(xa_)}-{_ftin(xb_)}) the beam carries tail joists ({td + tl:,.0f} lb each), not full joists"))
         # the two headers: notch post (outer end) -> trimmer (hanger)
         xa, xb = sorted((out, face))
         hdr_sup = sorted((pline, face))
@@ -1760,10 +1986,11 @@ class _CalcMore(Calc):
             grp = "Louvered roof load path"
             tags = ["roof"]
             self.add(Check(f"R-{ri + 1}.0", grp, f"{q['name']} ({q['W']:.1f}' x {q['D']:.1f}', {q['attach']}-attached, {n} posts on the deck)", "Post reactions (ASD inputs)",
-                           D + S, D + S, "lb", "ASCE 7-16 Ch. 7, 26-27; Centennial Sec. 18-2-30",
+                           D + S, 0.0, "lb", "ASCE 7-16 Ch. 7, 26-27; Centennial Sec. 18-2-30",
                            f"trib {trib:.0f} SF per post · D = {ROOF_DEAD_PSF:g} psf x {trib:.0f} + {ROOF_POST_DEAD_LB:g} = {D:,.0f} lb · S = ({c.roof_snow_psf:g} + {ROOF_SLIDING_PSF:g} sliding) psf = {S:,.0f} lb · "
                            f"qh = {qh:.1f} psf at {q['z_top']:.1f}' (Kz {Kz:.2f}) · W↓ = qh G {ROOF_CN_DOWN:g} = {Wd:,.0f} lb, W↑ = {Wu:,.0f} lb (louvers closed)",
                            status="INFO", tags=tags, note="Suncoast's stamped reactions replace these"))
+            self.roof_screens(q, posts, tags)
             for pi, p in enumerate(posts):
                 part = None
                 for P in self.parts:
@@ -1776,6 +2003,38 @@ class _CalcMore(Calc):
                     continue
                 P, xl, yl = part
                 self.roof_post(P, ri, pi, xl, yl, dict(D=D, S=S, Wd=Wd, Wu=Wu), q, tags)
+
+    def roof_screens(self, q: dict, posts: list, tags: List[str]):
+        """Option 3a: screens down catch wind (rated to 65 mph, they retract above it). The fabric spans between its side
+        tracks; each track post takes half a screen, half of that at its (pinned) base."""
+        c = self.c
+        scr = [sc for sc in (q.get("screens") or []) if float(sc.get("drop") or 0) > 0]
+        if not scr:
+            return
+        grp = "Louvered roof load path"
+        for sc in scr:
+            h = max(0.0, float(sc["z_top"]) - float(sc["z_bottom"])) * float(sc.get("drop") or 1.0)
+            A = float(sc["width"]) * h
+            q65, Kz = wind_q(c, (float(sc["z_top"]) + float(sc["z_bottom"])) / 2.0, V=SCREEN_V_MPH)
+            F = 0.6 * q65 * c.G * SCREEN_CF * A
+            V = F / 4.0
+            direction = "y" if sc.get("plane") == "y" else "x"
+            near = []
+            for p in posts:
+                d = min(math.hypot(p["x"] - sc["a"][0], p["y"] - sc["a"][1]), math.hypot(p["x"] - sc["b"][0], p["y"] - sc["b"][1]))
+                if d < 1.5:
+                    near.append(p)
+            for p in near:
+                part = next((P for P in self.parts if abs(P.spec.geometry.height_in / 12.0 - p["z_deck"]) < 0.2), self.parts[0])
+                ex = self.extra_lat.setdefault(part.idx, [0.0, 0.0])
+                ex[0 if direction == "x" else 1] += V
+            Zb = bolt_Z(0.5, 0.5, 3.0, 0.0, SPECIFIC_GRAVITY["SYP"], theta_m=90.0, Fes=1.5 * 38000.0)
+            cap = 4 * Zb * 1.6 * 0.7
+            self.add(Check(f"R-S{sc.get('index', 0) + 1}", grp, f"{q['name']}: {sc.get('name', sc['side'] + ' screen')} down, {float(sc['width']):.1f}' x {h:.1f}' ({A:.0f} SF)",
+                           f"Base shear per track post at {SCREEN_V_MPH:g} mph", V, cap, "lb", "ASCE 7-16 Ch. 29 (Cf {0:g}); NDS 2018 12.3".format(SCREEN_CF),
+                           f"qz = {q65:.1f} psf at {SCREEN_V_MPH:g} mph (Kz {Kz:.2f}) · F = 0.6 qz G Cf A = {F:,.0f} lb · half to each side track, half of that at the pinned base: {V:,.0f} lb "
+                           f"on {len(near)} roof post(s) ({direction}) · 4 x 1/2\" bolts, aluminum plate (Fe 1.5 x 38 ksi) into SYP blocking: 4 x {Zb:,.0f} x 1.6 x 0.7 = {cap:,.0f} lb",
+                           tags=tags + ["screens"], note="the screens retract automatically above 65 mph (wind sensor) — the roof's frame braces the post tops"))
 
     def roof_post(self, P: _Part, ri: int, pi: int, xl: float, yl: float, R: dict, q: dict, tags: List[str]):
         c = self.c
@@ -1876,6 +2135,8 @@ ROOF_SLIDING_PSF = 11.0      # ASCE 7-16 §7.9 sliding snow off the house roof, 
 ROOF_CN_DOWN = 1.2           # net pressure coefficients, louvers closed (ASCE 7-16 Fig. 27.3-4 free roof; §30.11 attached canopy ≈ 1.3)
 ROOF_CN_UP = 1.3
 ROOF_GUARD_H_IN = 42.0       # the IRX guard's 200 lb at the drink-rail top, when the roof post is the rail post
+SCREEN_V_MPH = 65.0          # Suncoast screens are rated to 65 mph and retract above it (louvered/research.md §1.6)
+SCREEN_CF = 1.3              # mesh at 80-90% density taken as a solid sign (ASCE 7-16 Fig. 29.3-1, wide and shallow)
 
 
 # ================================================================== run + package
@@ -1900,6 +2161,7 @@ def _analyze(spec, scope: str = "Base", exposure: Optional[str] = None) -> _Calc
         k.beam_lines(P)
     k.lateral()
     k.columns()
+    k.column_wind_rows()
     k.caps_and_bases()
     k.footings()
     k.guards()
@@ -1966,8 +2228,8 @@ def _review_and_assumptions(k: _CalcMore) -> Tuple[List[str], List[str]]:
     spec = k.spec
     review = [
         "Verify every connector value marked \"verify\" against Simpson C-C-2026 / the current ESRs (LUS210Z, HUCQ210-2-SDS, H2.5AZ, CS16, A35Z): these rows use conservative catalog readings.",
-        "The 8x8-to-Diamond-Pier base has no catalog part: detail the HDG standoff base on the single pier bolt (or a tenoned foot in an ABU66Z / ABW66RZ) for the required down / uplift / lateral values on the Caps & bases sheet.",
-        "Diamond Pier uplift and lateral values are Pin Foundations' tested chart values (ESR-1895 §5.6 does not evaluate them): accept or replace. Get PFI's written OK for a job over 600 SF.",
+        _base_review(k),
+        *_footing_review(k),
         "LedgerLOK is checked at a 1/2\" lag equivalence of 375 lb per screw: confirm with ESR-1078's ledger table for the joist spans here. Verify each ledger lands on a solid band (no brick veneer, IRC R507.9.1.1) and the hold-downs reach interior framing.",
         f"Wind Exposure {c.exposure} is used (conservative for the greenbelt behind the lot; IRC default B). Ke = 1.0 (ASCE 7-16 Table 26.9-1 allows about 0.82 at this elevation).",
         f"Seismic SDS taken at {c.sds:g} (top of SDC B); wind governs the deck's lateral design in both directions here.",
@@ -1988,7 +2250,7 @@ def _review_and_assumptions(k: _CalcMore) -> Tuple[List[str], List[str]]:
         f"Geometry is the engine's layout of the spec: deck heights {', '.join(f'{P.name} {_ftin(P.spec.geometry.height_in)}' for P in k.parts)} above grade; column lengths from the deck height less decking, joist, beam and the pier standoff.",
         "Joists are analyzed both spliced over interior beams and continuous (where one stick can run); the worse result governs. Beam pieces are continuous over their posts and end at the splices the layout shows.",
         "Live load is patterned span by span on every member (the envelope takes each span's live load where it makes the effect worse); deck live load and snow are not concurrent (IRC R507).",
-        "Typical joist line loads are kept across the stair notch and the trimmer's extra reaction is added on top (conservative for the beam).",
+        "Over a stair notch the beam carries the notch's short tail joists (the typical joist line load is corrected there) plus the trimmer's reaction above a typical joist's.",
         "Member sizes are dressed (NDS Table 1B): 6x10 = 5-1/2 x 9-1/2, 8x8 = 7-1/2 x 7-1/2; rough-sawn stock is larger (conservative).",
         "Shear is checked at the support (loads within d of the support not removed) — conservative.",
         f"Deck-edge dead load {c.edge_dead_plf:g} plf (doubled rim, fascia, guard and drink rail) at every joist's end.",
@@ -1997,6 +2259,42 @@ def _review_and_assumptions(k: _CalcMore) -> Tuple[List[str], List[str]]:
         assumptions.append(f"Louvered roof: {ROOF_DEAD_PSF:g} psf dead + {ROOF_POST_DEAD_LB:g} lb per post; {c.roof_snow_psf:g} psf snow + {ROOF_SLIDING_PSF:g} psf average sliding snow "
                            f"(house roof W ≈ 14' assumed — measure); net pressure coefficients {ROOF_CN_DOWN:g} down / {ROOF_CN_UP:g} up with the louvers closed; half the roof to the house.")
     return review, assumptions
+
+
+def _footing_review(k) -> List[str]:
+    kinds = {col.get("ftype") for col in k.cols if col.get("on_footing")}
+    out = []
+    if "diamond_pier" in kinds:
+        out.append("Diamond Pier uplift and lateral values are Pin Foundations' tested chart values (ESR-1895 §5.6 does not evaluate them): accept or replace. "
+                   "Get PFI's written OK for a job over 600 SF.")
+    if kinds & {"caisson", "existing", "concrete"}:
+        out.append(f"Caissons: capacity = end bearing at the presumptive {k.c.soil_psf:,.0f} psf + the engine's ≈{CAISSON_SKIN_PSF:g} psf skin-friction estimate — confirm the soil "
+                   "(Buick loam, CL/ML; a soils report if Centennial's R401.2 amendment applies), size the shafts and their reinforcing, and the cast-in anchors. "
+                   "Centennial R109.1.1: the footing inspection is by a Colorado PE.")
+    return out
+
+
+def _sources(k) -> List[str]:
+    kinds = {col.get("ftype") for col in k.cols if col.get("on_footing")}
+    out = list(SOURCES)
+    if "diamond_pier" not in kinds:
+        out = [x for x in out if "Diamond Pier" not in x]
+    if kinds & {"caisson", "existing", "concrete"}:
+        out.insert(4, "IBC 2021 1806.2 / 1807.3.2.1 (lateral bearing, embedded poles) for the caissons' lateral check; ACI 318 / ACI 332 for the concrete")
+    return out
+
+
+def _base_review(k) -> str:
+    ck = next((x for x in k.checks if x.id.startswith("K-BASE")), None)
+    if ck is None:
+        return "Post bases: confirm the base under every column for the down / uplift / lateral values on the Caps & bases sheet."
+    if "no catalog part" in ck.what:
+        return ("The column base on the Diamond Pier has no catalog part: detail an HDG standoff base on the single pier bolt (or a tenoned foot in an ABU66Z / ABW66RZ) "
+                "for the down / uplift / lateral values on the Caps & bases sheet.")
+    if "ABU88" in ck.what or "APB88" in ck.what:
+        return (f"{ck.what.replace('Post base ', '')} on the Diamond Pier: the base's second 5/8\" anchor is drilled into the pier head beside the cast-in bolt (owner's choice) — "
+                "not a catalog condition (5-5/8\" plinth edge distance, the head's concrete limit): Pin Foundations and the engineer confirm, or detail a single-bolt HDG standoff base.")
+    return f"{ck.what}: confirm it on the pier for the down / uplift / lateral values on the Caps & bases sheet."
 
 
 SOURCES = [
@@ -2035,10 +2333,11 @@ def _package(k: _CalcMore, scopes: List[str]) -> Package:
                          gy=None if col["gy"] != col["gy"] else round(col["gy"], 2), height_in=round(col["height"], 1), size=col.get("size"),
                          D=round(col["comp"].get("D", [0, 0])[0]), L=round(col["comp"].get("L", [0, 0])[0]), S=round(col["comp"].get("S", [0, 0])[0]),
                          W=[round(v) for v in col["comp"].get("W", [0, 0])], P=round(col.get("down", 0)), combo=col.get("P_combo", ""), uplift=round(col.get("up", 0)),
-                         Vb=round(col.get("Vb", 0.0)), model=col.get("model", ""), need=col.get("need", ""), on_footing=col.get("on_footing", False)))
+                         Vb=round(col.get("Vb", 0.0)), model=col.get("model", ""), need=col.get("need", ""), on_footing=col.get("on_footing", False),
+                         fcap=round(col.get("fcap", 0.0)), ftype=col.get("ftype", "")))
     return Package(job=spec.job, address=", ".join(x for x in (s.address, s.city, f"{s.state} {s.zip}".strip()) if x), client=spec.client,
                    prepared=date.today().strftime("%B %d, %Y"), criteria=k.c, criteria_rows=_criteria_rows(spec, k.c), load_rows=_load_rows(k),
-                   material_rows=_material_rows(k), checks=k.checks, columns=cols, assumptions=assumptions, review=review, sources=list(SOURCES),
+                   material_rows=_material_rows(k), checks=k.checks, columns=cols, assumptions=assumptions, review=review, sources=_sources(k),
                    scopes=scopes, method=list(METHOD))
 
 
@@ -2047,20 +2346,19 @@ def calc_package(base_spec, options: Sequence[Tuple[str, object]] = (), exposure
     by more than 1%, or a new member: the yard stair, the roof's load path), labeled with the option."""
     kb = _analyze(base_spec, "Base", exposure)
     pkg = _package(kb, ["Base"])
-    base = {ck.id: ck for ck in kb.checks}
+    seen = {ck.id: ck for ck in kb.checks}
     for label, spec in options:
         ko = _analyze(spec, label, exposure)
         for ck in ko.checks:
-            b = base.get(ck.id)
+            b = seen.get(ck.id)
             if b is None or abs(ck.demand - b.demand) > 0.01 * max(1.0, abs(b.demand)) or ck.result != b.result:
                 ck.scope = label
                 pkg.checks.append(ck)
-        seen = {c_["id"] for c_ in pkg.columns}
+                seen[ck.id] = ck
         for col in _package(ko, [label]).columns:
-            old = next((c_ for c_ in pkg.columns if c_["id"] == col["id"]), None)
-            if col["id"] not in seen or (old and abs(col["P"] - old["P"]) > 0.01 * max(1, old["P"])):
-                col = dict(col, scope=label)
-                pkg.columns.append(col)
+            old = next((c_ for c_ in reversed(pkg.columns) if c_["id"] == col["id"]), None)
+            if old is None or abs(col["P"] - old["P"]) > 0.01 * max(1, old["P"]):
+                pkg.columns.append(dict(col, scope=label))
         r2, a2 = _review_and_assumptions(ko)
         for x in r2:
             if x not in pkg.review and not x.split(" ")[0].isdigit():
@@ -2077,3 +2375,387 @@ def calc_package(base_spec, options: Sequence[Tuple[str, object]] = (), exposure
         pkg.review.insert(0, f"{len(fails)} check{'s' if len(fails) != 1 else ''} FAIL as the layout stands: " + "; ".join(f"{ck.id} {ck.what} [{ck.scope}]" for ck in fails[:10])
                           + (" …" if len(fails) > 10 else "") + " — resolve before the set is stamped.")
     return pkg
+
+
+# ================================================================== sheets (the drawing set's frame: 1000 x 700, black band, gold number, cream ground)
+INK, GOLD, CREAM, MUTE, LINE_C = "#111111", "#d49e1b", "#f7f2e8", "#6b665e", "#d9d2c3"
+RES_COLOR = {"PASS": "#2f6b3a", "FAIL": "#b3261e", "REVIEW": "#9a6a00", "INFO": "#6b665e"}
+SW, SH = 1000, 700
+BODY_H = SH - 52 - 36
+CALC_SHEET_PREFIX = "S-9"
+
+
+def _esc(t) -> str:
+    return _html.escape(str(t), quote=True)
+
+
+def _t(x, y, s, size=9.0, w=400, anchor="start", fill=INK, italic=False) -> str:
+    st = ' font-style="italic"' if italic else ""
+    return f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{w}" text-anchor="{anchor}" fill="{fill}"{st}>{_esc(s)}</text>'
+
+
+def _r(x, y, w, h, fill, stroke="none", sw=0.8, rx=0) -> str:
+    return f'<rect x="{x:.1f}" y="{y:.1f}" width="{max(w, 0):.1f}" height="{max(h, 0):.1f}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+
+
+def _ln(x0, y0, x1, y1, stroke=INK, sw=0.6) -> str:
+    return f'<line x1="{x0:.1f}" y1="{y0:.1f}" x2="{x1:.1f}" y2="{y1:.1f}" stroke="{stroke}" stroke-width="{sw}"/>'
+
+
+def _wrap(s: str, width_px: float, size: float) -> List[str]:
+    n = max(10, int(width_px / (0.53 * size)))
+    return textwrap.wrap(str(s), n) or [""]
+
+
+def _sheet_svg(num: str, title: str, sub: str, body: List[str], meta: dict) -> str:
+    hdr = [_r(0, 0, SW, 46, INK), _t(18, 30, num, 22, 900, fill=GOLD), _t(110, 22, title.upper(), 15, 900, fill="#f3ead9"),
+           _t(110, 39, textwrap.shorten(sub, 120, placeholder="…"), 9.5, 400, fill="#d8cfbf"),
+           _t(SW - 18, 20, textwrap.shorten(meta["job_line"], 70, placeholder="…"), 9.5, 700, "end", "#d8cfbf"),
+           _t(SW - 18, 36, meta["rev_line"], 8.5, 400, "end", "#b8b0a2")]
+    ftr = [_ln(0, SH - 34, SW, SH - 34, GOLD, 2), _t(18, SH - 14, meta.get("scale", "Calculations — no scale"), 9.5, 600, fill=MUTE),
+           _t(SW - 18, SH - 14, meta["footer"], 8.6, 400, "end", MUTE)]
+    cid = f"clip{num.replace('-', '').replace('.', '')}"
+    return (f'<svg viewBox="0 0 {SW} {SH}" xmlns="http://www.w3.org/2000/svg" font-family="Nunito Sans, -apple-system, Helvetica, Arial, sans-serif">'
+            f'<rect width="{SW}" height="{SH}" fill="{CREAM}"/><defs><clipPath id="{cid}"><rect x="0" y="0" width="{SW}" height="{BODY_H}"/></clipPath></defs>'
+            + "".join(hdr) + f'<g transform="translate(0,52)" clip-path="url(#{cid})">' + "".join(body) + "</g>" + "".join(ftr) + "</svg>")
+
+
+def _meta(pkg: Package, standalone: bool = False) -> dict:
+    return dict(job_line=f"{pkg.job} · {pkg.address}".strip(" ·"),
+                rev_line=f"GS Exterior Experts · {pkg.prepared} · Rev 0" + (" · CALCULATIONS FOR REVIEW" if standalone else ""),
+                footer="Structural calculations for review and seal by a Colorado-licensed professional engineer. The sealed set governs. Field verify.")
+
+
+def _num(v: float, unit: str) -> str:
+    if unit == "-":
+        return f"{v:.2f}"
+    return _f(v, unit)
+
+
+def _check_rows(checks: List[Check]) -> List[Tuple[str, object]]:
+    """Flatten into ("member", text) / ("check", Check) rows: a member line, then its checks."""
+    rows: List[Tuple[str, object]] = []
+    last = None
+    for ck in checks:
+        head = ck.member + (f"  [{ck.scope}]" if ck.scope and ck.scope != "Base" else "")
+        if head != last:
+            rows.append(("member", head))
+            last = head
+        rows.append(("check", ck))
+    return rows
+
+
+def _row_height(kind: str, obj) -> float:
+    if kind == "member":
+        return 15.0 * len(_wrap(obj, 950, 8.8))
+    ck = obj
+    basis = ck.basis + (f"  Note: {ck.note}" if ck.note else "")
+    return 12.5 + 9.2 * min(3, len(_wrap(basis, 884, 7.3))) + 3.0
+
+
+def _table_header(y: float) -> List[str]:
+    o = [_r(14, y - 11, SW - 28, 15, "#ece3d1")]
+    for x, s, a in ((18, "ID", "start"), (98, "CHECK", "start"), (382, "DEMAND", "end"), (472, "CAPACITY", "end"), (516, "RATIO", "end"),
+                    (530, "RESULT", "start"), (590, "CODE / SOURCE", "start")):
+        o.append(_t(x, y, s, 7.6, 800, a, MUTE))
+    return o
+
+
+def _render_rows(rows: List[Tuple[str, object]], y0: float) -> List[str]:
+    o = _table_header(y0)
+    y = y0 + 15
+    for kind, obj in rows:
+        if kind == "member":
+            for ln in _wrap(obj, 950, 8.8):
+                o.append(_t(18, y + 9, ln, 8.8, 800, fill=INK))
+                y += 15
+            o.append(_ln(18, y - 3, SW - 18, y - 3, LINE_C, 0.6))
+            continue
+        ck: Check = obj
+        res = ck.result
+        col = RES_COLOR.get(res, MUTE)
+        y += 9
+        o.append(_t(18, y, ck.id, 7.8, 700, fill=MUTE))
+        o.append(_t(98, y, textwrap.shorten(ck.what, 58, placeholder="…"), 8.4, 700))
+        cap_txt = "—" if (not ck.capacity and res in ("REVIEW", "INFO")) else _num(ck.capacity, ck.unit)
+        rat_txt = "—" if (not ck.capacity and res in ("REVIEW", "INFO")) else f"{ck.ratio:.2f}"
+        o.append(_t(382, y, _num(ck.demand, ck.unit), 8.4, 600, "end"))
+        o.append(_t(472, y, cap_txt, 8.4, 600, "end"))
+        o.append(_t(516, y, rat_txt, 8.4, 800, "end", col))
+        o.append(_r(530, y - 8.5, 48, 11, col, rx=2))
+        o.append(_t(554, y, res, 7.2, 800, "middle", "#ffffff"))
+        o.append(_t(590, y, textwrap.shorten(ck.code, 80, placeholder="…"), 7.6, 400, fill=MUTE))
+        basis = ck.basis + (f"  Note: {ck.note}" if ck.note else "")
+        lines = _wrap(basis, 884, 7.3)
+        if len(lines) > 3:
+            lines = lines[:3]
+            lines[-1] = textwrap.shorten(lines[-1] + " …", 200, placeholder="…")
+        for ln in lines:
+            y += 9.2
+            o.append(_t(98, y, ln, 7.3, 400, fill="#3d3a35"))
+        y += 6.0
+    return o
+
+
+def calc_sheets(pkg_or_spec, meta: Optional[dict] = None, standalone: bool = False) -> List[Tuple[str, str, str]]:
+    """[(num, title, svg)] — the calculation sheets in the drawing set's frame (S-901 ...). Accepts a Package or a DeckSpec
+    (calculated on the spot). This is the permit-set hook: append these after the drawing sheets."""
+    pkg = pkg_or_spec if isinstance(pkg_or_spec, Package) else run_calcs(pkg_or_spec)
+    meta = meta or _meta(pkg, standalone)
+    sheets: List[Tuple[str, str, List[str], str]] = []      # (title, sub, body, kind)
+    # ---------------- S-901: basis
+    o: List[str] = []
+    o.append(_t(24, 22, "PROJECT", 9, 800, fill=GOLD))
+    y = 38
+    for ln in [pkg.job[:110], pkg.address, f"Prepared for {pkg.client}" if pkg.client else "", f"Prepared {pkg.prepared} · scope: " + " · ".join(pkg.scopes)]:
+        if ln:
+            for w in _wrap(ln, 540, 9.5)[:2]:
+                o.append(_t(24, y, w, 9.5, 600)); y += 13
+    y += 8
+    o.append(_t(24, y, "DESIGN CRITERIA", 9, 800, fill=GOLD)); y += 15
+    for k_, v, src in pkg.criteria_rows:
+        ws = _wrap(v, 335, 7.8)
+        o.append(_t(24, y, k_, 7.8, 800))
+        for i, w in enumerate(ws[:3]):
+            o.append(_t(128, y + i * 10, w, 7.8, 400))
+        for i, w in enumerate(_wrap(src, 86, 6.8)[:2]):
+            o.append(_t(566, y + i * 8.5, w, 6.8, 400, "end", MUTE))
+        y += 10 * min(3, max(len(ws), 1 + (len(_wrap(src, 86, 6.8)) > 1))) + 3
+    y += 6
+    o.append(_t(24, y, "MATERIALS (NDS 2018 reference values, psi; adjusted for wet service)", 9, 800, fill=GOLD)); y += 14
+    for nm, v, src in pkg.material_rows:
+        o.append(_t(24, y, nm, 7.8, 800)); y += 10
+        for w in _wrap(v + " · " + src, 530, 7.4)[:2]:
+            o.append(_t(32, y, w, 7.4, 400)); y += 9.5
+        y += 2
+    x2 = 600
+    yy = 22
+    o.append(_t(x2, yy, "METHOD", 9, 800, fill=GOLD)); yy += 15
+    for m in pkg.method:
+        for i, w in enumerate(_wrap(m, 370, 7.6)):
+            o.append(_t(x2 + (10 if i else 0), yy, ("• " if i == 0 else "") + w, 7.6, 400)); yy += 10
+        yy += 3
+    yy += 6
+    o.append(_t(x2, yy, "RESULTS", 9, 800, fill=GOLD)); yy += 16
+    cnt = pkg.counts()
+    bx = x2
+    for res in ("PASS", "FAIL", "REVIEW", "INFO"):
+        n = cnt.get(res, 0)
+        o.append(_r(bx, yy - 11, 86, 30, RES_COLOR[res], rx=3))
+        o.append(_t(bx + 43, yy + 4, f"{n}", 15, 900, "middle", "#ffffff"))
+        o.append(_t(bx + 43, yy + 15, res, 7, 800, "middle", "#ffffff"))
+        bx += 92
+    yy += 34
+    o.append(_t(x2, yy, "SHEETS", 9, 800, fill=GOLD)); yy += 14
+    idx_y = yy
+    # (index filled after the sheets are laid out)
+    seal_y = BODY_H - 150
+    o.append(_r(x2, seal_y, 372, 138, "#fffdf8", INK, 0.8))
+    o.append(_t(x2 + 10, seal_y + 16, "ENGINEER OF RECORD — SEAL, SIGNATURE, DATE", 8, 800, fill=MUTE))
+    o.append(_t(x2 + 10, seal_y + 128, "Colorado PE · reviewed for the loads and criteria on this sheet", 7.2, 400, fill=MUTE))
+    sheets.append(("Structural calculations — basis", "Codes, design criteria, materials, method and the result count — the calculation set's cover", o, "basis"))
+    # ---------------- S-902: columns, reactions, footings
+    rows = [c_ for c_ in pkg.columns]
+    hdrs = [("COLUMN", 18, "start"), ("WHERE", 92, "start"), ("x, y (ft)", 300, "start"), ("HEIGHT", 392, "end"), ("D", 440, "end"), ("L", 485, "end"),
+            ("S", 528, "end"), ("W ↓/↑", 590, "end"), ("P ASD", 646, "end"), ("UPLIFT", 696, "end"), ("BASE V", 744, "end"), ("FOOTING", 760, "start"),
+            ("CAPACITY", 868, "end"), ("SCOPE", 904, "start")]
+    chunks = [rows[i:i + 36] for i in range(0, len(rows), 36)] or [[]]
+    for ci, chunk in enumerate(chunks):
+        o = [_t(24, 20, "COLUMN LOADS AND FOOTINGS (lb; components at the column top, P = governing ASD combination incl. column and base weight)", 9, 800, fill=GOLD)]
+        o.append(_r(14, 30, SW - 28, 15, "#ece3d1"))
+        for h, x, a in hdrs:
+            o.append(_t(x, 41, h, 7.4, 800, a, MUTE))
+        y = 58
+        for r in chunk:
+            where = f"{r['part']} · {r['label']}"
+            xy = "—" if r["gx"] is None else f"{r['gx']:.2f}, {r['gy']:.2f}"
+            over = bool(r.get("fcap")) and r["P"] > r["fcap"]
+            vals = [(r["id"], 18, "start", 700, INK), (textwrap.shorten(where, 44, placeholder="…"), 92, "start", 400, INK), (xy, 300, "start", 400, INK),
+                    (_ftin(r["height_in"]), 392, "end", 400, INK), (f"{r['D']:,}", 440, "end", 400, INK), (f"{r['L']:,}", 485, "end", 400, INK),
+                    (f"{r['S']:,}" if r["S"] else "—", 528, "end", 400, INK), (f"{r['W'][0]:,}/{r['W'][1]:,}" if any(r["W"]) else "—", 590, "end", 400, INK),
+                    (f"{r['P']:,}", 646, "end", 800, RES_COLOR["FAIL"] if over else INK), (f"{r['uplift']:,}" if r["uplift"] else "—", 696, "end", 400, INK),
+                    (f"{r['Vb']:,}" if r["Vb"] else "—", 744, "end", 400, INK), (textwrap.shorten(r.get("model") or "—", 20, placeholder="…"), 760, "start", 600, INK),
+                    (f"{r['fcap']:,}" if r.get("fcap") else "—", 868, "end", 600, RES_COLOR["FAIL"] if over else INK), (textwrap.shorten(r.get("scope", "Base"), 16, placeholder="…"), 904, "start", 400, MUTE)]
+            for s_, x, a, w, f in vals:
+                o.append(_t(x, y, s_, 7.8, w, a, f))
+            o.append(_ln(14, y + 4, SW - 14, y + 4, LINE_C, 0.4))
+            y += 14.5
+        y += 10
+        if ci == len(chunks) - 1:
+            kinds = {r.get("ftype") for r in rows}
+            if "diamond_pier" in kinds:
+                o.append(_t(24, y, "Piers: " + PIER_SRC + ". Capacities by soil (catalog.pier_capacity_lb); uplift and lateral are tested chart values, not ESR-evaluated (ESR-1895 §5.6).", 7.6, 400, fill=MUTE)); y += 11
+            if kinds & {"caisson", "existing", "concrete"}:
+                o.append(_t(24, y, f"Caissons: end bearing at the presumptive {pkg.criteria.soil_psf:,.0f} psf (IRC Table R401.4.1) + the engine's ≈{CAISSON_SKIN_PSF:g} psf skin-friction estimate; "
+                                   "uplift by the shaft's weight; lateral by IBC 1807.3.2.1 — the engineer sizes the shafts.", 7.6, 400, fill=MUTE))
+        sheets.append(("Column loads and footings" + (f" ({ci + 1}/{len(chunks)})" if len(chunks) > 1 else ""),
+                       "Every column: load components, the governing ASD load, uplift, base shear, the pier specified and the smallest that works", o, "cols"))
+    # ---------------- check sheets, by group
+    for g in GROUPS:
+        cks = [ck for ck in pkg.checks if ck.group == g]
+        if not cks:
+            continue
+        rows = _check_rows(cks)
+        page: List[Tuple[str, object]] = []
+        hgt = 20.0
+        pages = []
+        for kind, obj in rows:
+            h = _row_height(kind, obj)
+            if hgt + h > BODY_H - 14 and page:
+                pages.append(page); page = []; hgt = 20.0
+                if kind == "check":           # repeat the member line on a new sheet
+                    prev = next((o_ for k_, o_ in reversed(rows[:rows.index((kind, obj))]) if k_ == "member"), None)
+                    if prev:
+                        page.append(("member", prev + " (cont.)")); hgt += _row_height("member", prev)
+            page.append((kind, obj)); hgt += h
+        if page:
+            pages.append(page)
+        sub = {"Joists & cantilevers": "2x10 joists: bending, shear, deflection L/360, cantilevers (L/4, 220 lb at the end) — NDS 2018, IRC R507.6",
+               "Ledger & hangers": "Joist hangers and LedgerLOK at every ledger — IRC R507.9, ESR-1078",
+               "Beams": "6x10 DF-L No.1 drop beams, continuous pieces on their posts, live load patterned — NDS 2018 (outside IRC R507.5)",
+               "Columns": "8x8 DF-L No.1 columns: axial + buckling at their heights — NDS 2018 3.7, IRC R507.4",
+               "Caps & bases": "Column caps (CCQ / ECCQ) and post bases — Simpson C-C-2026",
+               "Footings": ("Caissons: bearing (end + skin friction), uplift, lateral embedment, frost — IRC R403 / R507.3, IBC 1807.3"
+                            if not any(r.get("ftype") == "diamond_pier" for r in pkg.columns) else
+                            "Diamond Piers: bearing by soil, uplift, lateral, frost, spacing — ESR-1895, Pin Foundations chart"),
+               "Lateral system": "House attachment (R507.9.2 hold-downs, ledger), deck diaphragm, knee braces at the end columns",
+               "Inset stair & notch": "Stringers, notch headers and trimmer, the stair base ledger and the lower rim",
+               "Stairs to the yard": "Option: stringers, landing joists and rims, landing posts and piers, the stair on the deck rim",
+               "Louvered roof load path": "Option: roof post reactions to the deck — gravity, uplift chain, base moment",
+               "Guards": "Guard posts and their blocking — IRC Table R301.5, ESR-4217"}.get(g, "")
+        for pi, pg in enumerate(pages):
+            body = _render_rows(pg, 10)
+            sheets.append((g + (f" ({pi + 1}/{len(pages)})" if len(pages) > 1 else ""), sub, body, "checks"))
+    # ---------------- review / assumptions / sources
+    o = [_t(24, 20, "FOR THE ENGINEER OF RECORD", 9, 800, fill=GOLD)]
+    y = 36
+    for i, r in enumerate(pkg.review):
+        ws = _wrap(r, 920, 8.0)
+        o.append(_t(24, y, f"{i + 1}.", 8.0, 800, fill=GOLD))
+        for w in ws:
+            o.append(_t(42, y, w, 8.0, 400)); y += 10.5
+        y += 3
+    y += 8
+    o.append(_t(24, y, "ASSUMPTIONS", 9, 800, fill=GOLD)); y += 15
+    for a in pkg.assumptions:
+        for i, w in enumerate(_wrap(a, 920, 7.8)):
+            o.append(_t(24 + (12 if i else 0), y, ("• " if i == 0 else "") + w, 7.8, 400)); y += 10
+        y += 2
+    y += 8
+    o.append(_t(24, y, "SOURCES", 9, 800, fill=GOLD)); y += 15
+    for s_ in pkg.sources:
+        for i, w in enumerate(_wrap(s_, 920, 7.6)):
+            o.append(_t(24 + (12 if i else 0), y, ("• " if i == 0 else "") + w, 7.6, 400, fill="#3d3a35")); y += 9.8
+    sheets.append(("Review items, assumptions, sources", "What the engineer of record decides, what this calculation assumes, and where the values come from", o, "review"))
+    # number them and fill the index on the cover
+    out = []
+    nums = [f"{CALC_SHEET_PREFIX}{i + 1:02d}" for i in range(len(sheets))]
+    idx = []
+    per_col = int(math.ceil(len(sheets) / 2.0))
+    step = min(10.6, (BODY_H - 162 - idx_y) / max(1, per_col))
+    for i, ((title, sub, body, kind), num) in enumerate(zip(sheets, nums)):
+        cx = x2 + (0 if i < per_col else 188)
+        yy = idx_y + (i % per_col) * step
+        idx.append(_t(cx, yy, num, 7.4, 800, fill=GOLD)); idx.append(_t(cx + 40, yy, textwrap.shorten(title, 34, placeholder="…"), 7.4, 500))
+    sheets[0][2].extend(idx)
+    for (title, sub, body, kind), num in zip(sheets, nums):
+        out.append((num, title, _sheet_svg(num, title, sub, body, meta)))
+    return out
+
+
+PIER_CAP_CACHE: Dict[Tuple[str, float], float] = {}
+
+
+def _pier_cap(model: str, soil: float) -> float:
+    from .catalog import pier_capacity_lb
+    k = (model, soil)
+    if k not in PIER_CAP_CACHE:
+        PIER_CAP_CACHE[k] = pier_capacity_lb(model, soil)
+    return PIER_CAP_CACHE[k]
+
+
+PAGE_CSS = """<style>
+:root { --ink:#141414; --ink-3:#8a8172; --ground:#fbf9f4; --paper:#ffffff; --line:#d9d2c3; --gold:#d49e1b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#f2ede2; --ink-3:#9a9182; --ground:#121110; --paper:#1b1916; --line:#3a352d; --gold:#e0ac2a; } }
+:root[data-theme="dark"] { --ink:#f2ede2; --ink-3:#9a9182; --ground:#121110; --paper:#1b1916; --line:#3a352d; --gold:#e0ac2a; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:"Nunito Sans", "Segoe UI", system-ui, sans-serif; font-size:15px; line-height:1.5; }
+.band { background:#000; color:#fff; padding:22px 20px 24px; }
+.band .in { max-width:1100px; margin:0 auto; }
+.band .kick { color:#d49e1b; font-weight:800; font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+.band h1 { margin:6px 0 4px; font-size:clamp(24px, 4.5vw, 36px); font-weight:900; line-height:1.08; }
+.band p { margin:0; color:#ecddb6; font-weight:300; }
+.wrap { max-width:1100px; margin:0 auto; padding:16px 16px 60px; }
+.index { columns:2; column-gap:28px; font-size:14px; padding-left:18px; }
+.counts { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 18px; }
+.counts span { padding:4px 10px; border-radius:4px; color:#fff; font-weight:800; font-size:13px; }
+.sheet-page { margin:0 0 26px; }
+.sheet-page h3 { font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin:0 0 6px; }
+.sheet-page svg { width:100%; height:auto; display:block; border:1px solid var(--line); background:#fff; }
+footer { color:var(--ink-3); font-size:12px; margin-top:20px; }
+@media (max-width: 640px) { .index { columns:1; } }
+@media print { @page { size: Letter landscape; margin: 0.3in; } body { background:#fff; color:#000; } .band, .intro, footer { display:none; }
+  .sheet-page { break-after: page; page-break-after: always; margin:0; } .sheet-page h3 { display:none; } .sheet-page svg { border:0; max-height:7.6in; } }
+</style>"""
+
+
+def render_html(pkg: Package, out_dir: str, pdf: bool = True, name: str = "calcs") -> dict:
+    """calcs.html (one sheet per Letter-landscape page when printed), calcs.json, and calcs.pdf with Chromium when asked."""
+    out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
+    sheets = calc_sheets(pkg, standalone=True)
+    cnt = pkg.counts()
+    title = f"{pkg.address.split(',')[0] if pkg.address else pkg.job} — structural calculations"
+    head = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>Structural Calculations</title>"
+            f"<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,600;6..12,700;6..12,800;6..12,900&display=swap'>"
+            f"{PAGE_CSS}</head><body>")
+    band = (f"<header class='band'><div class='in'><div class='kick'>GS Exterior Experts · Deck Division · structural calculations</div>"
+            f"<h1>{_esc(title)}</h1><p>{_esc(pkg.address)} · {_esc(pkg.prepared)} · {' · '.join(_esc(s) for s in pkg.scopes)}</p></div></header>")
+    intro = ("<section class='intro'><div class='counts'>" + "".join(f"<span style='background:{RES_COLOR[r]}'>{cnt.get(r, 0)} {r}</span>" for r in ("PASS", "FAIL", "REVIEW", "INFO"))
+             + "</div><ol class='index'>" + "".join(f"<li><b>{n}</b> {_esc(t)}</li>" for n, t, _ in sheets) + "</ol></section>")
+    body = "".join(f"<div class='sheet-page' id='{n}'><h3>{n} · {_esc(t)}</h3>{svg}</div>" for n, t, svg in sheets)
+    page = head + band + "<main class='wrap'>" + intro + body + ("<footer>Structural calculations for review and seal by a Colorado-licensed professional engineer. "
+                                                                 "Generated by decktakeoff.calcs from the job's spec and layout.</footer></main></body></html>\n")
+    (out / f"{name}.html").write_text(page)
+    (out / f"{name}.json").write_text(json.dumps(pkg.to_dict(), indent=1, default=str))
+    res = dict(html=str(out / f"{name}.html"), json=str(out / f"{name}.json"), sheets=len(sheets), counts=cnt)
+    if pdf:
+        try:
+            from .render import _chromium
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                b = pw.chromium.launch(executable_path=_chromium(), args=["--no-sandbox"])
+                pg = b.new_page(viewport={"width": 1400, "height": 1000})
+                pg.goto("file://" + str(out / f"{name}.html")); pg.wait_for_timeout(1500)
+                pg.emulate_media(media="print")
+                pg.pdf(path=str(out / f"{name}.pdf"), format="Letter", landscape=True, print_background=True, prefer_css_page_size=True)
+                b.close()
+            res["pdf"] = str(out / f"{name}.pdf")
+        except Exception as e:      # no Chromium here: the HTML still prints from a browser
+            res["pdf_error"] = str(e)
+    return res
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    import argparse
+    from .spec import DeckSpec
+    ap = argparse.ArgumentParser(prog="python -m decktakeoff.calcs", description="Structural calculation package for a deck spec")
+    ap.add_argument("spec", help="base spec JSON")
+    ap.add_argument("--option", action="append", default=[], help='"Label=path.json": an option spec whose added / changed checks join the package')
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--pdf", action="store_true")
+    ap.add_argument("--exposure", choices=["B", "C", "D"], default=None)
+    a = ap.parse_args(argv)
+    base = DeckSpec.from_dict(json.load(open(a.spec)))
+    opts = []
+    for o in a.option:
+        label, path = o.rsplit("=", 1)
+        opts.append((label, DeckSpec.from_dict(json.load(open(path)))))
+    pkg = calc_package(base, opts, exposure=a.exposure)
+    r = render_html(pkg, a.out, pdf=a.pdf)
+    print(json.dumps({k: v for k, v in r.items()}, indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

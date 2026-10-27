@@ -626,6 +626,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             for fg in st.geo.flights:
                 if fg.treads:
                     Qz.fascia_pieces += [(f"stair skirt ({st.side}, stepped)", round(fg.treads * st.geo.tread_in + 1.0, 1))] * 2
+                    if dkf["material"] == "PVC":      # PVC skirts take the TOPLoc fascia screws, counted with the rim fascia: 2 at each end + every 12"
+                        Qz.fascia_screws += 2 * (4 + max(0, int(math.ceil((fg.treads * st.geo.tread_in + 1.0) / 12)) - 1))
         if getattr(st, "build", "stringers") == "box":
             # a framed box per tread: 2x6 front + back rims across the width, cross members at 16" — no stringers, no hanger board
             ncm = int(math.ceil(st.width / 16.0)) + 1
@@ -816,11 +818,16 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         r3 = int(math.ceil(n_posts * (math.pi * (dia - 4) / 12 * 4) / 20))
         d_, uc, src = _item("footings", "rebar4_20"); lines.append(Line("Footings", d_, r4, r4, "ea", "exact — engineer governs", uc, src))
         d_, uc, src = _item("footings", "rebar3_20"); lines.append(Line("Footings", d_, r3, r3, "ea", "exact — engineer governs", uc, src))
-        d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_posts, n_posts, "ea", "exact", uc, src))
         bkeys = TIMBER_BASE.get(spec.framing.post_size, ("ABU66Z_black", "ABU66Z"))
         bkey = bkeys[0] if black else bkeys[1]
+        if bkey == "ABU88Z" and spec.framing.post_rough:
+            bkey = "ABU88RZ"                # a rough 8x8 (a full 8") takes the R-series ABU88
+        n_anc = n_posts * (2 if bkey.startswith("ABU88") else 1)       # an ABU88 bolts down with two 5/8" anchors
+        d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_anc, n_anc, "ea", "exact" + (f"  (2 per {bkey})" if n_anc > n_posts else ""), uc, src))
         d_, uc, src = _item("footings", bkey)
-        lines.append(Line("Footings", d_, n_posts, n_posts, "ea", "exact", uc, src, bkey))
+        lines.append(Line("Footings", d_ + (" on the cast-in anchor" if bkey.startswith("ABU88") else ""), n_posts, n_posts, "ea", "exact", uc, src, bkey))
+        if bkey.startswith("ABU88"):           # both anchors are cast in: the set is only the post screws
+            lines.append(Line("Footings", "ABU88 post screws: (8) Simpson SDS 1/4\" x 3\" per base", n_posts, n_posts, "set", "exact  (one set per ABU88 base)", 10.0, "EST — (8) SDS25300 per base"))
         base_screws = 0
     else:
         dia, depth = fr0.footing_dia_in, fr0.footing_depth_in
@@ -874,6 +881,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             dk = decking_facts(spec.decking.collection)
             nb = int(math.ceil(sf_l / (dk["width"] / 12 * 12) * 1.1))
             lines.append(Line("Stairs", f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color} 1x6x12 — landing {li + 1} decking ({sf_l:.0f} SF)", nb, nb, "ea", "+10% cuts", *_price("decking", f"{spec.decking.brand}|{spec.decking.collection}|12|{spec.decking.profile}")))
+            if getattr(st_s, "skirts", False) and spec.decking.fascia:
+                # a skirted stair's landing is wrapped in the fascia on all four sides (as the 3D draws it), packed with the deck's fascia
+                lp_ = [(f"landing {li + 1} fascia ({st_s.side} stair)", round(lw + 1.0, 1))] * 2 + [(f"landing {li + 1} fascia ({st_s.side} stair)", round(ld, 1))] * 2
+                Qz.fascia_pieces += lp_
+                if dkf["material"] == "PVC":
+                    Qz.fascia_screws += sum(4 + max(0, int(math.ceil(Lp / 12)) - 1) for _, Lp in lp_)
 
     # ================= HARDWARE / CONNECTORS
     hanger = spec.framing.hanger or HANGER_FOR_JOIST.get(jsize, "LUS210Z")

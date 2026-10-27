@@ -364,7 +364,8 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     rl = L.rail
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
         goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
-        how=[ms.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else [])
+        how=[ms.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."]
+                                    if (s.railing.drink_rail and "drink rail" not in ms.get("Rail", "").lower()) else [])
             + ([f"The step between the levels is guarded along the {lw(hi)}'s edge except at the stair opening."] if (faces and rl) else []),
         check=[f"Top of rail {rl.height:g}\" above each level's decking; posts plumb" if rl else "—",
                "Cables tensioned, no 4\" sphere passes" if RAIL_SYSTEMS.get(s.railing.system, {}).get("cable") else "Balusters under 4\" clear"]))

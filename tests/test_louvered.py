@@ -2,6 +2,9 @@
 the takeoff swaps the rail post kits for wall-mount kits, the scene draws it on its own layer with a live-viewer descriptor,
 the price is $/SF x the area, the drawing set gets A-403; a job without a roof is untouched."""
 import copy
+import math
+
+import pytest
 
 from decktakeoff import run
 from decktakeoff import louvered as lv
@@ -69,3 +72,31 @@ def test_part_roofs_frame():
     part = {"name": "Upper", "placement": {"origin": [29.1667, 0]}, "geometry": {}}
     q = lv.part_roofs([dict(x0=29.6, x1=49.6, y0=0, y1=10)], part)[0]
     assert q["_global"] and abs(q["x0"] - 0.4333) < 1e-3 and abs(q["x1"] - 20.4333) < 1e-3
+
+
+def test_roof_post_takes_the_rail_end_beside_it():
+    """The roof posts ARE the rail posts where the rail ties in: a run whose line passes within 12" of a roof post ends at
+    it (no IRX post beside it), the panel ends get wall-mount kits, and a line that misses the post's faces gets a filler."""
+    t, _, _ = run(_spec(dict(ROOF, x0=0.38, x1=19.8, y1=11.4, posts=[[0.6333, 11.1], [19.55, 11.1]])))
+    rl = t.layout.rail
+    roof = [q for q in rl.posts if getattr(q, "roof", False)]
+    ids = {q.roof for q in roof}
+    assert len(ids) == 2
+    assert all(math.hypot(q.x - a, q.y - b) > 12 for q in rl.posts if not getattr(q, "roof", False) for a, b in ids)
+    assert any(q.tag.startswith("left") for q in roof) and any(q.tag.startswith("right") for q in roof)
+    assert sum(l.order for l in t.lines if "Wall Mount" in l.item) == 4
+    assert any("filler block" in n for n in t.notes)
+
+
+def test_sold_size_and_eave_heights():
+    r = dict(x0=29.55, x1=50.1875, y0=0, y1=9.7917, price=35000, price_per_sf=175)
+    assert lv.sold_size(r) == (20.0, 10.0) and lv.roof_area_sf(r) == 200          # the owner's 20 x 10 at $175/SF
+    assert lv.sold_size(dict(r, nominal=[21, 9.5])) == (21.0, 9.5)
+    assert lv.sold_size(dict(r, price=None))[0] == pytest.approx(20.6375)
+    surf = [dict(name="C", x0=29.1667, x1=50.1667, y0=0.0, y1=9.875, z=8.5625)]
+    q = lv.resolve(dict(r, soffit_z=16.48), surf)          # roof-line mount: riser brackets over the wall line
+    assert q["z_top"] == pytest.approx(18.1467, abs=0.01) and q["clear_ft"] == pytest.approx(8.917, abs=0.01)
+    assert (q["z_top"] - q["h_b"]) - q["eave"]["z_wall"] == pytest.approx(2 / 12)
+    assert "20'-0\" x 10'-0\" (200 SF)" in lv.scope_words(q)[0] and any(n.startswith("built frame") for n in q["notes"])
+    qf = lv.resolve(dict(r, soffit_z=16.48, house_mount="fascia"), surf)       # hung under the soffit instead
+    assert qf["z_top"] == pytest.approx(16.48) and qf["clear_ft"] == pytest.approx(7.25, abs=0.01)
