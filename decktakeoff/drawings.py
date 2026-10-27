@@ -4046,7 +4046,10 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
     # the drawing sheets: no yard, no louvered roof (its own sheet), no option (A-100 / S-100 show it dashed), no stand-in
     # landing board on the level a stair lands on (the level is there)
     allb = [b for b in S0.boxes if getattr(b, "layer", "") not in ("site", "louvered") and not (b.tag or "").split(": ")[-1].startswith("lower deck at the")]
-    keep = [b for b in allb if not (getattr(b, "layer", "") or "").startswith("option:")]
+    optb_ = [q for q in allb if (getattr(q, "layer", "") or "").startswith("option:") and q.kind in ("riser", "railpost", "post", "tread", "stringer", "fascia")]
+    on_opt = lambda b: any(b.x0 < q.x1 + 0.06 and b.x1 > q.x0 - 0.06 and b.y0 < q.y1 + 0.06 and b.y1 > q.y0 - 0.06 and b.z0 < q.z1 + 0.06 and b.z1 > q.z0 - 0.06
+                           for q in optb_)                         # a light set on an option's stair or post goes with the option
+    keep = [b for b in allb if not (getattr(b, "layer", "") or "").startswith("option:") and not (b.kind in ("light", "fixture") and optb_ and on_opt(b))]
     S = _dc.replace(S0, boxes=keep)
     S.x_min = x_min
     S._job_spec = CL.spec
