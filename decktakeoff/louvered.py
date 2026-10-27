@@ -78,14 +78,19 @@ DEFAULTS = dict(
     screens_priced=None,                    # None -> as the roof ("own" | "option")
     note="",
 )
-SCREEN_DEFAULTS = dict(side="front", drop=0.0, fabric="mesh", color="black",
-                       bottom=None,           # ft above grade where the bottom bar lands fully down (None -> the deck under the screen)
-                       mount="inside",        # "inside": cassette under the frame inside the posts, fabric inside the rail, bar on the deck |
-                                              # "outside": cassette face-mounted on the beam's outer face, fabric outside the rail
-                       from_ft=None, to_ft=None,   # the screen's extent along its side (plan ft; None -> the frame's inside between beams)
-                       housing_in=5.5,        # Suncoast 5.5" square housing: spans to 22', drops to 11' (7" round housing: 30' / 22')
+SCREEN_DEFAULTS = dict(side="front", drop=0.0, fabric="mesh", density=90, color="black",
+                       bottom=None,           # ft above grade where the bottom bar lands fully down (None -> the deck under the screen's line)
+                       mount="inside",        # "inside": housing under the frame inboard of the posts, fabric inside the rail, the bar on the
+                                              #   deck (research F1) | "outside": housing face-mounted on the beam's outer face (the left-end
+                                              #   alternate L2: fabric outside the step face, down to the lower deck)
+                       from_ft=None, to_ft=None,   # the screen's extent along its side (plan ft; None -> post face to post face / the gutter line)
+                       housing_in=None,       # None -> Suncoast 5.5" square (to 22' wide, 11' drop), else the 7" round (to 30' / 22')
+                       track_post=None,       # a slim 2x2 track post at the screen's house end: None -> where the end screen stops short of the house
+                       fixed_panel=None,      # a fixed screen panel from the house to the gutter line: None -> with the track post
                        price=None, price_per_lf=None, name=None)
-SCREEN_EST_PER_LF = 275.0       # ESTIMATE until the owner sets it: sell $/LF of screen width, motorized, mesh, installed
+# ESTIMATE until the owner / Suncoast Denver prices screens (research.md 5.5: front 19' $6.5-9.5k, right end $4-6k, L2 +$5.5-8.5k)
+SCREEN_EST = dict(per_screen=1500.0, per_lf=350.0, track_post=500.0, fixed_panel=400.0, round_housing=1500.0)
+SCREEN_EST_PER_LF = SCREEN_EST["per_lf"]
 SCREEN_MAT = "lvfabric"
 HEM_H, HEM_T, TRACK_W, TRACK_D = 2.0 * IN, 1.25 * IN, 1.25 * IN, 2.0 * IN
 FABRIC = {"mesh": dict(rough=0.9), "vinyl": dict(rough=0.12)}   # mesh: Phifer SunTex `density` % (55-99, default 80); vinyl: clear

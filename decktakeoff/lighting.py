@@ -501,13 +501,35 @@ def labor_lines(t, lr: dict) -> list:
     return out
 
 
+def fixed_sell(t, labor_lines, factor: float, rate: float) -> Tuple[float, float]:
+    """(sell, work) of the lights when extras.lights.sell_each sets their installed price (the owner: "$200 per, installed, with
+    margin"): sell = sell_each x lights (risers + posts); work = their real materials (x the material factor, + tax) + their
+    labor — pricing.price takes the work off the margin base and adds the sell, so the rest of the job keeps its margin and the
+    cost stack still shows what the lights cost. (0, 0) without a set price or without lights."""
+    plan = getattr(t, "lighting", None)
+    each = (plan.cfg.get("sell_each") if plan is not None else None)
+    if not each or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
+        return 0.0, 0.0
+    m = sum(l.ext for l in t.lines if l.category == CATEGORY)
+    lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
+    return round(float(each) * plan.fixtures, 2), m * factor * (1 + rate) + lab
+
+
 def allocation(t, mats, labsum, comp) -> list:
-    """The lighting's line in "what the price includes" (sell value), or nothing."""
+    """The lighting's line in "what the price includes" (sell value: sell_each x lights when set), or nothing."""
     plan = getattr(t, "lighting", None)
     m = mats(lambda l: l.category == CATEGORY)
     if plan is None or not m:
         return []
+    if plan.cfg.get("sell_each"):
+        return [(short_words(plan), round(float(plan.cfg["sell_each"]) * plan.fixtures))]
     return [(short_words(plan), round(comp(m, labsum("Lighting"))))]
+
+
+def post_label(plan: "LightPlan", n: Optional[int] = None) -> str:
+    """How the post lights read: "post-cap lights" or "post accent lights" (with a count when n is given)."""
+    lab = "post accent light" if plan.post_kind == "accent" else "post-cap light"
+    return f"{n} {lab}{'s' if n != 1 else ''}" if n is not None else lab + "s"
 
 
 NUM = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
@@ -531,7 +553,7 @@ def short_words(plan: LightPlan) -> str:
     if plan.n_riser:
         bits.append(f"{plan.n_riser} riser lights")
     if plan.n_cap:
-        bits.append(f"{plan.n_cap} post-cap lights")
+        bits.append(post_label(plan, plan.n_cap))
     n = len(plan.transformers)
     return ("Lighting — " + " and ".join(bits) + ", LED, warm white, on " + (f"{NUM.get(n, n)} transformers with photocells and timers" if n > 1
                                                                           else "a transformer with a photocell and timer"))
@@ -549,7 +571,11 @@ def words(plan: LightPlan) -> str:
             lit.append((f"{'a' if k == 1 else NUM.get(k, k)} recessed LED light{'s' if k > 1 else ''} in each of the {nr} risers of the {low(nm)}"))
         else:
             lit.append("a recessed LED light in each stair riser (" + ", ".join(f"{nr * k} on the {low(nm)}" for nm, nr, k in rs) + ")")
-    if plan.n_cap:
+    if plan.n_cap and plan.post_kind == "accent":
+        stair = f" (on the stair and landing posts, the side toward the stair)" if plan.stair_posts else ""
+        lit.append((f"a small LED accent light on each of the {plan.n_cap} rail posts, on the deck side just below the drink rail" if cfg.get("every", 1) == 1
+                    else f"a small LED accent light on every other rail post ({plan.n_cap}), on the deck side just below the drink rail") + stair)
+    elif plan.n_cap:
         lit.append(f"an LED cap light on each of the {plan.n_cap} rail posts" if cfg.get("every", 1) == 1 else f"an LED cap light on every other rail post ({plan.n_cap})")
     k = cfg.get("kelvin", 2700)
     return (f"Low-voltage LED lighting, {k:g}K warm white: " + " and ".join(lit) + ". " + _switching(plan)[0].upper() + _switching(plan)[1:]
