@@ -3,57 +3,65 @@
   "house": {},
   "brick_painted": false
  },
- "gray": {
+ "cream": {
   "house": {
-   "siding": "#585858",
-   "accent": "#2f2f30",
-   "trim": "#2f2f30",
-   "fascia": "#2f2f30",
-   "gutter": "#2f2f30",
-   "soffit": "#2f2f30",
-   "brick": "#585858",
-   "mortar": "#585858",
-   "foundation": "#585858"
-  }
+   "siding": "#EFE8DB",
+   "foundation": "#EFE8DB",
+   "trim": "#EFE8DB",
+   "accent": "#EFE8DB",
+   "soffit": "#EFE8DB",
+   "fascia": "#EFE8DB",
+   "gutter": "#EFE8DB"
+  },
+  "brick_painted": false
  },
- "charcoal": {
+ "beige": {
   "house": {
-   "siding": "#434341",
-   "accent": "#2f2f30",
-   "trim": "#2f2f30",
-   "fascia": "#2f2f30",
-   "gutter": "#2f2f30",
-   "soffit": "#2f2f30",
-   "brick": "#434341",
-   "mortar": "#434341",
-   "foundation": "#434341"
-  }
+   "siding": "#D1C7B8",
+   "foundation": "#D1C7B8",
+   "trim": "#EDEAE0",
+   "accent": "#EDEAE0",
+   "soffit": "#EDEAE0",
+   "fascia": "#EDEAE0",
+   "gutter": "#EDEAE0"
+  },
+  "brick_painted": false
  },
- "black": {
+ "khaki": {
   "house": {
-   "siding": "#2f2f30",
-   "accent": "#2f2f30",
-   "trim": "#2f2f30",
-   "fascia": "#2f2f30",
-   "gutter": "#2f2f30",
-   "soffit": "#2f2f30",
-   "brick": "#2f2f30",
-   "mortar": "#2f2f30",
-   "foundation": "#2f2f30"
-  }
+   "siding": "#B8A992",
+   "foundation": "#B8A992",
+   "trim": "#EFE8DB",
+   "accent": "#EFE8DB",
+   "soffit": "#EFE8DB",
+   "fascia": "#EFE8DB",
+   "gutter": "#EFE8DB"
+  },
+  "brick_painted": false
  },
  "recommended": {
   "house": {
-   "siding": "#434341",
-   "accent": "#2f2f30",
-   "trim": "#2f2f30",
-   "fascia": "#2f2f30",
-   "gutter": "#2f2f30",
-   "soffit": "#2f2f30",
-   "brick": "#434341",
-   "mortar": "#434341",
-   "foundation": "#434341"
+   "siding": "#EFE8DB",
+   "foundation": "#EFE8DB",
+   "trim": "#EFE8DB",
+   "accent": "#EFE8DB",
+   "soffit": "#EFE8DB",
+   "fascia": "#2F2F30",
+   "gutter": "#2F2F30"
   },
-  "deck": "Mahogany"
+  "brick_painted": false
+ },
+ "recommended_dh": {
+  "house": {
+   "siding": "#EFE8DB",
+   "foundation": "#EFE8DB",
+   "trim": "#EFE8DB",
+   "accent": "#EFE8DB",
+   "soffit": "#EFE8DB",
+   "fascia": "#2F2F30",
+   "gutter": "#2F2F30"
+  },
+  "deck": "Dark Hickory",
+  "brick_painted": false
  }
 }

@@ -1,16 +1,17 @@
 #!/bin/bash
 # Photoreal (Cycles) stills of the exterior color study, one Blender at a time: the seven stills build_colorstudy.py reads.
-#   name             spec          still                                    station      brick
-#   recommended      recommended   cycles/recommended/yard.jpg              yard         painted
-#   recommended_up   recommended   cycles/recommended_up/upper_deck.jpg     upper_deck   painted
-#   charcoal         charcoal      cycles/charcoal/yard.jpg                 yard         painted
-#   charcoal_up      charcoal      cycles/charcoal_up/upper_deck.jpg        upper_deck   painted
-#   gray, black      same name     cycles/<name>/yard.jpg                   yard         painted
-#   existing         existing      cycles/existing/yard.jpg                 yard         the house's own buff brick
+#   name               spec             still                                       station
+#   recommended        recommended      cycles/recommended/yard.jpg                 yard          (the cover)
+#   recommended_up     recommended      cycles/recommended_up/upper_deck.jpg        upper_deck    (deck color: English Walnut)
+#   recommended_dh     recommended_dh   cycles/recommended_dh/yard.jpg              yard          (deck color: Dark Hickory)
+#   recommended_dh_up  recommended_dh   cycles/recommended_dh_up/upper_deck.jpg     upper_deck
+#   cream, beige, khaki, existing       cycles/<name>/yard.jpg                      yard
+# The brick: painted only for a palette with "brick_painted" true in palettes.json (the tan and cream study, 27 Oct: none; every
+# palette keeps the house's own buff brick).
 # Each runs as  nice -n 19 flock $S/blender.lock <bpy python> cycles_palette.py ...  and appends its output to cycles/run.log.
 # Quality and look as published: 40 samples, 1100x708, summer foliage, June 21 10:30 AM, the stations of cameras.json (a copy of the
 # fillmore/render stations the published stills used). The specs carry geometry.furniture; decktakeoff.cycles draws it by default.
-#     bash cycles_all.sh [name ...]      default: all seven, the cover and deck-color stills first
+#     bash cycles_all.sh [name ...]      default: all eight, the cover and deck-color stills first
 #     DRY_RUN=1   print the commands, run nothing
 #     FORCE=1     also re-render a still that is newer than its spec
 # A still newer than its spec and the cameras copy is kept, so a stopped run picks up where it stopped (make_specs.py leaves an
@@ -18,18 +19,18 @@
 # A spec without furniture is refused (ALLOW_NO_FURNITURE=1 to render it anyway). Exit 1 if any named still is missing at the end.
 S=/tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad; CS=$S/fillmore/colorstudy
 LOCK=$S/blender.lock; PY=$S/bvenv/bin/python; LOG=$CS/cycles/run.log; CAMS=$CS/cameras.json
-ALL="recommended recommended_up charcoal charcoal_up gray black existing"
+ALL="recommended recommended_up recommended_dh recommended_dh_up cream beige khaki existing"
 cd /home/user/Decks- || exit 1
 mkdir -p "$CS/cycles"
 failed=""
 for j in ${*:-$ALL}; do
   case $j in
-    *_up)     p=${j%_up}; st=upper_deck; pb=1 ;;
-    existing) p=$j;       st=yard;       pb=0 ;;
-    gray|charcoal|black|recommended) p=$j; st=yard; pb=1 ;;
+    *_up)     p=${j%_up}; st=upper_deck ;;
+    existing|cream|beige|khaki|recommended|recommended_dh) p=$j; st=yard ;;
     *) echo "$j: not one of: $ALL"; failed="$failed $j"; continue ;;
   esac
   spec=$CS/specs/$p.json; out=$CS/cycles/$j; jpg=$out/$st.jpg
+  pb=$(python3 -c "import json,sys; print(int(bool(json.load(open(sys.argv[1])).get(sys.argv[2], {}).get('brick_painted', True))))" "$CS/palettes.json" "$p")
   if [ ! -f "$spec" ]; then echo "$j: no spec $spec (python3 $CS/tools/make_specs.py)"; failed="$failed $j"; continue; fi
   if [ -z "$ALLOW_NO_FURNITURE" ] && ! grep -q '"furniture": \[{' "$spec"; then
     echo "$j: $spec has no geometry.furniture (python3 $CS/tools/make_specs.py, or ALLOW_NO_FURNITURE=1)"; failed="$failed $j"; continue

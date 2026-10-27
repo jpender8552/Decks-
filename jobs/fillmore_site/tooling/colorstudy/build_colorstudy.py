@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exterior Color Study, 7303 S Fillmore Cir (client document, GS Exterior Experts look; separate from the proposal).
 Reads the renders made by render_palettes.py (three.js, renders/<palette>/{yard,corner,upper}.jpg) and cycles_all.sh
-(photoreal, cycles/<palette>/yard.jpg, cycles/{charcoal,recommended}_up/upper_deck.jpg); writes page.html + r/ + files.json
+(photoreal, cycles/<palette>/yard.jpg, cycles/recommended_dh/yard.jpg, cycles/{recommended,recommended_dh}_up/upper_deck.jpg); writes page.html + r/ + files.json
 and the Letter PDF.     python3 build_colorstudy.py [--no-pdf]"""
 import html
 import json
@@ -25,28 +25,35 @@ TODAY = date.today().strftime("%B %d, %Y").replace(" 0", " ")
 
 # ---------------------------------------------------------------- the colors (Sherwin-Williams values from sherwin-williams.com)
 SW = {
-    "peppercorn": dict(name="Peppercorn", code="SW 7674", hex="#585858", lrv=10),
-    "iron_ore": dict(name="Iron Ore", code="SW 7069", hex="#434341", lrv=6),
+    "creamy": dict(name="Creamy", code="SW 7012", hex="#EFE8DB", lrv=81),
+    "accessible_beige": dict(name="Accessible Beige", code="SW 7036", hex="#D1C7B8", lrv=58),
+    "universal_khaki": dict(name="Universal Khaki", code="SW 6150", hex="#B8A992", lrv=40),
+    "alabaster": dict(name="Alabaster", code="SW 7008", hex="#EDEAE0", lrv=82),
     "tricorn": dict(name="Tricorn Black", code="SW 6258", hex="#2F2F30", lrv=3),
 }
 DECK = {   # TimberTech Vintage board tones: the GSX board catalog (timbertech-boards skill), mid tone of the render palette
     "English Walnut": dict(hex="#634E3E", img="cs-board-english-walnut.jpg"),
-    "Mahogany": dict(hex="#8E654E", img="cs-board-mahogany.jpg"),
+    "Dark Hickory": dict(hex="#454546", img="cs-board-dark-hickory.jpg"),
 }
-BODY_WHERE = "Siding, brick, foundation strip"
+BODY_WHERE = "Siding, foundation strip"
 TRIM_WHERE = "Casings, corner boards, bands, fascia, gutters, downspouts, soffits"
+TRIM_WHERE_EDGE = "Casings, corner boards, bands, soffits"
+EDGE_WHERE = "Fascia, gutters, downspouts"
+# Owner 27 Oct: Andie wants the house tan or cream (the dark study, gray / charcoal / black, is in the page's version history and
+# _work/dark_v1). The buff brick stays as it is in every palette (palettes.json brick_painted false).
 PALETTES = [
-    dict(key="gray", n="Palette 1", title="Dark gray", body="peppercorn", trim="tricorn", deck="English Walnut",
-         blurb="A dark neutral gray body with black trim. Of the three, it is the lightest: the siding grooves, the brick coursing "
-               "and the black trim, fascia and rail stand out against the walls."),
-    dict(key="charcoal", n="Palette 2", title="Charcoal", body="iron_ore", trim="tricorn", deck="English Walnut",
-         blurb="A charcoal body, close to black from the yard, with black trim one step darker. The black rail and trim read as "
-               "outlines against the walls."),
-    dict(key="black", n="Palette 3", title="Black", body="tricorn", trim="tricorn", deck="English Walnut",
-         blurb="One black on every painted surface: siding, brick, trim, fascia, gutters and soffits. The black rail and the trim "
-               "blend into the walls; the almond window frames and the deck boards are the contrast."),
+    dict(key="cream", n="Palette 1", title="Cream", body="creamy", trim="creamy", deck="English Walnut",
+         blurb="One warm cream on the siding and every piece of trim, with the buff brick as it is. The almond window frames are "
+               "close to the cream, and the English Walnut deck and the black rail stand out against it."),
+    dict(key="beige", n="Palette 2", title="Light tan", body="accessible_beige", trim="alabaster", deck="English Walnut",
+         blurb="A light tan with a gray cast, with warm white trim: a step darker than the cream and grayer. The white trim "
+               "outlines the windows and the roof edge, and the buff brick reads as the warmer color below."),
+    dict(key="khaki", n="Palette 3", title="Khaki", body="universal_khaki", trim="creamy", deck="English Walnut",
+         blurb="The deepest of the three: a mid tan, Sherwin-Williams' 2026 Color of the Year, with cream trim. Against it the "
+               "cream trim and the almond window frames read as outlines, and the buff brick as a warmer, yellower base."),
 ]
-REC = dict(key="recommended", n="Recommended", title="Charcoal with a Mahogany deck", body="iron_ore", trim="tricorn", deck="Mahogany")
+REC = dict(key="recommended", n="Recommended", title="Cream with black fascia and gutters", body="creamy", trim="creamy",
+           edge="tricorn", deck="English Walnut")
 CAP = {
     "yard": "From the yard, in front of the lower level",
     "corner": "From the front corner",
@@ -77,10 +84,13 @@ RAIL_CHIP = chip("#141416", "Rail", "IRX Baluster · Black", "black powder-coate
 
 
 def chips(p, deck_note):
-    one = p["body"] == p["trim"]
-    out = [paint_chip("Body and trim" if one else "Body", p["body"], "Every painted surface" if one else BODY_WHERE)]
-    if not one:
-        out.append(paint_chip("Trim", p["trim"], TRIM_WHERE))
+    one, edge = p["body"] == p["trim"], p.get("edge")
+    if one:
+        out = [paint_chip("Body and trim", p["body"], "Every painted surface but the fascia, gutters and downspouts" if edge else "Every painted surface")]
+    else:
+        out = [paint_chip("Body", p["body"], BODY_WHERE), paint_chip("Trim", p["trim"], TRIM_WHERE_EDGE if edge else TRIM_WHERE)]
+    if edge:
+        out.append(paint_chip("Fascia and gutters", edge, EDGE_WHERE))
     out += [deck_chip(p["deck"], deck_note), RAIL_CHIP]
     return '<div class="pchips">' + "".join(out) + "</div>"
 
@@ -187,7 +197,7 @@ footer { margin-top:16px; padding-bottom:0; font-size:10px; }
 
 def main(argv):
     files = {}
-    for nm in ("cs-board-english-walnut.jpg", "cs-board-mahogany.jpg"):
+    for nm in ("cs-board-english-walnut.jpg", "cs-board-dark-hickory.jpg"):
         files[f"r/{nm}"] = str(RO / nm)
     pal_views = {p["key"]: views(p["key"], files) for p in PALETTES + [REC]}
     today = None
@@ -196,11 +206,14 @@ def main(argv):
     else:
         today = (copy_img(R3 / "existing" / "yard.jpg", "cs-today-yard.jpg", files), f"{CAP['yard']} · {MODEL}")
     up = {}
-    for k, nm in (("charcoal_up", "English Walnut"), ("recommended_up", "Mahogany")):
+    for k, nm in (("recommended_up", "English Walnut"), ("recommended_dh_up", "Dark Hickory")):
         q = RC / k / "upper_deck.jpg"
-        src = q if q.exists() else R3 / ("charcoal" if k.startswith("charcoal") else "recommended") / "upper.jpg"
+        src = q if q.exists() else R3 / k[:-3] / "upper.jpg"
         up[nm] = (copy_img(src, f"cs-deck-{nm.lower().replace(' ', '-')}-upper.jpg", files),
                   f"{CAP['upper']} · {PHOTO if q.exists() else MODEL}")
+    q = RC / "recommended_dh" / "yard.jpg"
+    dh_yard = (copy_img(q if q.exists() else R3 / "recommended_dh" / "yard.jpg", "cs-recommended-dh-yard.jpg", files),
+               f"{CAP['yard']} · {PHOTO if q.exists() else MODEL}")
     hero = pal_views["recommended"][0][0]
 
     o = []; w = o.append
@@ -210,26 +223,26 @@ def main(argv):
     w('<body class="proposal">')
     # ------------------------------------------------------------ cover
     w('<header class="manifest"><div class="hero">')
-    w(f'<img class="hero-img" src="r/{hero}" alt="Rendering of the house in charcoal with the new deck in Mahogany">')
+    w(f'<img class="hero-img" src="r/{hero}" alt="Rendering of the house in cream with black fascia and gutters and the new deck in English Walnut">')
     w('<div class="hero-shade"></div><div class="hero-top"><div class="hin">' + PL.logo_svg()
       + f'<span class="mission">Exterior Color Study<br>{E(TODAY)}</span></div></div>')
     w('<div class="hero-title"><div class="hin"><span class="eyebrow">Exterior Color Study · Centennial, CO</span>'
       f'<h1>{E(ADDRESS)}</h1><p class="who">Prepared for Andie Jones · 7303 S Fillmore Cir, Centennial, CO 80122</p></div></div></div>')
     w('<div class="launch"><div class="hin"><div class="palstrip">')
     for p in PALETTES + [REC]:
-        b, t = SW[p["body"]], SW[p["trim"]]
+        b, t = SW[p["body"]], SW[p.get("edge") or p["trim"]]
         nm = "Recommended" if p is REC else p["title"]
-        sub = (f'{b["code"]} {b["name"]} + {t["name"]} trim · Vintage Mahogany deck' if p is REC else
+        sub = (f'{b["code"]} {b["name"]} · {t["name"]} fascia and gutters · Vintage English Walnut deck' if p is REC else
                (f'{b["code"]} {b["name"]}' + ("" if p["body"] == p["trim"] else f' · {t["name"]} trim')))
         w(f'<div><div class="sws"><i style="background:{b["hex"]}"></i><i style="background:{t["hex"]}"></i>'
           f'<i class="d" style="background:{DECK[p["deck"]]["hex"]}"></i></div><span class="tl">{E(p["n"] if p is not REC else "Our pick")}</span>'
           f'<span class="pv2">{E(nm)}</span><span class="ps">{E(sub)}</span></div>')
     w("</div>")
-    w('<p class="lede">Three dark exterior palettes for the house with the new deck: dark gray, charcoal and black, in '
-      'Sherwin-Williams colors. Each palette has its paint chips and renders from the yard, the front corner and the upper deck. '
-      'The last section is the palette we recommend: charcoal, with the deck boards in TimberTech Vintage Mahogany instead of '
-      'English Walnut. The cover shows it. Painting is not part of the GS Exterior Experts deck proposal; this study is for '
-      'choosing colors.</p>')
+    w('<p class="lede">Three tan and cream exterior palettes for the house with the new deck: cream, a light tan and khaki, in '
+      'Sherwin-Williams colors. In every palette the buff brick stays as it is. Each palette has its paint chips and renders from '
+      'the yard, the front corner and the upper deck. The last section is the palette we recommend: cream, with the fascia and '
+      'gutters in black and the deck in TimberTech Vintage English Walnut as proposed. The cover shows it. Painting is not part '
+      'of the GS Exterior Experts deck proposal; this study is for choosing colors.</p>')
     w("</div></div></header>")
     w('<main class="wrap">')
     # ------------------------------------------------------------ at a glance
@@ -242,32 +255,32 @@ def main(argv):
     w('<div class="legend2" aria-label="The palettes">')
     for p in PALETTES + [REC]:
         b, t = SW[p["body"]], SW[p["trim"]]
-        w(f'<div class="row"><i style="background:{b["hex"]}"></i><i style="background:{t["hex"]}"></i><i style="background:{DECK[p["deck"]]["hex"]}"></i>'
+        e = SW[p["edge"]] if p.get("edge") else None
+        w(f'<div class="row"><i style="background:{b["hex"]}"></i><i style="background:{(e or t)["hex"]}"></i><i style="background:{DECK[p["deck"]]["hex"]}"></i>'
           f'<span><b>{E(p["n"] if p is not REC else "Recommended")} · {E(p["title"])}</b> — body {E(b["code"] + " " + b["name"])}, '
-          f'trim {E(t["code"] + " " + t["name"])}, deck TimberTech Vintage {E(p["deck"])}</span></div>')
+          f'trim {E(t["code"] + " " + t["name"])}' + (f', fascia and gutters {E(e["code"] + " " + e["name"])}' if e else "")
+          + f', deck TimberTech Vintage {E(p["deck"])}</span></div>')
     w("</div>")
     w("</div>")
     # ------------------------------------------------------------ what gets painted
     w('<h2 class="kicker pagebreak" id="g-painted">What gets painted <span class="tag">the same in every palette</span></h2>')
     w('<div class="facts-cols">')
     w("<div><h3>Body color</h3><ul><li>The vertical-groove wood siding on every wall (today a red-brown stain)</li>"
-      "<li>The brick veneer: the walk-out level, the chimney and the wall at the arm end (today buff brick)</li>"
       "<li>The foundation strip below the siding</li></ul></div>")
     w("<div><h3>Trim color</h3><ul><li>Window and door casings and corner boards</li>"
       "<li>The trim bands at the sill and floor lines, the dentil band over the brick and the accent panel at the family-room slider (today maroon)</li>"
-      "<li>Fascia, gutters and downspouts</li><li>The box soffits under the eaves</li></ul></div>")
-    w("<div><h3>The brick: painted to match</h3><p>The brick takes the body color, so the walk-out level and the siding above "
-      "it read as one color. Limewash was the other option: it is a thin lime coat that lets the brick show through in patches, "
-      "so the brick would not match the solid siding color. Painted brick needs a masonry paint, and it does not easily go back "
-      "to bare brick.</p></div>")
+      "<li>Fascia, gutters and downspouts (black in the recommended palette)</li><li>The box soffits under the eaves</li></ul></div>")
+    w("<div><h3>The brick: left as it is</h3><p>The buff brick on the walk-out level, the chimney and the wall at the arm end "
+      "is not painted in any palette. Tan and cream are in the same family as the buff brick, so the brick goes with the new "
+      "siding color as it is: no masonry paint, and nothing on the brick to repaint later.</p></div>")
     w("<div><h3>Not painted</h3><ul><li>The roof shingles</li><li>The almond vinyl window and slider frames</li>"
-      "<li>The concrete patio</li><li>The new deck as proposed: TimberTech boards, the black IRX rail, the posts and beams</li>"
+      "<li>The buff brick, the chimney included</li><li>The concrete patio</li><li>The new deck as proposed: TimberTech boards, the black IRX rail, the posts and beams</li>"
       "<li>The outdoor furniture in the renders (Outer pieces, the same in every palette)</li></ul></div>")
     w("</div>")
     w('<h3>Reading the chips</h3><ul class="opt-scope">'
       "<li>Every paint is a Sherwin-Williams color, with its color number and the hex value Sherwin-Williams publishes for it</li>"
-      "<li>LRV (light reflectance value) is the share of light a color reflects, from 0 (black) to 100 (white). A lower LRV is "
-      "darker and absorbs more of the sun's heat</li>"
+      "<li>LRV (light reflectance value) is the share of light a color reflects, from 0 (black) to 100 (white). A higher LRV is "
+      "lighter and stays cooler in the sun</li>"
       "<li>The back of the house faces north-northeast: it gets direct sun only on summer mornings (on June 21, until about 10:50 AM). "
       "The photoreal renders are at 10:30 AM on June 21, with the sun raking across the back</li>"
       "<li>The deck chip is the TimberTech board, rendered; its tone is approximate</li>"
@@ -276,7 +289,7 @@ def main(argv):
       "<li>Screens and paper do not show paint exactly. Look at painted samples on the house, in sun and in shade, before choosing</li></ul>")
     w('<h3>Before choosing</h3><ul class="opt-scope">'
       "<li>Ask the Tiffany HOA whether a color change needs its approval; if it does, the paint colors can go in with the deck request</li>"
-      "<li>Put painted samples of the body and trim colors on the siding and on the brick, and hold the TimberTech samples against them</li>"
+      "<li>Put painted samples of the body and trim colors on the siding next to the brick, and hold the TimberTech samples against them</li>"
       "<li>Painting is by others: it is not part of the GS Exterior Experts deck proposal</li></ul>")
     # ------------------------------------------------------------ the palettes
     for i, p in enumerate(PALETTES):
@@ -289,29 +302,30 @@ def main(argv):
         w(view_block(pal_views[p["key"]]))
         w("</div></section>")
     # ------------------------------------------------------------ recommended
-    b, t = SW[REC["body"]], SW[REC["trim"]]
+    b, t = SW[REC["body"]], SW[REC["edge"]]
     w(f'<section class="optblock pagebreak" id="p-recommended"><div class="opt-head"><div class="opt-title">'
       f'<span class="eyebrow">Recommended</span><h3>{E(REC["title"])}</h3></div>'
       f'<span class="mission">{E(b["code"])} {E(b["name"])}<br>{E(t["code"])} {E(t["name"])}</span></div><div class="opt-body">')
     w('<ul class="why">'
-      f"<li>Iron Ore (LRV {b['lrv']}) is darker than Peppercorn (LRV {SW['peppercorn']['lrv']}) and lighter than Tricorn Black "
-      f"(LRV {t['lrv']}): from the yard it reads near-black, and the siding grooves and the brick coursing still show</li>"
-      "<li>The Tricorn Black trim, fascia and gutters are one step darker than the walls, so the windows and the roof edge stay outlined</li>"
-      "<li>The black IRX rail stays visible against charcoal; on a black house it blends into the wall (Palette 3)</li>"
-      f"<li>The deck in Vintage Mahogany (board tone ≈ {DECK['Mahogany']['hex']}) is lighter and warmer than English Walnut "
-      f"(≈ {DECK['English Walnut']['hex']}), which is close to Iron Ore in darkness. Against the charcoal, the Mahogany boards, "
-      "fascia and stairs read as wood</li>"
-      "<li>Same TimberTech Vintage collection: the board size, fasteners and layout in the proposal stay the same. The HOA "
-      "request would carry a Mahogany sample in place of English Walnut</li></ul>")
-    w(chips(REC, "in place of English Walnut"))
+      f"<li>Creamy (LRV {b['lrv']}) is the lightest of the three body colors. The back of the house faces north-northeast and is in shade "
+      "most of the day; a light body keeps it from reading dark</li>"
+      "<li>The buff brick stays as it is: cream sits next to it as its lighter partner, so the walk-out level needs no paint</li>"
+      "<li>The almond window frames are close to Creamy, so they blend in; against a bright white they would read yellow</li>"
+      f"<li>The fascia, gutters and downspouts in Tricorn Black (LRV {t['lrv']}) outline the roof and match the black IRX rail "
+      "and the black frame of the louvered roof (Option 3)</li>"
+      f"<li>The deck stays TimberTech Vintage English Walnut as proposed (board tone ≈ {DECK['English Walnut']['hex']}): the "
+      "darkest warm tone on the back of the house, so the deck reads strongly against the cream</li></ul>")
+    w(chips(REC, "as proposed"))
     w(view_block(pal_views["recommended"]))
     w("</div></section>")
-    w('<h2 class="kicker pagebreak" id="g-deck">The deck color <span class="tag">charcoal house, both boards, same view</span></h2>')
+    w('<h2 class="kicker pagebreak" id="g-deck">The deck color <span class="tag">the recommended house, both boards, same view</span></h2>')
+    w('<p class="fine2">English Walnut is the board in the proposal and the one we recommend with cream. Dark Hickory, a very dark gray '
+      'in the same TimberTech Vintage collection, is shown for comparison.</p>')
     w('<div class="compare">' + fig(up["English Walnut"][0], f"Vintage English Walnut (as proposed) · {up['English Walnut'][1]}")
-      + fig(up["Mahogany"][0], f"Vintage Mahogany (recommended) · {up['Mahogany'][1]}")
-      + fig(pal_views["charcoal"][0][0], f"Vintage English Walnut (as proposed) · {pal_views['charcoal'][0][1]}")
-      + fig(pal_views["recommended"][0][0], f"Vintage Mahogany (recommended) · {pal_views['recommended'][0][1]}") + "</div>")
-    w('<div class="facts-cols"><div><h3>What changes with Mahogany</h3><ul><li>Field boards, the picture frame and breaker boards</li>'
+      + fig(up["Dark Hickory"][0], f"Vintage Dark Hickory · {up['Dark Hickory'][1]}")
+      + fig(pal_views["recommended"][0][0], f"Vintage English Walnut (as proposed) · {pal_views['recommended'][0][1]}")
+      + fig(dh_yard[0], f"Vintage Dark Hickory · {dh_yard[1]}") + "</div>")
+    w('<div class="facts-cols"><div><h3>What changes with Dark Hickory</h3><ul><li>Field boards, the picture frame and breaker boards</li>'
       "<li>The fascia over the rim joists and the step skirt between the levels</li><li>Stair treads and risers</li></ul></div>"
       "<div><h3>What stays the same</h3><ul><li>TimberTech Vintage square-shoulder boards and the same fasteners</li>"
       "<li>The black IRX rail, the framing, the stairs and every dimension in the proposal</li></ul></div></div>")

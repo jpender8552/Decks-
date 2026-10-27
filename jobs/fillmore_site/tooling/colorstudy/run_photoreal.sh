@@ -3,8 +3,8 @@
 #     bash /tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad/fillmore/colorstudy/tools/run_photoreal.sh
 #     DRY_RUN=1 bash .../run_photoreal.sh      echoes every command, runs nothing
 #   1. make_specs.py   specs/*.json from the current job (furniture included); a spec that does not change keeps its mtime
-#   2. cycles_all.sh   the seven Cycles stills the page reads: yard x5 (gray, charcoal, black, recommended, existing) and the upper
-#                      deck x2 (charcoal_up, recommended_up). Each under  nice -n 19 flock $S/blender.lock,  output in cycles/run.log
+#   2. cycles_all.sh   the eight Cycles stills the page reads: yard x6 (cream, beige, khaki, recommended, recommended_dh, existing) and
+#                      the upper deck x2 (recommended_up, recommended_dh_up). Each under  nice -n 19 flock $S/blender.lock,  output in cycles/run.log
 #   3. build_colorstudy.py with the Letter PDF (nice -n 19), only when all seven stills exist; then a check that the page holds them
 # Estimate: about 15 minutes of Blender once the lock is yours. The old logs: 5 yards at about 2.0 min and 2 upper decks at about
 # 1.5 min = 13 to 14 min; the furniture is 6% more scene boxes and a few more shader nodes, so 5 to 10% more. Then under a minute for
@@ -37,11 +37,12 @@ fi
 say "$(date -u +%H:%M:%S) building the page and PDF"
 nice -n 19 python3 -B "$CS/tools/build_colorstudy.py" >> "$LOG" 2>&1 || { say "build_colorstudy.py failed, see $LOG"; exit 1; }
 n=0
-for pair in gray/yard:cs-gray-yard charcoal/yard:cs-charcoal-yard black/yard:cs-black-yard recommended/yard:cs-recommended-yard \
-            existing/yard:cs-today-yard charcoal_up/upper_deck:cs-deck-english-walnut-upper recommended_up/upper_deck:cs-deck-mahogany-upper; do
+for pair in cream/yard:cs-cream-yard beige/yard:cs-beige-yard khaki/yard:cs-khaki-yard recommended/yard:cs-recommended-yard \
+            existing/yard:cs-today-yard recommended_up/upper_deck:cs-deck-english-walnut-upper \
+            recommended_dh_up/upper_deck:cs-deck-dark-hickory-upper recommended_dh/yard:cs-recommended-dh-yard; do
   cmp -s "$CS/cycles/${pair%%:*}.jpg" "$CS/r/${pair##*:}.jpg" && n=$((n + 1)) || say "NOT in the page: cycles/${pair%%:*}.jpg"
 done
 pdf=$(ls "$CS"/*.pdf 2>/dev/null | head -1)
 [ -n "$pdf" ] && [ "$pdf" -nt "$CS/page.html" ] && say "pdf: $pdf" || say "WARNING: no PDF newer than page.html"
-say "$(date -u +%H:%M:%S) done: $n/7 photoreal stills in the page, $(((SECONDS - T0) / 60)) min in all"
-[ $n -eq 7 ]
+say "$(date -u +%H:%M:%S) done: $n/8 photoreal stills in the page, $(((SECONDS - T0) / 60)) min in all"
+[ $n -eq 8 ]
