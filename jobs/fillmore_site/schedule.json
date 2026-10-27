@@ -1,0 +1,3601 @@
+{
+ "job": "7303 S Fillmore Cir, Centennial CO 80122",
+ "made": "2026-10-27",
+ "units": "working days; construction day 1 = first day on site",
+ "crew": "one GSX crew of 4",
+ "counts": {
+  "deck_sf": 729.2,
+  "piers": "8 caissons 24\" x 42\" (owner 27 Oct: fewer columns, larger caissons; the roof version 9, 30\" under the upper level)",
+  "columns": "8",
+  "beam_pieces": 5,
+  "joists": 73,
+  "ledger_runs": 4,
+  "rail_lf": 111.6,
+  "rail_posts": 23,
+  "cortex_base": 3710,
+  "cortex_yard": 350,
+  "inset_risers": 5,
+  "yard_risers": 10,
+  "fascia_boards": 13,
+  "lights_base": 28,
+  "lights_yard": 22,
+  "brick_columns": "~10",
+  "slab_openings": 3
+ },
+ "plug_rate_per_installer_hour": 180,
+ "precon": [
+  {
+   "id": "sign",
+   "start_bd": 0,
+   "dur_bd": 0,
+   "end_bd": 0,
+   "after": [],
+   "label": "Contract signed (deposit); HOA ACC request + drawings submitted the same week"
+  },
+  {
+   "id": "verify",
+   "start_bd": 1,
+   "dur_bd": 1,
+   "end_bd": 2,
+   "after": [
+    "sign"
+   ],
+   "label": "Field verification: deck heights, ledger bands, old column centres, slab edges, chimney nook; dig beside one old column per level to expose its footing (footings.md 7, 13); private-line locate"
+  },
+  {
+   "id": "hoa",
+   "start_bd": 1,
+   "dur_bd": 15,
+   "end_bd": 16,
+   "after": [
+    "sign"
+   ],
+   "label": "Tiffany HOA ACC review \u2014 submit >= 3 weeks before work; ACC allows up to 3 weeks"
+  },
+  {
+   "id": "eng",
+   "start_bd": 2,
+   "dur_bd": 12,
+   "end_bd": 14,
+   "after": [
+    "verify"
+   ],
+   "label": "Stamped engineering (6x10 DF beams outside IRC tables; 8x8 DF columns on 20\" caissons): GSX planning 2-3 weeks"
+  },
+  {
+   "id": "permit",
+   "start_bd": 14,
+   "dur_bd": 10,
+   "end_bd": 24,
+   "after": [
+    "eng"
+   ],
+   "label": "Centennial deck permit: intake + plan-review fee (~2 bd), review 5 bd after fee paid, issue (~1 bd), +2 bd buffer; a comment round adds up to 5 bd"
+  },
+  {
+   "id": "ord_timber",
+   "start_bd": 14,
+   "dur_bd": 12,
+   "end_bd": 26,
+   "after": [
+    "eng"
+   ],
+   "label": "Order 8x8 DF #1 rough + 6x10 DF (special order via D&D): 10-15 bd planning; release earlier on the engineer's preliminary sizes if possible"
+  },
+  {
+   "id": "ord_dp",
+   "start_bd": 14,
+   "dur_bd": 12,
+   "end_bd": 26,
+   "after": [
+    "eng"
+   ],
+   "label": "Order Simpson ABU88RZ bases + CCQ/ECCQ caps (rough W2 = 8\" is a Simpson special order) via D&D; Sonotubes, rebar, anchors, concrete from stock"
+  },
+  {
+   "id": "ord_vintage",
+   "start_bd": 14,
+   "dur_bd": 8,
+   "end_bd": 22,
+   "after": [
+    "eng"
+   ],
+   "label": "Order Vintage English Walnut deck boards/fascia/risers + Cortex EW plugs (stock at D&D Denver unconfirmed; ProDeck MN quotes <2 wk)"
+  },
+  {
+   "id": "ord_irx",
+   "start_bd": 14,
+   "dur_bd": 8,
+   "end_bd": 22,
+   "after": [
+    "eng"
+   ],
+   "label": "Order IRX black panels/posts (stock) + drink-rail panel covers (special order) + clip kits"
+  },
+  {
+   "id": "ord_light",
+   "start_bd": 14,
+   "dur_bd": 8,
+   "end_bd": 22,
+   "after": [
+    "eng"
+   ],
+   "label": "Option 1: order TimberTech lights/transformer (not on any D&D quote; retail stock is shallow)"
+  },
+  {
+   "id": "locates",
+   "start_bd": 22,
+   "dur_bd": 3,
+   "end_bd": 25,
+   "after": [
+    "permit"
+   ],
+   "label": "Colorado 811 locates (2-3 business days; marks good ~30 days)"
+  }
+ ],
+ "construction_start_bd": 25,
+ "roof_precon": [
+  {
+   "id": "r_zoning",
+   "start_bd": 1,
+   "dur_bd": 15,
+   "end_bd": 16,
+   "label": "Planning: written LDC 12-14-805 interpretation that the louvered roof is a 'pergola' (3 ft) not an attached roof (20 ft rear setback) \u2014 STOP until answered; variance path = P&Z hearing 6-10 wk"
+  },
+  {
+   "id": "r_measure",
+   "start_bd": 3,
+   "dur_bd": 3,
+   "end_bd": 6,
+   "label": "Suncoast Denver (Cale Pilling) site visit + measure (soffit/roof line; deck side from GSX drawings)"
+  },
+  {
+   "id": "r_react",
+   "start_bd": 6,
+   "dur_bd": 3,
+   "end_bd": 9,
+   "label": "Dealer sends post reactions (down/uplift, base shear) to the GSX engineer (deck limits ~2,900 lb down / 1,400 lb up per post)"
+  },
+  {
+   "id": "r_draw",
+   "start_bd": 6,
+   "dur_bd": 10,
+   "end_bd": 16,
+   "label": "Dealer drawings + Colorado-PE stamped engineering (30 psf non-reducible + sliding snow, 115 mph, soffit/roof-line attachment)"
+  },
+  {
+   "id": "r_permit",
+   "start_bd": 16,
+   "dur_bd": 10,
+   "end_bd": 26,
+   "label": "Separate Centennial patio-cover permit (zoning approval required; 5 bd review after fee) after the Planning answer"
+  },
+  {
+   "id": "r_mfg",
+   "start_bd": 16,
+   "dur_bd": 35,
+   "end_bd": 51,
+   "label": "Factory: released on the Planning answer + deposit; 6-8 wk (Marygrove), 6-10 wk (Paragon), Suncoast unpublished -> 7 wk planning"
+  }
+ ],
+ "weather_float_by_month": {
+  "1": 0.163,
+  "2": 0.2,
+  "3": 0.149,
+  "4": 0.202,
+  "5": 0.18,
+  "6": 0.063,
+  "7": 0.078,
+  "8": 0.07,
+  "9": 0.104,
+  "10": 0.128,
+  "11": 0.157,
+  "12": 0.175
+ },
+ "scenarios": {
+  "Base": {
+   "tags": [
+    "base"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 5,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 1.0,
+     "end": 6.0,
+     "after": [
+      "piers"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.0,
+     "dur": 0.5,
+     "end": 6.5,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.5,
+     "dur": 2.0,
+     "end": 8.5,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.5,
+     "dur": 1.75,
+     "end": 10.25,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.25,
+     "dur": 3.5,
+     "end": 13.75,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 13.75,
+     "dur": 0.5,
+     "end": 14.25,
+     "after": [
+      "framing"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 14.25,
+     "dur": 1.25,
+     "end": 15.5,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.5,
+     "dur": 3.0,
+     "end": 18.5,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 18.5,
+     "dur": 0.75,
+     "end": 19.25,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.25,
+     "dur": 2.0,
+     "end": 21.25,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.25,
+     "dur": 0.5,
+     "end": 21.75,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 22,
+     "dur": 0.25,
+     "end": 22.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 21.75,
+   "end_of_construction_day": 22,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured",
+      "title": "Layout; concrete caissons drilled and poured",
+      "days": "Days 5\u20136",
+      "first_day": 5,
+      "last_day": 6,
+      "exact_start": 4.0,
+      "exact_end": 6.5,
+      "gantt_x": [
+       5.0,
+       7.5
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 7\u201310",
+      "first_day": 7,
+      "last_day": 10,
+      "exact_start": 5.0,
+      "exact_end": 10.25,
+      "gantt_x": [
+       6.0,
+       11.25
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "days": "Days 11\u201314",
+      "first_day": 11,
+      "last_day": 14,
+      "exact_start": 10.25,
+      "exact_end": 14.25,
+      "gantt_x": [
+       11.25,
+       15.25
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Day 15",
+      "first_day": 15,
+      "last_day": 15,
+      "exact_start": 14.25,
+      "exact_end": 15.5,
+      "gantt_x": [
+       15.25,
+       16.5
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 16\u201318",
+      "first_day": 16,
+      "last_day": 18,
+      "exact_start": 15.5,
+      "exact_end": 18.5,
+      "gantt_x": [
+       16.5,
+       19.5
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 19",
+      "first_day": 19,
+      "last_day": 19,
+      "exact_start": 18.5,
+      "exact_end": 19.25,
+      "gantt_x": [
+       19.5,
+       20.25
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail",
+      "days": "Days 20\u201321",
+      "first_day": 20,
+      "last_day": 21,
+      "exact_start": 19.25,
+      "exact_end": 21.25,
+      "gantt_x": [
+       20.25,
+       22.25
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 22",
+      "first_day": 22,
+      "last_day": 22,
+      "exact_start": 21.25,
+      "exact_end": 21.75,
+      "gantt_x": [
+       22.25,
+       22.75
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20136 \u2014 layout; concrete caissons drilled and poured.",
+     "Days 7\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201314 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening.",
+     "Day 15 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 16\u201318 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 19 \u2014 the stair between the levels.",
+     "Days 20\u201321 \u2014 Impression Rail Express, black, with the English Walnut drink rail.",
+     "Day 22 \u2014 final clean; end of construction."
+    ],
+    "title": "22 working days on site, weather permitting"
+   }
+  },
+  "Base + Option 1 (lighting)": {
+   "tags": [
+    "base",
+    "opt1"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 5,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 1.0,
+     "end": 6.0,
+     "after": [
+      "piers"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.0,
+     "dur": 0.5,
+     "end": 6.5,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.5,
+     "dur": 2.0,
+     "end": 8.5,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.5,
+     "dur": 1.75,
+     "end": 10.25,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.25,
+     "dur": 3.5,
+     "end": 13.75,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "light_rough",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 13.75,
+     "dur": 0.25,
+     "end": 14.0,
+     "after": [
+      "framing"
+     ],
+     "label": "Lighting rough-in: 12/2 through the blocking to every post + home run to the transformer spot",
+     "customer": null
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing",
+      "light_rough"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 14.5,
+     "dur": 1.25,
+     "end": 15.75,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.75,
+     "dur": 3.0,
+     "end": 18.75,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 18.75,
+     "dur": 0.75,
+     "end": 19.5,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.5,
+     "dur": 2.0,
+     "end": 21.5,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "elec_outlet",
+     "option": "opt1",
+     "kind": "elec",
+     "start": 14.5,
+     "dur": 0.5,
+     "end": 15.0,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Electrician (by others): GFCI in-use outlet at the transformer spot, if none exists",
+     "customer": null
+    },
+    {
+     "id": "light_trim",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 21.5,
+     "dur": 0.75,
+     "end": 22.25,
+     "after": [
+      "rail",
+      "inset_stair",
+      "elec_outlet"
+     ],
+     "label": "Lighting: 23 post-side accent lights (drink rail is over the posts) + 5 riser lights, transformer (photocell/timer), splice, test at dusk",
+     "customer": "Low-voltage lighting: riser lights and post lights"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 22.25,
+     "dur": 0.5,
+     "end": 22.75,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 23,
+     "dur": 0.25,
+     "end": 23.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 22.75,
+   "end_of_construction_day": 23,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured",
+      "title": "Layout; concrete caissons drilled and poured",
+      "days": "Days 5\u20136",
+      "first_day": 5,
+      "last_day": 6,
+      "exact_start": 4.0,
+      "exact_end": 6.5,
+      "gantt_x": [
+       5.0,
+       7.5
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 7\u201310",
+      "first_day": 7,
+      "last_day": 10,
+      "exact_start": 5.0,
+      "exact_end": 10.25,
+      "gantt_x": [
+       6.0,
+       11.25
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "days": "Days 11\u201314",
+      "first_day": 11,
+      "last_day": 14,
+      "exact_start": 10.25,
+      "exact_end": 14.5,
+      "gantt_x": [
+       11.25,
+       15.5
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Days 15\u201316",
+      "first_day": 15,
+      "last_day": 16,
+      "exact_start": 14.5,
+      "exact_end": 15.75,
+      "gantt_x": [
+       15.5,
+       16.75
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 17\u201319",
+      "first_day": 17,
+      "last_day": 19,
+      "exact_start": 15.75,
+      "exact_end": 18.75,
+      "gantt_x": [
+       16.75,
+       19.75
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 20",
+      "first_day": 20,
+      "last_day": 20,
+      "exact_start": 18.75,
+      "exact_end": 19.5,
+      "gantt_x": [
+       19.75,
+       20.5
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 19.5,
+      "exact_end": 21.5,
+      "gantt_x": [
+       20.5,
+       22.5
+      ]
+     },
+     {
+      "key": "lights",
+      "option": "opt1",
+      "label": "low-voltage lighting: riser lights and post lights on a transformer with photocell and timer",
+      "title": "Low-voltage lighting: riser lights and post lights on a transformer with photocell and timer",
+      "days": "Day 22",
+      "first_day": 22,
+      "last_day": 22,
+      "exact_start": 21.5,
+      "exact_end": 22.25,
+      "gantt_x": [
+       22.5,
+       23.25
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 23",
+      "first_day": 23,
+      "last_day": 23,
+      "exact_start": 22.25,
+      "exact_end": 22.75,
+      "gantt_x": [
+       23.25,
+       23.75
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20136 \u2014 layout; concrete caissons drilled and poured.",
+     "Days 7\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201314 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening.",
+     "Days 15\u201316 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 17\u201319 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 20 \u2014 the stair between the levels.",
+     "Day 21 \u2014 Impression Rail Express, black, with the English Walnut drink rail.",
+     "Day 22 \u2014 low-voltage lighting: riser lights and post lights on a transformer with photocell and timer.",
+     "Day 23 \u2014 final clean; end of construction."
+    ],
+    "title": "23 working days on site, weather permitting"
+   }
+  },
+  "Base + Option 2 (yard stair)": {
+   "tags": [
+    "base",
+    "opt2"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "piers_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "+4 caisson holes 12\" x 42\" for the yard-stair landing (same rig)",
+     "customer": "4 caissons for the stair landing"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 6,
+     "dur": 0.25,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.25,
+     "dur": 1.0,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.25,
+     "dur": 0.5,
+     "end": 6.75,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.75,
+     "dur": 2.0,
+     "end": 8.75,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.75,
+     "dur": 1.75,
+     "end": 10.5,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.5,
+     "dur": 3.5,
+     "end": 14.0,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "landing_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "Yard stair: 4 landing posts + 9'x4' landing frame",
+     "customer": "Stair landing framed"
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 14.5,
+     "dur": 0.5,
+     "end": 15.0,
+     "after": [
+      "framing",
+      "landing_y"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.0,
+     "dur": 1.25,
+     "end": 16.25,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 16.25,
+     "dur": 3.0,
+     "end": 19.25,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.25,
+     "dur": 0.75,
+     "end": 20.0,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "flights_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 20.0,
+     "dur": 1.25,
+     "end": 21.25,
+     "after": [
+      "decking",
+      "landing_y"
+     ],
+     "label": "Yard stair: two flights (10 risers), treads, risers, ~350 Cortex, waterfall skirts",
+     "customer": "The stair to the yard: landing deck and two flights"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.25,
+     "dur": 2.0,
+     "end": 23.25,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "rail_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 23.25,
+     "dur": 0.75,
+     "end": 24.0,
+     "after": [
+      "rail",
+      "flights_y"
+     ],
+     "label": "Yard stair rail (both sides on the horseshoe, the yard side along the deck) + landing guard + graspable handrails",
+     "customer": "Rail on the stair to the yard"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 24.0,
+     "dur": 0.5,
+     "end": 24.5,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 25,
+     "dur": 0.25,
+     "end": 25.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 24.5,
+   "end_of_construction_day": 25,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "title": "Layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "days": "Days 5\u20137",
+      "first_day": 5,
+      "last_day": 7,
+      "exact_start": 4.0,
+      "exact_end": 6.75,
+      "gantt_x": [
+       5.0,
+       7.75
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 8\u201310",
+      "first_day": 8,
+      "last_day": 10,
+      "exact_start": 5.25,
+      "exact_end": 10.5,
+      "gantt_x": [
+       6.25,
+       11.5
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "days": "Days 11\u201315",
+      "first_day": 11,
+      "last_day": 15,
+      "exact_start": 10.5,
+      "exact_end": 15.0,
+      "gantt_x": [
+       11.5,
+       16.0
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Day 16",
+      "first_day": 16,
+      "last_day": 16,
+      "exact_start": 15.0,
+      "exact_end": 16.25,
+      "gantt_x": [
+       16.0,
+       17.25
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 17\u201319",
+      "first_day": 17,
+      "last_day": 19,
+      "exact_start": 16.25,
+      "exact_end": 19.25,
+      "gantt_x": [
+       17.25,
+       20.25
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 20",
+      "first_day": 20,
+      "last_day": 20,
+      "exact_start": 19.25,
+      "exact_end": 20.0,
+      "gantt_x": [
+       20.25,
+       21.0
+      ]
+     },
+     {
+      "key": "yard",
+      "option": "opt2",
+      "label": "the stair to the yard: landing deck and two flights",
+      "title": "The stair to the yard: landing deck and two flights",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 20.0,
+      "exact_end": 21.25,
+      "gantt_x": [
+       21.0,
+       22.25
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "days": "Days 22\u201324",
+      "first_day": 22,
+      "last_day": 24,
+      "exact_start": 21.25,
+      "exact_end": 24.0,
+      "gantt_x": [
+       22.25,
+       25.0
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 25",
+      "first_day": 25,
+      "last_day": 25,
+      "exact_start": 24.0,
+      "exact_end": 24.5,
+      "gantt_x": [
+       25.0,
+       25.5
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20137 \u2014 layout; concrete caissons drilled and poured, the stair-landing caissons included.",
+     "Days 8\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201315 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed.",
+     "Day 16 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 17\u201319 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 20 \u2014 the stair between the levels.",
+     "Day 21 \u2014 the stair to the yard: landing deck and two flights.",
+     "Days 22\u201324 \u2014 Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard.",
+     "Day 25 \u2014 final clean; end of construction."
+    ],
+    "title": "25 working days on site, weather permitting"
+   }
+  },
+  "Base + Options 1 + 2 (incl. yard-stair lights)": {
+   "tags": [
+    "base",
+    "opt1",
+    "opt12",
+    "opt2"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "piers_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "+4 caisson holes 12\" x 42\" for the yard-stair landing (same rig)",
+     "customer": "4 caissons for the stair landing"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 6,
+     "dur": 0.25,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.25,
+     "dur": 1.0,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.25,
+     "dur": 0.5,
+     "end": 6.75,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.75,
+     "dur": 2.0,
+     "end": 8.75,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.75,
+     "dur": 1.75,
+     "end": 10.5,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.5,
+     "dur": 3.5,
+     "end": 14.0,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "landing_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "Yard stair: 4 landing posts + 9'x4' landing frame",
+     "customer": "Stair landing framed"
+    },
+    {
+     "id": "light_rough",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 14.5,
+     "dur": 0.25,
+     "end": 14.75,
+     "after": [
+      "framing"
+     ],
+     "label": "Lighting rough-in: 12/2 through the blocking to every post + home run to the transformer spot",
+     "customer": null
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 14.75,
+     "dur": 0.5,
+     "end": 15.25,
+     "after": [
+      "framing",
+      "landing_y",
+      "light_rough"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.25,
+     "dur": 1.25,
+     "end": 16.5,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 16.5,
+     "dur": 3.0,
+     "end": 19.5,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.5,
+     "dur": 0.75,
+     "end": 20.25,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "flights_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 20.25,
+     "dur": 1.25,
+     "end": 21.5,
+     "after": [
+      "decking",
+      "landing_y"
+     ],
+     "label": "Yard stair: two flights (10 risers), treads, risers, ~350 Cortex, waterfall skirts",
+     "customer": "The stair to the yard: landing deck and two flights"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.5,
+     "dur": 2.0,
+     "end": 23.5,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "rail_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 23.5,
+     "dur": 0.75,
+     "end": 24.25,
+     "after": [
+      "rail",
+      "flights_y"
+     ],
+     "label": "Yard stair rail (both sides on the horseshoe, the yard side along the deck) + landing guard + graspable handrails",
+     "customer": "Rail on the stair to the yard"
+    },
+    {
+     "id": "elec_outlet",
+     "option": "opt1",
+     "kind": "elec",
+     "start": 15.25,
+     "dur": 0.5,
+     "end": 15.75,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Electrician (by others): GFCI in-use outlet at the transformer spot, if none exists",
+     "customer": null
+    },
+    {
+     "id": "light_trim",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 24.25,
+     "dur": 0.75,
+     "end": 25.0,
+     "after": [
+      "rail",
+      "inset_stair",
+      "elec_outlet"
+     ],
+     "label": "Lighting: 23 post-side accent lights (drink rail is over the posts) + 5 riser lights, transformer (photocell/timer), splice, test at dusk",
+     "customer": "Low-voltage lighting: riser lights and post lights"
+    },
+    {
+     "id": "lights_y",
+     "option": "opt12",
+     "kind": "crew",
+     "start": 25.0,
+     "dur": 0.5,
+     "end": 25.5,
+     "after": [
+      "light_trim",
+      "rail_y"
+     ],
+     "label": "Yard-stair lighting: 10 riser + 5-12 post lights, wire down the stringers",
+     "customer": "Lights on the stair to the yard"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 25.5,
+     "dur": 0.5,
+     "end": 26.0,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 26,
+     "dur": 0.25,
+     "end": 26.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 26.0,
+   "end_of_construction_day": 26,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "title": "Layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "days": "Days 5\u20137",
+      "first_day": 5,
+      "last_day": 7,
+      "exact_start": 4.0,
+      "exact_end": 6.75,
+      "gantt_x": [
+       5.0,
+       7.75
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 8\u201310",
+      "first_day": 8,
+      "last_day": 10,
+      "exact_start": 5.25,
+      "exact_end": 10.5,
+      "gantt_x": [
+       6.25,
+       11.5
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "days": "Days 11\u201315",
+      "first_day": 11,
+      "last_day": 15,
+      "exact_start": 10.5,
+      "exact_end": 15.25,
+      "gantt_x": [
+       11.5,
+       16.25
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Day 16",
+      "first_day": 16,
+      "last_day": 16,
+      "exact_start": 15.25,
+      "exact_end": 16.5,
+      "gantt_x": [
+       16.25,
+       17.5
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 17\u201319",
+      "first_day": 17,
+      "last_day": 19,
+      "exact_start": 16.5,
+      "exact_end": 19.5,
+      "gantt_x": [
+       17.5,
+       20.5
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 20",
+      "first_day": 20,
+      "last_day": 20,
+      "exact_start": 19.5,
+      "exact_end": 20.25,
+      "gantt_x": [
+       20.5,
+       21.25
+      ]
+     },
+     {
+      "key": "yard",
+      "option": "opt2",
+      "label": "the stair to the yard: landing deck and two flights",
+      "title": "The stair to the yard: landing deck and two flights",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 20.25,
+      "exact_end": 21.5,
+      "gantt_x": [
+       21.25,
+       22.5
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "days": "Days 22\u201324",
+      "first_day": 22,
+      "last_day": 24,
+      "exact_start": 21.5,
+      "exact_end": 24.25,
+      "gantt_x": [
+       22.5,
+       25.25
+      ]
+     },
+     {
+      "key": "lights",
+      "option": "opt1",
+      "label": "low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included",
+      "title": "Low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included",
+      "days": "Day 25",
+      "first_day": 25,
+      "last_day": 25,
+      "exact_start": 24.25,
+      "exact_end": 25.5,
+      "gantt_x": [
+       25.25,
+       26.5
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 26",
+      "first_day": 26,
+      "last_day": 26,
+      "exact_start": 25.5,
+      "exact_end": 26.0,
+      "gantt_x": [
+       26.5,
+       27.0
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20137 \u2014 layout; concrete caissons drilled and poured, the stair-landing caissons included.",
+     "Days 8\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201315 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed.",
+     "Day 16 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 17\u201319 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 20 \u2014 the stair between the levels.",
+     "Day 21 \u2014 the stair to the yard: landing deck and two flights.",
+     "Days 22\u201324 \u2014 Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard.",
+     "Day 25 \u2014 low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included.",
+     "Day 26 \u2014 final clean; end of construction."
+    ],
+    "title": "26 working days on site, weather permitting"
+   }
+  },
+  "Base + Option 3 (louvered roof)": {
+   "tags": [
+    "base",
+    "opt3"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 5,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 1.0,
+     "end": 6.0,
+     "after": [
+      "piers"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.0,
+     "dur": 0.5,
+     "end": 6.5,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.5,
+     "dur": 2.0,
+     "end": 8.5,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.5,
+     "dur": 1.75,
+     "end": 10.25,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "roof_gsx",
+     "option": "opt3",
+     "kind": "crew",
+     "start": 10.25,
+     "dur": 0.25,
+     "end": 10.5,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "Solid blocking + uplift ties (H2.5AZ/CS16) at the 2 roof-post bases; the roof version's own structure \u2014 U1 on 4 columns with 30\" caissons, drilled and poured with the deck's",
+     "customer": null
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.5,
+     "dur": 3.5,
+     "end": 14.0,
+     "after": [
+      "posts_beams",
+      "roof_gsx"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "roof_elec1",
+     "option": "opt3",
+     "kind": "elec",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "Electrician: circuit for the roof motor to the house-side attachment (rough), electrical permit",
+     "customer": null
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 14.5,
+     "dur": 1.25,
+     "end": 15.75,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.75,
+     "dur": 3.0,
+     "end": 18.75,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 18.75,
+     "dur": 0.75,
+     "end": 19.5,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.5,
+     "dur": 2.0,
+     "end": 21.5,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.5,
+     "dur": 0.5,
+     "end": 22.0,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 22,
+     "dur": 0.25,
+     "end": 22.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 22.0,
+   "end_of_construction_day": 22,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured",
+      "title": "Layout; concrete caissons drilled and poured",
+      "days": "Days 5\u20136",
+      "first_day": 5,
+      "last_day": 6,
+      "exact_start": 4.0,
+      "exact_end": 6.5,
+      "gantt_x": [
+       5.0,
+       7.5
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 7\u201310",
+      "first_day": 7,
+      "last_day": 10,
+      "exact_start": 5.0,
+      "exact_end": 10.5,
+      "gantt_x": [
+       6.0,
+       11.5
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "days": "Days 11\u201314",
+      "first_day": 11,
+      "last_day": 14,
+      "exact_start": 10.5,
+      "exact_end": 14.5,
+      "gantt_x": [
+       11.5,
+       15.5
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Days 15\u201316",
+      "first_day": 15,
+      "last_day": 16,
+      "exact_start": 14.5,
+      "exact_end": 15.75,
+      "gantt_x": [
+       15.5,
+       16.75
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 17\u201319",
+      "first_day": 17,
+      "last_day": 19,
+      "exact_start": 15.75,
+      "exact_end": 18.75,
+      "gantt_x": [
+       16.75,
+       19.75
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 20",
+      "first_day": 20,
+      "last_day": 20,
+      "exact_start": 18.75,
+      "exact_end": 19.5,
+      "gantt_x": [
+       19.75,
+       20.5
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 19.5,
+      "exact_end": 21.5,
+      "gantt_x": [
+       20.5,
+       22.5
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 22",
+      "first_day": 22,
+      "last_day": 22,
+      "exact_start": 21.5,
+      "exact_end": 22.0,
+      "gantt_x": [
+       22.5,
+       23.0
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20136 \u2014 layout; concrete caissons drilled and poured.",
+     "Days 7\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201314 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening.",
+     "Days 15\u201316 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 17\u201319 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 20 \u2014 the stair between the levels.",
+     "Day 21 \u2014 Impression Rail Express, black, with the English Walnut drink rail.",
+     "Day 22 \u2014 final clean; end of construction."
+    ],
+    "title": "22 working days on site, weather permitting"
+   }
+  },
+  "Base + Options 3 + 3a (roof + screens)": {
+   "tags": [
+    "base",
+    "opt3",
+    "opt3a"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 5,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 1.0,
+     "end": 6.0,
+     "after": [
+      "piers"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.0,
+     "dur": 0.5,
+     "end": 6.5,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.5,
+     "dur": 2.0,
+     "end": 8.5,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.5,
+     "dur": 1.75,
+     "end": 10.25,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "roof_gsx",
+     "option": "opt3",
+     "kind": "crew",
+     "start": 10.25,
+     "dur": 0.25,
+     "end": 10.5,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "Solid blocking + uplift ties (H2.5AZ/CS16) at the 2 roof-post bases; the roof version's own structure \u2014 U1 on 4 columns with 30\" caissons, drilled and poured with the deck's",
+     "customer": null
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.5,
+     "dur": 3.5,
+     "end": 14.0,
+     "after": [
+      "posts_beams",
+      "roof_gsx"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "roof_elec1",
+     "option": "opt3",
+     "kind": "elec",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "Electrician: circuit for the roof motor to the house-side attachment (rough), electrical permit",
+     "customer": null
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 14.0,
+     "dur": 0.5,
+     "end": 14.5,
+     "after": [
+      "framing"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 14.5,
+     "dur": 1.25,
+     "end": 15.75,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.75,
+     "dur": 3.0,
+     "end": 18.75,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 18.75,
+     "dur": 0.75,
+     "end": 19.5,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.5,
+     "dur": 2.0,
+     "end": 21.5,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.5,
+     "dur": 0.5,
+     "end": 22.0,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 22,
+     "dur": 0.25,
+     "end": 22.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 22.0,
+   "end_of_construction_day": 22,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured",
+      "title": "Layout; concrete caissons drilled and poured",
+      "days": "Days 5\u20136",
+      "first_day": 5,
+      "last_day": 6,
+      "exact_start": 4.0,
+      "exact_end": 6.5,
+      "gantt_x": [
+       5.0,
+       7.5
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 7\u201310",
+      "first_day": 7,
+      "last_day": 10,
+      "exact_start": 5.0,
+      "exact_end": 10.5,
+      "gantt_x": [
+       6.0,
+       11.5
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening",
+      "days": "Days 11\u201314",
+      "first_day": 11,
+      "last_day": 14,
+      "exact_start": 10.5,
+      "exact_end": 14.5,
+      "gantt_x": [
+       11.5,
+       15.5
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Days 15\u201316",
+      "first_day": 15,
+      "last_day": 16,
+      "exact_start": 14.5,
+      "exact_end": 15.75,
+      "gantt_x": [
+       15.5,
+       16.75
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 17\u201319",
+      "first_day": 17,
+      "last_day": 19,
+      "exact_start": 15.75,
+      "exact_end": 18.75,
+      "gantt_x": [
+       16.75,
+       19.75
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 20",
+      "first_day": 20,
+      "last_day": 20,
+      "exact_start": 18.75,
+      "exact_end": 19.5,
+      "gantt_x": [
+       19.75,
+       20.5
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 19.5,
+      "exact_end": 21.5,
+      "gantt_x": [
+       20.5,
+       22.5
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 22",
+      "first_day": 22,
+      "last_day": 22,
+      "exact_start": 21.5,
+      "exact_end": 22.0,
+      "gantt_x": [
+       22.5,
+       23.0
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20136 \u2014 layout; concrete caissons drilled and poured.",
+     "Days 7\u201310 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 11\u201314 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening.",
+     "Days 15\u201316 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 17\u201319 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 20 \u2014 the stair between the levels.",
+     "Day 21 \u2014 Impression Rail Express, black, with the English Walnut drink rail.",
+     "Day 22 \u2014 final clean; end of construction."
+    ],
+    "title": "22 working days on site, weather permitting"
+   }
+  },
+  "Everything (1 + 2 + 3 + 3a)": {
+   "tags": [
+    "base",
+    "opt1",
+    "opt12",
+    "opt2",
+    "opt3",
+    "opt3a"
+   ],
+   "rows": [
+    {
+     "id": "demo",
+     "option": "base",
+     "kind": "crew",
+     "start": 0.0,
+     "dur": 3.0,
+     "end": 3.0,
+     "after": [],
+     "label": "Mobilize, protect patio/beds; tear-off decking, rail, the stair; framing down; brick columns down; haul-off (2 roll-offs)",
+     "customer": "Protection; old deck, stair and brick columns out; haul-off"
+    },
+    {
+     "id": "slab_ftg",
+     "option": "base",
+     "kind": "crew",
+     "start": 3.0,
+     "dur": 1.0,
+     "end": 4.0,
+     "after": [
+      "demo"
+     ],
+     "label": "Saw-cut/core 3 openings in the patio slab for the upper caissons (4 with the roof); the old brick-column footings per the owner's plan",
+     "customer": null
+    },
+    {
+     "id": "piers",
+     "option": "base",
+     "kind": "crew",
+     "start": 4.0,
+     "dur": 1.0,
+     "end": 5.0,
+     "after": [
+      "slab_ftg"
+     ],
+     "label": "Layout (string lines, laser); auger 8 caisson holes 24\" x 42\" (track auger through the side gate; spoils hauled); Sonotubes + cages set",
+     "customer": "Layout; the caisson holes drilled"
+    },
+    {
+     "id": "piers_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 5.0,
+     "dur": 0.25,
+     "end": 5.25,
+     "after": [
+      "piers"
+     ],
+     "label": "+4 caisson holes 12\" x 42\" for the yard-stair landing (same rig)",
+     "customer": "4 caissons for the stair landing"
+    },
+    {
+     "id": "insp_ftg",
+     "option": "base",
+     "kind": "insp",
+     "start": 6,
+     "dur": 0.25,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "FOOTING inspection of the open caisson holes + cages before the pour: City (request by 3:30 pm -> next business-day a.m.) and, per Centennial R109.1.1, the PE's observation + stamped report [C]",
+     "customer": null
+    },
+    {
+     "id": "ledgers",
+     "option": "base",
+     "kind": "crew",
+     "start": 5.25,
+     "dur": 1.0,
+     "end": 6.25,
+     "after": [
+      "piers",
+      "piers_y"
+     ],
+     "label": "4 ledger runs (B, arm door wall, C band above the veneer, D): siding strip, membrane + Z-flashing, LedgerLOK, 8 DTT2Z from inside (runs while the footing inspection happens)",
+     "customer": "Ledgers flashed and fastened"
+    },
+    {
+     "id": "pour",
+     "option": "base",
+     "kind": "crew",
+     "start": 6.25,
+     "dur": 0.5,
+     "end": 6.75,
+     "after": [
+      "insp_ftg",
+      "ledgers"
+     ],
+     "label": "Pour the caissons, nothing wet-set (the ABU88RZ bases go on after the cure); flush with the slab on the patio, 7\" up in the beds",
+     "customer": "Caissons poured"
+    },
+    {
+     "id": "cure",
+     "option": "base",
+     "kind": "cure",
+     "start": 6.75,
+     "dur": 2.0,
+     "end": 8.75,
+     "after": [
+      "pour"
+     ],
+     "label": "Caisson cure: 2 days before the columns load them",
+     "customer": null
+    },
+    {
+     "id": "posts_beams",
+     "option": "base",
+     "kind": "crew",
+     "start": 8.75,
+     "dur": 1.75,
+     "end": 10.5,
+     "after": [
+      "ledgers",
+      "cure"
+     ],
+     "label": "8 rough 8x8 DF columns on ABU88RZ bases set on the cured caissons ((2) 5/8\" Titen HD each), cut to elevation; 5 beam pieces 6x10 DF (L1 x2 spliced, A2, U1 x2 spliced) lifted onto CCQ/ECCQ caps",
+     "customer": "8x8 Douglas fir columns; 6x10 Douglas fir beams"
+    },
+    {
+     "id": "roof_gsx",
+     "option": "opt3",
+     "kind": "crew",
+     "start": 10.5,
+     "dur": 0.25,
+     "end": 10.75,
+     "after": [
+      "posts_beams"
+     ],
+     "label": "Solid blocking + uplift ties (H2.5AZ/CS16) at the 2 roof-post bases; the roof version's own structure \u2014 U1 on 4 columns with 30\" caissons, drilled and poured with the deck's",
+     "customer": null
+    },
+    {
+     "id": "framing",
+     "option": "base",
+     "kind": "crew",
+     "start": 10.75,
+     "dur": 3.5,
+     "end": 14.25,
+     "after": [
+      "posts_beams",
+      "roof_gsx"
+     ],
+     "label": "~73 2x10 TrueFrame joists @12\" (LUS210Z, H2.5AZ on the beams), double rims, blocking @4' + picture-frame/breaker blocking, joist tape, inset-stair notch, arm A over beam A2, rail-post blocking",
+     "customer": "Frame both levels: 2x10 joists at 12\", joist tape, the stair opening"
+    },
+    {
+     "id": "landing_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 14.25,
+     "dur": 0.5,
+     "end": 14.75,
+     "after": [
+      "framing"
+     ],
+     "label": "Yard stair: 4 landing posts + 9'x4' landing frame",
+     "customer": "Stair landing framed"
+    },
+    {
+     "id": "light_rough",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 14.75,
+     "dur": 0.25,
+     "end": 15.0,
+     "after": [
+      "framing"
+     ],
+     "label": "Lighting rough-in: 12/2 through the blocking to every post + home run to the transformer spot",
+     "customer": null
+    },
+    {
+     "id": "roof_elec1",
+     "option": "opt3",
+     "kind": "elec",
+     "start": 14.25,
+     "dur": 0.5,
+     "end": 14.75,
+     "after": [
+      "framing"
+     ],
+     "label": "Electrician: circuit for the roof motor to the house-side attachment (rough), electrical permit",
+     "customer": null
+    },
+    {
+     "id": "insp_frame",
+     "option": "base",
+     "kind": "hold",
+     "start": 15.0,
+     "dur": 0.5,
+     "end": 15.5,
+     "after": [
+      "framing",
+      "landing_y",
+      "light_rough"
+     ],
+     "label": "FRAMING inspection (ledger, flashing, hangers, caps, lateral ties, notch, landing). Next-day a.m.; crew holds ~1/2 day",
+     "customer": null
+    },
+    {
+     "id": "fascia",
+     "option": "base",
+     "kind": "crew",
+     "start": 15.5,
+     "dur": 1.25,
+     "end": 16.75,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Vintage EW fascia 1/2x11-3/4 (13 x 12', TOPLoc, pre-drilled) + vertical-board step-face skirt on 2x4 furring",
+     "customer": "English Walnut fascia; the vertical-board face between the levels"
+    },
+    {
+     "id": "decking",
+     "option": "base",
+     "kind": "crew",
+     "start": 16.75,
+     "dur": 3.0,
+     "end": 19.75,
+     "after": [
+      "fascia"
+     ],
+     "label": "Vintage EW decking: picture frame + breakers first, field, rips; ~3,710 Cortex screws + plugs (~1 crew-day of it at 180/installer-hr x 3)",
+     "customer": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged"
+    },
+    {
+     "id": "inset_stair",
+     "option": "base",
+     "kind": "crew",
+     "start": 19.75,
+     "dur": 0.75,
+     "end": 20.5,
+     "after": [
+      "decking"
+     ],
+     "label": "Inset stair: 5 stringers, 4 treads, 5 risers, Cortex, waterfall skirts, graspable handrail",
+     "customer": "The stair between the levels"
+    },
+    {
+     "id": "flights_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 20.5,
+     "dur": 1.25,
+     "end": 21.75,
+     "after": [
+      "decking",
+      "landing_y"
+     ],
+     "label": "Yard stair: two flights (10 risers), treads, risers, ~350 Cortex, waterfall skirts",
+     "customer": "The stair to the yard: landing deck and two flights"
+    },
+    {
+     "id": "rail",
+     "option": "base",
+     "kind": "crew",
+     "start": 21.75,
+     "dur": 2.0,
+     "end": 23.75,
+     "after": [
+      "decking"
+     ],
+     "label": "IRX black: 23 posts (HeadLOK into blocking), 20 panels, drink-rail covers + clips, Vintage EW drink rail OVER the posts (posts cut level, inserts, seams on post centres, mitred corners)",
+     "customer": "Impression Rail Express, black, with the English Walnut drink rail"
+    },
+    {
+     "id": "rail_y",
+     "option": "opt2",
+     "kind": "crew",
+     "start": 23.75,
+     "dur": 0.75,
+     "end": 24.5,
+     "after": [
+      "rail",
+      "flights_y"
+     ],
+     "label": "Yard stair rail (both sides on the horseshoe, the yard side along the deck) + landing guard + graspable handrails",
+     "customer": "Rail on the stair to the yard"
+    },
+    {
+     "id": "elec_outlet",
+     "option": "opt1",
+     "kind": "elec",
+     "start": 15.5,
+     "dur": 0.5,
+     "end": 16.0,
+     "after": [
+      "insp_frame"
+     ],
+     "label": "Electrician (by others): GFCI in-use outlet at the transformer spot, if none exists",
+     "customer": null
+    },
+    {
+     "id": "light_trim",
+     "option": "opt1",
+     "kind": "crew",
+     "start": 24.5,
+     "dur": 0.75,
+     "end": 25.25,
+     "after": [
+      "rail",
+      "inset_stair",
+      "elec_outlet"
+     ],
+     "label": "Lighting: 23 post-side accent lights (drink rail is over the posts) + 5 riser lights, transformer (photocell/timer), splice, test at dusk",
+     "customer": "Low-voltage lighting: riser lights and post lights"
+    },
+    {
+     "id": "lights_y",
+     "option": "opt12",
+     "kind": "crew",
+     "start": 25.25,
+     "dur": 0.5,
+     "end": 25.75,
+     "after": [
+      "light_trim",
+      "rail_y"
+     ],
+     "label": "Yard-stair lighting: 10 riser + 5-12 post lights, wire down the stringers",
+     "customer": "Lights on the stair to the yard"
+    },
+    {
+     "id": "clean",
+     "option": "base",
+     "kind": "crew",
+     "start": 25.75,
+     "dur": 0.5,
+     "end": 26.25,
+     "after": [
+      "rail",
+      "inset_stair"
+     ],
+     "label": "Punch list, magnet sweep, final clean (end of construction)",
+     "customer": "Final clean; end of construction"
+    },
+    {
+     "id": "insp_final",
+     "option": "base",
+     "kind": "insp",
+     "start": 27,
+     "dur": 0.25,
+     "end": 27.25,
+     "after": [
+      "clean"
+     ],
+     "label": "FINAL inspection (deck, stairs, guards, lights) \u2014 next business day; then HOA ACC close-out request",
+     "customer": null
+    }
+   ],
+   "crew_days": 26.25,
+   "end_of_construction_day": 27,
+   "customer": {
+    "precon": {
+     "label": "Engineering & ordering",
+     "weeks": [
+      5,
+      6
+     ],
+     "text": "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved",
+     "gantt_x": [
+      0,
+      1
+     ]
+    },
+    "rows": [
+     {
+      "key": "out",
+      "option": "base",
+      "label": "protection; old deck, stair and brick columns out; haul-off",
+      "title": "Protection; old deck, stair and brick columns out; haul-off",
+      "days": "Days 1\u20134",
+      "first_day": 1,
+      "last_day": 4,
+      "exact_start": 0.0,
+      "exact_end": 4.0,
+      "gantt_x": [
+       1.0,
+       5.0
+      ]
+     },
+     {
+      "key": "piers",
+      "option": "base",
+      "label": "layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "title": "Layout; concrete caissons drilled and poured, the stair-landing caissons included",
+      "days": "Days 5\u20137",
+      "first_day": 5,
+      "last_day": 7,
+      "exact_start": 4.0,
+      "exact_end": 6.75,
+      "gantt_x": [
+       5.0,
+       7.75
+      ]
+     },
+     {
+      "key": "structure",
+      "option": "base",
+      "label": "ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "title": "Ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set",
+      "days": "Days 8\u201311",
+      "first_day": 8,
+      "last_day": 11,
+      "exact_start": 5.25,
+      "exact_end": 10.75,
+      "gantt_x": [
+       6.25,
+       11.75
+      ]
+     },
+     {
+      "key": "frame",
+      "option": "base",
+      "label": "frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "title": "Frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed",
+      "days": "Days 12\u201315",
+      "first_day": 12,
+      "last_day": 15,
+      "exact_start": 10.75,
+      "exact_end": 15.5,
+      "gantt_x": [
+       11.75,
+       16.5
+      ]
+     },
+     {
+      "key": "fascia",
+      "option": "base",
+      "label": "English Walnut fascia; the vertical-board face between the levels",
+      "title": "English Walnut fascia; the vertical-board face between the levels",
+      "days": "Days 16\u201317",
+      "first_day": 16,
+      "last_day": 17,
+      "exact_start": 15.5,
+      "exact_end": 16.75,
+      "gantt_x": [
+       16.5,
+       17.75
+      ]
+     },
+     {
+      "key": "decking",
+      "option": "base",
+      "label": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "title": "Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged",
+      "days": "Days 18\u201320",
+      "first_day": 18,
+      "last_day": 20,
+      "exact_start": 16.75,
+      "exact_end": 19.75,
+      "gantt_x": [
+       17.75,
+       20.75
+      ]
+     },
+     {
+      "key": "stair",
+      "option": "base",
+      "label": "the stair between the levels",
+      "title": "The stair between the levels",
+      "days": "Day 21",
+      "first_day": 21,
+      "last_day": 21,
+      "exact_start": 19.75,
+      "exact_end": 20.5,
+      "gantt_x": [
+       20.75,
+       21.5
+      ]
+     },
+     {
+      "key": "yard",
+      "option": "opt2",
+      "label": "the stair to the yard: landing deck and two flights",
+      "title": "The stair to the yard: landing deck and two flights",
+      "days": "Day 22",
+      "first_day": 22,
+      "last_day": 22,
+      "exact_start": 20.5,
+      "exact_end": 21.75,
+      "gantt_x": [
+       21.5,
+       22.75
+      ]
+     },
+     {
+      "key": "rail",
+      "option": "base",
+      "label": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "title": "Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard",
+      "days": "Days 23\u201324",
+      "first_day": 23,
+      "last_day": 24,
+      "exact_start": 21.75,
+      "exact_end": 24.5,
+      "gantt_x": [
+       22.75,
+       25.5
+      ]
+     },
+     {
+      "key": "lights",
+      "option": "opt1",
+      "label": "low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included",
+      "title": "Low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included",
+      "days": "Days 25\u201326",
+      "first_day": 25,
+      "last_day": 26,
+      "exact_start": 24.5,
+      "exact_end": 25.75,
+      "gantt_x": [
+       25.5,
+       26.75
+      ]
+     },
+     {
+      "key": "clean",
+      "option": "base",
+      "label": "final clean; end of construction",
+      "title": "Final clean; end of construction",
+      "days": "Day 27",
+      "first_day": 27,
+      "last_day": 27,
+      "exact_start": 25.75,
+      "exact_end": 26.25,
+      "gantt_x": [
+       26.75,
+       27.25
+      ]
+     }
+    ],
+    "schedule_lines": [
+     "Engineering & ordering \u2014 about 5\u20136 weeks from signing: stamped drawings; the Douglas fir timbers, footings and English Walnut boards ordered; samples approved.",
+     "Days 1\u20134 \u2014 protection; old deck, stair and brick columns out; haul-off.",
+     "Days 5\u20137 \u2014 layout; concrete caissons drilled and poured, the stair-landing caissons included.",
+     "Days 8\u201311 \u2014 ledgers flashed and fastened; 8x8 Douglas fir columns and 6x10 Douglas fir beams set.",
+     "Days 12\u201315 \u2014 frame both levels: 2x10 joists at 12\" with joist tape, blocking, the stair opening; the yard-stair landing framed.",
+     "Days 16\u201317 \u2014 English Walnut fascia; the vertical-board face between the levels.",
+     "Days 18\u201320 \u2014 Vintage English Walnut decking: picture frame and breaker boards first, every screw plugged.",
+     "Day 21 \u2014 the stair between the levels.",
+     "Day 22 \u2014 the stair to the yard: landing deck and two flights.",
+     "Days 23\u201324 \u2014 Impression Rail Express, black, with the English Walnut drink rail; rail and handrails on the stair to the yard.",
+     "Days 25\u201326 \u2014 low-voltage lighting: riser lights and post lights on a transformer with photocell and timer, the stair to the yard included.",
+     "Day 27 \u2014 final clean; end of construction."
+    ],
+    "title": "27 working days on site, weather permitting"
+   }
+  }
+ },
+ "calendar_examples": {
+  "2026-11-09": {
+   "Base": {
+    "start": "2026-12-16",
+    "crew_days": 21.75,
+    "weather_days": 5.9,
+    "thaw": 1.0,
+    "working_days": 29,
+    "end_of_construction": "2027-01-29",
+    "weeks_from_signing": 11.6
+   },
+   "Base + Option 1 (lighting)": {
+    "start": "2026-12-16",
+    "crew_days": 22.75,
+    "weather_days": 6.2,
+    "thaw": 1.0,
+    "working_days": 30,
+    "end_of_construction": "2027-02-01",
+    "weeks_from_signing": 12.0
+   },
+   "Base + Option 2 (yard stair)": {
+    "start": "2026-12-16",
+    "crew_days": 24.5,
+    "weather_days": 6.7,
+    "thaw": 1.0,
+    "working_days": 33,
+    "end_of_construction": "2027-02-04",
+    "weeks_from_signing": 12.4
+   },
+   "Base + Options 1 + 2 (incl. yard-stair lights)": {
+    "start": "2026-12-16",
+    "crew_days": 26.0,
+    "weather_days": 7.0,
+    "thaw": 1.0,
+    "working_days": 34,
+    "end_of_construction": "2027-02-05",
+    "weeks_from_signing": 12.6
+   },
+   "Base + Option 3 (louvered roof)": {
+    "start": "2026-12-16",
+    "crew_days": 22.0,
+    "weather_days": 5.9,
+    "thaw": 1.0,
+    "working_days": 29,
+    "end_of_construction": "2027-01-29",
+    "roof_install_start": "2027-02-01",
+    "roof_done": "2027-02-03",
+    "weeks_from_signing": 12.3
+   },
+   "Base + Options 3 + 3a (roof + screens)": {
+    "start": "2026-12-16",
+    "crew_days": 22.0,
+    "weather_days": 5.9,
+    "thaw": 1.0,
+    "working_days": 29,
+    "end_of_construction": "2027-01-29",
+    "roof_install_start": "2027-02-01",
+    "roof_done": "2027-02-04",
+    "weeks_from_signing": 12.4
+   },
+   "Everything (1 + 2 + 3 + 3a)": {
+    "start": "2026-12-16",
+    "crew_days": 26.25,
+    "weather_days": 7.2,
+    "thaw": 1.0,
+    "working_days": 35,
+    "end_of_construction": "2027-02-08",
+    "roof_install_start": "2027-02-09",
+    "roof_done": "2027-02-12",
+    "weeks_from_signing": 13.6
+   }
+  },
+  "2027-02-01": {
+   "Base": {
+    "start": "2027-03-09",
+    "crew_days": 21.75,
+    "weather_days": 3.6,
+    "thaw": 0.0,
+    "working_days": 26,
+    "end_of_construction": "2027-04-13",
+    "weeks_from_signing": 10.1
+   },
+   "Base + Option 1 (lighting)": {
+    "start": "2027-03-09",
+    "crew_days": 22.75,
+    "weather_days": 3.8,
+    "thaw": 0.0,
+    "working_days": 27,
+    "end_of_construction": "2027-04-14",
+    "weeks_from_signing": 10.3
+   },
+   "Base + Option 2 (yard stair)": {
+    "start": "2027-03-09",
+    "crew_days": 24.5,
+    "weather_days": 4.2,
+    "thaw": 0.0,
+    "working_days": 29,
+    "end_of_construction": "2027-04-16",
+    "weeks_from_signing": 10.6
+   },
+   "Base + Options 1 + 2 (incl. yard-stair lights)": {
+    "start": "2027-03-09",
+    "crew_days": 26.0,
+    "weather_days": 4.4,
+    "thaw": 0.0,
+    "working_days": 31,
+    "end_of_construction": "2027-04-20",
+    "weeks_from_signing": 11.1
+   },
+   "Base + Option 3 (louvered roof)": {
+    "start": "2027-03-09",
+    "crew_days": 22.0,
+    "weather_days": 3.6,
+    "thaw": 0.0,
+    "working_days": 26,
+    "end_of_construction": "2027-04-13",
+    "roof_install_start": "2027-04-15",
+    "roof_done": "2027-04-19",
+    "weeks_from_signing": 11.0
+   },
+   "Base + Options 3 + 3a (roof + screens)": {
+    "start": "2027-03-09",
+    "crew_days": 22.0,
+    "weather_days": 3.6,
+    "thaw": 0.0,
+    "working_days": 26,
+    "end_of_construction": "2027-04-13",
+    "roof_install_start": "2027-04-15",
+    "roof_done": "2027-04-20",
+    "weeks_from_signing": 11.1
+   },
+   "Everything (1 + 2 + 3 + 3a)": {
+    "start": "2027-03-09",
+    "crew_days": 26.25,
+    "weather_days": 4.6,
+    "thaw": 0.0,
+    "working_days": 31,
+    "end_of_construction": "2027-04-20",
+    "roof_install_start": "2027-04-21",
+    "roof_done": "2027-04-26",
+    "weeks_from_signing": 12.0
+   }
+  },
+  "2027-03-15": {
+   "Base": {
+    "start": "2027-04-19",
+    "crew_days": 21.75,
+    "weather_days": 4.2,
+    "thaw": 0.0,
+    "working_days": 26,
+    "end_of_construction": "2027-05-24",
+    "weeks_from_signing": 10.0
+   },
+   "Base + Option 1 (lighting)": {
+    "start": "2027-04-19",
+    "crew_days": 22.75,
+    "weather_days": 4.4,
+    "thaw": 0.0,
+    "working_days": 28,
+    "end_of_construction": "2027-05-26",
+    "weeks_from_signing": 10.3
+   },
+   "Base + Option 2 (yard stair)": {
+    "start": "2027-04-19",
+    "crew_days": 24.5,
+    "weather_days": 4.7,
+    "thaw": 0.0,
+    "working_days": 30,
+    "end_of_construction": "2027-05-28",
+    "weeks_from_signing": 10.6
+   },
+   "Base + Options 1 + 2 (incl. yard-stair lights)": {
+    "start": "2027-04-19",
+    "crew_days": 26.0,
+    "weather_days": 4.9,
+    "thaw": 0.0,
+    "working_days": 31,
+    "end_of_construction": "2027-06-01",
+    "weeks_from_signing": 11.1
+   },
+   "Base + Option 3 (louvered roof)": {
+    "start": "2027-04-19",
+    "crew_days": 22.0,
+    "weather_days": 4.2,
+    "thaw": 0.0,
+    "working_days": 27,
+    "end_of_construction": "2027-05-25",
+    "roof_install_start": "2027-05-26",
+    "roof_done": "2027-05-28",
+    "weeks_from_signing": 10.6
+   },
+   "Base + Options 3 + 3a (roof + screens)": {
+    "start": "2027-04-19",
+    "crew_days": 22.0,
+    "weather_days": 4.2,
+    "thaw": 0.0,
+    "working_days": 27,
+    "end_of_construction": "2027-05-25",
+    "roof_install_start": "2027-05-26",
+    "roof_done": "2027-06-01",
+    "weeks_from_signing": 11.1
+   },
+   "Everything (1 + 2 + 3 + 3a)": {
+    "start": "2027-04-19",
+    "crew_days": 26.25,
+    "weather_days": 5.1,
+    "thaw": 0.0,
+    "working_days": 32,
+    "end_of_construction": "2027-06-02",
+    "roof_install_start": "2027-06-03",
+    "roof_done": "2027-06-08",
+    "weeks_from_signing": 12.1
+   }
+  }
+ }
+}

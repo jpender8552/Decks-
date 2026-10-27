@@ -595,7 +595,11 @@ def timeline_of(s) -> Optional[dict]:
         return None
     if isinstance(tl, str):
         path, _, name = tl.partition("#")
-        with open(path) as fh:
+        from pathlib import Path as _P
+        p_ = _P(path)
+        if not p_.is_absolute() and not p_.exists():          # a repo-relative path ("jobs/<job>_site/schedule.json")
+            p_ = _P(__file__).resolve().parent.parent / path
+        with open(p_) as fh:
             d = json.load(fh)
         if "scenarios" in d:
             sc = d["scenarios"][name] if name else next(iter(d["scenarios"].values()))

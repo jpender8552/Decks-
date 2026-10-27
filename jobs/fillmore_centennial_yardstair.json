@@ -14116,7 +14116,7 @@
     "ref": "stairs agent 27 Oct 03:25; stairs.md §4.4"
    }
   ],
-  "timeline": "/tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad/fillmore/schedule/schedule.json#Base + Option 2 (yard stair)",
+  "timeline": "jobs/fillmore_site/schedule.json#Base + Option 2 (yard stair)",
   "rail_sell_per_lf": 0,
   "engineering_included": false,
   "lights": null

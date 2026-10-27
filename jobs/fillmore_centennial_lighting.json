@@ -14072,7 +14072,7 @@
    "post_cap": true,
    "sell_each": null
   },
-  "timeline": "/tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad/fillmore/schedule/schedule.json#Base + Option 1 (lighting)",
+  "timeline": "jobs/fillmore_site/schedule.json#Base + Option 1 (lighting)",
   "rail_sell_per_lf": 0,
   "engineering_included": false
  },

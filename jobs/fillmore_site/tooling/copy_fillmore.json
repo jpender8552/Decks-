@@ -1,0 +1,120 @@
+{
+ "_source": "copy/copy.md v3.3 (customer-copy agent, 27 Oct 02:55 UTC): section 7 strings + sections 1.1, 1.13, 2.4, 3. Engine numbers are {keys}, filled at build time from the specs (build_fillmore.py engine_facts); a line containing TBD is never used. Not taken on purpose: the lights and stairs `facts` lists (the engine's own facts are current and correct now), the client box (1.15: extras.engineered is true, so proposal_note does not print), the timing line (1.9: no slot in the page). Footing words are engine facts ({footing_one}, {column_bases_internal}), so the text follows the spec's footing_type (owner: caissons, copy v3.3). Owner 27 Oct: Option 2B (stairs along the deck) next to Option 2, each with the lights on its stairs as an add-on; GS branding; no promo; screens $15,000 in the spec. Owner 27 Oct: lights are a la carte — Option 1 (riser + post lights) and the yard stairs' lights as the add-on; never in the base. Owner 27 Oct: the gutter LED strip is in the roof bid (roof.facts[5]); the roof version has its own deck structure (roof_doc.deck_note).",
+ "_copy_md_mtime": 1793069740.0,
+ "client": "Andie Jones",
+ "name_proposal": "Deck Replacement · 7303 S Fillmore Cir",
+ "name_internal": "7303 S Fillmore Cir · Deck Replacement · Centennial",
+ "name_roof": "Louvered Roof · 7303 S Fillmore Cir",
+ "name_supplier": "7303 S Fillmore Cir · Deck Replacement",
+ "name_permit": "7303 S Fillmore Cir · Deck Replacement",
+ "permit_title": "Two-level deck",
+ "sub_internal": "7303 S Fillmore Cir, Centennial · Andie Jones (buyer) · two-level deck replaced in the same footprint, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape on 6x10 DF #1 drop beams (L1 and A2 under the lower level, U1 under the upper level) and {columns} 8x8 rough DF columns on {column_bases_internal}, in place of the 9 brick columns · TimberTech Vintage English Walnut parallel to the house, one picture frame, breakers at A|B, mid-B, mid-C and C|D, no butt joints, Cortex on every board, TOPLoc on the fascia and the vertical skirt · TimberTech Impression Rail Express, Black, vertical balusters, Vintage English Walnut drink rail over the posts · 5-riser stair set into the upper level at B|C, the step face in vertical English Walnut fascia · demo · options: 1 lighting, 2 / 2B stairs to the yard (two layouts, one or the other), 3 louvered roof (+ 3a screens)",
+ "sub_supplier": "7303 S Fillmore Cir, Centennial CO 80122 · two-level deck, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape, 6x10 DF #1 drop beams, {columns} 8x8 rough DF columns on {column_bases_internal} · TimberTech Vintage English Walnut, picture frame, breakers, Cortex on every board, TOPLoc on the fascia and the vertical skirt · Impression Rail Express, Black, vertical balusters, Vintage English Walnut drink rail over the posts · 5-riser stair set into the upper level, vertical English Walnut skirt",
+ "sub_permit": "7303 S Fillmore Cir, Centennial CO 80122 · two-level deck replaced in the same footprint, {width} along the house: lower level (A + B) and upper level (C + D), {step_in}\" between them",
+ "lede": "Your deck, rebuilt in the same footprint across the back of the house: two levels, {width} along the house, the upper level {step_in}\" above the lower. The old deck and its brick columns come out. The new frame is TrueFrame 2x10 joists at 12\" on center with joist tape, on 6x10 Douglas fir beams and 8x8 rough Douglas fir columns, each column on {footing_one}. TimberTech Vintage decking in English Walnut runs parallel to the house, with a picture frame and breaker boards so every board is one piece. Every deck board and stair tread is screwed through the face with Cortex and plugged in English Walnut. Black Impression Rail Express with vertical balusters, and an English Walnut drink rail over the posts. The stair between the levels is set into the upper level, and the face between the levels is English Walnut boards installed vertically.",
+ "viewer_note": "Your deck and its options in 3D, in a web browser. Turn each option on and off, move the sun through any day at your address, open and close the louvers, raise and lower the screens, and see the lights after dark.",
+ "lights": {
+  "title": "Lighting",
+  "blurb_accent": "Low-voltage LED lights, 2700K warm white, for the stair between the levels and the rail. The drink rail runs over the posts, so each post light is a small accent light on the post's side, just below the drink rail. {lights_total} lights, installed.",
+  "blurb_cap": "Low-voltage LED lights, 2700K warm white: a light in every riser of the stair between the levels and an LED cap light on every rail post. {lights_total} lights, installed.",
+  "note": "With Option 3, the roof's posts take the place of {roof_fewer_posts} rail posts, so there are {roof_fewer_posts} fewer post lights."
+ },
+ "stairs": {
+  "title": "Stairs to the yard",
+  "blurb_horseshoe": "A stair from the front of the lower level down to the yard, about 6' to the left of the stair between the levels. A {yard_width_short}-wide flight goes down to a {yard_landing_short} landing, turns back toward the house, and goes down to the lawn.",
+  "blurb_relay": "A stair from the front of the lower level down to the yard: one step down to a {yard_landing_short} landing, then down along the front of the deck to the lawn.",
+  "blurb_other": "TBD: words for a yard-stair layout that is neither the horseshoe nor the re-lay (copy.md 1.11)",
+  "addon_label": "With Option 1: lights on these stairs",
+  "addon_note": "{add_riser} more riser lights and {add_post} more post lights"
+ },
+ "roof": {
+  "title": "Louvered roof",
+  "blurb": "A black Suncoast Louvered Roof over the main section of the upper level: {roof_w} along the house by {roof_d} out, {roof_sf} SF at ${roof_rate} per square foot.",
+  "facts": [
+   "Suncoast Louvered Roof, motorized, black powder-coated aluminum, over the upper level's main section",
+   "Aluminum blades, 8\" wide on 8\" spacing, in {roof_zones} zones with one motor each. Closed, they seal against rain and drain into the gutters; open, they turn up to 140 degrees, by remote or app",
+   "Two 6x6 aluminum posts on the deck at the rail line. They are the rail posts there; the rail panels bracket into them",
+   "House side: the eave is about 8' above the upper deck, so the roof's house side is carried on flashed brackets on the roof above it, with no posts at the house",
+   "Gutters built into the frame; the downspouts run inside the posts",
+   "An LED light strip in the gutter's light track, warm white, on the roof's remote and app"
+  ],
+  "note": "The louvered roof has its own document with the details.",
+  "url_text": "The louvered roof's own document"
+ },
+ "screens": {
+  "label": {
+   "front+right": "Motorized screens: the front and the right end",
+   "front+left+right": "Motorized screens on the open sides: the front and both ends",
+   "*": "Motorized screens"
+  },
+  "note_tail": {
+   "front+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail, so the drink rail stays outside it. The left end stays open, so the stair between the levels stays clear.",
+   "front+left+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail, so the drink rail stays outside it. The left screen comes down across the top of the stair between the levels; raise it to use the stair."
+  }
+ },
+ "roof_doc": {
+  "lede": "A black Suncoast Louvered Roof over the main section of your upper deck: {roof_w} along the house and {roof_d} out, {roof_sf} SF. Motorized aluminum blades turn from closed to 140 degrees open. Closed, they seal against rain and drain into gutters built into the frame, and the downspouts run inside the posts. Two posts stand on the deck at the rail line and are the rail posts there. The house's eave is about 8' above the deck, so the house side is attached at the roof line above it, with no posts at the house. Suncoast builds the roof to the measured size of your deck.",
+  "viewer_note": "The deck and the louvered roof in 3D, in a web browser. Move the sun through any day at your address, turn the louvers to any angle, and raise and lower the screens.",
+  "screens_label": {
+   "front+right": "Motorized screens on the front and the right end",
+   "front+left+right": "Motorized screens on the open sides",
+   "*": "Motorized screens"
+  },
+  "screens_blurb": {
+   "front+right": "Screens that come down from the frame on the front and the right end. The front screen comes down inside the rail, so the drink rail stays outside it. The left end stays open, so the stair between the levels stays clear.",
+   "front+left+right": "Screens that come down from the frame on the front and both ends. The front screen comes down inside the rail, so the drink rail stays outside it. The left screen crosses the top of the stair between the levels; raise it to use the stair."
+  },
+  "facts": {
+   "what": [
+    "Structural aluminum frame, beams, posts and blades, powder-coated (AAMA 2604), in black",
+    "8\" blades on 8\" spacing with weather stripping on every blade: closed, they seal against rain and drain into the gutters; open, they turn up to 140 degrees",
+    "A motor inside one blade of each zone (one motor for up to 150 SF): no arms, levers or pistons outside the frame",
+    "Built by Suncoast to the measured size of your deck, from measurements taken on site"
+   ],
+   "gutters": [
+    "A gutter runs around each zone, inside the frame; the blades drain into it and water flows freely from zone to zone",
+    "The downspouts run inside the two posts",
+    "The gutters are cleaned by hand or with a shop vacuum"
+   ],
+   "screens": [
+    "Gaposa motor with obstacle detection, on the roof's remote and app",
+    "Phifer mesh held in zipper side tracks; a weighted, sealed bottom bar",
+    "Rated for wind up to 65 mph; they can retract automatically in higher winds",
+    "Black mesh, in black housings and tracks to match the frame"
+   ]
+  },
+  "deck_note": "With the roof, the upper level is framed for it from the start: a column on a larger concrete caisson under each of the roof's two posts, and blocking and ties at each post base.",
+  "schedule": [
+   "Suncoast measures on site and builds the roof to those measurements.",
+   "Installed after the deck is built: the roof's posts stand on the new upper level.",
+   "TBD (confirm the days and the lead time with Suncoast Denver, copy.md 2.6): About 3 working days on site for the roof, and 1 more for the screens."
+  ],
+  "exclusions": []
+ },
+ "captions": {
+  "yard": "From the yard, in front of the lower level",
+  "yard_left": "From the yard, looking across to the upper level",
+  "yard_along": "From the yard below the lower level, looking along the deck",
+  "yard_center": "From the yard at the step between the levels",
+  "lower_deck": "On the lower level at the arm, looking along the deck",
+  "arm": "On the lower level, looking back along the arm to the slider",
+  "upper_deck": "On the upper level at the stair, looking back over the lower level",
+  "upper_rail": "On the upper level, along the rail",
+  "high34": "From above, the arm (left) end",
+  "high34r": "From above, the right end",
+  "stair_yard": "The stairs to the yard, from the yard",
+  "dusk": "From the yard at dusk: the riser lights and the post lights",
+  "dusk_deck": "On the lower level at dusk: the riser lights in the stair between the levels",
+  "dusk_stair": "From the yard at dusk: the stairs to the yard with their lights",
+  "roof_yard": "The louvered roof from the yard",
+  "roof_deck": "On the upper level under the louvered roof"
+ },
+ "stairs2b": {
+  "title": "Stairs to the yard — along the deck",
+  "blurb_relay": "A stair from the front of the lower level down to the yard: one step down to a {yard2b_landing_short} landing, then down along the front of the deck to the lawn.",
+  "blurb_horseshoe": "A stair from the front of the lower level down to the yard. A {yard2b_width_short}-wide flight goes down to a {yard2b_landing_short} landing, turns back toward the house, and goes down to the lawn.",
+  "blurb_other": "TBD: words for this layout of the stairs along the deck (copy.md 1.11)",
+  "addon_label": "With Option 1: lights on these stairs",
+  "addon_note": "{add_riser_2b} more riser lights and {add_post_2b} more post lights"
+ }
+}

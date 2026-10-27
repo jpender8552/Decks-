@@ -14164,7 +14164,7 @@
     "ref": "OWNER 27 Oct (via the lead, ~03:10)"
    }
   ],
-  "timeline": "/tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad/fillmore/schedule/schedule.json#Base + Options 3 + 3a (roof + screens)",
+  "timeline": "jobs/fillmore_site/schedule.json#Base + Options 3 + 3a (roof + screens)",
   "rail_sell_per_lf": 0,
   "engineering_included": false,
   "lights": null

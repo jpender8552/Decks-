@@ -14067,7 +14067,7 @@
     "ref": "footings.md §10 (caissons, 27 Oct)"
    }
   ],
-  "timeline": "/tmp/claude-0/-home-user-Decks-/3110cd41-980c-5ceb-b230-1490acc026a8/scratchpad/fillmore/schedule/schedule.json#Base",
+  "timeline": "jobs/fillmore_site/schedule.json#Base",
   "rail_sell_per_lf": 0,
   "engineering_included": false,
   "lights": null
