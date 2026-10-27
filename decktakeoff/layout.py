@@ -974,6 +974,8 @@ class OutlineFrame:
     notes: List[str] = field(default_factory=list)
     rim_to_ledger: int = 0                                                                     # doubled rim ends hung on a ledger
     rim_ledger: List[str] = field(default_factory=list)                                         # each of them by the angle it meets: square | skew45 | field
+    notch_hangers: int = 0       # inset-stair notches: concealed-flange double hangers (trimmer ends, headers on the trimmer)
+    notches: List[dict] = field(default_factory=list)   # per framed notch: side, trimmer (x, y_a, y_b, ends), headers, PF joist
 
 
 def _col_cross(poly, x) -> List[Tuple[float, int]]:

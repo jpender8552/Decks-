@@ -780,9 +780,11 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     return sheet("D-501", "Details — steel frame", "Steel ledger · joist clips · boxed beam on the shared pier · Diamond Pier · deck edge · under the deck", o, "Schematic details, not to scale · the engineer's details govern", meta)
 
 
-def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
+def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[Tuple[List[Tuple[float, float]], Optional[str]]]] = None) -> Optional[str]:
     """C-100 site plan: the parcel and the house from the county GIS (plan frame, feet), the new decks, roof covers and
-    stairs, distances to the lot lines, the reference setbacks, north arrow, street, lot coverage and the parcel facts."""
+    stairs, distances to the lot lines, the reference setbacks, north arrow, street, lot coverage and the parcel facts.
+    outlines: [(polygon, label)] when the deck is drawn as several pieces (the levels of a composite deck); None -> the
+    scene's one outline."""
     s = L.spec
     sp = s.site.plan or {}
     if not sp.get("parcel"):
@@ -836,15 +838,21 @@ def sheet_site(L: Layout, S: Scene, t, meta) -> Optional[str]:
         cx = sum(p[0] for p in fp) / len(fp); cy = sum(p[1] for p in fp) / len(fp)
         o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE)); o.append(T(X(cx), Y(cy) + 12, sp.get("house_label", "one-story + garage (no work)"), 7.5, 600, "middle", MUTE))
     # decks
-    out = deck_outline(S)
-    o.append(PG([(X(x), Y(y)) for x, y in out], FILL["deck"], INK, 1.2))
+    outs = outlines or [(deck_outline(S), None)]
+    for poly_, _ in outs:
+        o.append(PG([(X(x), Y(y)) for x, y in poly_], FILL["deck"], INK, 1.2))
+    out = [p for poly_, _ in outs for p in poly_]
+    if outlines and not sp.get("deck_label_inside"):              # each level named on it
+        for poly_, lab_ in outs:
+            if lab_:
+                o.append(T(X(sum(q[0] for q in poly_) / len(poly_)), Y(sum(q[1] for q in poly_) / len(poly_)) + 3, lab_, 6.4, 900, "middle", INK))
     if sp.get("deck_label") and sp.get("deck_label_inside"):     # inside the deck (a setback line runs under its front)
         cxd, cyd = sum(q[0] for q in out) / len(out), sum(q[1] for q in out) / len(out)
         for k_, ln_ in enumerate(textwrap.wrap(sp["deck_label"], 34)[:3]):
             o.append(T(X(cxd), Y(cyd) - 4 + k_ * 9, ln_, 7, 900, "middle", INK))
     elif sp.get("deck_label"):          # one label for the whole deck, below its front edge
         o.append(T(X(sum(q[0] for q in out) / len(out)), Y(max(q[1] for q in out)) + 12, sp["deck_label"], 7.2, 900, "middle", INK))
-    else:
+    elif not outlines:
         for z in S.meta["zones"]:
             deep = z["front"] - z["wall_y"] > 6
             o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
@@ -1400,6 +1408,13 @@ def _a(word: str) -> str:
     return "an" if word[:1].upper() in "AEFHILMNORSX" else "a"
 
 
+def _stair_pairs(L) -> list:
+    """(stair spec, stair layout) for every stair of the job: a composite deck's stairs live in its parts."""
+    if hasattr(L, "parts"):
+        return [(ss, sl) for p in L.parts for ss, sl in zip(p.spec.stairs or [], p.layout.stairs or [])]
+    return list(zip(L.spec.stairs or [], L.stairs or []))
+
+
 def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool], Tuple[float, float, float], str]]:
     """(label, which boxes, where on the box, pick) for every member the job has, in build order — the callout key."""
     s = L.spec
@@ -1421,7 +1436,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
                + ("LedgerLOK" if lf_.startswith("ledgerlok") else "1/2\" through-bolts" if "bolt" in lf_ else "1/2\" lags")
                + (f", 2 rows staggered {oc.group(1)}\" OC" if oc else "") + "; membrane + L-flashing")
     sts = []
-    for ss, st in zip(s.stairs or [], L.stairs or []):
+    for ss, st in _stair_pairs(L):
         nm = getattr(ss, "name", None) or ""
         if getattr(st, "build", "") == "box":
             sts.append(f"{nm or 'box step'}: {st.geo.risers} risers, framed box")

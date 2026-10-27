@@ -397,8 +397,15 @@ def columns_of(t) -> int:
 
 
 def lights_of(t) -> dict:
-    """The deck's lights, counted off the order: {"riser", "post_cap", "other", "total", "transformer"} (all 0 / "" without lights)."""
+    """The deck's lights: {"riser", "post_cap", "other", "total", "transformer"} (all 0 / "" without lights) — from the
+    lighting plan (lighting.py) when the takeoff has one, else counted off the order."""
     out = dict(riser=0, post_cap=0, other=0, total=0, transformer="")
+    plan = getattr(t, "lighting", None)
+    if plan is not None and any(l.category == "Lighting" for l in t.lines):
+        out.update(riser=int(plan.n_riser), post_cap=int(plan.n_cap), total=int(plan.n_riser + plan.n_cap))
+        tr = next((l.item for l in t.lines if l.category == "Lighting" and "transformer" in l.item.lower()), "")
+        out["transformer"] = tr or ("transformer" if plan.transformers else "")
+        return out
     for l in t.lines:
         it = l.item.lower()
         if l.category != "Lighting" and "light" not in it:

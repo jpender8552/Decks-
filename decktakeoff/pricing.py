@@ -146,7 +146,12 @@ def price_louvered(spec, roof: dict, name: str = "Louvered roof") -> AddonPrice:
     if roof.get("price"):
         sell, basis = float(roof["price"]), "owner-set price"
     elif rate:
-        sell, basis = rate * sf, f"{sf:g} SF x ${rate:,.2f}/SF"
+        if all(roof.get(k) is not None for k in ("x0", "x1", "y0", "y1")):      # the louvered engine's own rule, so every document agrees
+            from .louvered import roof_sell
+            sell = roof_sell(roof)
+        else:
+            sell = rate * sf
+        basis = f"{sf:g} SF x ${rate:,.2f}/SF"
     else:
         raise ValueError("louvered roof has neither price nor price_per_sf")
     c, f, m = fixed_terms(spec, sell)
@@ -285,6 +290,7 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
                     1, "lot", float(sl.get("labor_lot", 900.0 + (350.0 if deck_m else 750.0) * n_p)), "ESTIMATE — no sail rate on the card; confirm"))
     if s.extras.blinds_reinstall and _covs:
         lab.append(("Take down, store and rehang the owner's roll-down blinds on the new beams", 1, "lot", lr.get("blinds_reinstall_lot", 250.0), "ESTIMATE — confirm"))
+    lab += __import__("decktakeoff.lighting", fromlist=["labor_lines"]).labor_lines(t, lr)     # extras.lights: fixtures + transformer (ESTIMATE, no card rate)
     return lab
 
 
@@ -427,6 +433,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         lead = "Porch cover — shed roof" if n_cv == 1 else f"{n_cv} roof covers — lean-to roofs"
         parts.append((f"{lead} on 6x6 {'Douglas fir' if s.extras.cover_post_species.upper().startswith('DF') else 'cedar'} posts, {roof}, {finish}" + (", existing covers torn off" if s.extras.demo_covers else "") + (", blinds rehung" if s.extras.blinds_reinstall else ""),
                       round(comp(cover_m, labsum("Porch cover") + labsum("Take down, store")))))
+    parts += __import__("decktakeoff.lighting", fromlist=["allocation"]).allocation(t, mats, labsum, comp)     # extras.lights: what is lit, at its sell value
     main = rest - sum(v for _, v in parts)
     if s.is_timber:
         label = ("Timber-frame deck: caissons, Douglas fir frame (end grain sealed), " + f"{s.decking.color} decking, "

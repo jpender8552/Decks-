@@ -219,6 +219,8 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         hanger=dict(color="#1c1c1e" if spec.framing.hardware_finish == "black" else "#8f9498", metal=0.7, rough=0.5),
         **(__import__("decktakeoff.house", fromlist=["materials"]).materials(spec.geometry.house_model) if getattr(spec.geometry, "house_model", None) else {}),
         **(_site_materials(spec.geometry.site_model) if getattr(spec.geometry, "site_model", None) else {}),
+        **__import__("decktakeoff.lighting", fromlist=["materials"]).materials(spec),     # led_riser / led_cap / led_housing when extras.lights is on
+        **__import__("decktakeoff.louvered", fromlist=["materials"]).materials(spec),     # lvmetal / lvled / lvfabric when the job has a louvered roof
     )
 
 
@@ -280,6 +282,7 @@ def build_scene(L) -> Scene:
     for _c in (spec.geometry.covers or []):
         draw_cover(add, spec, dict(COVER_DEFAULTS, **_c), zt)
     draw_sails(add, spec)
+    __import__("decktakeoff.louvered", fromlist=["draw"]).draw(add, L)     # louvered roofs this layout owns (a composite's job-level roof: drawn once there)
     draw_benches(add, spec, zt, fixed_append=lambda b: B.append(b))
     # a deck or roof above this one (existing, drawn for context) and the columns that carry it through this deck
     for ov in (spec.geometry.overhead or []):
@@ -605,6 +608,8 @@ def build_scene(L) -> Scene:
             x, y = sh(p.x * IN, p.y * IN)
             if any(abs(x - sx) < 0.4 and abs(y - sy) < 0.4 for sx, sy in sail_xy):
                 continue                       # the sail post is this corner post
+            if getattr(p, "roof", False):
+                continue                       # a louvered-roof post is the rail post here (louvered.py draws it)
             add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "railmetal", 7, tag=p.kind)
             add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "railmetal", 7)
         # sections: reconstruct post pairs along each edge run from the post list order
@@ -1053,6 +1058,7 @@ def build_scene(L) -> Scene:
     if spec.geometry.house_walls and not getattr(spec.geometry, "house_model", None):     # with a measured house model these only classify the deck's edges
         for wseg in spec.geometry.house_walls:
             fixed.append(angled_wall(*wseg, z0=0.0, z1=H_house))
+    fixed += __import__("decktakeoff.lighting", fromlist=["scene_lights"]).scene_lights(fixed, spec)    # extras.lights: a light on every riser + rail-post box (a composite gets them per part)
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
                 zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN, ledger=bool(z.frame.ledger)) for z in L.zones],
                 edge=edge, timber=timber, oiled=spec.framing.finish == "oil",
@@ -1062,6 +1068,8 @@ def build_scene(L) -> Scene:
         meta["sun"] = list(sun_vector(spec.site))
     if getattr(spec.geometry, "site_model", None) and spec.geometry.site_model.get("cameras"):
         meta["cameras"] = spec.geometry.site_model["cameras"]       # measured-site camera stations (inside the lot), plan feet
+    if getattr(spec.geometry, "louvered_roofs", None):              # blades / screens a live viewer can turn and run (louvered.descriptors)
+        meta["louvered_roofs"] = __import__("decktakeoff.louvered", fromlist=["descriptors"]).descriptors(L)
     return Scene(fixed, zt, W, y_min, y_front, materials_for(spec), meta)
 
 
@@ -1185,6 +1193,7 @@ def build_composite_scene(L) -> Scene:
             if b.kind in SITE_KINDS:       # each part's own ground and stand-in house
                 continue
             B.append(_place_box(b, p.placement, p.name))
+    __import__("decktakeoff.louvered", fromlist=["draw"]).draw(add, L)     # the job-level louvered roofs, once, in the global frame
     x0, x1, y0, y1 = L.bbox
     H_house = zt + 9.5
     hm, sm = getattr(g, "house_model", None), getattr(g, "site_model", None)
@@ -1229,6 +1238,8 @@ def build_composite_scene(L) -> Scene:
         meta["sun"] = list(sun_vector(spec.site))
     if sm and sm.get("cameras"):
         meta["cameras"] = sm["cameras"]
+    if __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(spec):    # blades / screens a live viewer can turn and run
+        meta["louvered_roofs"] = __import__("decktakeoff.louvered", fromlist=["descriptors"]).descriptors(L)
     S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
     S.x_min = x0
     return S
@@ -1607,6 +1618,35 @@ def _roof_hex(color: str) -> str:
     return "#3a3c3f"
 
 
+def _outline_chain(poly, a, b, tol, lo_t, hi_t, ux, uy, L_):
+    """Indices of the outline vertices on the polygon chain between points a and b — walking the polygon either way from
+    the side nearest a to the side nearest b, the way whose vertices in between stay within tol of the straight a->b and
+    inside its span — plus the outer vertices of those two end sides. None when neither way does (the caller then keeps
+    every near vertex)."""
+    n = len(poly)
+    def near(P):
+        best = None
+        for i in range(n):
+            (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+            dx, dy = x1 - x0, y1 - y0
+            l2 = dx * dx + dy * dy
+            t = 0.0 if l2 < 1e-12 else max(0.0, min(1.0, ((P[0] - x0) * dx + (P[1] - y0) * dy) / l2))
+            d = math.hypot(x0 + t * dx - P[0], y0 + t * dy - P[1])
+            if best is None or d < best[0] - 1e-9:
+                best = (d, i)
+        return best[1]
+    ia, ib = near(a), near(b)
+    def ok(v):
+        px, py = poly[v]
+        t = ((px - a[0]) * ux + (py - a[1]) * uy) / L_
+        d = abs((px - a[0]) * -uy + (py - a[1]) * ux)
+        return d < tol and lo_t - 0.05 < t < hi_t + 0.05
+    fwd = [(ia + 1 + k) % n for k in range((ib - ia) % n)]          # vertices ia+1 .. ib
+    back = [(ia - k) % n for k in range((ia - ib) % n)]             # vertices ia .. ib+1
+    good = [set(c) | ({ia, (ib + 1) % n} if c is fwd else {(ia + 1) % n, ib}) for c in (fwd, back) if all(ok(v) for v in c)]
+    return min(good, key=len) if good else None
+
+
 def outline_path(spec, a, b, tol=3.0, ends=False):
     """Outline vertices (feet) between points a and b along the straight a->b, within tol ft of it — the curve of a front
     edge. ends=True also returns the vertices at the ends of the run (for interpolation); the default is strictly between.
@@ -1620,8 +1660,13 @@ def outline_path(spec, a, b, tol=3.0, ends=False):
         return []
     ux, uy = (bx - ax) / L_, (by - ay) / L_
     lo, hi = (-0.02, 1.02) if ends else (0.02, 0.98)
+    # only the outline that actually runs between the two ends can bend the run: a notch or jog elsewhere in the polygon
+    # (an inset stair's notch 3' in from a straight front) has vertices within tol of the line but is not on the chain
+    chain = _outline_chain(poly, a, b, tol, lo, hi, ux, uy, L_)
     pts = []
-    for px, py in poly:
+    for vi, (px, py) in enumerate(poly):
+        if chain is not None and vi not in chain and math.hypot(px - ax, py - ay) > 0.1 and math.hypot(px - bx, py - by) > 0.1:
+            continue
         t = ((px - ax) * ux + (py - ay) * uy) / L_
         d = abs((px - ax) * -uy + (py - ay) * ux)
         if lo < t < hi and d < tol and (ends or d > 0.02):

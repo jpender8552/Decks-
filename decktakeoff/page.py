@@ -9,7 +9,7 @@
 render_page(spec, out_dir, mode) writes page.html + files.json (the render files the page references as r/<key>-<still>.jpg)
 and, with pdf=True, page.pdf (a print version: cover locked to one page, sheets expanded, the 3D swapped for a still).
 """
-import html, json, re, shutil
+import html, json, math, re, shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from .spec import DeckSpec
@@ -361,6 +361,7 @@ def _reads_levels(t, L, sm):
 LEVELS_CSS = """<style>
 .reads.levels { grid-template-columns:160px 1fr; }
 @media (max-width: 640px) { .reads.levels { grid-template-columns:1fr; } }
+@media print { #g-reads + .gal img { max-height:2.05in; object-fit:cover; } .reads.levels { gap:3px 12px; } .reads.levels dd { font-size:13px; } }
 </style>"""
 
 
@@ -406,6 +407,183 @@ def _reads_lite(t, L, sm):
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
 
+def _added_facts(t0, t1) -> list:
+    """What an option adds, in the homeowner's words, from the two takeoffs: new stairs, lights, rail, foundations."""
+    from .pricing import stair_specs
+    from .report import lights_of, stair_words
+    rows = []
+    s0 = stair_specs(t0)
+    for ss, st in zip(stair_specs(t1), t1.layout.stairs):
+        if ss not in s0:
+            rows.append((getattr(ss, "name", None) or "Stair", stair_words(ss, st, hasattr(t1.layout, "parts"))))
+    l0, l1 = lights_of(t0), lights_of(t1)
+    if l1["riser"] > l0["riser"]:
+        rows.append(("Riser lights", f"{l1['riser'] - l0['riser']} LED lights, one in every riser"))
+    if l1["post_cap"] > l0["post_cap"]:
+        rows.append(("Post-cap lights", f"{l1['post_cap'] - l0['post_cap']} LED post-cap lights, one on every rail post"))
+    if l1["other"] > l0["other"]:
+        rows.append(("Lights", f"{l1['other'] - l0['other']} more LED lights"))
+    plan = getattr(t1, "lighting", None)
+    if l1["transformer"] and not l0["transformer"] and plan is not None:     # the lighting engine's own words for how it switches
+        from .lighting import _switching
+        rows.append(("Power", _switching(plan)[0].upper() + _switching(plan)[1:] + "; it plugs into an outdoor GFCI outlet with an in-use cover"
+                     " (adding an outlet, if one is needed, is not included)"))
+    elif l1["transformer"] and not l0["transformer"]:
+        tr = l1["transformer"].lower()
+        rows.append(("Power", "low voltage from a transformer" + (" with a photocell and timer" if "photo" in tr and "timer" in tr else
+                                                                  (" with a photocell" if "photo" in tr else (" with a timer" if "timer" in tr else "")))))
+    r0, r1 = t0.layout.rail, t1.layout.rail
+    drl = round(r1.rail_lf - (r0.rail_lf if r0 else 0.0), 1) if r1 else 0.0
+    if drl >= 1:
+        rows.append(("Rail", f"{drl:g} LF more of the same rail"))
+    def piers(t):
+        return int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or t.layout.n_footings
+    dp = piers(t1) - piers(t0)
+    if dp > 0:
+        rows.append(("Foundation", f"{dp} more Diamond Pier foundation{'s' if dp != 1 else ''}"))
+    return rows
+
+
+def _sign(v) -> str:
+    return ("+" if v >= 0 else "−") + money(abs(v))
+
+
+def _render_figs(o: dict, rd: Path, key: str, ok: str, files: dict) -> list:
+    """The figures for an option's (or add-on's) own renders: o["renders"] = [name | (name, caption)] — stills in
+    o["renders_dir"] (default: the page's renders), captions from that folder's captions.json; each file goes in files.json
+    as r/<key>-<option>-<name>.jpg."""
+    rdir = Path(o["renders_dir"]) if o.get("renders_dir") else rd
+    caps = dict(CAP)
+    if (rdir / "captions.json").exists():
+        caps.update(json.load(open(rdir / "captions.json")))
+    figs = []
+    for r_ in o.get("renders") or []:
+        nm, cp = (r_[0], r_[1]) if isinstance(r_, (list, tuple)) else (r_, None)
+        if not (rdir / f"{nm}.jpg").exists():
+            continue
+        fn = f"r/{key}-{ok}-{nm}.jpg"
+        files[fn] = str(rdir / f"{nm}.jpg")
+        cp = cp or caps.get(nm, nm)
+        figs.append(f'<figure><img src="{fn}" alt="{E(cp)}" loading="lazy"><figcaption>{E(cp)}</figcaption></figure>')
+    return figs
+
+
+def _price_trio(c, f, m, show_fin: bool) -> str:
+    """An option's price three ways, as additions to the deck price."""
+    if not show_fin:
+        return f'<div class="opt-prices one"><div class="lead"><span class="pl">Check or ACH</span><span class="pv">{_sign(c)}</span></div></div>'
+    return ('<div class="opt-prices">'
+            f'<div class="lead"><span class="pl">Check or ACH</span><span class="pv">{_sign(c)}</span></div>'
+            f'<div><span class="pl">Financed</span><span class="pv">{_sign(f)}</span></div>'
+            f'<div><span class="pl">Monthly</span><span class="pv">{_sign(m)}</span></div></div>')
+
+
+def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
+    """Options given as dicts: one block each — its price three ways, what it adds, its own renders, an add-on when it
+    combines with another option — and the rows for the investment summary. See render_page for the keys."""
+    from . import run
+    from .pricing import option_delta, fixed_terms, price_louvered, _monthly
+    from .report import lights_of
+    show_fin = spec.extras.show_financing
+    out, rows = [], []
+    tc = tf = 0.0
+    for i, o in enumerate(blocks, 1):
+        ok = re.sub(r"[^a-z0-9]+", "-", str(o.get("key") or f"opt{i}").lower()).strip("-")
+        title, num = o.get("title") or f"Option {i}", o.get("number") or f"Option {i}"
+        t2 = None
+        if o.get("spec") is not None:            # the deck with this option: an engine delta (on a per-SF deck: cost math at the job margin)
+            t2, _, p2 = run(o["spec"])
+            c, f, m = option_delta(p, p2)
+        elif o.get("roof") is not None:          # a louvered roof: its own price per SF x its area (or a set price), outside the deck's margin
+            from .louvered import roofs_of, resolve, surfaces_of, scope_words
+            rs = o.get("roof_spec") or spec      # the spec that carries the roof (the deck's, or a copy with the roof on it)
+            roof = roofs_of(rs)[o["roof"]] if isinstance(o["roof"], int) else o["roof"]
+            ap = price_louvered(rs, roof)
+            c, f, m = ap.sell, ap.retail, ap.monthly
+            if o.get("facts") is None:
+                o = dict(o, facts=scope_words(resolve(roof, surfaces_of(t.layout if rs is spec else run(rs)[0].layout))))
+        elif o.get("price") is not None:         # a price the owner set outright
+            c, f, m = fixed_terms(spec, o["price"])
+        else:
+            raise ValueError(f"option {title!r}: give spec, roof or price")
+        facts = o.get("facts")
+        if facts is None:
+            facts = _added_facts(t, t2) if t2 is not None else []
+        adds = []
+        for ai, a in enumerate(o.get("addons") or [], 1):
+            note = a.get("note", "")
+            if a.get("spec") is not None:       # rides with another option (the lights on the yard stair): the extra over both alone
+                ta, _, pa = run(a["spec"])
+                tb, _, pb = run(a["against"])
+                ca, fa, ma = option_delta(pb, pa)
+                ca, fa, ma = ca - c, fa - f, ma - m
+                if not note and t2 is not None:
+                    la, lb, lo, l0 = lights_of(ta), lights_of(tb), lights_of(t2), lights_of(t)
+                    xr, xp = (la["riser"] - lb["riser"]) - (lo["riser"] - l0["riser"]), (la["post_cap"] - lb["post_cap"]) - (lo["post_cap"] - l0["post_cap"])
+                    note = " and ".join(x for x in ((f"{xr} more riser light{'s' if xr != 1 else ''}" if xr > 0 else ""),
+                                                     (f"{xp} more post-cap light{'s' if xp != 1 else ''}" if xp > 0 else "")) if x)
+            elif a.get("price") is not None:     # a set price
+                ca, fa, ma = fixed_terms(spec, a["price"])
+            elif a.get("screens") and o.get("roof") is not None:     # the roof's screens: the louvered engine's price for them
+                from .louvered import roof_pricing
+                rs = o.get("roof_spec") or spec
+                rows_ = roof_pricing(rs, t.layout if rs is spec else run(rs)[0].layout)["roofs"]
+                rr = rows_[o["roof"] if isinstance(o["roof"], int) else 0]
+                if not rr.get("screens_sell"):
+                    raise ValueError("screens add-on: the roof has no screens (louvered_roofs[i].screens)")
+                ca, fa, ma = fixed_terms(spec, rr["screens_sell"])
+                note = note or "; ".join(x["words"] for x in rr.get("screens") or [])
+            else:
+                raise ValueError(f"add-on {a.get('label')!r}: give spec + against, price, or screens (on a roof option)")
+            adds.append((a.get("label") or "Add-on", ca, fa, ma, note, _render_figs(a, rd, key, f"{ok}-a{ai}", files)))
+        imgs = _render_figs(o, rd, key, ok, files)
+        h = [f'<section class="optblock" id="g-opt-{ok}" aria-labelledby="oh-{ok}"><div class="opt-head"><div class="opt-title">'
+             f'<span class="eyebrow">{E(num)}</span><h3 id="oh-{ok}">{E(title)}</h3></div>{_price_trio(c, f, m, show_fin)}</div><div class="opt-body">']
+        if o.get("blurb"):
+            h.append(f'<p class="opt-blurb">{E(o["blurb"])}</p>')
+        if facts and all(isinstance(x, str) for x in facts):     # scope lines (the roof's)
+            h.append('<ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in facts) + "</ul>")
+        elif facts:
+            h.append('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in facts) + "</dl>")
+        if imgs:
+            h.append('<div class="gal">' + "".join(imgs) + "</div>")
+        for lab, ca, fa, ma, note, figs in adds:
+            h.append(f'<div class="opt-addon"><div class="oa-line"><b>{E(lab)}</b><span>{_sign(ca)} check or ACH' + (f" · {_sign(fa)} financed · {_sign(ma)}/mo" if show_fin else "") + "</span></div>"
+                     + (f'<span class="fine">{E(note)}</span>' if note else "") + ('<div class="gal">' + "".join(figs) + "</div>" if figs else "") + "</div>")
+        if o.get("note") or o.get("url"):
+            h.append('<p class="opt-note">' + E(o.get("note", "")) + (f' <a href="{E(o["url"])}">{E(o.get("url_text") or o["url"])}</a>' if o.get("url") else "") + "</p>")
+        h.append("</div></section>")
+        out.append("".join(h))
+        rows.append((f"{num} — {title}", c, f, m, False))
+        rows += [(lab, ca, fa, ma, True) for lab, ca, fa, ma, _, _ in adds]
+        tc += c + sum(a[1] for a in adds)
+        tf += f + sum(a[2] for a in adds)
+    head = ('<h2 class="kicker pb" id="g-options">Options <span class="tag">each priced on its own, added to the deck price · '
+            + ("its own renders" if any("<figure>" in x for x in out) else "the whole installed difference") + "</span></h2>")
+    return dict(html=head + "".join(out), rows=rows, total=(p.sell + tc, p.retail + tf, _monthly(p.retail + tf)), show_fin=show_fin)
+
+
+def _options_summary(ob) -> str:
+    """The options in the investment section: each one's price three ways (the add-ons under the option they ride with), then
+    the deck with every option."""
+    show_fin = ob["show_fin"]
+    body = [[(f'<span class="sub">{E(lab)}</span>' if sub else E(lab)), _sign(c)] + ([_sign(f), _sign(m) + "/mo"] if show_fin else [])
+            for lab, c, f, m, sub in ob["rows"]]
+    tc, tf, tm = ob["total"]
+    body.append(["<b>The deck with every option</b>", f"<b>{money(tc)}</b>"] + ([f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>"] if show_fin else []))
+    return ("<p>Each line is the whole difference, installed, added to the deck price above.</p>"
+            + table(["Option", "Check or ACH"] + (["Financed", "Monthly"] if show_fin else []), body, "optsum", ["l", "r"] + (["r", "r"] if show_fin else [])))
+
+
+def _viewer_link(url: str, note: Optional[str] = None) -> str:
+    """The customer documents link to the interactive 3D page instead of embedding the viewer (a PDF keeps the link)."""
+    if not url:
+        return ""
+    return ('<h2 class="kicker" id="g-3d">Interactive 3D <span class="tag">opens in a web browser</span></h2>'
+            f'<div class="v3d-link"><p>{E(note or "The deck and its options in 3D, in a web browser.")}</p>'
+            f'<a class="v3d-btn" href="{E(url)}">Open the interactive 3D model</a><span class="v3d-url">{E(url)}</span></div>')
+
+
 def _options_table(p, options):
     """Full installed deltas against this proposal: [(label, other pricing)]."""
     if not options:
@@ -420,14 +598,27 @@ def _options_table(p, options):
 
 def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str = "job", name: Optional[str] = None, sub: str = "",
                 lede: str = "", hero: str = "corner", render: bool = True, renders_dir: Optional[str] = None, pdf: bool = False,
-                date_line: Optional[str] = None, options: Optional[list] = None, alt_tag: Optional[str] = None, roof: int = 0) -> dict:
+                date_line: Optional[str] = None, options: Optional[list] = None, alt_tag: Optional[str] = None, roof: int = 0,
+                viewer_url: Optional[str] = None, viewer_note: Optional[str] = None, addon: Optional[dict] = None) -> dict:
     """Build the page. mode = "internal" | "customer" | "proposal" (the customer page without the sheets, schedules and
     step-by-step: cover, at a glance, what it is, renders, isometrics, exploded views, under the deck, investment with
-    options, 3D) | "addon" (the louvered roof's own proposal, geometry.louvered_roofs[roof]: see render_addon).
-    options = [(label, DeckSpec)] priced as full installed deltas; the option's renders are the alt-*.jpg stills in renders_dir,
-    shown under "The option, rendered" with alt_tag as its tag. Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
+    options, 3D) | "addon" (the louvered roof's own proposal, roofs_of(spec)[roof]: see render_addon; addon = its options).
+
+    options, either form (they can be mixed):
+      (label, DeckSpec) — a line in the investment's options table, the whole installed difference; its renders are the
+          alt-*.jpg stills in renders_dir, under "The option, rendered" with alt_tag as the tag (the Prentice rail option).
+      dict — an option block of its own, before the investment: title, number ("Option 1"), key, blurb, and its price from
+          spec (the deck with the option: an engine delta — on a deck sold per SF, the engine's cost math at the job margin),
+          roof (a louvered roof: index into louvered.roofs_of(roof_spec or spec), or the roof dict: its own price per SF) or
+          price (set outright); facts ([(label, text)] or [line]; None -> worked out from what the option adds); renders
+          [name | (name, caption)] from renders_dir (or the option's own renders_dir); addons [dict(label, spec + against |
+          price, note, renders, renders_dir)] — e.g. the lights on the yard stair when both are taken, the roof's screens;
+          note / url (e.g. the roof's own document). The investment then lists every option and the deck with all of them.
+    viewer_url: the customer page links to the interactive 3D page instead of embedding the viewer ("" drops the 3D
+    altogether); viewer_note is the line above the button. Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
     if mode == "addon":
-        return render_addon(spec, out_dir, key=key, name=name, lede=lede, hero=hero, renders_dir=renders_dir, pdf=pdf, date_line=date_line, roof=roof)
+        return render_addon(spec, out_dir, key=key, name=name, lede=lede, hero=hero, renders_dir=renders_dir, pdf=pdf, date_line=date_line, roof=roof,
+                            viewer_url=viewer_url, viewer_note=viewer_note, addon=addon)
     from . import run
     from .buildset import build_set
     from .viewer import viewer_html
@@ -496,7 +687,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
         w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     elif proposal:
-        opts = [(lab, run(sp_)[2]) for lab, sp_ in (options or [])]
+        opts = [(lab, run(sp_)[2]) for lab, sp_ in (o_ for o_ in (options or []) if not isinstance(o_, dict))]
+        blocks = [o_ for o_ in (options or []) if isinstance(o_, dict)]
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
         w(_reads_lite(t, L, sm))
@@ -518,15 +710,22 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
         w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
         w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
+        ob = _option_blocks(spec, t, p, blocks, key, rd, files) if blocks else None
+        if ob:
+            w(ob["html"])
+        opt_html = _options_table(p, opts) + (_options_summary(ob) if ob else "")
         if spec.extras.price_breakdown:
             nxt = re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):])
-            w(PL.wheel(spec, p, _options_table(p, opts), md_to_html(nxt)).replace('<section class="invest"', '<section class="invest" id="g-investment"', 1))
+            w(PL.wheel(spec, p, opt_html, md_to_html(nxt)).replace('<section class="invest"', '<section class="invest" id="g-investment"', 1))
         else:
             w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
             q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
-            w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + _options_table(p, opts) + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
-        w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
-        w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
+            w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + opt_html + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
+        if viewer_url is not None:           # the interactive 3D page instead of the embedded viewer (PDF-first documents)
+            w(_viewer_link(viewer_url, viewer_note))
+        else:
+            w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
+            w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     elif customer:
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
@@ -561,8 +760,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         q2 = qmd[:qmd.index("## INCLUDED")] + qmd[qmd.index("## PLAN"):]
         q2 = re.sub(r"## SCHEDULE\n.*?(?=## )", "", q2, flags=re.S)
         w('<div class="quote">' + md_to_html(q2) + "</div>")
-        w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
-        w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
+        if viewer_url is not None:
+            w(_viewer_link(viewer_url, viewer_note))
+        else:
+            w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
+            w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     else:
         w('<h2 class="kicker" id="g-reads">Design reads</h2>')
         w(_reads(t, L, sm, n_piers, False))
@@ -657,7 +859,9 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
-            + (PL.FONT + PL.CSS if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "") + "</head>" + ('<body class="proposal">' if customer else "<body>")
+            + (PL.FONT + PL.CSS if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
+            + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
+            + "</head>" + ('<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
     page = page.replace(CDN, "", 1)
@@ -679,6 +883,237 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     if pdf:
         result["pdf"] = render_pdf(page, files, str(out / "page.pdf"), key, hero="isolow" if "isolow" in have else hero)
     return result
+
+
+# ================================================================== the louvered roof's own document ("make it a whole other document")
+def _plan_boxes(L) -> list:
+    """The deck's zone rectangles in the job frame (feet): [(level, zone, x0, x1, y0, y1, surface z ft)]."""
+    if hasattr(L, "parts"):
+        out = []
+        for p in L.parts:
+            for z in p.layout.zones:
+                x0, x1, y0, y1 = p.placement.box(z.x0 / 12, (z.x0 + z.W) / 12, z.wall_y / 12, (z.wall_y + z.D) / 12)
+                out.append((p.name, z.name, x0, x1, y0, y1, p.spec.geometry.height_in / 12))
+        return out
+    return [("Deck", z.name, z.x0 / 12, (z.x0 + z.W) / 12, z.wall_y / 12, (z.wall_y + z.D) / 12, L.spec.geometry.height_in / 12) for z in L.zones]
+
+
+def _roof_plan_svg(L, q) -> str:
+    """Plan (house at the top, the yard below): every deck zone shaded by its level, the house walls, the roof's frame
+    hatched with its posts, the size and the level heights. Feet are the drawing units."""
+    boxes = _plan_boxes(L)
+    xs = [b[2] for b in boxes] + [b[3] for b in boxes] + [q["x0"], q["x1"]]
+    ys = [b[4] for b in boxes] + [b[5] for b in boxes] + [q["y0"], q["y1"]]
+    x0, x1, y0, y1 = min(xs) - 1.5, max(xs) + 1.5, min(ys) - 3.2, max(ys) + 4.2
+    zs = sorted({round(b[6], 3) for b in boxes})
+    fill = {z: c for z, c in zip(zs, ["#e7dfd0", "#cbbb9f", "#b5a284", "#a08d70"])}
+    f = 'font-family="Nunito Sans, Segoe UI, sans-serif"'
+    s = [f'<svg viewBox="{x0:.2f} {y0:.2f} {x1 - x0:.2f} {y1 - y0:.2f}" role="img" aria-label="Plan of the deck with the louvered roof">',
+         '<defs><pattern id="lvh" width="0.9" height="0.9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+         '<rect width="0.9" height="0.9" fill="rgba(20,20,22,.22)"/><line x1="0" y1="0" x2="0" y2="0.9" stroke="#141416" stroke-width="0.16"/></pattern></defs>']
+    for lv, zn, a, b, c, d, z in boxes:
+        s.append(f'<rect x="{a:.3f}" y="{c:.3f}" width="{b - a:.3f}" height="{d - c:.3f}" fill="{fill[round(z, 3)]}" stroke="#8a8172" stroke-width="0.08"/>')
+        s.append(f'<line x1="{a:.3f}" y1="{c:.3f}" x2="{b:.3f}" y2="{c:.3f}" stroke="#3a352d" stroke-width="0.45"/>')
+    s.append(f'<rect x="{q["x0"]:.3f}" y="{q["y0"]:.3f}" width="{q["W"]:.3f}" height="{q["D"]:.3f}" fill="url(#lvh)" stroke="#141416" stroke-width="0.24"/>')
+    for pt in q["posts"]:
+        h = q["post"] / 2
+        s.append(f'<rect x="{pt["x"] - h:.3f}" y="{pt["y"] - h:.3f}" width="{2 * h:.3f}" height="{2 * h:.3f}" fill="#141416"/>')
+    cx, cy = (q["x0"] + q["x1"]) / 2, (q["y0"] + q["y1"]) / 2
+    s.append(f'<rect x="{cx - 6.6:.2f}" y="{cy - 1.55:.2f}" width="13.2" height="3.1" rx="0.3" fill="#fbf9f4" opacity="0.92"/>')
+    s.append(f'<text x="{cx:.2f}" y="{cy - 0.2:.2f}" text-anchor="middle" font-size="1.15" font-weight="800" fill="#141416" {f}>{E(q["name"])}</text>')
+    s.append(f'<text x="{cx:.2f}" y="{cy + 1.05:.2f}" text-anchor="middle" font-size="0.95" fill="#3a352d" {f}>{E(ftin(q["W"] * 12))} x {E(ftin(q["D"] * 12))} · {q["area"]:g} SF</text>')
+    by_level = {}
+    for lv, zn, a, b, c, d, z in boxes:
+        e = by_level.setdefault(lv, [a, b, d, z])
+        e[0], e[1], e[2] = min(e[0], a), max(e[1], b), max(e[2], d)
+    for lv, (a, b, d, z) in by_level.items():
+        s.append(f'<text x="{(a + b) / 2:.2f}" y="{d + 1.6:.2f}" text-anchor="middle" font-size="1.0" font-weight="700" fill="#534d45" {f}>{E(lv)} · {E(ftin(z * 12))} above grade</text>')
+    s.append(f'<text x="{(x0 + x1) / 2:.2f}" y="{y0 + 1.6:.2f}" text-anchor="middle" font-size="0.95" letter-spacing="0.3" fill="#8a8172" {f}>HOUSE</text>')
+    s.append(f'<text x="{(x0 + x1) / 2:.2f}" y="{y1 - 0.6:.2f}" text-anchor="middle" font-size="0.95" letter-spacing="0.3" fill="#8a8172" {f}>YARD</text>')
+    s.append("</svg>")
+    return "".join(s)
+
+
+def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional[str] = None, lede: str = "", hero: str = "corner",
+                 renders_dir: Optional[str] = None, pdf: bool = False, date_line: Optional[str] = None, roof: int = 0,
+                 viewer_url: Optional[str] = None, viewer_note: Optional[str] = None, addon: Optional[dict] = None) -> dict:
+    """The louvered roof's own proposal, in the deck proposal's look: cover (hero render of the deck with the roof, the
+    roof's numbers, its price three ways), what it is, size and placement (a plan), structure, controls / gutters / lights,
+    the screens add-on (its own price line and renders), the roof rendered (open and closed), warranty, investment, schedule,
+    terms, the link to the interactive 3D page. The roof is louvered.roofs_of(spec)[roof]; its price is its own (price, or
+    price_per_sf x its area), financed and monthly the way the deck's price gets them; nothing here touches the deck's price.
+    addon (all optional): renders [name | (name, caption)] (default: every roof-*.jpg in renders_dir), screens dict(price,
+    renders, words, label) (price overrides the engine's estimate), facts {section: [lines]} over PL.LOUVER_FACTS, schedule
+    [lines], exclusions [lines], deck_note (a line on the deck the roof goes on). Returns {"html", "files", "pdf"?, "pricing"}."""
+    from . import run
+    from .louvered import roofs_of, resolve, surfaces_of, roof_pricing, scope_words, ANGLE_RANGE
+    from .pricing import fixed_terms, price_louvered
+    from datetime import date
+    a = dict(addon or {})
+    out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
+    t, flags, _p_deck = run(spec)
+    L = t.layout
+    roofs = roofs_of(spec)
+    if not roofs:
+        raise ValueError("render_addon: the spec carries no louvered roof (geometry.louvered_roofs)")
+    r = roofs[roof]
+    q = resolve(r, surfaces_of(L))
+    rp = roof_pricing(spec, L)["roofs"][roof]
+    ap = price_louvered(spec, r)                     # the same rule the deck proposal's option block uses
+    c, f, m = ap.sell, ap.retail, ap.monthly
+    show_fin = spec.extras.show_financing
+    facts = {k: list(v) for k, v in PL.LOUVER_FACTS.items()}
+    facts.update(a.get("facts") or {})
+    rd = Path(renders_dir) if renders_dir else out / "renders"
+    have = {x.stem for x in rd.glob("*.jpg")} if rd.exists() else set()
+    files = {f"r/{key}-{n_}.jpg": str(rd / f"{n_}.jpg") for n_ in have}
+    CAP.clear(); CAP.update(CAP0)
+    if (rd / "captions.json").exists():
+        CAP.update(json.load(open(rd / "captions.json")))
+    today = date_line or date.today().strftime("%B %d, %Y")
+    addr = ", ".join(x for x in (spec.site.address, spec.site.city, f"{spec.site.state} {spec.site.zip}".strip()) if x)
+    name = name or f"{q['name']} · {spec.site.address}".strip(" ·")
+    # ---- the screens add-on: the engine's estimate (internal sets say so) unless the job sets the price
+    sa = dict(a.get("screens") or {})
+    scr = rp.get("screens") or []
+    if sa.get("price") is not None:
+        sc_c, sc_f, sc_m = fixed_terms(spec, sa["price"])
+        sc_est = False
+    elif scr:
+        sc_c, sc_f, sc_m = fixed_terms(spec, rp["screens_sell"])
+        sc_est = bool(rp.get("screens_estimate"))
+    else:
+        sc_c = sc_f = sc_m = 0
+        sc_est = False
+    has_screens = bool(sc_c)
+    # ---- cover
+    title, eyebrow = PL._title_parts(name, spec.site.address)
+    eyebrow = " · ".join(x for x in (eyebrow, ", ".join(x for x in (spec.site.city, spec.site.state) if x)) if x)
+    rail_posts = sum(1 for pt in q["posts"] if pt["on_rail"])
+    tele = [(f"{q['area']:g}", "square feet"), (ftin(q["W"] * 12), "along the house"), (ftin(q["D"] * 12), "out from the house"),
+            (ftin(q["clear_ft"] * 12), "clear under the beams"), (str(len(q["blades"])), "louver blades"), (str(len(q["posts"])), "posts on the deck")]
+    prices = ([("Check or ACH", money(c), f"{(1 - c / f) * 100:.0f}% below the financed price"), ("Financed", money(f), "no money down"),
+               ("Monthly", money(m), "6.99% · 10 years")] if show_fin else [("Price · check or ACH", money(c), "")])
+    chips = [(q["hex"], "Roof", f"{q['brand']} {q['product']} · {str(q['color']).capitalize()}")]
+    if has_screens and scr:
+        sc0 = scr[0]
+        chips.append(({"black": "#141416", "white": "#ecebe6"}.get(str(sc0.get("color", "")).lower(), "#3a3a3c"), "Screens (add-on)",
+                      ("Clear vinyl" if sc0.get("fabric") == "vinyl" else f"{str(sc0.get('color', '')).capitalize()} mesh")))
+    from .catalog import BOARDS_PALETTE
+    pal = BOARDS_PALETTE.get((spec.decking.collection, spec.decking.color))
+    chips.append((pal[len(pal) // 2] if pal else "#73624a", "On the deck", f"{spec.decking.brand} {spec.decking.collection} · {spec.decking.color}"))
+    hero_html = f'<img class="hero-img" src="r/{key}-{hero}.jpg" alt="Rendering of the deck with the louvered roof">' if hero in have else ""
+    who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
+    head = PL.addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission=f"{q['brand']} {q['product']} · Proposal")
+    o = []; w = o.append
+    w(f'<section class="job" id="job-{key}">')
+    # ---- what it is
+    w('<h2 class="kicker" id="g-what">What it is <span class="tag">' + E(f"{q['brand']} {q['product']}") + "</span></h2>")
+    if facts.get("what"):
+        w("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in facts["what"]) + "</ul>")
+    w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in scope_words(q)) + "</ul>")
+    # ---- size and placement
+    under = sorted({f"{b[0]} {b[1]}" for b in _plan_boxes(L) if min(q["x1"], b[3]) - max(q["x0"], b[2]) > 0.5 and min(q["y1"], b[5]) - max(q["y0"], b[4]) > 0.5})
+    zl = {f"{b[0]} {b[1]}": b for b in _plan_boxes(L)}
+    w('<h2 class="kicker pb" id="g-size">Size and placement <span class="tag">plan · house at the top</span></h2>')
+    w(f'<figure class="plan-fig">{_roof_plan_svg(L, q)}<figcaption>The roof (hatched) and its posts over the deck; the darker the deck, the higher the level.</figcaption></figure>')
+    reads = [("Size", f"{ftin(q['W'] * 12)} along the house x {ftin(q['D'] * 12)} out from it, {q['area']:g} SF"),
+             ("Over", (", ".join(under) if under else "the deck") + (f" — {ftin(q['z_deck'] * 12)} above grade" if q["z_deck"] else "")),
+             ("House side", "attached at the house's soffit / roof line on wall brackets — no posts at the house" if q["attach"] == "house" else "freestanding, posts at every corner"),
+             ("Height", f"top of the frame {ftin((q['z_top'] - q['z_deck']) * 12)} above the deck; {ftin(q['clear_ft'] * 12)} clear under the beams")]
+    if a.get("deck_note"):
+        reads.append(("The deck", a["deck_note"]))
+    w('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>")
+    # ---- structure
+    w('<h2 class="kicker" id="g-structure">Structure <span class="tag">how it stands</span></h2>')
+    st = [("Posts", f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
+           + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} there — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else "")),
+          ("Frame", f"{q['beam_label']} aluminum perimeter beams with the gutter built in" + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else "")),
+          ("House side", "the house-side beam hangs on wall brackets at the soffit / roof line" if q["attach"] == "house" else "posts at every corner")]
+    over = _posts_over_columns(L, q)
+    if over is not None:
+        st.append(("Under the posts", over))
+    st += [(k, v) for k, v in (facts.get("structure_rows") or [])]
+    w('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in st) + "</dl>")
+    # ---- controls, motor, gutters, lights
+    groups = [("Controls and motor", facts.get("controls")), ("Gutters and drainage", facts.get("gutters")), ("Lights", facts.get("lights") if q["lights"] else None),
+              ("Sensors and accessories", facts.get("accessories"))]
+    groups = [(h_, v_) for h_, v_ in groups if v_]
+    if groups:
+        w('<h2 class="kicker" id="g-controls">Controls, motor, gutters, lights</h2><div class="facts-cols">'
+          + "".join(f"<div><h3>{E(h_)}</h3><ul>" + "".join(f"<li>{E(x)}</li>" for x in v_) + "</ul></div>" for h_, v_ in groups) + "</div>")
+    # ---- the screens add-on
+    if has_screens:
+        figs = _render_figs(dict(renders=sa.get("renders") or sorted(n_ for n_ in have if n_.startswith("screens-")), renders_dir=sa.get("renders_dir") or str(rd)),
+                            rd, key, "screens", files)
+        words = sa.get("words") or ([x["words"] for x in scr] if scr else [])
+        w('<section class="optblock" id="g-screens" aria-labelledby="oh-screens"><div class="opt-head"><div class="opt-title">'
+          f'<span class="eyebrow">Add-on</span><h3 id="oh-screens">{E(sa.get("label") or "Motorized screens")}</h3></div>{_price_trio(sc_c, sc_f, sc_m, show_fin)}</div><div class="opt-body">'
+          + (f'<p class="opt-blurb">{E(sa["blurb"])}</p>' if sa.get("blurb") else "")
+          + ("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in list(words) + list(facts.get("screens") or [])) + "</ul>" if (words or facts.get("screens")) else "")
+          + ('<div class="gal">' + "".join(figs) + "</div>" if figs else "") + "</div></section>")
+    # ---- the roof rendered
+    rn = a.get("renders") or sorted(n_ for n_ in have if n_.startswith("roof-"))
+    figs = _render_figs(dict(renders=rn, renders_dir=str(rd)), rd, key, "roof", files)
+    if figs:
+        w('<h2 class="kicker pb" id="g-renders">The roof, rendered <span class="tag">louvers open and closed through the day · design intent</span></h2>')
+        w('<div class="gal">' + "".join(figs) + "</div>")
+    # ---- warranty
+    if facts.get("warranty"):
+        w('<h2 class="kicker" id="g-warranty">Warranty</h2><ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in facts["warranty"]) + "</ul>")
+    # ---- investment, schedule, terms
+    rows = [(f"{q['brand']} {q['product']} — {ftin(q['W'] * 12)} x {ftin(q['D'] * 12)}", c, f, m, "item")]
+    if has_screens:
+        rows.append((sa.get("label") or "Motorized screens", sc_c, sc_f, sc_m, "addon"))
+        tf = f + sc_f
+        from .pricing import _monthly
+        rows.append(("The roof with the screens", c + sc_c, tf, _monthly(tf), "total"))
+    terms = ["This is a fixed-price proposal on the selections above. Check or ACH, or financed with approved credit. Numbers hold 30 days.",
+             "The roof is priced on its own; the deck's price does not include it."] + list(a.get("terms") or [])
+    w(PL.addon_invest(rows, (c, f, m), "".join(f"<p>{E(x)}</p>" for x in terms), title="The roof's price", show_fin=show_fin))
+    sched = a.get("schedule") or facts.get("schedule") or []
+    if sched:
+        w('<h2 class="kicker" id="g-schedule">Schedule</h2><ol class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in sched) + "</ol>")
+    excl = list(a.get("exclusions") or []) + list(facts.get("exclusions") or [])
+    if excl:
+        w('<h2 class="kicker" id="g-terms">Not included</h2><ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in excl) + "</ul>")
+    if viewer_url is not None:
+        w(_viewer_link(viewer_url, viewer_note))
+    w("</section>")
+    body = head + '<main class="wrap">' + "".join(o) + ('<footer><span>GS Exterior Experts · Deck Division</span><span>Renders are design intent. '
+                                                       f'{E(q["brand"])} product details per the manufacturer. Numbers hold 30 days.</span></footer></main>')
+    title_ = f"{name} — Proposal"
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title_)}</title>{FONT}{CSS}"
+            + PL.FONT + PL.CSS + LEVELS_CSS + PL.OPTIONS_CSS + "</head><body class=\"proposal\">" + body + "</body></html>\n")
+    txt = re.sub(r"<(script|style)\b.*?</\1>", "", page, flags=re.S)
+    for bad in ("internal", "INTERNAL", "rate card", "cost stack", "GM", "ESTIMATE", "estimate"):
+        assert bad not in txt, f"roof document carries internal wording: {bad}"
+    (out / "page.html").write_text(page)
+    json.dump(files, open(out / "files.json", "w"), indent=1)
+    pr = dict(roof=dict(sell=c, financed=f, monthly=m, area_sf=q["area"], basis=ap.basis),
+              screens=dict(sell=sc_c, financed=sc_f, monthly=sc_m, estimate=sc_est) if has_screens else None)
+    result = dict(html=str(out / "page.html"), files=files, pricing=pr, roof=q)
+    if pdf:
+        result["pdf"] = render_pdf(page, files, str(out / "page.pdf"), key, hero=hero)
+    return result
+
+
+def _posts_over_columns(L, q) -> Optional[str]:
+    """Whether each roof post stands over a deck column (a beam-line post or an edge post within 1') — said only when true."""
+    cols = []
+    parts = L.parts if hasattr(L, "parts") else None
+    for p in (parts or [None]):
+        Lp = p.layout if p is not None else L
+        tr = (lambda x, y: p.placement.pt(x, y)) if p is not None else (lambda x, y: (x, y))
+        for bl in Lp.beam_lines:
+            cols += [tr(px / 12, bl.y / 12) for px in bl.posts_x]
+        for ep in getattr(Lp, "edge_posts", None) or []:
+            cols.append(tr(getattr(ep, "x", 0) / 12, getattr(ep, "y", 0) / 12))
+    if not q["posts"] or not cols:
+        return None
+    if all(any(math.hypot(pt["x"] - cx, pt["y"] - cy) <= 1.0 for cx, cy in cols) for pt in q["posts"]):
+        return "each post stands over a deck column, so its load goes straight down to a footing"
+    return None
 
 
 def render_pdf(page: str, files: Dict[str, str], pdf_path: str, key: str, hero: str = "isolow") -> str:

@@ -1,11 +1,20 @@
-"""The house behind the deck, built from a measured model (geometry.house_model): walls with lap siding and real openings,
-windows with sashes, lites and plantation shutters, doors with a security storm door, gable / shed roofs as meshes with
-fascia, gutters and downspouts, bays and cantilevered floors, lanterns, window wells. Everything is Box geometry, so the
-WebGL viewer and the photoreal renderer draw the same house.
+"""The house behind the deck, built from a measured model (geometry.house_model): walls with lap siding, vertical-groove
+siding (T1-11 / channel boards, real grooves) or brick veneer, painted fields and trim bands, real openings (windows with
+sashes, lites, plantation shutters or blinds; sliding patio doors with their panels, tracks and screens; doors with a security
+storm door; brick rowlock sills), gable / shed / hip / free-form roofs as meshes with fascia, box soffits, gutters and
+downspouts, chimneys, bays and cantilevered floors, lanterns, window wells. Everything is Box geometry, so the WebGL viewer
+and the photoreal renderer draw the same house.
 
 Frame: the deck's plan frame in feet (x along the rear wall from the deck's left end as seen from the yard, y out into the
 yard, z above the reference grade). A wall runs from a to b; its outside faces the left-hand normal (-dy, dx), which is the
-yard side when walls are listed left to right as seen from the yard."""
+yard side when walls are listed left to right as seen from the yard.
+
+Wall keys beyond a/b/z0/z1: cladding "lap" (default; exposure_in courses) | "vertical" (groove_in spacing, groove_off first
+groove from a, relief_in) | "brick" | "plain"; mat (the cladding material); panels [{u0,u1,z0,z1,mat}] (painted fields);
+bands [{z0,z1[,u0,u1][,mat][,d]}] (trim boards); corners ["a","b"] + corner_mat; top [[u,z],...] (a sloped / gable top
+edge above z1); foundation (bool); thick. Opening keys beyond u0/u1/z0/z1: type window | slider | door | arch | void;
+casing (bool), casing_mat, casing_in, frame_mat, sill "trim" | "rowlock" | "none", head "soldier", blinds, shutters,
+panels / ops / screen (sliders)."""
 from __future__ import annotations
 
 import math
@@ -15,11 +24,21 @@ IN = 1 / 12.0
 
 DEFAULT_COLORS = dict(siding="#c9c3a4", trim="#f3f1ea", fascia="#2e463b", roof="#6b655e", door="#ece9df", storm="#141414",
                       foundation="#a9a59c", interior="#3b3632", shutter="#f1efe8", glass="#b4c4cf", gutter="#2e463b", metal="#8f959b")
+# colours only the newer features use (painted fields, brick, vinyl frames, screens, blinds, chimney caps)
+EXTRA_COLORS = dict(accent="#5c3833", brick="#b08a5c", mortar="#a59d8f", frame="#e6e2d6", screen="#26282a", blind="#ece6d6",
+                    cap="#8a8680")
+
+
+def _shade(hexc: str, k: float) -> str:
+    h = hexc.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    f = lambda v: max(0, min(255, int(round(v * (1 + k)))))
+    return "#%02x%02x%02x" % (f(r), f(g), f(b))
 
 
 def materials(model: dict) -> Dict[str, dict]:
-    c = dict(DEFAULT_COLORS, **(model.get("colors") or {}))
-    return dict(
+    c = dict(DEFAULT_COLORS, **EXTRA_COLORS, **(model.get("colors") or {}))
+    out = dict(
         siding=dict(color=c["siding"], rough=0.82, label="lap siding"),
         sidinglap=dict(color=c["siding"], rough=0.82),
         htrim=dict(color=c["trim"], rough=0.6, label="trim"),
@@ -32,8 +51,24 @@ def materials(model: dict) -> Dict[str, dict]:
         shutter=dict(color=c["shutter"], rough=0.6, label="plantation shutters"),
         hglass=dict(color=c["glass"], metal=0.0, rough=0.05, glass=True, label="glass"),
         hmetal=dict(color=c["metal"], metal=0.85, rough=0.35),
-        hsoffit=dict(color=c["trim"], rough=0.7),
+        hsoffit=dict(color=c.get("soffit") or c["trim"], rough=0.7),
     )
+    tex = model.get("siding_texture")            # "rsawn": rough-sawn plywood / cedar grain on the siding (photoreal + viewer)
+    if tex or model.get("siding_label"):
+        out["siding"] = dict(out["siding"], label=model.get("siding_label") or out["siding"]["label"], **({"pattern": tex} if tex else {}))
+    course = float(model.get("brick_course_in", 8.0 / 3.0))
+    out.update(
+        siding2=dict(color=c["accent"], rough=0.82, label="painted siding (accent)", **({"pattern": tex} if tex else {})),
+        hgroove=dict(color=_shade(c["siding"], -0.55), rough=0.95),
+        haccent=dict(color=c["accent"], rough=0.62, label="accent trim"),
+        hbrick=dict(color=c["brick"], mortar=c["mortar"], pattern="hbrick", rough=0.92, course_in=course,
+                    brick_in=float(model.get("brick_len_in", 8.0)), label="brick veneer"),
+        hframe=dict(color=c["frame"], rough=0.45, label="vinyl window + door frames"),
+        hscreen=dict(color=c["screen"], rough=0.9, opacity=0.6, label="insect screen"),
+        hblind=dict(color=c["blind"], rough=0.6, label="blinds"),
+        hcap=dict(color=c["cap"], rough=0.85, label="chimney cap"),
+    )
+    return out
 
 
 class _Builder:
@@ -68,6 +103,8 @@ class _Builder:
 
     # --------------------------------------------------------------- a wall: slab with openings, lap siding, corner boards
     def wall(self, w: dict, openings: List[dict]):
+        if w.get("cladding", "lap") != "lap":
+            return self.wall_v2(w, openings)
         z0, z1 = float(w.get("z0", 0.0)), float(w.get("z1", 9.0))
         L = self.frame(w)[6]
         gable = w.get("gable")                      # {"at": u of the peak, "z": peak z} -> the wall top is a gable
@@ -137,37 +174,294 @@ class _Builder:
                 self.slab(w, ua, ub, zc, zc + 0.045, 0.01, 0.045, "siding", "sidinglap", tag="gable lap drip")
             zc += self.exp
 
+    # --------------------------------------------------------------- vertical-groove / brick / plain walls
+    @staticmethod
+    def margin(o) -> float:
+        """How far the wall's cladding stops short of an opening: the casing width (+ a hair) when it has a casing, else
+        nothing (brick returns to the frame)."""
+        if o.get("type") == "void":
+            return 0.0
+        if not o.get("casing", True):
+            return 0.0
+        return float(o.get("casing_in", o.get("trim_in", 3.5))) * IN + 0.01
+
+    @staticmethod
+    def _top_at(top, u, z1):
+        """The wall's top edge at u: the piecewise-linear `top` [[u, z], ...] or the flat z1."""
+        if not top:
+            return z1
+        pts = sorted((float(a), float(b)) for a, b in top)
+        if u <= pts[0][0]:
+            return pts[0][1]
+        for (ua, za), (ub, zb) in zip(pts, pts[1:]):
+            if ua <= u <= ub:
+                return za + (zb - za) * (u - ua) / max(1e-9, ub - ua)
+        return pts[-1][1]
+
+    def _upper(self, w, ua, ub, z1, d0, d1, kind, mat, tag):
+        """The part of a strip (u ua..ub) above z1 up to the sloped top: a box to the lower corner, a mesh quad above it."""
+        top = w.get("top")
+        if not top:
+            return
+        ta, tb = self._top_at(top, ua, z1), self._top_at(top, ub, z1)
+        lo = min(ta, tb)
+        if lo - z1 > 0.01:
+            self.slab(w, ua, ub, z1, lo, d0, d1, kind, mat, tag=tag)
+        if abs(ta - tb) > 0.005:
+            ax, ay, ux, uy, nx, ny, L = self.frame(w)
+            P = lambda u, z, d: [ax + ux * u + nx * d, ay + uy * u + ny * d, z]
+            if ta > tb:
+                tri = [P(ua, lo, d1), P(ub, lo, d1), P(ua, ta, d1)]
+            else:
+                tri = [P(ua, lo, d1), P(ub, lo, d1), P(ub, tb, d1)]
+            self.mesh(kind, tri, mat, tag=tag)
+
+    def wall_v2(self, w: dict, openings: List[dict]):
+        clad = w.get("cladding", "vertical")
+        z0, z1 = float(w.get("z0", 0.0)), float(w.get("z1", 9.0))
+        ax, ay, ux, uy, nx, ny, L = self.frame(w)
+        th = float(w.get("thick", 0.45))
+        ops = sorted([o for o in openings], key=lambda o: o["u0"])
+        face = 0.0 if clad in ("brick", "plain") else -0.02          # the slab's face: the cladding itself, or the groove bottoms
+        slab_mat = w.get("mat") or {"brick": "hbrick", "plain": "siding", "vertical": "hgroove"}[clad]
+        if clad == "vertical":
+            slab_mat = w.get("groove_mat", "hgroove")
+        # the slab in rectangles around the openings (each opening's own margin)
+        cuts = sorted(set([0.0, L] + [o["u0"] - self.margin(o) for o in ops] + [o["u1"] + self.margin(o) for o in ops]))
+        cuts = [c for c in cuts if -1e-6 <= c <= L + 1e-6]
+        for ua, ub in zip(cuts, cuts[1:]):
+            if ub - ua < 0.005:
+                continue
+            inside = [o for o in ops if o["u0"] - self.margin(o) - 1e-6 <= ua and ub <= o["u1"] + self.margin(o) + 1e-6]
+            zs = [z0]
+            for o in sorted(inside, key=lambda o: o["z0"]):
+                zs += [o["z0"] - self.margin(o), o["z1"] + self.margin(o)]
+            zs.append(z1)
+            for za, zb in zip(zs[0::2], zs[1::2]):
+                za, zb = max(z0, za), min(z1, zb)
+                if zb - za > 0.005:
+                    self.slab(w, ua, ub, za, zb, -th, face, "house", slab_mat, tag="wall")
+            self._upper(w, ua, ub, z1, -th, face, "house", slab_mat, "wall (gable / rake)")
+        if clad == "vertical":
+            self.vertical_boards(w, ops, z0, z1, L)
+        # painted fields on brick / plain walls sit proud of the face as panels
+        if clad in ("brick", "plain"):
+            for p in w.get("panels", []):
+                self.slab(w, p["u0"], p["u1"], p["z0"], p["z1"], 0.0, float(p.get("d", 0.06)), "trim", p.get("mat", "haccent"),
+                          tag=p.get("name", "panel"))
+        for bd in w.get("bands", []):           # horizontal trim boards
+            d0, d1 = (0.0, float(bd["d"])) if isinstance(bd.get("d"), (int, float)) else tuple(bd.get("d", (0.0, 0.06)))
+            self.slab(w, float(bd.get("u0", 0.0)), float(bd.get("u1", L)), bd["z0"], bd["z1"], d0, d1, "trim", bd.get("mat", "haccent"),
+                      tag=bd.get("name", "trim band"))
+        cw = float(w.get("corner_in", 3.5)) * IN
+        for end in w.get("corners", []):        # corner boards
+            ua = 0.0 if end == "a" else L - cw
+            ztop = max(self._top_at(w.get("top"), ua, z1), self._top_at(w.get("top"), ua + cw, z1)) if w.get("top") else z1
+            self.slab(w, ua, ua + cw, z0, min(z1, ztop), 0.0, 0.07, "trim", w.get("corner_mat", "haccent"), tag="corner board")
+        if w.get("foundation"):
+            fz = float(w.get("foundation_z", z0))
+            self.slab(w, 0.0, L, fz - float(w.get("foundation_h", 0.8)), fz, -th, 0.01, "house", "foundation", tag="foundation")
+
+    def vertical_boards(self, w, ops, z0, z1, L):
+        """Vertical-groove siding as real geometry: a board face between every pair of grooves, standing `relief_in` proud of
+        the groove bottoms (the slab face), split around the openings (their casings) and at painted-field edges."""
+        s = float(w.get("groove_in", 8.0)) * IN
+        gw = float(w.get("groove_w_in", 0.375)) * IN
+        rel = float(w.get("relief_in", 0.3)) * IN
+        d0, d1 = -0.02, -0.02 + rel
+        off = float(w.get("groove_off", s)) % s
+        panels = w.get("panels", [])
+        gs = []
+        g = off
+        while g < L - 1e-6:
+            if g > 1e-6:
+                gs.append(g)
+            g += s
+        edges = [0.0] + [x for g in gs for x in (g - gw / 2, g + gw / 2)] + [L]
+        strips = [(edges[i], edges[i + 1]) for i in range(0, len(edges), 2)]
+        for sa, sb in strips:
+            if sb - sa < 0.01:
+                continue
+            # split the strip at opening and panel u-edges that fall inside it
+            cuts = {sa, sb}
+            for o in ops:
+                m = self.margin(o)
+                for c in (o["u0"] - m, o["u1"] + m):
+                    if sa < c < sb:
+                        cuts.add(c)
+            for p in panels:
+                for c in (p["u0"], p["u1"]):
+                    if sa < c < sb:
+                        cuts.add(c)
+            cuts = sorted(cuts)
+            for pa, pb in zip(cuts, cuts[1:]):
+                if pb - pa < 0.004:
+                    continue
+                pm = (pa + pb) / 2
+                blocked = sorted([(o["z0"] - self.margin(o), o["z1"] + self.margin(o)) for o in ops
+                                  if o["u0"] - self.margin(o) < pm < o["u1"] + self.margin(o)])
+                ivs, zc = [], z0
+                for ba, bb in blocked:
+                    if ba > zc:
+                        ivs.append((zc, min(ba, z1)))
+                    zc = max(zc, bb)
+                if zc < z1:
+                    ivs.append((zc, z1))
+                for za, zb in ivs:
+                    # split at the painted fields' z-edges (fields cover this strip when its middle is inside their u-range)
+                    zcuts = {za, zb}
+                    for p in panels:
+                        if p["u0"] < pm < p["u1"]:
+                            for c in (p["z0"], p["z1"]):
+                                if za < c < zb:
+                                    zcuts.add(c)
+                    zcuts = sorted(zcuts)
+                    for qa, qb in zip(zcuts, zcuts[1:]):
+                        if qb - qa < 0.004:
+                            continue
+                        zm = (qa + qb) / 2
+                        mat = w.get("mat", "siding")
+                        for p in panels:
+                            if p["u0"] < pm < p["u1"] and p["z0"] < zm < p["z1"]:
+                                mat = p.get("mat", "siding2")
+                        self.slab(w, pa, pb, qa, qb, d0, d1, "siding", mat, tag="vertical siding board")
+                # the gable / rake part above z1
+                if w.get("top") and not any(o["u0"] - self.margin(o) < pm < o["u1"] + self.margin(o) and o["z1"] >= z1 for o in ops):
+                    mat = w.get("mat", "siding")
+                    for p in panels:
+                        if p["u0"] < pm < p["u1"] and p["z1"] > z1:
+                            mat = p.get("mat", "siding2")
+                    self._upper(w, pa, pb, z1, d0, d1, "siding", mat, "vertical siding board (gable)")
+
     # --------------------------------------------------------------- openings
     def window(self, w, o):
         u0, u1, z0, z1 = o["u0"], o["u1"], o["z0"], o["z1"]
-        tw = float(o.get("trim_in", 3.5)) * IN
+        tw = float(o.get("casing_in", o.get("trim_in", 3.5))) * IN
+        cm, fm = o.get("casing_mat", "htrim"), o.get("frame_mat", "htrim")
+        dset = float(o.get("set_back", 0.0))           # the frame set back into a brick opening
         # trim (casing) proud of the siding, sill nose
-        self.slab(w, u0 - tw, u1 + tw, z1, z1 + tw, 0.0, 0.08, "trim", "htrim", tag="window head trim")
-        self.slab(w, u0 - tw, u1 + tw, z0 - tw, z0, 0.0, 0.1, "trim", "htrim", tag="window sill")
-        self.slab(w, u0 - tw, u0, z0, z1, 0.0, 0.08, "trim", "htrim", tag="window side trim")
-        self.slab(w, u1, u1 + tw, z0, z1, 0.0, 0.08, "trim", "htrim", tag="window side trim")
+        if o.get("casing", True):
+            self.slab(w, u0 - tw, u1 + tw, z1, z1 + tw, 0.0, 0.08, "trim", cm, tag="window head trim")
+            if o.get("sill", "trim") == "trim":
+                self.slab(w, u0 - tw, u1 + tw, z0 - tw, z0, 0.0, 0.1, "trim", cm, tag="window sill")
+            self.slab(w, u0 - tw, u0, z0, z1, 0.0, 0.08, "trim", cm, tag="window side trim")
+            self.slab(w, u1, u1 + tw, z0, z1, 0.0, 0.08, "trim", cm, tag="window side trim")
+        self.brick_details(w, o)
         # the vinyl frame and the lites (fractions of the width), glass set back, mullions
-        fr = 0.12
-        self.slab(w, u0, u1, z1 - fr, z1, -0.2, 0.0, "trim", "htrim", tag="window frame")
-        self.slab(w, u0, u1, z0, z0 + fr, -0.2, 0.0, "trim", "htrim", tag="window frame")
-        self.slab(w, u0, u0 + fr, z0, z1, -0.2, 0.0, "trim", "htrim", tag="window frame")
-        self.slab(w, u1 - fr, u1, z0, z1, -0.2, 0.0, "trim", "htrim", tag="window frame")
+        fr = float(o.get("frame_in", 1.44)) * IN if o.get("frame_in") else 0.12
+        self.slab(w, u0, u1, z1 - fr, z1, -0.2 - dset, 0.0 - dset, "trim", fm, tag="window frame")
+        self.slab(w, u0, u1, z0, z0 + fr, -0.2 - dset, 0.0 - dset, "trim", fm, tag="window frame")
+        self.slab(w, u0, u0 + fr, z0, z1, -0.2 - dset, 0.0 - dset, "trim", fm, tag="window frame")
+        self.slab(w, u1 - fr, u1, z0, z1, -0.2 - dset, 0.0 - dset, "trim", fm, tag="window frame")
         lites = o.get("lites") or [1.0]
         acc, xs = 0.0, []
         for f in lites[:-1]:
             acc += f
             xs.append(u0 + (u1 - u0) * acc)
+        mw = float(o.get("mullion_in", 1.92)) * IN if o.get("mullion_in") else 0.08
         for xm in xs:
-            self.slab(w, xm - 0.08, xm + 0.08, z0, z1, -0.2, -0.01, "trim", "htrim", tag="window mullion")
+            self.slab(w, xm - mw, xm + mw, z0, z1, -0.2 - dset, -0.01 - dset, "trim", fm, tag="window mullion")
         if o.get("meeting_rail"):          # single / double hung
             zm = z0 + (z1 - z0) * float(o["meeting_rail"])
-            self.slab(w, u0, u1, zm - 0.06, zm + 0.06, -0.2, -0.01, "trim", "htrim", tag="meeting rail")
-        self.slab(w, u0 + fr, u1 - fr, z0 + fr, z1 - fr, -0.16, -0.14, "glass", "hglass", tag="glass")
-        if o.get("shutters", True):
+            self.slab(w, u0, u1, zm - 0.06, zm + 0.06, -0.2 - dset, -0.01 - dset, "trim", fm, tag="meeting rail")
+        if o.get("sash_in"):               # sliding / hung sashes: a frame around every lite (the sash stiles and rails)
+            sw = float(o["sash_in"]) * IN
+            edges = [u0 + fr] + xs + [u1 - fr]
+            for a_, b_ in zip(edges, edges[1:]):
+                a2 = a_ + (mw if a_ in xs else 0.0); b2 = b_ - (mw if b_ in xs else 0.0)
+                self.slab(w, a2, b2, z1 - fr - sw, z1 - fr, -0.17 - dset, -0.05 - dset, "trim", fm, tag="sash rail")
+                self.slab(w, a2, b2, z0 + fr, z0 + fr + sw, -0.17 - dset, -0.05 - dset, "trim", fm, tag="sash rail")
+                self.slab(w, a2, a2 + sw, z0 + fr, z1 - fr, -0.17 - dset, -0.05 - dset, "trim", fm, tag="sash stile")
+                self.slab(w, b2 - sw, b2, z0 + fr, z1 - fr, -0.17 - dset, -0.05 - dset, "trim", fm, tag="sash stile")
+        self.slab(w, u0 + fr, u1 - fr, z0 + fr, z1 - fr, -0.16 - dset, -0.14 - dset, "glass", "hglass", tag="glass")
+        if o.get("blinds"):
+            self.blinds(w, u0 + fr, u1 - fr, z0 + fr, z1 - fr, o, dset)
+        elif o.get("shutters", True):
             self.shutters(w, u0 + fr, u1 - fr, z0 + fr, z1 - fr, o)
-        self.slab(w, u0, u1, z0, z1, -1.6, -1.5, "house", "interior", tag="room")
+        if o.get("interior", True):
+            self.slab(w, u0, u1, z0, z1, -1.6, -1.5, "house", "interior", tag="room")
         if o.get("half_round"):            # an arched transom / gable window: a fan of thin wedges
             pass
+
+    def brick_details(self, w, o):
+        """Brick around an opening: a rowlock sill (bricks on edge, pitched, projecting 1-1/4") and an optional soldier course."""
+        u0, u1, z0, z1 = o["u0"], o["u1"], o["z0"], o["z1"]
+        if o.get("sill") == "rowlock":
+            ext = float(o.get("sill_ext_in", 2.0)) * IN
+            h = float(o.get("sill_h_in", 4.5)) * IN
+            self.slab(w, u0 - ext, u1 + ext, z0 - h, z0, -0.25, float(o.get("sill_proj_in", 1.25)) * IN, "trim",
+                      o.get("sill_mat", "hbrick"), tag="brick rowlock sill")
+        if o.get("head") == "soldier":
+            self.slab(w, u0 - 0.04, u1 + 0.04, z1, z1 + 7.625 * IN, -0.02, 0.012, "trim", o.get("head_mat", "hbrick"), tag="brick soldier course")
+
+    def blinds(self, w, u0, u1, z0, z1, o, dset=0.0):
+        """Horizontal blinds just behind the glass: 1" slats tilted half open, a head rail; lowered to o["blinds"] (fraction)."""
+        frac = float(o["blinds"]) if isinstance(o["blinds"], (int, float)) and not isinstance(o["blinds"], bool) else 1.0
+        d0, d1 = -0.3 - dset, -0.24 - dset
+        self.slab(w, u0, u1, z1 - 0.12, z1, d0, d1 + 0.02, "shutter", "hblind", tag="blind head rail")
+        zb = z1 - (z1 - z0) * frac
+        zc = z1 - 0.12 - 0.07
+        while zc > zb + 0.02:
+            self.slab(w, u0 + 0.02, u1 - 0.02, zc - 0.022, zc, d0, d1, "shutter", "hblind", tag="blind slat")
+            zc -= 0.085
+
+    def slider(self, w, o):
+        """A sliding patio door (u0..u1 frame outside, z0 = sill bottom, z1 = head top): a vinyl / aluminium frame, n panels
+        ("ops": X = sliding on the inner track, O = fixed on the outer track), stiles and rails, glass, a pull on the sliding
+        panel, an insect screen on the outermost track over the sliding panel, the casing around it, the room behind."""
+        u0, u1, z0, z1 = o["u0"], o["u1"], o["z0"], o["z1"]
+        tw = float(o.get("casing_in", o.get("trim_in", 3.5))) * IN
+        cm, fm = o.get("casing_mat", "htrim"), o.get("frame_mat", "htrim")
+        ds = float(o.get("set_back", 0.0))
+        if o.get("casing", True):
+            self.slab(w, u0 - tw, u1 + tw, z1, z1 + tw, 0.0, 0.08, "trim", cm, tag="slider head casing")
+            self.slab(w, u0 - tw, u0, z0, z1, 0.0, 0.08, "trim", cm, tag="slider casing")
+            self.slab(w, u1, u1 + tw, z0, z1, 0.0, 0.08, "trim", cm, tag="slider casing")
+        self.brick_details(w, o)
+        fr = float(o.get("frame_in", 1.75)) * IN
+        D0, D1 = -0.42 - ds, 0.0 - ds
+        self.slab(w, u0, u1, z1 - fr, z1, D0, D1, "trim", fm, tag="slider frame head")
+        self.slab(w, u0, u0 + fr, z0, z1, D0, D1, "trim", fm, tag="slider frame jamb")
+        self.slab(w, u1 - fr, u1, z0, z1, D0, D1, "trim", fm, tag="slider frame jamb")
+        self.slab(w, u0, u1, z0, z0 + 0.11, D0, D1 + 0.04, "trim", fm, tag="slider sill + track")
+        ops = (o.get("ops") or "XO").upper()
+        n = len(ops)
+        ia, ib = u0 + fr, u1 - fr
+        ov = float(o.get("overlap_in", 1.5)) * IN
+        pw = (ib - ia + ov * (n - 1)) / n
+        st, rt, rb = 2.0 * IN, 2.25 * IN, 3.5 * IN
+        zb, zt = z0 + 0.11, z1 - fr
+        for i, op in enumerate(ops):
+            pa = ia + i * (pw - ov)
+            pb = pa + pw
+            dt = (-0.3, -0.2) if op == "X" else (-0.17, -0.07)
+            dt = (dt[0] - ds, dt[1] - ds)
+            msl = st + (0.5 * IN if (i > 0) else 0.0)          # meeting stiles a little heavier
+            msr = st + (0.5 * IN if (i < n - 1) else 0.0)
+            self.slab(w, pa, pa + msl, zb, zt, dt[0], dt[1], "trim", fm, tag="slider panel stile")
+            self.slab(w, pb - msr, pb, zb, zt, dt[0], dt[1], "trim", fm, tag="slider panel stile")
+            self.slab(w, pa, pb, zt - rt, zt, dt[0], dt[1], "trim", fm, tag="slider panel rail")
+            self.slab(w, pa, pb, zb, zb + rb, dt[0], dt[1], "trim", fm, tag="slider panel rail")
+            gm = (dt[0] + dt[1]) / 2
+            self.slab(w, pa + msl, pb - msr, zb + rb, zt - rt, gm - 0.01, gm + 0.01, "glass", "hglass", tag="slider glass")
+            if op == "X":
+                # the pull + lock sit on the stile that closes against the jamb (the outer end of an end panel)
+                hu = (pb - msr / 2) if (i == n - 1 and n > 1) else (pa + msl / 2)
+                zh = z0 + 3.1
+                self.slab(w, hu - 0.035, hu + 0.035, zh - 0.25, zh + 0.25, dt[1], dt[1] + 0.06, "trim", o.get("handle_mat", "storm"), tag="slider pull")
+                if o.get("screen", True):
+                    sa, sb = pa - 0.02, pb + 0.02
+                    s0, s1 = -0.06 - ds, -0.035 - ds
+                    self.slab(w, sa, sb, zb, zb + 0.09, s0, s1, "trim", fm, tag="screen frame")
+                    self.slab(w, sa, sb, zt - 0.09, zt, s0, s1, "trim", fm, tag="screen frame")
+                    self.slab(w, sa, sa + 0.09, zb, zt, s0, s1, "trim", fm, tag="screen frame")
+                    self.slab(w, sb - 0.09, sb, zb, zt, s0, s1, "trim", fm, tag="screen frame")
+                    self.slab(w, sa + 0.09, sb - 0.09, zb + 0.09, zt - 0.09, s0 + 0.008, s1 - 0.008, "glass", "hscreen", tag="screen mesh")
+        if o.get("blinds"):
+            self.blinds(w, ia, ib, zb, zt, dict(o, blinds=o["blinds"]), ds + 0.2)
+        if o.get("interior", True):
+            self.slab(w, u0, u1, z0, z1, -1.6, -1.5, "house", "interior", tag="room")
+
 
     def shutters(self, w, u0, u1, z0, z1, o):
         """Interior plantation shutters seen through the glass: panels about 16" wide with 2" stiles, a divider rail at the

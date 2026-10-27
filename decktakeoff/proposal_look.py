@@ -125,6 +125,63 @@ body.proposal .invest { break-before:page; page-break-before:always; break-insid
 body.proposal .legend li { padding:6px 4px; font-size:12.5px; }
 </style>"""
 
+OPTIONS_CSS = """<style>
+/* Options as blocks (each its own price three ways, what it adds, its own renders, its add-ons) and the link to the
+   interactive 3D page. Added only to a page that has them. */
+.optblock { margin:26px 0 10px; border:1px solid var(--line); background:var(--paper); }
+.opt-head { background:var(--space); color:var(--space-ink); padding:18px 20px; display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:14px 24px; align-items:end; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.opt-title { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.opt-head h3 { font-family:var(--display); font-weight:800; text-transform:uppercase; letter-spacing:.02em; line-height:1; font-size:clamp(24px, 3.4vw, 36px); margin:0; color:#ffffff; text-wrap:balance; }
+.opt-prices { display:grid; grid-template-columns:repeat(3, auto); border:1px solid var(--space-line); }
+.opt-prices.one { grid-template-columns:auto; }
+.opt-prices > div { padding:10px 16px; display:flex; flex-direction:column; gap:4px; min-width:0; }
+.opt-prices > div + div { border-left:1px solid var(--space-line); }
+.opt-prices .pv { font-size:clamp(20px, 2.6vw, 28px); white-space:nowrap; }
+.opt-prices .lead .pv { background:linear-gradient(100deg, var(--gold-a) 0%, var(--gold-b) 55%, var(--gold-a) 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.opt-body { padding:16px 20px 20px; display:flex; flex-direction:column; gap:14px; }
+.opt-body p { margin:0; max-width:72ch; }
+.opt-blurb { font-size:16px; line-height:1.55; }
+.opt-scope { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px; font-size:15px; }
+.opt-addon { border-left:3px solid var(--gold); padding:10px 14px; background:var(--ground); display:flex; flex-direction:column; gap:8px; }
+.oa-line { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline; justify-content:space-between; }
+.oa-line span { font-variant-numeric:tabular-nums; font-weight:700; }
+.opt-note { color:var(--ink-3); font-size:13.5px; }
+table.optsum td:first-child { min-width:240px; }
+table.optsum .sub { display:block; padding-left:14px; color:var(--space-mute); font-size:13px; }
+table.optsum tr.addon td:first-child { padding-left:14px; color:var(--space-soft); }
+table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weight:800; }
+.plan-fig { margin:6px 0 4px; }
+.plan-fig svg { display:block; width:100%; height:auto; background:#fbf9f4; border:1px solid var(--line); }
+.facts-cols { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 28px; }
+.facts-cols h3 { margin:12px 0 4px; }
+.facts-cols ul { margin:0; padding-left:18px; } .facts-cols li { margin:3px 0; }
+@media (max-width:760px) { .facts-cols { grid-template-columns:1fr; } }
+.v3d-link { background:var(--space); color:var(--space-ink); padding:20px; display:flex; flex-direction:column; gap:12px; align-items:flex-start; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.v3d-link p { margin:0; color:var(--space-soft); max-width:70ch; }
+.v3d-btn { display:inline-block; font-family:var(--display); font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:14px; color:#050608; text-decoration:none;
+  background:linear-gradient(100deg, var(--gold-a), var(--gold-b)); padding:12px 18px; border-radius:3px; }
+.v3d-btn:focus-visible { outline:2px solid #ffffff; outline-offset:3px; }
+.v3d-url { font-size:12.5px; color:var(--space-mute); word-break:break-all; }
+@media (max-width:760px) {
+  .opt-head { grid-template-columns:1fr; }
+  .opt-prices { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .opt-prices > div { padding:10px 10px; }
+  table.optsum td:first-child { min-width:160px; }
+}
+@media print {
+  .optblock + .optblock { break-before:page; page-break-before:always; }
+  .optblock { margin-top:0.1in; border:0; }
+  .opt-head, .opt-body { padding-left:0.18in; padding-right:0.18in; }
+  .opt-body { gap:10px; }
+  .opt-blurb { font-size:12.5px; }
+  .opt-scope { font-size:11.5px; }
+  .optblock .gal { gap:8px; }
+  .optblock figure img { max-height:2.45in; object-fit:cover; }
+  .opt-addon { break-inside:avoid; page-break-inside:avoid; }
+  .v3d-link { break-inside:avoid; page-break-inside:avoid; }
+}
+</style>"""
+
 JS = """<script>
 document.querySelectorAll('.inv-grid').forEach(function (g) {
   var v = g.querySelector('.wc-v'), l = g.querySelector('.wc-l');
@@ -176,17 +233,15 @@ def _title_parts(name: str, address: str):
 def _levels_tele(spec, L, t, n_piers) -> list:
     """Telemetry for a deck on two or more levels: SF, each level's height, the columns, the rail, the lights."""
     from .report import levels_of, columns_of, lights_of
-    tele = [(f"{L.deck_sf:,.0f}", "square feet")] + [(ftin(v["height_in"]), f"{v['name'].lower()} above grade") for v in levels_of(t)]
+    tele = [(f"{L.deck_sf:,.0f}", "square feet")] + [(ftin(v["height_in"]), v["name"].lower()) for v in levels_of(t)]    # each level's height above grade
     tele.append((str(columns_of(t)), f"{spec.framing.post_size} columns"))
     if L.rail:
         tele.append((f"{L.rail.rail_lf:g}'", f"{L.rail.color.lower()} rail"))
     lt = lights_of(t)
     if lt["total"]:
         tele.append((str(lt["total"]), "LED lights"))
-    elif L.stairs:
-        tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
     else:
-        tele.append((str(n_piers), "Diamond Piers"))
+        tele.append((ftin(L.finished_w), "across the house"))
     return tele
 
 
@@ -233,6 +288,65 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
             + prices
             + '<div class="chips">' + "".join(f'<div class="chip"><i style="background:{c}"></i><span><b>{E(k)}</b>{E(v)}</span></div>' for c, k, v in chips) + "</div>"
             + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></div></header>")
+
+
+# The Suncoast Louvered Roof as the homeowner reads it: product facts only, from $S/fillmore/louvered/research.md (the
+# manufacturer's site, brochure, care guide and warranty page). A job overrides any section through render_addon(addon=dict(facts=...)).
+LOUVER_FACTS = dict(
+    what=[],            # what the product is
+    controls=[],        # motor, remote / app, how far the blades turn
+    gutters=[],         # the integrated gutter, downspouts
+    lights=[],          # the LED light track
+    accessories=[],     # sensors, heaters, other options the maker offers
+    screens=[],         # the retractable screens (product facts; the job's screen sizes come from the engine)
+    warranty=[],        # the maker's warranty terms
+    schedule=[],        # lead time and install sequence
+    exclusions=[],      # what the roof's price does not include
+    structure_rows=[],  # extra (label, text) rows for the structure section
+)
+
+
+def addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede, mission="Proposal") -> str:
+    """The launch-manifest cover for a separately sold item (the louvered roof's own document): the same look as the deck's
+    cover — hero render, title, the item's numbers, its price three ways (prices = [(label, value, sub)]), the materials."""
+    lead = ' class="lead"'
+    pr = ('<div class="prices' + (" one" if len(prices) == 1 else "") + '">'
+          + "".join(f'<div{lead if i == 0 else ""}><span class="pl">{E(l_)}</span><span class="pv">{E(v_)}</span>'
+                    + (f'<span class="ps">{E(s_)}</span>' if s_ else "") + "</div>" for i, (l_, v_, s_) in enumerate(prices)) + "</div>")
+    return ('<header class="manifest"><div class="hero">' + hero_html + '<div class="hero-shade"></div>'
+            f'<div class="hero-top"><div class="hin">{logo_svg()}<span class="mission">{E(mission)}<br>{E(today)}</span></div></div>'
+            f'<div class="hero-title"><div class="hin">' + (f'<span class="eyebrow">{E(eyebrow)}</span>' if eyebrow else "")
+            + f'<h1>{E(title)}</h1><p class="who">{E(who)}</p></div></div></div>'
+            '<div class="launch"><div class="hin">'
+            '<div class="telemetry">' + "".join(f'<div><span class="tv">{E(v)}</span><span class="tl">{E(k)}</span></div>' for v, k in tele) + "</div>"
+            + pr
+            + '<div class="chips">' + "".join(f'<div class="chip"><i style="background:{c}"></i><span><b>{E(k)}</b>{E(v)}</span></div>' for c, k, v in chips) + "</div>"
+            + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></div></header>")
+
+
+def addon_invest(rows, terms, next_html: str, title: str = "The price", show_fin: bool = True) -> str:
+    """Investment for a separately sold item: its price three ways and the financing (terms = (check, financed, monthly)),
+    then each line (rows = [(label, check, financed, monthly, kind)], kind "item" | "addon" | "total") and the next step."""
+    c, f, m = terms
+    if show_fin:
+        tg = ('<div class="terms">'
+              f'<div class="lead"><span class="pl">Check or ACH</span><span class="tv">{money(c)}</span><span class="ps">{(1 - c / f) * 100:.0f}% savings</span></div>'
+              f'<div><span class="pl">Total investment</span><span class="tv">{money(f)}</span><span class="ps">financed, no money down</span></div>'
+              f'<div><span class="pl">About</span><span class="tv">{money(m)}/mo</span><span class="ps">6.99% for 10 years</span></div>'
+              '<div><span class="pl">Or</span><span class="tv">12 or 18 mo</span><span class="ps">no payments, no down payment</span></div></div>')
+    else:
+        tg = f'<div class="terms one"><div class="lead"><span class="pl">Price · check or ACH</span><span class="tv">{money(c)}</span></div></div>'
+
+    def cell(v, kind):
+        return ("+" if kind == "addon" else "") + money(v)
+    head = "<tr><th>Item</th><th class='num'>Check or ACH</th>" + ("<th class='num'>Financed</th><th class='num'>Monthly</th>" if show_fin else "") + "</tr>"
+    body = "".join(f"<tr class='{kind}'><td>{('<b>' + E(lab) + '</b>') if kind == 'total' else E(lab)}</td><td class='num'>{cell(cc, kind)}</td>"
+                   + (f"<td class='num'>{cell(ff, kind)}</td><td class='num'>{cell(mm, kind)}/mo</td>" if show_fin else "") + "</tr>"
+                   for lab, cc, ff, mm, kind in rows)
+    return ('<section class="invest" id="g-investment" aria-labelledby="inv-h"><div class="inv-head"><span class="eyebrow">Investment</span>'
+            f'<h3 id="inv-h">{E(title)}</h3></div>' + tg
+            + f'<div class="opts"><div class="tw"><table class="optsum"><thead>{head}</thead><tbody>{body}</tbody></table></div></div>'
+            + (f'<div><h4>Next step</h4>{next_html}</div>' if next_html else "") + "</section>")
 
 
 def _arc(cx, cy, r, a0, a1):

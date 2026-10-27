@@ -118,6 +118,10 @@ class Geometry:
                                                        #  bottom of the beam at the posts, above the deck), posts_x_ft, footing
                                                        #  "deck" | "diamond_pier", overhang_ft, blinds [{"from_ft","to_ft","lowered"}]}
     louvered_roofs: List[dict] = field(default_factory=list)  # motorized aluminum louvered roofs (Suncoast) over the deck — keys and defaults in louvered.py (DEFAULTS)
+    step_skirt: Optional[dict] = None    # the face between two levels clad in the decking fascia installed VERTICALLY (cut to height, seams
+                                         # showing) on 2x4 furring: {"edges": ["edge:1", ...] (outline sides it covers: the step face and an
+                                         # inset stair's notch cheeks), "drop_in": 36 (deck surface to the lower level's surface), "gap_in": 0.125
+                                         # (between panels), "stud_oc_in": 16} — layout.step_skirt_layout reads it
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
                                                                         # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
@@ -246,6 +250,14 @@ class Stair:
     build: str = "stringers"             # "stringers" (cut 2x12) | "box": a framed 2x6 box step on a compacted base — no stringers, fascia-wrapped (a step or two at grade)
     name: Optional[str] = None           # how the stair reads in client documents ("Centre stair", "Left-side box step"); None -> from the side
     skirts: bool = False                 # fascia skirts on both open sides, stepped under each tread — no stringer or framing shows
+    inset: bool = False                  # recessed into the deck: leaves the inner face of a notch in the outline (side "edge:N") and runs out
+                                         # to the face the notch is cut in, its bottom riser flush with that face's skirt; the notch is framed
+                                         # (trimmer, headers, posts at its outer corners, a carrier under the stringer feet), its cheeks are the
+                                         # stair's side walls (geometry.step_skirt), the deck's picture-frame board is the top nosing
+    handrail: str = ""                   # "" -> one graspable handrail kit per stair when 4+ risers | "each flight": one along every flight |
+                                         # "guard posts": an inset stair's handrail, bracketed to the deck guard's posts along one cheek
+    handrail_side: str = "right"         # the side the handrail is on, going down ("right" | "left")
+    option: str = ""                     # the option this stair belongs to ("Stairs to the yard"): its 3D boxes carry layer "option:<name>"
 
 
 @dataclass
@@ -257,7 +269,8 @@ class Extras:
     ledger_on_brick_veneer: bool = False
     ledger_on_cantilevered_floor: bool = False
     privacy_wall: bool = False
-    lighting: bool = False
+    lighting: bool = False               # True = the riser + post-cap lights at the defaults (same as lights = {})
+    lights: Optional[dict] = None        # low-voltage LED lights: {"riser": true, "post_cap": true, ...} — keys and defaults in lighting.py (DEFAULTS); None = off
     gm: Optional[float] = None           # gross-margin override (default 42.5%, 40% floor)
     gm_below_floor: bool = False         # the owner set a margin under the 40% floor on purpose — use it as given
     field_flags: List[dict] = field(default_factory=list)   # job-specific flags for the internal set: [{severity, topic, text, ref}]
