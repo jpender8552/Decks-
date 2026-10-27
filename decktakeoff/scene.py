@@ -613,8 +613,10 @@ def build_scene(L) -> Scene:
                 continue                       # the sail post is this corner post
             if getattr(p, "roof", False):
                 continue                       # a louvered-roof post is the rail post here (louvered.py draws it)
-            add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h, "railmetal", 7, tag=p.kind)
-            add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "railmetal", 7)
+            over_ = spec.railing.drink_rail and (spec.railing.drink_rail_mount or "between") == "over"
+            add("railpost", x - pw / 2, x + pw / 2, y - pw / 2, y + pw / 2, zt, zt + h + (0.06 if over_ else 0.0), "railmetal", 7, tag=p.kind)
+            if not over_:          # over-the-post drink rail: the post is cut level under the board, no cap
+                add("railcap", x - pw / 2 - 0.03, x + pw / 2 + 0.03, y - pw / 2 - 0.03, y + pw / 2 + 0.03, zt + h, zt + h + 0.06, "railmetal", 7)
         # sections: reconstruct post pairs along each edge run from the post list order
         posts = [(p.x * IN, p.y * IN) for p in rl.posts]
         pairs = _rail_pairs(rl)

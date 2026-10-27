@@ -1395,6 +1395,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _price("decking", f"{spec.decking.brand}|{dcoll}|16|square")
             on_ = ("on the drink-rail clips over the universal panel covers" if f"{sysn}|panel_cover|8" in PRICEBOOK["rail"] else "laid flat on the top rail")
             lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge {on_}, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
+            if (spec.railing.drink_rail_mount or "between") == "over" and f"{sysn}|post_insert_8" in PRICEBOOK["rail"]:
+                # over the posts: posts cut level within 1/4" of the panel-cover tops, an insert in each, the board's seams on post centres
+                n_ins = len(rl.posts)
+                pk_ = int(math.ceil(n_ins / 8))
+                d_, uc, src = _item("rail", f"{sysn}|post_insert_8")
+                lines.append(Line("Rail", d_, pk_, pk_, "pk", f"{n_ins} posts  (drink rail over the posts: posts cut level, (3) 2-1/2\" screws each side of every board joint into the insert)", uc, src))
             kkey = f"{sysn.lower()}_drink_rail_bracket_kit" if f"{sysn.lower()}_drink_rail_bracket_kit" in PRICEBOOK["hardware"] else "drink_rail_bracket_kit"
             d_, uc, src = _item("hardware", kkey)
             kc = PRICEBOOK["hardware"][kkey].get("clips")

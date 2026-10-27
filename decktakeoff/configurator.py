@@ -213,6 +213,7 @@ def _fixtures(entries, mats: dict) -> List[list]:
             out.append([cx, cy, b.z0 - 0.02, 1, 0, 0, FX_LINE, 1.0, hx, mask])
         else:
             out.append([cx, cy, b.z0 - 0.02, 0, 1, 0, FX_LINE, 1.0, hy, mask])
+    out.sort(key=lambda f: f[0])                   # along x: the page's light loop skips / stops by x
     return [[round(v, 3) if isinstance(v, float) else v for v in f] for f in out]
 
 
@@ -492,7 +493,9 @@ def configurator_html(data: dict, three_src: Optional[str] = None, standalone: b
     body = (BODY.replace("__TITLE__", title).replace("__ADDR__", _html.escape(str(data.get("address") or "")))
             + f'<script type="application/json" id="cfg-data">{payload}</script>\n'
             + f"<script>{three_src}</script>\n<script>{JS}</script>")
-    head = f'<title>{title}</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n<style>{CSS}</style>\n'
+    desc = _html.escape(f"{data.get('address') or title}: the deck with its options, the sun at the address through the day, the louvered roof and the lights at night.")
+    head = (f'<title>{title}</title>\n<meta name="description" content="{desc}">\n<meta name="claude:viewport-fit-sides" content="cover">\n'
+            f'<style>{CSS}</style>\n')
     if not standalone:
         return head + body
     return ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
@@ -711,6 +714,10 @@ renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 stage.insertBefore(renderer.domElement, stage.firstChild);
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label', '3D view of the deck, the house and the yard');
+renderer.domElement.addEventListener('webglcontextlost', function (e) { e.preventDefault(); }, false);
+renderer.domElement.addEventListener('webglcontextrestored', function () { renderer.shadowMap.needsUpdate = true; invalidate(); }, false);
 var gl = renderer.getContext();
 var scene = new THREE.Scene();
 var P3 = function (x, y, z) { return new THREE.Vector3(x, z, y); };   // plan (x along the house, y to the yard, z up) -> three
@@ -803,16 +810,27 @@ if (2 * FXN + 120 > maxFU) FXN = Math.max(1, Math.floor((maxFU - 120) / 2));
 var FX = D.fixtures.slice(0, FXN);
 var fxA = [], fxB = [];
 for (var fi = 0; fi < FXN; fi++) { fxA.push(new THREE.Vector4()); fxB.push(new THREE.Vector4()); }
-var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.Color(1.0, 0.72, 0.45) }, fxGain: { value: 0 } };
+var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.Color(1.0, 0.72, 0.45) }, fxGain: { value: 0 },
+  fxBox: { value: new THREE.Vector4(0, 0, 0, 0) }, fxY: { value: new THREE.Vector2(0, 0) } };
+(function () {                                   // where any light can reach: fragments outside skip the loop
+  if (!D.fixtures.length) return;
+  var xs = D.fixtures.map(function (f) { return f[0]; }), ys = D.fixtures.map(function (f) { return f[1]; }), zs = D.fixtures.map(function (f) { return f[2]; });
+  var R = 11.5, mn = function (a) { return Math.min.apply(null, a); }, mx = function (a) { return Math.max.apply(null, a); };
+  FXU.fxBox.value.set(mn(xs) - R, mx(xs) + R, mn(ys) - R, mx(ys) + R); FXU.fxY.value.set(mn(zs) - R, mx(zs) + 2.0);
+})();
 var FX_GAIN = [7.0, 1.7, 0.9];        // a riser spot, a post-cap lantern, an LED strip (its nearest point)
 var FX_CHUNK = [
   '#define FX_N ' + FXN,
-  'uniform vec4 fxA[FX_N]; uniform vec4 fxB[FX_N]; uniform vec3 fxCol; uniform float fxGain;',
+  'uniform vec4 fxA[FX_N]; uniform vec4 fxB[FX_N]; uniform vec3 fxCol; uniform float fxGain; uniform vec4 fxBox; uniform vec2 fxY;',
   'varying vec3 vFxW; varying vec3 vFxN;',
   'vec3 fxLight(vec3 P, vec3 N) {',
   '  float acc = 0.0;',
+  '  if (P.x < fxBox.x || P.x > fxBox.y || P.z < fxBox.z || P.z > fxBox.w || P.y < fxY.x || P.y > fxY.y) return vec3(0.0);',
   '  for (int i = 0; i < FX_N; i++) {',
-  '    vec4 a = fxA[i]; if (a.w <= 0.0) continue;',
+  '    vec4 a = fxA[i];',
+  '    if (a.x < P.x - 11.0) continue;',
+  '    if (a.x > P.x + 11.0) break;',
+  '    if (a.w <= 0.0) continue;',
   '    vec4 b = fxB[i]; vec3 Lp = a.xyz;',
   '    if (b.w > 2.5) { float h = b.w - 3.0; vec3 t = vec3(b.x, 0.0, b.z); Lp = a.xyz + t * clamp(dot(P - a.xyz, t), -h, h); }',
   '    vec3 L = Lp - P; float d2 = dot(L, L); if (d2 > 121.0) continue;',
@@ -828,6 +846,7 @@ var FX_CHUNK = [
 function addFx(mat) {
   mat.onBeforeCompile = function (sh) {
     sh.uniforms.fxA = FXU.fxA; sh.uniforms.fxB = FXU.fxB; sh.uniforms.fxCol = FXU.fxCol; sh.uniforms.fxGain = FXU.fxGain;
+    sh.uniforms.fxBox = FXU.fxBox; sh.uniforms.fxY = FXU.fxY;
     sh.vertexShader = 'varying vec3 vFxW; varying vec3 vFxN;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', [
       '#include <worldpos_vertex>',
       'vec4 fxw = vec4(transformed, 1.0); vec3 fxn = objectNormal;',
@@ -1186,8 +1205,9 @@ function applyOptions() {
   SCR.forEach(function (o) { o.vis = shows(o.s.mask, c); placeScreen(o, S.scr[o.s.id]); });
   for (var i = 0; i < FXN; i++) {
     var f = FX[i];
-    if (!f || !shows(f[9], c)) { fxA[i].set(0, 0, 0, 0); fxB[i].set(0, 0, 0, 0); continue; }
+    if (!f) { fxA[i].set(1e5, 0, 0, 0); fxB[i].set(0, 0, 0, 0); continue; }
     var p = P3(f[0], f[1], f[2]), a = P3(f[3], f[4], f[5]);
+    if (!shows(f[9], c)) { fxA[i].set(p.x, p.y, p.z, 0); continue; }      // off: keeps its place in the x order
     var gain = FX_GAIN[f[6]] * f[7];
     fxA[i].set(p.x, p.y, p.z, gain);
     if (f[6] === 0) fxB[i].set(a.x, a.y, a.z, Math.cos(62 * RAD));
@@ -1274,6 +1294,7 @@ el3.addEventListener('touchmove', function (e) {
 el3.addEventListener('touchend', function (e) { touches = e.touches.length ? tinfo(e) : null; }, { passive: false });
 document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 var hintEl = $('hint');
+if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) hintEl.textContent = 'Drag to turn \u00b7 pinch to zoom \u00b7 two fingers to move';
 function hideHint() { if (hintEl) { hintEl.classList.add('gone'); hintEl = null; } }
 if (STILL || NOUI) $('hint').hidden = true; else setTimeout(hideHint, 9000);
 

@@ -229,6 +229,7 @@ class Railing:
     drink_rail: bool = False             # deck board on top of the rail (IRX): collection/color below
     drink_rail_collection: Optional[str] = None
     drink_rail_color: Optional[str] = None
+    drink_rail_mount: str = "between"    # IRX drink rail: "over" the posts (posts cut level under one continuous board, post inserts, no caps) | "between" them (post caps stay)
 
 
 @dataclass
