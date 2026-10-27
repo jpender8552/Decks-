@@ -1,5 +1,5 @@
 {
- "_source": "Drafted by the compliance review (scratchpad messner/compliance/g002_notes.md, 27 Oct 2026) for the 2025 CRC / CWUIC; values known from asbuilt.json filled in, (V) = field-verify, [ ] = for the engineer of record or the owner to complete. Sections 2 and 3 (codes, design criteria) are on G-001.",
+ "_source": "Drafted by the compliance review (scratchpad messner/compliance/g002_notes.md, 27 Oct 2026) for the 2025 CRC / CWUIC; values known from asbuilt.json filled in, (V) = field-verify, [ ] = for the engineer of record or the owner to complete. Sections 2 and 3 (codes, design criteria) are on G-001. Connector fasteners checked against the Simpson C-C-2026 catalog pages in jobs/messner_site/submittal/product_data/.",
  "notes": [
   {
    "head": "1. Project description",
@@ -8,7 +8,7 @@
     "- The deck is about 51 ft long (51'-3\" along the house) (V) and its walking surface is about 10'-9\" to 12'-9\" above the lower yard (V).",
     "- Deck area is about 741 sq ft (V); stair and landing area is [___] sq ft.",
     "- There is no change of use or occupancy, and no new conditioned floor area.",
-    "Existing vs. new work. Work shown is existing as-built construction unless it is tagged NEW and clouded. NEW items are corrective work required for code compliance and are built under this permit.",
+    "Existing construction. The sheets record the existing deck, landing and stair as built; values marked (V) are field-verified before the final submittal.",
     "Applicant/builder. Owners: Adam Messner and Allison Rhodes Messner, Trustees of The 2017 Messner Family Trust. Assessor's parcel number: 051-091-11.",
     "Zoning and planning. Zoning district R1. Setbacks and any Design Review determination: [per Marin County Planning, reference ___]."
    ]
@@ -16,7 +16,7 @@
   {
    "head": "4. General notes",
    "items": [
-    "Field verification. Before any corrective work, the owner verifies all existing dimensions, member sizes, connections and conditions shown, and reports any difference to the engineer of record and the building inspector. Dimensions marked \"(V.I.F.)\" were verified in the field on [date].",
+    "Field verification. The owner verifies the existing dimensions, member sizes, connections and conditions shown, each value marked (V), and reports any difference to the engineer of record and the building inspector. Dimensions marked \"(V.I.F.)\" were verified in the field on [date].",
     "Concealed work. Existing work that inspection cannot see was verified as listed in the Verification Log on this sheet: footings, ledger attachment and flashing, guard post blocking, and tension-tie anchorage. Concealed elements are exposed as the building official directs, or certified by the engineer of record's field observation letter dated [___].",
     "Photo log. The dated photo log [reference] is part of this submittal. Each photo is identified by grid location (posts A1-A7 inner row, B1-B7 outer row, L1-L4 landing).",
     "Prescriptive and engineered portions. Deck framing not identified as engineered complies with CRC Section R507 (prescriptive). These elements are engineered under CRC R301.1.3 and R301.1.3.1, and are shown on sheets stamped by a California-licensed engineer:",
@@ -26,7 +26,7 @@
     "- the deck lateral-force-resisting system;",
     "- the guard post attachment, where not covered by manufacturer test data.",
     "Manufacturer's instructions. Products are installed per the manufacturer's current written installation instructions and evaluation reports. Where these conflict with the drawings, the more restrictive governs. Substitutions need approval from the engineer of record and the building official.",
-    "Discrepancies. Report any condition found during corrective work that differs from the drawings to the engineer of record before proceeding.",
+    "Discrepancies. Any condition found in the field that differs from the drawings is reported to the engineer of record and the building inspector.",
     "Special inspection. None is required for the prescriptive portions. If the engineer of record specifies post-installed adhesive anchors, provide special inspection per the anchor's evaluation report and CBC 1705. Otherwise use through-bolts or mechanical screw anchors."
    ]
   },
@@ -58,16 +58,18 @@
    ]
   },
   {
-   "head": "6. Connector schedule (fill in from field verification)",
+   "head": "6. Connector schedule (as built; fasteners per the Simpson C-C-2026 catalog)",
    "items": [
-    "Joist to ledger — Simpson LUS[28/210] — [Z] — 10d HDG common, all face and joist holes — [existing / verify]",
-    "Joist to outer beam — Simpson H2.5A[Z] — [Z] — (10) 0.131 x 1-1/2 in. per manufacturer — [existing]",
-    "Joist to inner beam — Simpson H2.5AZ — Z — (10) 0.131 x 1-1/2 in. per manufacturer — [NEW if missing]",
-    "Post to beam — [model; rated, sized for 6x post and 6x beam] — per manufacturer — [verify / NEW]",
-    "Post to pier — [cast-in model] — per manufacturer — [existing]",
-    "Deck-to-house lateral — Simpson DTT2Z (2 min., within 24 in. of each end) — Z — per manufacturer, 1/2 in. rod/bolt — [1 existing, 1 NEW]",
-    "Knee brace ends — per engineer — HDG — per engineer — [NEW]",
-    "Stair stringer top — [model] — Z — per manufacturer — [verify]"
+    "Joist to ledger: Simpson LUS210Z face-mount hanger at every joist (stamp legible). Catalog: (8) 0.148\" x 3\" face + (4) 0.148\" x 3\" joist nails, or the catalog's SD connector screws (SD screws seen). Fasteners in every hole (V).",
+    "Joists to the B1 header: LUS-type face-mount hangers on the header's house-side face. Model and fasteners (V).",
+    "Header to beam B1: A35 / LTP4-type framing clips, about one per joist bay. Catalog: (12) 0.131\" x 1-1/2\" nails each (A35 and LTP4). Model and fasteners (V).",
+    "Joist to outer beam B2: Simpson H2.5A at each joist (about 10 seen). Catalog: (10) 0.131\" x 2-1/2\" nails, (5) into the joist and (5) into the beam. Count and nails (V).",
+    "Post to beam: column cap, black-painted plate with galvanized legs (CCQ/ECCQ-type). Catalog: CCQ66SDS2.5 (16) 1/4\" x 2-1/2\" SDS to the beam + (14) to the post; ECCQ66SDS2.5 (14) + (14). Model and fasteners (V).",
+    "Post to pier: cast-in standoff post base (CBSQ66-type), 1\" standoff. Catalog: (14) 1/4\" x 2\" SDS into the post. Model and screws (V).",
+    "Deck-to-house lateral: Simpson DTT2Z. Catalog: (8) 1/4\" x 1-1/2\" SDS into the joist + a 1/2\" threaded rod or bolt with the washer through the ledger and band. 1 confirmed (IMG_5677); count, locations and the anchorage inside the house (V). CRC R507.9.2: 2 devices of 1,500 lb within 24\" of each end of the deck.",
+    "Knee-brace ends: not visible (V), per the engineer of record.",
+    "Stair stringers to the deck header: LSCZ-type adjustable stringer connectors, 2 seen (V). Catalog: (8) 0.148\" x 1-1/2\" into the header + (8) into the stringer's wide face + (1) into its narrow face (#9 x 1-1/2\" SD screws may substitute).",
+    "Treads to the outer stringers: TA-type staircase angles at every step. Catalog TA10Z: (4) 1/4\" x 1-1/2\" SDS into the stringer + (3) into the tread. Model (V)."
    ]
   },
   {
@@ -86,11 +88,11 @@
     "- Each joist bearing on a single-ply (solid) beam has a mechanical connector (CRC R507.6.1).",
     "- Joists framing into the ledger are supported by approved joist hangers.",
     "- Blocking or hangers at least 60 percent of joist depth are provided at joist ends and bearings. Rim joists are fastened to each joist end with 3-10d nails or 3 No. 10 x 3 in. screws (CRC R507.6.2).",
-    "Knee braces (ENGINEER). Knee braces are connected at both ends as detailed by the engineer of record [or: knee braces are removed per the engineer of record's evaluation]. Braces do not obstruct required escape paths.",
+    "Knee braces (engineered). The knee braces are 6x6 in the planes of the beams (S-101); their end connections are not visible (V) and are as the engineer of record evaluates and details them. Braces do not obstruct required escape paths.",
     "Ledger.",
     "- The ledger is at least a 2x8 PT No. 2. It is fastened to the existing house band joist with 1/2 in. [through-bolts/lag screws] at [__] in. o.c., staggered, with placement per CRC Table R507.9.1.3(2).",
     "- The ledger does not support beams or girders, and it is not attached to veneer or stucco.",
-    "- The existing band joist is [2x solid-sawn / 1 in. engineered rim], bearing on the wall below (CRC R507.9.1.2).",
+    "- The existing main-floor band joist is [2x solid-sawn / 1 in. engineered rim] (V). It sits at the end of the main-floor cantilever, about 2'-9\" past the basement wall (V), not on the wall below: the ledger attachment is engineered (CRC R507.9.1.2, R301.1.3).",
     "Ledger flashing and WRB.",
     "- Continuous flashing over the ledger with its vertical leg lapped under the water-resistive barrier, per CRC R507.9.1.5 through R507.9.1.8 and R703.4.",
     "- Exterior wall covering ends above the deck surface.",
@@ -124,7 +126,7 @@
     "- Post spacing [___] in. o.c. maximum.",
     "- Structural basis: [manufacturer test report/letter dated ___] or [engineer of record calculation, sheet ___], including wind on the glass infill.",
     "Fascia post attachment.",
-    "- Each fascia-mounted post bracket is fastened with [___] into solid blocking or a joist.",
+    "- As seen, each fascia bracket is fastened with (2) galvanized hex lags and washers per flange through the PVC fascia into the rim; the blocking behind it is not visible (V). ESR-4217 covers the bracket on concrete only: the attachment to the wood rim is engineered.",
     "- The rim or end joist is connected to adjacent joists to prevent rotation (CRC R507.10.1, R507.10.1.1).",
     "- Fasteners do not rely only on end-grain withdrawal.",
     "Glass.",
@@ -133,7 +135,7 @@
     "- Each panel is permanently marked per CRC R324.1, and the mark is visible after installation.",
     "- Glass panels are infill. The top rail and posts carry the guard load.",
     "Stair and landing guards.",
-    "- Vertical cable infill, [manufacturer/system], installed and tensioned per the manufacturer's instructions.",
+    "- Vertical stainless cable infill (IRX-type, system (V)), about 3-1/4\" o.c. as seen (V), installed and tensioned per the manufacturer's instructions.",
     "- Cable spacing and post spacing are such that a 4-3/8 in. sphere (stair) or a 4 in. sphere (landing) does not pass.",
     "Stairs.",
     "- Clear width 36 in. minimum (CRC R318.7.1).",
@@ -146,7 +148,7 @@
     "- Bottom landing at grade: [concrete/paver], [__] in. x [__] in., slope 2 percent maximum (CRC R318.7.7).",
     "Stair treads and stringers.",
     "- TimberTech Advanced PVC treads on stringers spaced at [__] in. o.c. maximum, per the manufacturer's stair-tread requirements.",
-    "- Stringers are positively attached at the top with [connector] and anchored at the bottom to a concrete footing or pad.",
+    "- As built, the stringers hang from the deck header on LSCZ-type connectors (2 seen (V)), and the lower flight bears on a PT plank at grade (V): no concrete pad was seen. The engineer of record confirms the bearing.",
     "Handrail.",
     "- At least one side of each flight; continuous for the full length of the flight.",
     "- Top of rail 34 to 38 in. above the tread nosings.",

@@ -29,7 +29,7 @@
    "occupancy": "R-3 / U accessory deck; Type V-B (CRC)",
    "live_psf": 40,
    "dead_psf": 12,
-   "dead_psf_text": "12 psf actual, including the PVC decking — engineer of record [V]",
+   "dead_psf_text": "12 psf actual, including the PVC decking (V) — engineer of record",
    "guard_lb": 200,
    "snow_psf": 0,
    "wind_text": "Vult [___] mph, Risk Category II, Exposure [B/C], Kzt [___] (CBC 1609, ASCE 7-22) — engineer of record",
@@ -48,8 +48,7 @@
  },
  "geometry": {
   "size_mode": "frame",
-  "height_in": 129,
-  "height_high_in": 153,
+  "height_in": 161,
   "attachment": "ledger",
   "picture_frame": true,
   "board_direction": "parallel",
@@ -136,7 +135,7 @@
   "lateral_ties": 2,
   "blocking_midspan": "house",
   "knee_brace_size": "6x6",
-  "knee_brace_bolts": "end connections not visible — per the engineer of record (2018 detail: 5/8\" x 10\" lag each end + LTP4 each side)",
+  "knee_brace_bolts": "end connections: not visible (V) — per the engineer of record",
   "knee_brace_layout": {
    "outer": {
     "single": [
@@ -156,10 +155,10 @@
    }
   },
   "beam_notes": [
-   "B1 (inner, ~87\" from the house): the house-side joists hang from a continuous header on it (LUS-type hangers, A35 / LTP4-type clips header to beam)",
-   "B2 (outer, ~172\" from the house): the joists bear on top, Simpson H2.5A at each joist"
+   "B1 (inner, ~87\" from the house (V)): the house-side joists hang from a continuous header on it (LUS-type hangers, A35 / LTP4-type clips header to beam)",
+   "B2 (outer, ~172\" from the house (V)): the joists bear on top, Simpson H2.5A at each joist (~10 seen; count (V))"
   ],
-  "footing_words": "Existing round concrete piers ~12-14\" dia., 4-12\" above grade, cast-in post bases (CBSQ66-type); 2018 design: 12\" Quik-Tube pier on a 15\" sq x 12\" spread footing, 36\" min. into competent bearing, (4) #4 vert + #3 ties — size and depth as built to be verified (V)"
+  "footing_words": "Existing round concrete piers ~12-14\" dia., 4-12\" above grade, cast-in CBSQ66-type bases; footing size and depth (V) (2018 design: 12\" Quik-Tube pier on a 15\" sq x 12\" footing, 36\" min. into competent bearing)"
  },
  "decking": {
   "brand": "TimberTech",
@@ -209,7 +208,8 @@
    "landing": "grade",
    "stringer_size": "2x12",
    "closed_risers": true,
-   "mid_support": false
+   "mid_support": false,
+   "landing_grade_in": -25
   }
  ],
  "extras": {
@@ -231,15 +231,167 @@
    "post_caps": "cap and leg fasteners (screw holes look empty)",
    "knee_brace_bolts": "brace end connections (none visible)",
    "footings": "pier size and depth (expose one, or the engineer certifies)",
-   "lateral_ties": "one DTT2Z seen at the ledger; count and photograph each, and the anchorage inside",
+   "lateral_ties": "one DTT2Z seen at the ledger (IMG_5677, ~30-35 ft from the north end); count, locations and the anchorage inside",
    "joist_ties": "H2.5A at the outer beam (~10 seen)",
    "guard_system": "IRX system, glass part numbers and the bracket fastening",
    "guard_blocking": "blocking behind the rim at each guard post (not visible)",
    "glass_marks": "the safety-glazing mark on each panel",
    "stair_landing": "3' stair width and the 3'x3' landing (code minimums: tape them)",
-   "stair_base": "the lower flight sits on a PT plank at grade, no concrete pad seen"
+   "stair_base": "the lower flight sits on a PT plank at grade, no concrete pad seen",
+   "stair_guard": "stair guard ~38\" over the nosings and the landing guard height",
+   "house_cantilever": "the main-floor cantilever past the basement wall (~2'-9\") and what carries the band"
   },
-  "notes": "messner_notes.json"
+  "notes": "messner_notes.json",
+  "facts": {
+   "_about": "The deck as built, in the words every sheet uses (from asbuilt.json and the photo inventory). (V) = field-verify. Datum: z = 0 at the outer-row (B2) grade, so geometry.height_in (161\") is the surface over that grade; elevations in inches from it, y in inches out from the house face.",
+   "height": "Deck surface ~10'-9\" over the inner-row (B1) pier tops and ~12'-9\" over the outer-row (B2) pier tops (V)",
+   "pier_top_in": {
+    "inner": 32,
+    "outer": 8
+   },
+   "pier_dia_in": 13,
+   "pier_reveal_in": 8,
+   "grade_profile_in": [
+    [
+     -60,
+     53.5
+    ],
+    [
+     8,
+     53.5
+    ],
+    [
+     87,
+     24
+    ],
+    [
+     172,
+     0
+    ],
+    [
+     190,
+     -5
+    ],
+    [
+     190,
+     -41
+    ],
+    [
+     260,
+     -64
+    ]
+   ],
+   "grade": "Grade falls away from the house: ~2' between the pier rows; the stair's lower flight lands near the house on a PT plank (V)",
+   "retaining_wall": {
+    "y_in": 190,
+    "top_in": -5,
+    "bottom_in": -41,
+    "words": "~3' timber retaining wall just outboard of the outer piers (seen; location and height (V))"
+   },
+   "house_cantilever_in": 33,
+   "house": "The main floor cantilevers ~2'-9\" (V) past the basement wall below (house sheets A-1.10); a soffit runs under the ledger",
+   "ledger": "2x12 ledger (V) to the main-floor band: 1/2\"-5/8\" bolts or lags (V) with ~2-1/2\" sq. plate washers, about one per joist bay (~16\" o.c.) (V)",
+   "ledger_flashing": "Flashing: not visible — verify (V); CWUIC 504.7.3.1 6\" vertical metal flashing at the deck-to-wall line (V)",
+   "ledger_support": "Ledger on the cantilevered main-floor band (V) — engineered (CRC R507.9.1.2 / R301.1.3)",
+   "footings": "Existing round concrete piers ~12-14\" dia., 4-12\" above grade, cast-in CBSQ66-type bases; footing size and depth (V) (2018 design: 12\" Quik-Tube pier on a 15\" sq x 12\" footing, 36\" min. into competent bearing)",
+   "post_base": "Cast-in standoff post base, black-painted (CBSQ66-type): (14) 1/4\" x 2\" SDS per the catalog — model and screws (V)",
+   "posts": "14 6x6 PT posts in two rows of 7: ~9' (inner row, B1) and ~11' (outer row, B2) (V); stations estimated ~90\" o.c. (V)",
+   "post_caps": "Post cap: black-painted plate with galvanized legs on the post (CCQ/ECCQ-type) — model and fasteners (V)",
+   "beams": "6x12 solid-sawn drop beams B1 (~87\" from the house) and B2 (~172\") (V); PT DF or redwood (V); every splice over a post (V)",
+   "joists": "2x10 PT DF joists @ 16\" o.c. (grade stamp (V)); Simpson LUS210Z at every joist at the ledger",
+   "header": "B1: the house-side joists hang from a continuous header on the beam (LUS-type hangers; A35 / LTP4-type clips header to beam, ~1 per bay)",
+   "rims": "Single 2x10 rim; PVC fascia over it, two boards high, face-fastened",
+   "joist_ties": "Simpson H2.5A at each joist on the outer beam B2 (~10 seen; count (V)): (10) 0.131\" x 2-1/2\" nails per the catalog",
+   "lateral_ties": "Simpson DTT2Z: 1 confirmed (IMG_5677, ~30-35 ft from the north end (V)); total count and locations (V); CRC R507.9.2: 2 x 1,500 lb within 24\" of each end",
+   "lateral_tie_seen_ft_from_north": 32.5,
+   "lateral_tie_fastening": "(8) 1/4\" x 1-1/2\" SDS into the joist + a 1/2\" threaded rod or bolt through the ledger and band (catalog); the anchorage inside (V)",
+   "knee_braces": "6x6 knee braces at 45° in the planes of the beams: B2 — singles at both end posts + Y-braces at posts 2, 4 and 6; B1 — one at the south end post",
+   "knee_brace_ends": "Knee-brace end connections: not visible (V) — per the engineer of record",
+   "blocking": "Solid 2x10 blocking over both beams + one continuous row at mid-span of the house-side bay (as seen)",
+   "guard_blocking": "Blocking behind the rim at each guard post: not visible (V)",
+   "decking": "TimberTech Vintage Weathered Teak (5.5\" PVC boards), parallel to the house",
+   "border": "a darker Vintage board (color V)",
+   "deck_fasteners": "hidden clips (CONCEALoc-type) (V)",
+   "fascia": "PVC fascia over the rim, two boards high, face-fastened",
+   "guard": "Black aluminum guard, IRX-type (system and part numbers (V)): fascia-mounted posts ~5-6' o.c., top rail, bottom channel, clear glass infill, 42\"",
+   "guard_bracket": "Fascia bracket (U-cup with side flanges): (2) galvanized hex lags + washers per flange through the PVC fascia into the rim, as seen; an engineered connection on wood (ESR-4217 covers the bracket on concrete only)",
+   "stairs": "Stair to the lower yard: 16 risers ~6-5/8\" (11 + 5), 14 treads ~11-1/2\"; ~3' wide and a ~3' x 3' landing on 4 posts (V)",
+   "stringers_per_flight": 3,
+   "stringers": "3 stringers per flight: a notched 3x center stringer + 2 solid outer stringers",
+   "stair_connectors": "Simpson LSCZ-type stringer connectors at the deck header: 2 seen (V)",
+   "tread_angles": "TA-type tread angles on the outer stringers, every step",
+   "stair_base": "Lower flight bears on a PT plank at grade (V) — no concrete pad",
+   "stair_guard": "Stair and landing guards: black aluminum posts and top rail, vertical stainless cable ~3-1/4\" o.c. (V); ~38\" over the nosings (V); landing guard height (V)",
+   "handrail": "Round black graspable handrail on one side of each flight, looped returns",
+   "area": "~741 SF (V)",
+   "summary": [
+    [
+     "Height",
+     "~10'-9\" over the inner-row pier tops, ~12'-9\" over the outer-row pier tops (V); grade falls away from the house"
+    ],
+    [
+     "Footings",
+     "Existing round concrete piers ~12-14\" dia., 4-12\" above grade, cast-in CBSQ66-type bases; footing size and depth (V) (2018 design: 12\" Quik-Tube pier on a 15\" sq x 12\" footing, 36\" min.)"
+    ],
+    [
+     "Posts",
+     "14 6x6 PT in two rows of 7: ~9' inner / ~11' outer (V); caps CCQ/ECCQ-type, black plate + galvanized legs — model and fasteners (V)"
+    ],
+    [
+     "Beams",
+     "6x12 drop beams: B1 ~87\" and B2 ~172\" from the house (V), PT DF or redwood (V); B1 carries a header for the house-side joists"
+    ],
+    [
+     "Joists",
+     "2x10 PT DF @ 16\" o.c. (grade stamp (V)); LUS210Z at the ledger; H2.5A at each joist on B2 (~10 seen; count (V))"
+    ],
+    [
+     "Ledger",
+     "2x12 (V) on the cantilevered main-floor band (V): 1/2\"-5/8\" bolts or lags, plate washers ~16\" o.c. (V); flashing not visible (V) — engineered (R507.9.1.2 / R301.1.3)"
+    ],
+    [
+     "Lateral",
+     "Simpson DTT2Z: 1 confirmed (IMG_5677, ~30-35 ft from the north end (V)); count and locations (V); R507.9.2: 2 x 1,500 lb within 24\" of each end"
+    ],
+    [
+     "Knee braces",
+     "6x6 at 45° in the beam planes: B2 singles at both end posts + 3 Y-braces, B1 one at the south end post; end connections not visible (V)"
+    ],
+    [
+     "Blocking",
+     "Solid 2x10 over both beams + mid-span of the house-side bay; behind the guard posts not visible (V)"
+    ],
+    [
+     "Decking",
+     "TimberTech Vintage Weathered Teak; border a darker Vintage board (color V); hidden clips (CONCEALoc-type) (V); PVC fascia"
+    ],
+    [
+     "Guard",
+     "Black aluminum, IRX-type (V), 42\", glass infill (safety mark (V)), fascia-mounted posts ~5-6' o.c.: bracket lags as seen, blocking (V)"
+    ],
+    [
+     "Stairs",
+     "16 risers (11 + 5) ~6-5/8\", 3 stringers per flight, LSCZ-type 2 seen (V), TA-type angles; lower flight on a PT plank at grade (V); vertical cable ~38\" (V), handrail one side"
+    ]
+   ],
+   "prior_permit": "Prior permit: Marin County B.P. 157826 (Deck & Stairs), issued 03/01/2018 — the original deck at the north end (2018 design). Final status (V).",
+   "scope": "This application covers the deck, landing and stair as they now stand, including the extension to the south built after B.P. 157826.",
+   "cover": {
+    "owner": "Owner / applicant: Adam Messner and Allison Rhodes Messner, Trustees of The 2017 Messner Family Trust — owner-builder.",
+    "responsible": [
+     "Engineer of record (engineered portions): [name, CA license no.] (V).",
+     "Drawings prepared by: PCG — Pender Consulting Group LLC, Jade Pender, 303-550-9558."
+    ],
+    "deferred": [
+     "None."
+    ],
+    "conventional": [
+     "Conventional (CRC R507, R318–R321, R324): joists, hangers, decking, stair geometry, guards and handrail heights and openings, glazing.",
+     "Non-conventional, designed by the engineer of record per CRC R301.1.3 (see the stamped calculations): the 6x12 beams; the lateral system (tension ties, bracing); the post-to-beam connections; the fascia-mounted guard attachment; the ledger at the cantilevered floor; the footings on the slope."
+    ],
+    "footing_depth": "Footing depth: 12\" min. below undisturbed grade (CRC R403.1.4); bear on competent native material."
+   }
+  }
  },
  "brand": {
   "dir": "jobs/messner_site/brand"
