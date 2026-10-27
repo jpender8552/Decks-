@@ -242,10 +242,12 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
         if st.landing_rail_lf:
             lab.append((f"Landing guard rail ({nm_})", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
+        if getattr(st, "own_footings", 0):      # its landing + carrier posts on its own 12" caissons: the card's hole, no large-footing add-on
+            lab.append((f"{nm_} — 12\" caissons under its landing and carrier posts", st.own_footings, "hole", lr["caisson_each"], "rate card (12\": no large-footing add-on)"))
     for ss in stair_specs(t):
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144
-            if getattr(ss, "landing_footing", "") == "deck":   # its 4 posts stand on the deck's own footings: installed (and counted) with the deck's
+            if getattr(ss, "landing_footing", "") in ("deck", "caisson12"):   # its 4 posts stand on the deck's footings or the stair's own caissons (above)
                 lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"], "base rate — frame + decking; its footings are in the footing line"))
                 continue
             if s.framing.footing_type == "diamond_pier":     # the card's own rates: frame + decking per SF of landing, and $50 a pier for its 4 Diamond Piers
