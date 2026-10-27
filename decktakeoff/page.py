@@ -513,7 +513,10 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             c, f, m = ap.sell, ap.retail, ap.monthly
             basis = f"owner-set: {ap.basis}, sold on its own (outside the deck's cost and margin)"
             if o.get("facts") is None:
-                o = dict(o, facts=scope_words(resolve(roof, surfaces_of(t.layout if rs is spec else run(rs)[0].layout))))
+                from .pricing import roof_size_ft
+                _w, _d = roof_size_ft(roof)
+                o = dict(o, facts=_roof_scope(resolve(roof, surfaces_of(t.layout if rs is spec else run(rs)[0].layout)),
+                                              dict(width_ft=_w, depth_ft=_d, area_sf=ap.sf)))
         elif o.get("price") is not None:         # a price the owner set outright
             c, f, m = fixed_terms(spec, o["price"])
             basis = "owner-set price"
@@ -941,9 +944,11 @@ def _plan_boxes(L) -> list:
     return [("Deck", z.name, z.x0 / 12, (z.x0 + z.W) / 12, z.wall_y / 12, (z.wall_y + z.D) / 12, L.spec.geometry.height_in / 12) for z in L.zones]
 
 
-def _roof_plan_svg(L, q) -> str:
+def _roof_plan_svg(L, q, size=None) -> str:
     """Plan (house at the top, the yard below): every deck zone shaded by its level, the house walls, the roof's frame
-    hatched with its posts, the size and the level heights. Feet are the drawing units."""
+    hatched with its posts, the size (size = (W, D, SF) as sold; default the frame as built) and the level heights. Feet are
+    the drawing units."""
+    sW, sD, sA = size or (q["W"], q["D"], q["area"])
     boxes = _plan_boxes(L)
     xs = [b[2] for b in boxes] + [b[3] for b in boxes] + [q["x0"], q["x1"]]
     ys = [b[4] for b in boxes] + [b[5] for b in boxes] + [q["y0"], q["y1"]]
@@ -964,7 +969,7 @@ def _roof_plan_svg(L, q) -> str:
     cx, cy = (q["x0"] + q["x1"]) / 2, (q["y0"] + q["y1"]) / 2
     s.append(f'<rect x="{cx - 6.6:.2f}" y="{cy - 1.55:.2f}" width="13.2" height="3.1" rx="0.3" fill="#fbf9f4" opacity="0.92"/>')
     s.append(f'<text x="{cx:.2f}" y="{cy - 0.2:.2f}" text-anchor="middle" font-size="1.15" font-weight="800" fill="#141416" {f}>{E(q["name"])}</text>')
-    s.append(f'<text x="{cx:.2f}" y="{cy + 1.05:.2f}" text-anchor="middle" font-size="0.95" fill="#3a352d" {f}>{E(ftin(q["W"] * 12))} x {E(ftin(q["D"] * 12))} · {q["area"]:g} SF</text>')
+    s.append(f'<text x="{cx:.2f}" y="{cy + 1.05:.2f}" text-anchor="middle" font-size="0.95" fill="#3a352d" {f}>{E(ftin(sW * 12))} x {E(ftin(sD * 12))} · {sA:g} SF</text>')
     by_level = {}
     for lv, zn, a, b, c, d, z in boxes:
         e = by_level.setdefault(lv, [a, b, d, z])
@@ -1005,6 +1010,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     ap = price_louvered(spec, r)                     # the same rule the deck proposal's option block uses
     c, f, m = ap.sell, ap.retail, ap.monthly
     show_fin = spec.extras.show_financing
+    # the size as sold (the roof's x / y extents, what the price is per SF of); the frame as built (q) can differ by a post inset
+    Wp, Dp, Ap = float(rp.get("width_ft") or q["W"]), float(rp.get("depth_ft") or q["D"]), float(rp.get("area_sf") or q["area"])
     facts = {k: list(v) for k, v in PL.LOUVER_FACTS.items()}
     facts.update(a.get("facts") or {})
     rd = Path(renders_dir) if renders_dir else out / "renders"
@@ -1033,7 +1040,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     title, eyebrow = PL._title_parts(name, spec.site.address)
     eyebrow = " · ".join(x for x in (eyebrow, ", ".join(x for x in (spec.site.city, spec.site.state) if x)) if x)
     rail_posts = sum(1 for pt in q["posts"] if pt["on_rail"])
-    tele = [(f"{q['area']:g}", "square feet"), (ftin(q["W"] * 12), "along the house"), (ftin(q["D"] * 12), "out from the house"),
+    tele = [(f"{Ap:g}", "square feet"), (ftin(Wp * 12), "along the house"), (ftin(Dp * 12), "out from the house"),
             (ftin(q["clear_ft"] * 12), "clear under the beams"), (str(len(q["blades"])), "louver blades"), (str(len(q["posts"])), "posts on the deck")]
     prices = ([("Check or ACH", money(c), f"{(1 - c / f) * 100:.0f}% below the financed price"), ("Financed", money(f), "no money down"),
                ("Monthly", money(m), "6.99% · 10 years")] if show_fin else [("Price · check or ACH", money(c), "")])
@@ -1054,12 +1061,12 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     w('<h2 class="kicker" id="g-what">What it is <span class="tag">' + E(f"{q['brand']} {q['product']}") + "</span></h2>")
     if facts.get("what"):
         w("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in facts["what"]) + "</ul>")
-    w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in scope_words(q)) + "</ul>")
+    w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in _roof_scope(q, rp)) + "</ul>")
     # ---- size and placement
     under = sorted({f"{b[0]} {b[1]}" for b in _plan_boxes(L) if min(q["x1"], b[3]) - max(q["x0"], b[2]) > 0.5 and min(q["y1"], b[5]) - max(q["y0"], b[4]) > 0.5})
     w('<h2 class="kicker pb" id="g-size">Size and placement <span class="tag">plan · house at the top</span></h2>')
-    w(f'<figure class="plan-fig">{_roof_plan_svg(L, q)}<figcaption>The roof (hatched) and its posts over the deck; the darker the deck, the higher the level.</figcaption></figure>')
-    reads = [("Size", f"{ftin(q['W'] * 12)} along the house x {ftin(q['D'] * 12)} out from it, {q['area']:g} SF"),
+    w(f'<figure class="plan-fig">{_roof_plan_svg(L, q, (Wp, Dp, Ap))}<figcaption>The roof (hatched) and its posts over the deck; the darker the deck, the higher the level.</figcaption></figure>')
+    reads = [("Size", f"{ftin(Wp * 12)} along the house x {ftin(Dp * 12)} out from it, {Ap:g} SF"),
              ("Over", (", ".join(under) if under else "the deck") + (f" — {ftin(q['z_deck'] * 12)} above grade" if q["z_deck"] else "")),
              ("House side", "attached to the house at the soffit / roof line — no posts at the house" if q["attach"] == "house" else "freestanding, posts at every corner"),
              ("Height", f"top of the frame {ftin((q['z_top'] - q['z_deck']) * 12)} above the deck; {ftin(q['clear_ft'] * 12)} clear under the beams")]
@@ -1107,7 +1114,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if facts.get("warranty"):
         w('<h2 class="kicker" id="g-warranty">Warranty</h2><ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in facts["warranty"]) + "</ul>")
     # ---- investment, schedule, terms
-    rows = [(f"{q['brand']} {q['product']} — {ftin(q['W'] * 12)} x {ftin(q['D'] * 12)}", c, f, m, "item")]
+    rows = [(f"{q['brand']} {q['product']} — {ftin(Wp * 12)} x {ftin(Dp * 12)}", c, f, m, "item")]
     if has_screens:
         rows.append((sa.get("label") or "Motorized screens", sc_c, sc_f, sc_m, "addon"))
         tf = f + sc_f
@@ -1137,12 +1144,24 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
         assert bad not in txt, f"roof document carries internal wording: {bad}"
     (out / "page.html").write_text(page)
     json.dump(files, open(out / "files.json", "w"), indent=1)
-    pr = dict(roof=dict(sell=c, financed=f, monthly=m, area_sf=q["area"], basis=ap.basis),
+    pr = dict(roof=dict(sell=c, financed=f, monthly=m, area_sf=Ap, basis=ap.basis),
               screens=dict(sell=sc_c, financed=sc_f, monthly=sc_m, estimate=sc_est) if has_screens else None)
     result = dict(html=str(out / "page.html"), files=files, pricing=pr, roof=q)
     if pdf:
         result["pdf"] = render_pdf(page, files, str(out / "page.pdf"), key, hero=hero)
     return result
+
+
+def _roof_scope(q, rp: Optional[dict] = None) -> list:
+    """The louvered engine's scope lines for the roof, with the size as sold (what the price per SF is of) where the engine
+    quotes the frame as built (a post set on the rail line can make the frame a hair deeper)."""
+    from .louvered import scope_words
+    lines = scope_words(q)
+    if rp and rp.get("area_sf") and abs(float(rp["area_sf"]) - float(q["area"])) > 0.01:
+        built = f"{ftin(q['W'] * 12)} x {ftin(q['D'] * 12)} ({q['area']:g} SF)"
+        sold = f"{ftin(float(rp['width_ft']) * 12)} x {ftin(float(rp['depth_ft']) * 12)} ({float(rp['area_sf']):g} SF)"
+        lines = [x.replace(built, sold) for x in lines]
+    return lines
 
 
 def _posts_over_columns(L, q) -> Optional[str]:

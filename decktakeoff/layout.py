@@ -1288,12 +1288,12 @@ class StepSkirt:
         return [round(self.z_top - min(z for _, _, z in p), 2) for f in self.faces for p in f.panels]
 
     def panel_screws(self) -> int:
-        """2 at the rim, 2 at every blocking row the panel crosses."""
+        """TimberTech TOPLoc fascia screws, the owner's rule: 2 at each board end, then 2 every 12" on the nailers between."""
         n = 0
         for f in self.faces:
             for p in f.panels:
-                a, b, zb = min(q[0] for q in p), max(q[1] for q in p), min(q[2] for q in p)
-                n += 2 + 2 * sum(1 for ra, rb, zc in f.rows if ra < b - 1 and rb > a + 1 and zc - 1.75 > zb - 0.01)
+                h = self.z_top - min(q[2] for q in p)
+                n += 4 + 2 * max(0, int(math.ceil((h - 2.0) / 12.0 - 1e-9)) - 1)
         return n
 
     def furring_pieces(self) -> List[Tuple[float, str]]:
@@ -1416,8 +1416,10 @@ def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
             if rim_bot - zb >= 4.0:
                 sf.studs.append((round(p, 2), round(zb, 2)))
         if sf.studs:
-            z_rows = [-drop + SKIRT_GAP_BOTTOM + 1.75]
-            z_rows.append((rim_bot + z_rows[0] + 1.75) / 2)
+            # blocking rows: one at the panels' bottom, more between it and the rim so no fastening line is over 12" from the next
+            z_b = -drop + SKIRT_GAP_BOTTOM + 1.75
+            n_mid = max(0, int(math.ceil((rim_bot - 1.0 - z_b) / 12.0 - 1e-9)) - 1)
+            z_rows = [z_b] + [round(z_b + (rim_bot - 1.0 - z_b) * (k + 1) / (n_mid + 1), 2) for k in range(n_mid)]
             st_pos = sorted(p for p, _ in sf.studs)
             for zc in z_rows:
                 run_a = None

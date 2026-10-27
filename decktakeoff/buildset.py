@@ -9,7 +9,7 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, MUTE
+from .drawings import all_sheets, sheet, sheet_meta, T, R, LN, esc, INK, GOLD, MUTE, inch
 from .layout import Layout
 from .scene import build_scene, Scene, PHASES
 from .takeoff import Takeoff
@@ -23,6 +23,8 @@ STEP_VIEWS = {1: "step1", 2: "step2", 3: "step3", 4: "step4", 5: "step5", 6: "st
 
 def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
     """Build steps generalized from the takeoff: what goes in, how to build it, what to check — per phase."""
+    if hasattr(L, "parts"):                 # two levels / a wrap: each phase once for the whole deck, every level named in it
+        return composite_step_sheets(t, L)
     s = L.spec
     timber = s.is_timber
     lines = t.lines
@@ -189,8 +191,175 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             check=["Ledger flashed and counterflashed — hose test before the ceiling closes", "Posts plumb over blocking, beam level, rafters tied",
                    "Panels straight, seams engaged full length, no oil-canning; snow bar continuous" if ss else "Shingles straight, ridge cap sealed",
                    "Gutter falls to the outlets, downspouts discharge away from the footings" if s.extras.cover_gutters else "Water sheds clear of the deck edge"]))
+    lt_ = _lighting_step(t)                   # low-voltage lights, when the order carries them
+    if lt_:
+        steps.append(lt_)
     steps[-1]["check"] = steps[-1]["check"] + ["End of construction"]     # on whichever step is built last
     for i, st_ in enumerate(steps):          # numbered as built: the phase numbers skip (no stone bases, no cover)
+        st_["n"], st_["code"] = i + 1, f"T-4{i:02d}"
+    return steps
+
+
+def _lighting_step(t: Takeoff) -> Optional[dict]:
+    """The lights as a build step when the order has Lighting lines (lighting.py's plan: transformers, runs, fixtures)."""
+    lt = [l for l in t.lines if l.category == "Lighting"]
+    if not lt:
+        return None
+    plan = getattr(t, "lighting", None)
+    cfg = getattr(plan, "cfg", None) or {}
+    how = []
+    if plan is not None:
+        tr = list(getattr(plan, "transformers", []) or [])
+        how.append(f"{len(tr) or 1} transformer{'s' if len(tr) > 1 else ''} ({', '.join(tr)}) on the house wall at the outdoor GFCI outlet, photocell + timer set "
+                   f"{cfg.get('timer', 'dusk + 6 h')}." if tr else f"Transformer on the house wall at the outdoor GFCI outlet, photocell + timer set {cfg.get('timer', 'dusk + 6 h')}.")
+        runs = list(getattr(plan, "runs", []) or [])
+        how.append(f"{len(runs)} run{'s' if len(runs) != 1 else ''} of 12/2 low-voltage cable (~{getattr(plan, 'wire_lf', 0):,} LF): under the frame, stapled to the joists, "
+                   f"a loop up every lit post; no run over {float(cfg.get('run_max_w', 60)):g} W.")
+        if getattr(plan, "n_riser", 0):
+            how.append(f"{plan.n_riser} riser lights: cut each riser board for the housing before it goes on; the lead behind the riser to the run.")
+        if getattr(plan, "n_cap", 0):
+            how.append(f"{plan.n_cap} post-cap lights: the lead down inside the post to the run under the deck; the light takes the post's cap.")
+    how.append("Splices in silicone-filled wire nuts; test every run before the skirt and fascia close it in.")
+    return dict(n=9, code="T-408", title="Lights", still="yard", goes_in=[f"({l.net:g}) {l.item}" for l in lt][:8], how=how,
+                check=["Every light on at dusk and off on the timer", "No open splice; cable stapled clear of every decking screw", "Transformer on a GFCI outlet with an in-use cover"])
+
+
+def composite_step_sheets(t: Takeoff, L) -> List[dict]:
+    """Build steps for a composite deck (two levels, a wrap): every phase once for the whole deck, each level's beam lines,
+    posts and ledger named and placed in the deck's frame (x from its left end, y out from the main rear wall — the frame of
+    the S-100 schedule), the level change, every part's stairs and the step skirt, the lights when the job has them."""
+    import re as _re
+    from .drawings import _comp_levels, _step_faces, _merged_schedule
+    from .takeoff import inches_frac
+    s = L.spec
+    timber = s.is_timber
+    lines = t.lines
+    def items(pred, n=7):
+        return [f"({l.net:g}) {l.item}" for l in lines if pred(l)][:n]
+    levels = _comp_levels(L)
+    faces = _step_faces(levels)
+    ms = _merged_schedule(t, levels)
+    fr = L.frame
+    ft = s.framing.footing_type
+    n_posts = L.n_footings
+    lw = lambda lv: lv.name.lower()
+    hi, lo = max(levels, key=lambda q: q.top), min(levels, key=lambda q: q.top)
+    rise = hi.h_in - lo.h_in
+    per = " + ".join(f"{sum(len(b.posts) for b in lv.beams) + len(lv.eps)} {lw(lv)}" for lv in levels)
+    steps = []
+    # 1 footings
+    lay = "; ".join(f"{lv.name} {bm.short} {ftin(bm.a[1] * 12)} out, posts at x " + " / ".join(ftin(p.x * 12) for p in bm.posts) for lv in levels for bm in lv.beams)
+    steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
+        goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),
+        how=[("Call 811 and locate before any hole or pin. Strip the existing deck first." if s.extras.demo_existing else "Call 811 and locate before any hole or pin."),
+             "Lay out in the deck's frame — x from its left end, y out from the main rear wall (the S-100 schedule): " + lay + ".",
+             {"caisson": f"Auger {n_posts} holes ({per}) {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
+              "diamond_pier": f"Set {n_posts} Diamond Pier heads ({per}) level at grade on undisturbed soil and drive the 4 pins in each; caps on.",
+              "concrete": f"Dig and form {n_posts} piers ({per}) {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)}, pour, set the standoff bases wet.",
+              "existing": f"The {n_posts} existing caissons stay ({per}); the engineer confirms each before the new beams land on them."}[ft]],
+        check=["Footings on the layout within 1/2\"; bearing on undisturbed soil" if ft != "existing" else "Every existing caisson sound, level and on the beam line",
+               "Frost depth met" if ft not in ("diamond_pier", "existing") else ("Pins fully driven, heads level" if ft == "diamond_pier" else "Epoxy cured before load"),
+               "Photos before backfill"]))
+    # 2 posts
+    kinds = {b.kind for lv in levels for b in lv.beams}
+    seat = {frozenset({"drop"}): "the joist bottom (drop beams)", frozenset({"flush"}): "the joist top (flush beams)"}.get(frozenset(kinds), "the joist bottom (drop beam) or the joist top (flush beam)")
+    plen = " · ".join(f"{lw(lv)} " + ", ".join(b.short for b in lv.beams) + " " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)
+    steps.append(dict(n=2, code="T-401", title="Posts", still="step2",
+        goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item),
+        how=[f"{s.framing.post_size} {post_words(s)} posts on the {post_base_sku(s)} bases, cut so the beam top lands at {seat}: {plen} — field-measure each"
+             + (f"; the {lw(hi)}'s posts stand {inch(rise)} taller than the {lw(lo)}'s." if faces else "."),
+             "Plumb both ways, brace, then the caps go on with the beams."]
+            + ([f"Knee braces: 4x4 at 45°, {ftin(s.framing.knee_leg_in)} legs, both directions at every post; 1/2\" through-bolt each end."] if s.framing.knee_braces else [])
+            + (["Seal every cut end before it goes up."] if timber and s.framing.end_grain_seal else []),
+        check=["Posts plumb to a string; tops on each level's beam line", "Every cut end sealed" if timber else "No post in ground contact without a standoff"]))
+    if s.extras.stone_bases:
+        steps.append(dict(n=3, code="T-402", title="Stone column bases", still="step3", goes_in=items(lambda l: "Stone" in l.item),
+            how=["Mason after the posts and before the beams or after the frame — owner's call on access. Cement board wrap, lath, scratch, ledgestone, 24\" cap.", "Keep the cap 1/2\" clear of the post; caulk the joint."],
+            check=["Stone plumb and square to the deck; caps level", "Sample color approved by the homeowner"]))
+    # 4 beams
+    is_beam = lambda l: l.category == "Lumber" and (("beam" in (l.why or "").lower() and "stringer" not in (l.why or "").lower())
+                                                    or bool(_re.match(r"^(6x(8|10|12|14)|4x12)x", l.item)) or ("4x10x" in l.item and not timber))
+    caps = sorted({b.bl.cap_mid for lv in levels for b in lv.beams if b.bl.cap_mid})
+    sizes = [_re.match(r"\((\d)\)(\dx)", b.size) for lv in levels for b in lv.beams]
+    two_by = any(m and m.group(2) == "2x" for m in sizes)
+    two_ply4 = any(m and m.group(1) == "2" and m.group(2) == "4x" for m in sizes)
+    if any(lv.beams for lv in levels):
+        bhow = [f"{lv.name} {bm.short}: {bm.size} {ftin(bm.length)} " + (f"in {len(bm.pieces)} pieces spliced over posts" if len(bm.pieces) > 1 else "one piece")
+                + f", {len(bm.posts)} posts @ {ftin(max((q.x - p.x) for p, q in zip(bm.posts, bm.posts[1:])) * 12) if len(bm.posts) > 1 else ftin(bm.length)} max"
+                for lv in levels for bm in lv.beams]
+        steps.append(dict(n=4, code="T-403", title="Beams", still="step4",
+            goes_in=items(is_beam) + items(lambda l: "cap" in l.item.lower() and l.category == "Hardware") + items(lambda l: l.item.startswith("Simpson SD10212")),
+            how=bhow + ["Crown up, strung straight, caps screwed off with the " + ("SDS screws in the box." if any(c.startswith("CCQ") for c in caps) else "SD screws (SD10212).")]
+                + (["Built-up beam: laminate the plies with GRK RSS 3-1/8\", 2 rows 2\" from top and bottom, staggered @ 12\" OC, before it goes up."] if two_by else [])
+                + (["Two-ply beam: through-bolt the plies with 1/2\" HDG bolts, 2 rows 2\" from top and bottom, staggered @ 24\" OC, a pair 6\" from each end."] if two_ply4 else []),
+            check=[{frozenset({"drop"}): "Beam top = joist bottom (drop beams), crown up", frozenset({"flush"}): "Beam top = joist top (flush beams), crown up"}.get(
+                       frozenset(kinds), "Beam top = joist bottom (drop) / joist top (flush)"), "Splices land on a post; caps fully fastened"]))
+    # 5 frame, both levels and the level change
+    js = s.framing.joist_size
+    ztxt = "; ".join(f"{z.name}: {len(z.z.frame.joist_x)} joists @ {z.z.frame.spacing:g}\" OC x {ftin(z.z.frame.joist_len)}" for lv in levels for z in lv.zones)
+    stairs = [(p, ss, sl) for p in L.parts for ss, sl in zip(p.spec.stairs or [], p.layout.stairs or []) if not getattr(ss, "option", "")]
+    notch = [f"the notch for {ss.name or 'the stair'} in the {p.name.lower()}" for p, ss, sl in stairs if getattr(ss, "inset", False) or str(sl.side).startswith("edge:")]
+    fhow = [f"Ledgers: {ms.get('Ledger', 'per the schedule')}.",
+            f"{ztxt}. Crown up, hangers at the ledger" + (", both faces of the flush beam" if "flush" in kinds else "") + "."]
+    if faces:
+        fhow.append(f"The {lw(hi)} frames {inch(rise)} above the {lw(lo)}: build the {lw(lo)} first, then the {lw(hi)}; the two rims stand side by side at the step, "
+                    f"each level on its own posts — nothing of the {lw(hi)} bears on the {lw(lo)}." + (f" Frame {notch[0]} with doubled trimmers and a doubled header, joists into the header in hangers." if notch else ""))
+    fhow += [v for v in (ms.get("Blocking", "Blocking one row over the beam, staggered."), ms.get("Joist tape", "Tape every joist top.")) if v and not _re.search(r"(^|\s|: )0 x ", v)]
+    steps.append(dict(n=5, code="T-404", title="Frame", still="step5",
+        goes_in=items(lambda l: l.category == "Lumber" and js in l.item and not is_beam(l), 6)
+                + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane", "DTT1Z"))
+                        or (l.category == "Hardware" and l.item.startswith("GRK RSS") and "100 ct" in l.item), 14),
+        how=fhow,
+        check=["Each level square: diagonals within 1/8\"", f"The {lw(hi)}'s deck {inch(rise)} above the {lw(lo)}'s, measured at the step" if faces else "Frame level",
+               "Every hanger fully nailed; ledger fasteners per the schedule", "Tape continuous; photos of the ledgers, hangers and footings before decking"]))
+    # 6 decking
+    rows = "; ".join(f"{lv.name}: " + (lv.L.plan.summary() if lv.L.plan is not None else "rows per zone " + " · ".join(f"{z.name} {z.z.decking.rows}" for z in lv.zones)) for lv in levels)
+    steps.append(dict(n=6, code="T-405", title="Decking", still="step6",
+        goes_in=items(lambda l: l.category in ("Decking", "Fasteners", "Fascia") and "skirt" not in l.item.lower(), 14),
+        how=[ms.get("Field", ""), ms.get("Face screws", "Borders first, then the field."),
+             rows + ". Borders and breakers first" + (" — on both sides of the step between the levels" if faces else "") + ", then the field rows from the outer edge toward the house."],
+        check=[f"{ftin(s.deck_gap)} gaps held", "No cut end shows at an outer edge or at the step", "Color: every board from the same run"]))
+    # 7 rail
+    rl = L.rail
+    steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
+        goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
+        how=[ms.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else [])
+            + ([f"The step between the levels is guarded along the {lw(hi)}'s edge except at the stair opening."] if (faces and rl) else []),
+        check=[f"Top of rail {rl.height:g}\" above each level's decking; posts plumb" if rl else "—",
+               "Cables tensioned, no 4\" sphere passes" if RAIL_SYSTEMS.get(s.railing.system, {}).get("cable") else "Balusters under 4\" clear"]))
+    # 8 the stairs and the step skirt
+    skirt = next((getattr(p.spec.geometry, "step_skirt", None) for p in L.parts if getattr(p.spec.geometry, "step_skirt", None)), None)
+    if stairs or faces:
+        shw = []
+        for p, ss, sl in stairs:
+            nm, g = getattr(ss, "name", None) or "Stair", sl.geo
+            if getattr(sl, "build", "") == "box":
+                shw.append(f"{nm}: {g.risers} risers @ {inches_frac(g.riser_in)} — a framed 2x6 box {ftin(sl.width)} wide on a 4\" compacted base, fascia on the front and both ends, decked in the field board.")
+                continue
+            inset = getattr(ss, "inset", False) or str(sl.side).startswith("edge:")
+            oc_ = sl.width / max(1, sl.stringers - 1)
+            shw.append(f"{nm}: {g.risers} risers @ {inches_frac(g.riser_in)}, {g.treads} tread{'s' if g.treads != 1 else ''} @ {inches_frac(g.tread_in)} — {sl.stringers} 2x12 stringers @ {oc_:.0f}\" OC"
+                       + (f" hung from the notch header in the {p.name.lower()}, the bottom riser at the step face, the feet on the {lw(lo)} deck" if (inset and sl.landing == "deck") else " on LSCZ connectors at the rim")
+                       + (", fascia skirts both sides stepped under each tread" if getattr(sl, "skirts", False) else "") + ", closed risers, treads Cortex 2 per stringer per board.")
+        if faces:
+            sk = skirt or {}
+            shw.append(f"Step skirt: the face between the levels in {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia boards cut to height and installed vertically, "
+                       f"{inch(float(sk.get('gap_in', 0.125)), 16)} gaps, on 2x4 furring @ {float(sk.get('stud_oc_in', 16)):g}\" OC fastened to the {lw(hi)}'s rim; 1/2\" off the {lw(lo)}'s decking, "
+                       f"the {lw(hi)}'s picture frame over its top.")
+        if any(sl.landing == "grade" for p, ss, sl in stairs):
+            shw.append("Each stair that lands on grade: 36\" of firm, level ground at the bottom, as wide as the stair (no pad in this scope).")
+        steps.append(dict(n=8, code="T-407", title=("Stairs and the step skirt" if faces and stairs else "The step skirt" if faces else "Stairs"), still="yard",
+            goes_in=items(lambda l: (l.category == "Lumber" and any(k in (l.why or "") for k in ("stair", "box step", "skirt")))
+                          or (l.category == "Stairs" and "door step" not in l.item.lower()) or (l.category == "Hardware" and ("stair" in l.item.lower() or "box step" in l.item.lower()))
+                          or "skirt" in l.item.lower() or "furring" in l.item.lower(), 14),
+            how=shw,
+            check=["Risers within 3/8\" of each other; treads level, nosings straight", "Skirt boards plumb, gaps even, 1/2\" off the lower decking" if faces else "Landing at the bottom firm and level, 36\" deep",
+                   "Plugs set flush"]))
+    lt_ = _lighting_step(t)
+    if lt_:
+        steps.append(lt_)
+    steps[-1]["check"] = steps[-1]["check"] + ["End of construction"]
+    for i, st_ in enumerate(steps):
         st_["n"], st_["code"] = i + 1, f"T-4{i:02d}"
     return steps
 

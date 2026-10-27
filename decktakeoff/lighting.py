@@ -1,20 +1,26 @@
-"""Low-voltage deck lighting: a recessed LED light in every stair riser and an LED cap light on every rail post, on a
-12 V transformer with a photocell and timer, wired with 12/2 low-voltage cable.
+"""Low-voltage deck lighting: a recessed LED light in every stair riser and an LED light on every rail post, on a 12 V
+transformer with a photocell and timer, wired with 12/2 low-voltage cable. The post light follows the rail: a lantern cap
+light on each post, or, where the drink rail runs OVER the posts (railing.drink_rail_mount "over": no post caps), a small
+accent light on the deck side of each post just below the drink rail.
 
 Off unless the spec turns it on (an OPTION on most jobs: the option spec sets it, the engine prices the delta):
     extras.lights = {"riser": true, "post_cap": true, ...}      keys and defaults in DEFAULTS
     extras.lighting = true                                     (the older flag) = both, at the defaults
 Nothing here draws a stair or a rail. Every piece works from what the engine has already built:
-    scene_lights(boxes, spec)   3D: a faceplate + lens on the face of every riser box, a lantern cap on every rail-post box
-    materials(spec)             the material keys led_riser / led_cap (emissive: emission, emission_strength) and led_housing
+    scene_lights(boxes, spec)   3D: a faceplate + lens on the face of every riser box; on every rail-post box a lantern cap, or
+                                an accent light (housing + lens) on its deck-side face below the drink rail
+    materials(spec)             the material keys led_riser / led_cap / led_accent (emissive: emission, emission_strength, lumens)
+                                and led_housing
     finish_takeoff(t)           the Lighting lines: fixtures from the layout's own stairs and rail posts, the transformer(s)
                                 sized at 1.2 x the load, the 12/2 runs estimated from the layout, splices, staples.
                                 Runs once per Takeoff (takeoff.Takeoff.__post_init__); a composite redoes it for the whole job
     labor_lines(t, lr)          install labor (ESTIMATE: the GSX rate card has no lighting line)
+    fixed_sell(...)             extras.lights.sell_each: the lights sell at a set price each, installed (the rest of the job keeps
+                                its margin; the cost stack still shows their real materials and labor)
     allocation(...)             "what the price includes": what is lit and how it switches, at its sell value
     option_price / stair_addon  the option, and the extra for the lights on another option (the yard stair), as engine deltas
-Every fixture box carries a tag naming the option ("Lighting option: riser light" / "... post-cap light" / "... housing"), so
-an interactive page can find, toggle and glow them."""
+Every fixture box carries a tag naming the option ("Lighting option: riser light" / "... post-cap light" / "... accent light" /
+"... housing"), so an interactive page can find, toggle and glow them."""
 from __future__ import annotations
 
 import copy
@@ -27,12 +33,15 @@ IN = 1 / 12.0
 
 DEFAULTS = dict(
     riser=True,                 # a light in every riser of every stair (closed risers)
-    post_cap=True,              # a cap light on every rail post
-    stair_posts=True,           # ... the stair and landing-guard posts included (False: the deck rail posts only)
+    post_cap=True,              # a light on every rail post (the key keeps its old name: a cap light or an accent light, below)
+    post_light=None,            # "cap" | "accent" | None -> from the rail: "accent" when the drink rail runs over the posts
+                                #   (railing.drink_rail_mount "over": no post caps), else "cap"
+    stair_posts=True,           # ... the stair and landing-guard posts included, with the same light (False: the deck rail posts only)
     every=1,                    # 1 = every post, 2 = every other post (TimberTech: every post or alternate posts)
     per_riser=None,             # lights per riser; None -> one per 5' of stair width (one on a 4' stair)
     riser_sku="AZTDLRECRISERMB",
     cap_sku="AZTDL3X3LANCAPB",
+    accent_sku="AZTIXLEDACCB",
     transformers=["AZTDL100TRAN", "AZTDL150PPR"],   # candidates; the cheapest installed set >= 1.2 x the load wins
     wire_skus=["LV12-2-250", "LV12-2-100"],          # 12/2 stock rolls; the cheapest mix that covers the estimate
     connector_sku="wirenut_silicone_25",
@@ -46,6 +55,8 @@ DEFAULTS = dict(
     option="Lighting",          # the option name in the 3D tags ("Lighting option: riser light")
     wire_lf=None,               # owner / field count of 12/2 (overrides the estimate)
     prices={},                  # per-job unit costs by SKU: {"AZTDL3X3LANCAPB": 129.99}
+    sell_each=None,             # the owner's installed sell per light (riser or post), margin included: the lights sell at
+                                #   sell_each x lights and the rest of the job keeps its margin (None -> cost + the job margin)
 )
 
 # Products (shape of the pricebook entries). Sources: $S/fillmore/materials.md section 6.1 (TimberTech 2026 Product Guide p.39,
@@ -54,8 +65,13 @@ PRODUCTS: Dict[str, dict] = {
     "AZTDLRECRISERMB": dict(desc="TimberTech Recessed LED Riser Light, Matte Black, 12V, 2700K, 6' lead", each=88.24, watts=2.0,
                             face_in=(5.75, 2.75), lens_in=(3.25, 1.25), proud_in=0.1875, depth_in=0.5,
                             source="EST — Lumbermens list eff. 1 Jun 2026 (The Deck Store $94.99); not on a D&D quote"),
-    "AZTDL3X3LANCAPB": dict(desc="TimberTech 3\" LED Lantern Post Cap Light for Impression Rail Express, Black, 12V, 2700K", each=136.0, watts=4.0,
-                            source="EST — TimberTech 3\" LED Lantern Post Cap (IRX); Lumbermens list 4\" lantern $135.69 eff. 1 Jun 2026; not on a D&D quote"),
+    "AZTDL3X3LANCAPB": dict(desc="TimberTech 3\" LED Lantern Post Cap Light for Impression Rail Express, Black, 12V, 2700K", each=136.0, watts=3.0,
+                            source="EST — TimberTech 3\" LED Lantern Post Cap (IRX); Lumbermens list 4\" lantern $135.69 eff. 1 Jun 2026; not on a D&D quote; "
+                                   "3 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
+    "AZTIXLEDACCB": dict(desc="TimberTech Small Accent Light for Impression Rail Express, Black, 12V AC, 1-5/8\" x 3/4\" x 4-1/4\"", each=58.99, watts=1.0,
+                         size_in=(1.625, 0.75, 4.25), lens_in=(1.0, 1.25),
+                         source="EST — The Deck Store $58.99 (Small Accent Light, TimberTech / AZEK), 27 Oct 2026; not on a D&D quote; SKU per the "
+                                "TimberTech 2026 Product Guide (materials.md); 1 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
     "AZTDL3X3LEDCAP": dict(desc="TimberTech Impression Rail Express Post Cap Light (LED lens between the post and its cap), 12V", each=78.99, watts=4.0,
                            source="EST — The Deck Store $78.99 (AZTDL3X3LEDCAP); not on a D&D quote"),
     "AZTDL100TRAN": dict(desc="TimberTech 100W 12V transformer with photocell + timer", each=135.15, watts=100.0, watts_max=90.0,
@@ -107,6 +123,20 @@ def per_riser(cfg: dict, width_in: float) -> int:
     return int(cfg["per_riser"]) if cfg.get("per_riser") else max(1, int(math.ceil(width_in / 60.0 - 1e-9)))
 
 
+def post_fixture(spec, cfg: dict) -> str:
+    """"cap" (a lantern cap light on each post) or "accent" (a small accent light on the post's deck side): the job's choice
+    (extras.lights.post_light), else from the rail — a drink rail OVER the posts (railing.drink_rail_mount "over") leaves no
+    post cap, so the post light is an accent light; a drink rail between the posts, or none, keeps the caps."""
+    if cfg.get("post_light") in ("cap", "accent"):
+        return cfg["post_light"]
+    r = getattr(spec, "railing", None)
+    return "accent" if (getattr(r, "drink_rail", False) and str(getattr(r, "drink_rail_mount", "between") or "between").lower() == "over") else "cap"
+
+
+def post_sku(spec, cfg: dict) -> str:
+    return cfg["accent_sku"] if post_fixture(spec, cfg) == "accent" else cfg["cap_sku"]
+
+
 # ================================================================== the plan: what gets a light, the load, the transformer, the runs
 @dataclass
 class Node:
@@ -145,7 +175,7 @@ class LightPlan:
     deck_posts: int                               # deck rail posts lit
     stair_posts: int                              # stair + landing guard posts lit
     riser_w: float
-    cap_w: float
+    cap_w: float                                  # watts of a post light (cap or accent)
     transformers: List[str]
     runs: List[Run]
     wire_ft: float                                # the estimate before slack
@@ -154,10 +184,16 @@ class LightPlan:
     splices: int
     notes: List[str] = field(default_factory=list)
     parts: List[str] = field(default_factory=list)
+    post_kind: str = "cap"                        # "cap" | "accent" (post_fixture)
 
     @property
     def n_cap(self) -> int:
+        """Post lights (cap or accent: post_kind says which)."""
         return self.deck_posts + self.stair_posts
+
+    @property
+    def n_post(self) -> int:
+        return self.n_cap
 
     @property
     def load_w(self) -> float:
@@ -272,8 +308,13 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
     cfg = cfg or lights_of(spec)
     if cfg is None:
         return None
-    rp = product(cfg, cfg["riser_sku"]); cp = product(cfg, cfg["cap_sku"])
-    riser_w, cap_w = float(rp.get("watts", 2.0)), float(cp.get("watts", 4.0))
+    kind = post_fixture(spec, cfg)                    # "cap" or "accent" (a drink rail over the posts: no caps)
+    rp = product(cfg, cfg["riser_sku"]); cp = product(cfg, post_sku(spec, cfg))
+    riser_w, cap_w = float(rp.get("watts", 2.0)), float(cp.get("watts", 3.0 if kind == "cap" else 1.0))
+    # cable at a post: a cap light splices in the cavity under its cap (TimberTech), so the run goes up into every post and back
+    # down; an accent light's lead goes in through a 3/8" hole behind it and down inside the post to a splice on the run under
+    # the deck (5/8" hole through the decking under the post)
+    per_post = (lambda h: 2 * (h + 0.75)) if kind == "cap" else (lambda h: h + 1.0)
     parts = [(p.layout, p.placement, p.spec, p.name) for p in L.parts] if hasattr(L, "parts") else [(L, None, spec, "")]
     stairs, nodes, notes = [], [], []
     n_riser = deck_posts = stair_posts = 0
@@ -293,7 +334,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
             deck_posts += len(lit)
             for p in lit:
                 x, y = to_job(p.x / 12.0, p.y / 12.0)
-                nodes.append(Node(x, y, z_deck, cap_w, 2 * (post_h + 0.75), "post", pname))     # up into the cap cavity and back down
+                nodes.append(Node(x, y, z_deck, cap_w, per_post(post_h), "post", pname))
         for st, ss in zip(Lp.stairs, list(sp.stairs) + [None] * len(Lp.stairs)):
             nm = stair_name(ss, st) if ss is not None else f"Stair ({st.side})"
             nr = st.geo.risers if (cfg.get("riser") and st.riser_pieces) else 0
@@ -308,7 +349,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
             run_ft = sum(math.hypot(fg.run_in, fg.rise_in) for fg in st.geo.flights) / 12.0
             land_ft = sum((float(a) + float(b)) for a, b in (getattr(ss, "landings", None) or [])) / 12.0 if ss is not None else 0.0
             trunk = run_ft + land_ft + 3.0                         # down the stringer, across the landings, the tee at the top
-            leads = 1.0 * nr * k + 2 * ((rl.height if rl else 36.0) + 7.5) / 12.0 * sposts   # slack at each riser; up and down each 43-1/2" stair post
+            leads = 1.0 * nr * k + per_post(((rl.height if rl else 36.0) + 7.5) / 12.0) * sposts   # slack at each riser; each 43-1/2" stair post
             tx, ty, _ = _stair_top(st, Lp)
             x, y = to_job(tx / 12.0, ty / 12.0)
             w_st = nr * k * riser_w + sposts * cap_w
@@ -316,7 +357,8 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
             for i in range(n_sub):
                 nodes.append(Node(x, y, z_deck, w_st / n_sub, trunk * (i + 1) / n_sub + leads / n_sub, f"stair: {nm}" + (f" ({i + 1}/{n_sub})" if n_sub > 1 else ""), pname))
     if not nodes:
-        return LightPlan(cfg, stairs, 0, 0, 0, riser_w, cap_w, [], [], 0.0, 0, (0.0, 0.0), 0, ["nothing to light: no closed risers and no rail posts"])
+        return LightPlan(cfg, stairs, 0, 0, 0, riser_w, cap_w, [], [], 0.0, 0, (0.0, 0.0), 0, ["nothing to light: no closed risers and no rail posts"],
+                         post_kind=kind)
     # the outlet: the job's own point, else the house wall behind the middle of the lights
     if cfg.get("transformer_at"):
         ox, oy = float(cfg["transformer_at"][0]), float(cfg["transformer_at"][1])
@@ -344,7 +386,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
     wire_lf = int(cfg["wire_lf"]) if cfg.get("wire_lf") else int(math.ceil(wire_ft * 1.10 / 10.0) * 10)
     splices = n_riser + deck_posts + stair_posts + sum(1 for n in nodes if n.what.startswith("stair"))    # every fixture lead, every stair's tee
     plan = LightPlan(cfg, stairs, n_riser, deck_posts, stair_posts, riser_w, cap_w, [], runs, round(wire_ft, 1), wire_lf, (round(ox, 2), round(oy, 2)),
-                     splices, notes, [p[3] for p in parts if p[3]])
+                     splices, notes, [p[3] for p in parts if p[3]], post_kind=kind)
     plan.transformers = _choose_transformers(cfg, plan.load_w)
     for i, r in enumerate(runs):
         if r.drop_v > V_DROP_NOTE:
