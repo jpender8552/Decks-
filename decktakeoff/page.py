@@ -554,15 +554,15 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             h.append('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in facts) + "</dl>")
         if imgs:
             h.append('<div class="gal">' + "".join(imgs) + "</div>")
-        for lab, ca, fa, ma, note, figs in adds:
+        for lab, ca, fa, ma, note, figs, _ab in adds:
             h.append(f'<div class="opt-addon"><div class="oa-line"><b>{E(lab)}</b><span>{_sign(ca)} check or ACH' + (f" · {_sign(fa)} financed · {_sign(ma)}/mo" if show_fin else "") + "</span></div>"
                      + (f'<span class="fine">{E(note)}</span>' if note else "") + ('<div class="gal">' + "".join(figs) + "</div>" if figs else "") + "</div>")
         if o.get("note") or o.get("url"):
             h.append('<p class="opt-note">' + E(o.get("note", "")) + (f' <a href="{E(o["url"])}">{E(o.get("url_text") or o["url"])}</a>' if o.get("url") else "") + "</p>")
         h.append("</div></section>")
         out.append("".join(h))
-        rows.append((f"{num} — {title}", c, f, m, False))
-        rows += [(lab, ca, fa, ma, True) for lab, ca, fa, ma, _, _ in adds]
+        rows.append((f"{num} — {title}", c, f, m, False, basis))
+        rows += [(lab, ca, fa, ma, True, ab_) for lab, ca, fa, ma, _, _, ab_ in adds]
         tc += c + sum(a[1] for a in adds)
         tf += f + sum(a[2] for a in adds)
     head = ('<h2 class="kicker pb" id="g-options">Options <span class="tag">each priced on its own, added to the deck price · '
@@ -575,11 +575,33 @@ def _options_summary(ob) -> str:
     the deck with every option."""
     show_fin = ob["show_fin"]
     body = [[(f'<span class="sub">{E(lab)}</span>' if sub else E(lab)), _sign(c)] + ([_sign(f), _sign(m) + "/mo"] if show_fin else [])
-            for lab, c, f, m, sub in ob["rows"]]
+            for lab, c, f, m, sub, _b in ob["rows"]]
     tc, tf, tm = ob["total"]
     body.append(["<b>The deck with every option</b>", f"<b>{money(tc)}</b>"] + ([f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>"] if show_fin else []))
     return ("<p>Each line is the whole difference, installed, added to the deck price above.</p>"
             + table(["Option", "Check or ACH"] + (["Financed", "Monthly"] if show_fin else []), body, "optsum", ["l", "r"] + (["r", "r"] if show_fin else [])))
+
+
+def _options_internal(ob) -> str:
+    """The internal set: every option as the proposal prices it, with how each number was made — an engine delta, an
+    owner-set price, or an ESTIMATE the owner has not set (the lead confirms it before anything goes to the client)."""
+    rows = [[(("&nbsp;&nbsp;" + E(lab)) if sub else f"<b>{E(lab)}</b>"), _sign(c), _sign(f), _sign(m) + "/mo", E(b)] for lab, c, f, m, sub, b in ob["rows"]]
+    tc, tf, tm = ob["total"]
+    rows.append(["<b>The deck with every option</b>", f"<b>{money(tc)}</b>", f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>", ""])
+    est = [lab for lab, c, f, m, sub, b in ob["rows"] if "ESTIMATE" in b]
+    return ('<h2 class="kicker" id="g-options">Options in the proposal <span class="tag">internal · how each price was made</span></h2>'
+            + (f'<p><b>ESTIMATE — not set by the owner:</b> {E("; ".join(est))}. Confirm the number before the proposal goes to the client.</p>' if est else "")
+            + table(["Option", "Check / ACH", "Financed", "Monthly", "Basis"], rows, "", ["l", "r", "r", "r", "l"]))
+
+
+def _screens_basis(rr: dict) -> str:
+    """How the roof's screens are priced, for the internal set: the owner's price, or the louvered engine's placeholder rate."""
+    scr = rr.get("screens") or []
+    lf = sum(float(x.get("width_ft") or 0) for x in scr)
+    rates = sorted({float(x.get("rate_per_lf") or 0) for x in scr if x.get("rate_per_lf")})
+    est = any(x.get("estimate") for x in scr)
+    rate = (f"${rates[0]:,.0f}/LF x {lf:.1f} LF of screen" if len(rates) == 1 else f"{lf:.1f} LF of screen")
+    return (f"ESTIMATE — the louvered engine's placeholder {rate}; the owner has not set this price" if est else f"set on the roof: {rate}")
 
 
 def _viewer_link(url: str, note: Optional[str] = None) -> str:
