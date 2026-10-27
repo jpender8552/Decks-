@@ -142,8 +142,9 @@ def test_steel_frame_is_outside_this_calc():
 
 
 def test_yard_stair_on_its_own_12in_caissons():
-    """Stair.landing_footing "caisson12": the landing posts are 6x6 on 12" caissons, as long as the layout's landing_post_h
-    (the yard's fall included) less the footing top and base."""
+    """Stair.landing_footing "caisson12": the landing posts are the deck's posts on the deck's base (owner 27 Oct: 8x8 rough on
+    ABU88RZ, never a 6x6 / ABU66) on their own 12" caissons, as long as the layout's landing_post_h (the yard's fall included)
+    less the footing top and base."""
     d = json.loads(json.dumps(TWO_LEVELS))
     d["geometry"]["parts"][0]["stairs"] = [{"side": "front:B", "width_in": 48, "position_in": 60, "total_rise_in": 66, "landing": "grade", "rails": 2,
                                             "flights": [6, 3], "turn": "switchback", "landings": [[108, 48]], "landing_footing": "caisson12",
@@ -154,9 +155,34 @@ def test_yard_stair_on_its_own_12in_caissons():
     if not getattr(st, "own_footings", 0):
         pytest.skip("this engine has no stair-owned footings")
     posts = [c for c in k.cols if c["kind"] == "landing"]
-    assert len(posts) == st.own_footings and all(c["size"] == "6x6" for c in posts)
+    assert len(posts) == st.own_footings and all(c["size"] == spec.framing.post_size for c in posts)
     P = k.parts[0]
     assert posts[0]["height"] == pytest.approx(st.landing_post_h[0] - k.stair_standoff(P, st.own_footings))
     f = [c for c in k.checks if c.id.startswith("F-") and c.what.startswith("Caisson bearing") and "S1" in c.id]
     assert f and all(c.capacity == pytest.approx(math.pi * 0.25 * 1500 + math.pi * 1.0 * 42 / 12 * 400, rel=1e-3) for c in f)
-    assert any(c.id == "K-BASE-6x6" for c in k.checks)
+    from decktakeoff.takeoff import _deck_base
+    base = next(c for c in k.checks if c.id == f"K-BASE-{spec.framing.post_size}-ST")
+    assert base.what == f"Post base {_deck_base(spec)}" == "Post base ABU88RZ" and base.result == "PASS"
+    assert not any("6x6" in c.id or "ABU66" in c.what for c in k.checks)
+
+
+def test_long_flight_without_carrier_is_review():
+    """Owner 27 Oct, no mid-run carrier: a flight past DCA6's 6'-0" whose NDS rows pass is the engineer's REVIEW (not a FAIL),
+    no carrier or carrier posts are added, a throat within 1/8" of the 5" minimum is REVIEW, and both reach the review list."""
+    d = json.loads(json.dumps(TWO_LEVELS))
+    d["geometry"]["parts"][0]["stairs"] = [{"side": "front:B", "width_in": 48, "position_in": 60, "total_rise_in": 72, "landing": "grade", "rails": 2,
+                                            "flights": [1, 9], "turn": "right", "landings": [[48, 48]], "landing_footing": "caisson12",
+                                            "mid_support": False, "name": "Stairs to the yard"}]
+    spec = DeckSpec.from_dict(d)
+    k = calcs._analyze(spec)
+    st = next(s for P in k.parts for s in P.L.stairs if not s.inset)
+    assert not st.mid_support
+    rows = {c.id: c for c in k.checks if c.group == "Stairs to the yard"}
+    span = next(c for c in rows.values() if c.what.startswith("Span between supports") and c.demand > 72.0)
+    assert all(rows[span.id[:-1] + s].result == "PASS" for s in "123")          # bending, shear, deflection on the throat
+    assert span.result == "REVIEW" and span.ratio > 1.0 and "mid_support is off" in span.note
+    assert not any(c.get("line_label") == "carrier" for c in k.cols) and not any("carrier" in c.member for c in rows.values())
+    th = rows[span.id[:-1] + "5"]
+    assert th.result == ("REVIEW" if th.capacity - 5.0 < 0.125 else "PASS")
+    review = calcs._review_and_assumptions(k)[0]
+    assert any(x.startswith(span.id + " ") for x in review)

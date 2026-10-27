@@ -44,6 +44,51 @@ def _hex(h: str) -> Tuple[float, float, float]:
     return tuple((c / 12.92) if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in srgb)   # linear for the shader
 
 
+def _board_with_relief(TT, collection, color, length_in, ppi, seed_offset):
+    """One board from the timbertech-boards renderer plus its relief: the renderer's own finish field (wire-brush /
+    scrape / crosscut, captured from that same seeded call, so it lines up with the albedo texel for texel) and the
+    grain-line field it embosses. The renderer bakes that finish into the albedo as light and dark; here it is a height."""
+    cap, grain, orig = [], [], {}
+
+    def wrap(nm, f):
+        def g(*a, **k):
+            r = f(*a, **k)
+            if nm == "_emboss":
+                grain.append(np.asarray(a[0], np.float32))
+            else:
+                cap.append(np.asarray(r, np.float32))
+            return r
+        return g
+    for nm in ("_wire_brush", "_heavy_brush", "_hand_scrape", "_crosscut", "_emboss"):
+        if hasattr(TT, nm):
+            orig[nm] = getattr(TT, nm)
+            setattr(TT, nm, wrap(nm, orig[nm]))
+    try:
+        im = TT.render_board(collection, color, length_in=length_in, ppi=ppi, seed_offset=seed_offset)
+    finally:
+        for nm, f in orig.items():
+            setattr(TT, nm, f)
+    rel = sum(cap) if cap else np.zeros((im.height, im.width), np.float32)
+    return im, rel, (grain[0] if grain else np.zeros_like(rel))
+
+
+def _bake_board_edges(rgb, rel, grain, ppi, fall_in=0.25, depth=0.28, ridge=0.05):
+    """The skill's deck-render rule: bake each board's eased edges into its tile - a darker 1/4" fall-off along both long
+    edges and a faint lighter ridge just inside it - so the boards read one by one. The relief becomes a 16-bit height
+    (0.5 +- 3 sigma of the finish, the grain lines a touch recessed) that rolls off over the same 1/4" (the edge radius)."""
+    h = rgb.shape[0]
+    d = (np.minimum(np.arange(h) + 0.5, h - np.arange(h) - 0.5) / ppi)[:, None]       # inches from the nearer long edge
+    t = np.clip(d / fall_in, 0.0, 1.0)
+    shade = 1.0 - depth * (1.0 - t) ** 2 + ridge * np.exp(-((d - fall_in * 1.25) / (fall_in * 0.18)) ** 2)
+    alb = np.clip(rgb * shade[..., None], 0, 255).astype(np.uint8)
+    hgt = 0.5 + rel / (6.0 * (float(rel.std()) or 1.0)) - 0.06 * np.clip(grain, 0.0, 1.0)
+    hgt = hgt * (t * t * (3.0 - 2.0 * t)) ** 0.5
+    return alb, (np.clip(hgt, 0.0, 1.0) * 65535).astype(np.uint16)
+
+
+BOARD_RELIEF_FT = 0.0012      # the wire-brushed cap's relief, full range (~0.35 mm): the bump depth of the h_ board maps
+
+
 # ====================================================================== textures (generated, cached in OUT/_tex)
 class Tex:
     def __init__(self, out_dir: str):
@@ -59,8 +104,10 @@ class Tex:
         p = os.path.join(self.dir, name)
         return p if os.path.exists(p) else None
 
-    def boards(self, collection: str, color: str, n: int = 6, length_in: float = 240, ppi: float = 24) -> List[str]:
-        """Full-length TimberTech board textures from the skill renderer (deterministic per board)."""
+    def boards(self, collection: str, color: str, n: int = 4, length_in: float = 240, ppi: float = 28) -> List[str]:
+        """Full-length TimberTech board textures from the skill renderer (deterministic per board), per the skill's deck
+        render fidelity rules: 240" at 28 ppi, 4 distinct boards per colour, the eased edges baked in. Beside each albedo,
+        h_<name> is the same board's 16-bit relief (the renderer's own wire-brush field) for the bump and roughness."""
         out = []
         sys.path.insert(0, SKILL_BOARDS)
         try:
@@ -71,13 +118,15 @@ class Tex:
         pal = BOARDS_PALETTE.get((collection, color))
         if pal:   # the engine catalog's palette wins over the skill's synced copy: a skill re-sync cannot revert the boards' colour
             TT.C.BOARDS = [(b[0], b[1], b[2], list(pal)) + tuple(b[4:]) if (b[0], b[1]) == (collection, color) else b for b in TT.C.BOARDS]
-        tag = hashlib.md5(json.dumps(pal or []).encode()).hexdigest()[:6]   # in the cache name: a cached texture never outlives its palette
+        tag = hashlib.md5(json.dumps([pal or [], ppi, "relief1"]).encode()).hexdigest()[:6]   # a cached texture never outlives its palette
         for k in range(n):
             nm = f"board_{collection}_{color}_{tag}_{k}.png".replace(" ", "_").replace("+", "plus")
             p = self.path(nm)
-            if not p:
-                im = TT.render_board(collection, color, length_in=length_in, ppi=ppi, seed_offset=100 + k)
-                p = self._save(nm, im)
+            if not p or not self.path("h_" + nm):
+                im, rel, gr = _board_with_relief(TT, collection, color, length_in, ppi, 100 + k)
+                alb, hgt = _bake_board_edges(np.asarray(im, np.float32), rel, gr, ppi)
+                p = self._save(nm, Image.fromarray(alb, "RGB"))
+                self._save("h_" + nm, Image.fromarray(hgt))
             out.append(p)
         return out
 
@@ -378,7 +427,10 @@ class Mats:
         nt.links.new(sock(mx.outputs, "Result_Color"), bsdf.inputs["Base Color"])
 
     def board(self, key: str, k: int) -> bpy.types.Material:
-        """A TimberTech board material: the k-th full-length texture, low-gloss cap, grain bump."""
+        """A TimberTech board material: the k-th full-length texture (eased edges baked in) on a low-gloss cap. The board's
+        relief map (h_<texture>: the renderer's wire-brush field) drives the bump - a grazing sun shows the brushing - and
+        the roughness: the brushed ridge tops a little glossier than the grooves. Deck, border, fascia (risers, step faces)
+        and drink rail all come here."""
         name = f"{key}#{k}"
         if name in self.cache:
             return self.cache[name]
@@ -391,14 +443,25 @@ class Mats:
             imgs = self.tex.boards(coll, color)
             self.board_imgs[key] = imgs
         m, nt, bsdf, out = self._new(name)
-        img = self._img(nt, imgs[k % len(imgs)])
+        path = imgs[k % len(imgs)]
+        img = self._img(nt, path)
         self._tint(nt, img.outputs["Color"], bsdf)
         # a matte cap (TimberTech: low-gloss): at the low angle of a yard view a glossier cap mirrors the sky and the brown goes grey
         bsdf.inputs["Roughness"].default_value = 0.85
         bsdf.inputs["Specular IOR Level"].default_value = 0.25
-        bw = nt.nodes.new("ShaderNodeRGBToBW")
-        nt.links.new(img.outputs["Color"], bw.inputs[0])
-        self._bump(nt, bsdf, bw.outputs[0], strength=0.12, distance=0.004)
+        hp = os.path.join(os.path.dirname(path), "h_" + os.path.basename(path))
+        if os.path.exists(hp):
+            hi = self._img(nt, hp, non_color=True)
+            rm = nt.nodes.new("ShaderNodeMapRange")
+            for nm_, v in (("From Min", 0.45), ("From Max", 0.85), ("To Min", 0.90), ("To Max", 0.68)):
+                rm.inputs[nm_].default_value = v
+            nt.links.new(hi.outputs["Color"], rm.inputs["Value"])
+            nt.links.new(rm.outputs["Result"], bsdf.inputs["Roughness"])
+            self._bump(nt, bsdf, hi.outputs["Color"], strength=1.0, distance=BOARD_RELIEF_FT)
+        else:
+            bw = nt.nodes.new("ShaderNodeRGBToBW")
+            nt.links.new(img.outputs["Color"], bw.inputs[0])
+            self._bump(nt, bsdf, bw.outputs[0], strength=0.12, distance=0.004)
         self.cache[name] = m
         return m
 
@@ -448,15 +511,18 @@ class Mats:
             self._bump(nt, bsdf, hi.outputs["Color"], 0.6, 0.02)
             bsdf.inputs["Roughness"].default_value = 0.85
         elif pat == "grass":
-            c, h = self.tex.grass()
-            img = self._img(nt, c); hi = self._img(nt, h, non_color=True)
-            hsv = nt.nodes.new("ShaderNodeHueSaturation")
-            tgt = np.array(_srgb255(md["color"]), float); ref = np.array([109, 138, 60.0])
-            hsv.inputs["Value"].default_value = float(np.clip(tgt.mean() / ref.mean(), 0.6, 1.4))
-            nt.links.new(img.outputs["Color"], hsv.inputs["Color"])
-            nt.links.new(hsv.outputs[0], bsdf.inputs["Base Color"])
-            self._bump(nt, bsdf, hi.outputs["Color"], 0.5, 0.02)
-            bsdf.inputs["Roughness"].default_value = 0.9
+            # procedural, in world coordinates: the old 4' image tile repeated its darker edge as mowing stripes
+            c_out, h_out = _lawn_nodes(nt, key, md)
+            nt.links.new(c_out, bsdf.inputs["Base Color"])
+            self._bump(nt, bsdf, h_out, 0.3, 0.02)
+            bsdf.inputs["Roughness"].default_value = 0.95
+            bsdf.inputs["Specular IOR Level"].default_value = 0.3
+            try:                                # the soft silvery sheen a lawn shows toward a low view
+                bsdf.inputs["Sheen Weight"].default_value = 0.25
+                bsdf.inputs["Sheen Roughness"].default_value = 0.45
+                bsdf.inputs["Sheen Tint"].default_value = (0.85, 0.9, 0.75, 1.0)
+            except KeyError:
+                pass
         elif pat == "gravel" and key in ("mulch",):
             c, h = self.tex.mulch(md["color"])
             img = self._img(nt, c); hi = self._img(nt, h, non_color=True)
@@ -979,11 +1045,73 @@ def _cone(g: Geo, b, s=1.0, n=16):
         g.face([B(cx + r * math.cos(a0), cy + r * math.sin(a0), z0), B(cx, cy, z1), B(cx + r * math.cos(a1), cy + r * math.sin(a1), z0)], [(0, 0)] * 3)
 
 
+# ====================================================================== the lawn's colour (ground + blades)
+LAWN = {   # sRGB albedo (green patch, the lawn, dry patch): Kentucky bluegrass in a Colorado June, a little dry and patchy
+    "lawn": ("#4d5e2c", "#5b6836", "#7b7545"),
+    "ground": ("#536130", "#606a39", "#7c7647"),
+    "meadow": ("#58603a", "#6c6a41", "#8a8151"),          # the unmown creek bank: more straw
+    "groundcover": ("#2d4223", "#394e2b", "#4a5733"),
+}
+
+
+def _lawn_nodes(nt, key: str, md: dict, relative: bool = False):
+    """The lawn's colour field in world coordinates, shared by the ground and the blades near the cameras: broad dry /
+    green patches (~25'), mottling (~4'), clumps (~1') and blade speckle. relative=True returns it as a multiplier about
+    1.0 (the blades keep their own colours and take the patches). Returns (colour socket, height socket for a bump)."""
+    if key in LAWN:
+        green, base, dry = LAWN[key]
+    else:
+        c = np.array(_srgb255(md.get("color", "#5b6836")), float)
+        green, base, dry = ("#%02x%02x%02x" % tuple(int(v) for v in np.clip(c * f, 0, 255)) for f in ((0.85, 0.9, 0.82), (1, 1, 1), (1.3, 1.12, 1.25)))
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+
+    def noise(scale, detail, rough=0.5, dist=0.0):
+        n = nt.nodes.new("ShaderNodeTexNoise")
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        n.inputs["Roughness"].default_value = rough
+        n.inputs["Distortion"].default_value = dist
+        nt.links.new(geo.outputs["Position"], n.inputs["Vector"])
+        return n
+
+    def mrange(sock, a, b, lo, hi):
+        m = nt.nodes.new("ShaderNodeMapRange")
+        for nm, v in (("From Min", a), ("From Max", b), ("To Min", lo), ("To Max", hi)):
+            m.inputs[nm].default_value = v
+        nt.links.new(sock, m.inputs["Value"])
+        return m.outputs["Result"]
+
+    def mul(a, b):
+        m = nt.nodes.new("ShaderNodeMath"); m.operation = "MULTIPLY"
+        nt.links.new(a, m.inputs[0]); nt.links.new(b, m.inputs[1])
+        return m.outputs[0]
+    cb = np.array(_hex(base))
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    els = ramp.color_ramp.elements
+    els[0].position, els[1].position = 0.36, 0.68
+    els.new(0.5)
+    for el, hx in zip(sorted(els, key=lambda e: e.position), (green, base, dry)):
+        c = np.array(_hex(hx)) / (cb if relative else 1.0)
+        el.color = (float(c[0]), float(c[1]), float(c[2]), 1.0)
+    n1 = noise(0.045, 3.0, 0.55, 0.3)
+    nt.links.new(n1.outputs["Fac"], ramp.inputs["Fac"])
+    n2, n3, n4 = noise(0.28, 2.0), noise(1.3, 2.0), noise(34.0, 1.0)
+    m = mrange(n2.outputs["Fac"], 0.35, 0.65, 0.9, 1.1)
+    if not relative:
+        m = mul(mul(m, mrange(n3.outputs["Fac"], 0.3, 0.7, 0.93, 1.06)), mrange(n4.outputs["Fac"], 0.3, 0.7, 0.86, 1.12))
+    sc = nt.nodes.new("ShaderNodeVectorMath"); sc.operation = "SCALE"
+    nt.links.new(ramp.outputs["Color"], sc.inputs[0]); nt.links.new(m, sc.inputs["Scale"])
+    h = nt.nodes.new("ShaderNodeMath"); h.operation = "MULTIPLY_ADD"
+    nt.links.new(n3.outputs["Fac"], h.inputs[0]); h.inputs[1].default_value = 0.3; nt.links.new(n4.outputs["Fac"], h.inputs[2])
+    return sc.outputs["Vector"], h.outputs[0]
+
+
 # ====================================================================== grass (real blades in the near field)
 def _grass_patch(name, rng, n_blades=650, size=1.0):
     """A 1' x 1' patch of blades: a bent two-segment strip each, colour per vertex (darker at the root)."""
     g = Geo()
-    greens = [(92, 122, 48), (108, 138, 56), (124, 150, 62), (82, 110, 42), (136, 156, 72), (98, 128, 50), (116, 132, 60), (150, 158, 86)]
+    # olive bluegrass blade tips (a Colorado lawn in June, a little dry); the lawn's patch field multiplies them
+    greens = [(86, 98, 50), (98, 108, 56), (110, 116, 62), (78, 90, 44), (120, 122, 68), (94, 104, 52), (104, 106, 60), (136, 130, 82)]
     lin = lambda c: tuple(((v / 255) / 12.92 if v / 255 <= 0.04045 else ((v / 255 + 0.055) / 1.055) ** 2.4) for v in c)
     for _ in range(n_blades):
         x, y = rng.uniform(-size / 2, size / 2), rng.uniform(-size / 2, size / 2)      # centred: a turned patch stays on its cell
@@ -1075,10 +1203,13 @@ def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: floa
     nt = mat.node_tree
     bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
     attr = nt.nodes.new("ShaderNodeAttribute"); attr.attribute_name = "tint"
-    nt.links.new(attr.outputs["Color"], bsdf.inputs["Base Color"])
+    patch, _ = _lawn_nodes(nt, "lawn", {}, relative=True)          # the ground's dry / green patches carry into the blades
+    tm = nt.nodes.new("ShaderNodeVectorMath"); tm.operation = "MULTIPLY"
+    nt.links.new(attr.outputs["Color"], tm.inputs[0]); nt.links.new(patch, tm.inputs[1])
+    nt.links.new(tm.outputs["Vector"], bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.6
     out = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
-    tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); nt.links.new(attr.outputs["Color"], tr.inputs["Color"])
+    tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); nt.links.new(tm.outputs["Vector"], tr.inputs["Color"])
     mx = nt.nodes.new("ShaderNodeMixShader"); mx.inputs[0].default_value = 0.3
     nt.links.new(bsdf.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2]); nt.links.new(mx.outputs[0], out.inputs[0])
     for k in range(3):
@@ -1126,6 +1257,99 @@ def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: floa
 
 
 # ====================================================================== light, camera, render
+CLOUDS = 0.32       # the camera sky's cumulus cover (0..1, --clouds=0 for a clear sky); haze always
+
+
+def _sky_with_clouds(nt, sky_col, v):
+    """The camera's sky: the sky model pulled toward a white haze (a third overall, most of the way at the horizon - the
+    owner's photos show a pale, partly cloudy sky, not the model's saturated blue) with soft cumulus on a flat cloud deck
+    (the noise is taken at direction.xy / direction.z, so clouds shrink toward the horizon). A cloud is lit on its sun side
+    (density sampled a step toward the sun) and greyer away from it; its brightness follows the sky's own luminance there."""
+    N = nt.nodes.new
+    tc = N("ShaderNodeTexCoord")
+    sep = N("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+
+    def math_(op, a, b=None, c=None):
+        m = N("ShaderNodeMath"); m.operation = op
+        for i, s in enumerate((a, b, c)):
+            if s is None:
+                continue
+            if isinstance(s, (int, float)):
+                m.inputs[i].default_value = float(s)
+            else:
+                nt.links.new(s, m.inputs[i])
+        return m.outputs[0]
+
+    def mrange(s, a, b, lo, hi, smooth=False):
+        m = N("ShaderNodeMapRange")
+        if smooth:
+            m.interpolation_type = "SMOOTHSTEP"
+        for nm, val in (("From Min", a), ("From Max", b), ("To Min", lo), ("To Max", hi)):
+            m.inputs[nm].default_value = val
+        nt.links.new(s, m.inputs["Value"])
+        return m.outputs["Result"]
+
+    def mix(a, b, f):
+        m = N("ShaderNodeMix"); m.data_type = "RGBA"
+        sock = lambda coll, ident: next(x for x in coll if x.identifier == ident)
+        for s, ident in ((f, "Factor_Float"), (a, "A_Color"), (b, "B_Color")):
+            if isinstance(s, tuple):
+                sock(m.inputs, ident).default_value = s
+            elif isinstance(s, (int, float)):
+                sock(m.inputs, ident).default_value = float(s)
+            else:
+                nt.links.new(s, sock(m.inputs, ident))
+        return sock(m.outputs, "Result_Color")
+
+    def scale(c, s):
+        m = N("ShaderNodeVectorMath"); m.operation = "SCALE"
+        nt.links.new(c, m.inputs[0])
+        if isinstance(s, (int, float)):
+            m.inputs["Scale"].default_value = float(s)
+        else:
+            nt.links.new(s, m.inputs["Scale"])
+        return m.outputs["Vector"]
+    z = sep.outputs["Z"]
+    bw = N("ShaderNodeRGBToBW"); nt.links.new(sky_col, bw.inputs[0])
+    lum = bw.outputs[0]
+    # haze: 0.34 overall, 0.85 at the horizon; the haze is the sky's own luminance, a touch blue
+    hz = math_("MULTIPLY_ADD", mrange(z, 0.0, 0.42, 1.0, 0.0, smooth=True), 0.51, 0.34)
+    haze = N("ShaderNodeCombineXYZ")
+    for i, k in enumerate((0.97, 1.0, 1.06)):
+        nt.links.new(math_("MULTIPLY", lum, k * 1.08), haze.inputs[i])
+    sky_h = mix(sky_col, haze.outputs[0], hz)
+    if not CLOUDS:
+        return sky_h
+    zc = math_("MAXIMUM", z, 0.05)
+    uv = N("ShaderNodeCombineXYZ")
+    nt.links.new(math_("DIVIDE", sep.outputs["X"], zc), uv.inputs[0]); nt.links.new(math_("DIVIDE", sep.outputs["Y"], zc), uv.inputs[1])
+    off = N("ShaderNodeCombineXYZ"); off.name = "cloud_sun_off"          # set_sun() moves it with the sun
+    sx, sy = v.x, v.y
+    L = math.hypot(sx, sy) or 1.0
+    off.inputs[0].default_value, off.inputs[1].default_value = 0.09 * sx / L, 0.09 * sy / L
+    uv2 = N("ShaderNodeVectorMath"); uv2.operation = "ADD"
+    nt.links.new(uv.outputs[0], uv2.inputs[0]); nt.links.new(off.outputs[0], uv2.inputs[1])
+
+    def cloud_noise(vec):
+        n = N("ShaderNodeTexNoise")
+        for nm, val in (("Scale", 1.15), ("Detail", 7.0), ("Roughness", 0.56), ("Distortion", 0.35)):
+            n.inputs[nm].default_value = val
+        nt.links.new(vec, n.inputs["Vector"])
+        return n.outputs["Fac"]
+    n0, n1 = cloud_noise(uv.outputs[0]), cloud_noise(uv2.outputs["Vector"])
+    cover = 0.64 - 0.16 * CLOUDS / 0.32
+    dens = math_("MULTIPLY", mrange(n0, cover - 0.05, cover + 0.11, 0.0, 1.0, smooth=True), mrange(z, 0.03, 0.2, 0.0, 1.0, smooth=True))
+    lit = mrange(math_("SUBTRACT", n0, n1), -0.045, 0.03, 0.0, 1.0, smooth=True)
+    c_lit, c_sh = scale(lum, 2.3), scale(lum, 1.05)          # luminance as grey: the cloud's lit top and its shaded side
+    cl = mix(mix(c_sh, (0.92, 0.95, 1.02, 1.0), 0.0), c_lit, lit)
+    tint = N("ShaderNodeMix"); tint.data_type = "RGBA"; tint.blend_type = "MULTIPLY"
+    sock = lambda coll, ident: next(x for x in coll if x.identifier == ident)
+    sock(tint.inputs, "Factor_Float").default_value = 1.0
+    nt.links.new(cl, sock(tint.inputs, "A_Color"))
+    nt.links.new(mix((0.9, 0.93, 1.0, 1.0), (1.0, 0.99, 0.97, 1.0), lit), sock(tint.inputs, "B_Color"))
+    return mix(sky_h, sock(tint.outputs, "Result_Color"), math_("MULTIPLY", dens, 0.92))
+
+
 def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065, fill_sat=0.5):
     scn = bpy.context.scene
     sun = D["meta"].get("sun") or [-0.5, 0.5, 0.7]
@@ -1151,12 +1375,14 @@ def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065
     # 0.96 / 0.89 — half the light on a horizontal surface and four times bluer than the sun, so white trim in full sun came
     # out blue and the deck brown went grey. A clear sky at ~5,850 ft is ~10-15% of the light on the ground (a daylight
     # white balance reads sunlit white as white); fill 0.065 at half saturation gives ~20% (G) and sunlit white neutral.
+    # The camera's sky also gets haze and soft cumulus (_sky_with_clouds); the light on the scene stays the clear sky.
     bg = nt.nodes.new("ShaderNodeBackground"); bg.inputs["Strength"].default_value = sky_strength
     hs = nt.nodes.new("ShaderNodeHueSaturation"); hs.inputs["Saturation"].default_value = fill_sat
     fill = nt.nodes.new("ShaderNodeBackground"); fill.inputs["Strength"].default_value = fill_strength
     lp = nt.nodes.new("ShaderNodeLightPath"); mx = nt.nodes.new("ShaderNodeMixShader")
     out = nt.nodes.new("ShaderNodeOutputWorld")
-    nt.links.new(sky.outputs[0], bg.inputs[0]); nt.links.new(sky.outputs[0], hs.inputs["Color"]); nt.links.new(hs.outputs[0], fill.inputs[0])
+    nt.links.new(_sky_with_clouds(nt, sky.outputs[0], v) if CLOUDS else sky.outputs[0], bg.inputs[0])
+    nt.links.new(sky.outputs[0], hs.inputs["Color"]); nt.links.new(hs.outputs[0], fill.inputs[0])
     nt.links.new(lp.outputs["Is Camera Ray"], mx.inputs[0]); nt.links.new(fill.outputs[0], mx.inputs[1]); nt.links.new(bg.outputs[0], mx.inputs[2])
     nt.links.new(mx.outputs[0], out.inputs[0])
     ld = bpy.data.lights.new("sun", "SUN")
@@ -1422,6 +1648,9 @@ def set_sun(v):
         if n.type == "TEX_SKY":
             n.sun_elevation = el
             n.sun_rotation = math.atan2(vb.x, vb.y)
+        elif n.name == "cloud_sun_off":                 # the clouds' lit side follows the sun
+            L = math.hypot(vb.x, vb.y) or 1.0
+            n.inputs[0].default_value, n.inputs[1].default_value = 0.09 * vb.x / L, 0.09 * vb.y / L
     m["sun"].rotation_euler = vb.to_track_quat("Z", "Y").to_euler()
     m["sun"].data.color = _sun_rgb(math.degrees(el))
     m["sun"].data.energy = m.get("energy", 5.0) if el > 0 else 0.0
@@ -1471,7 +1700,41 @@ def generic_views(D) -> Dict[str, dict]:
     }
 
 
-def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.75, modes=None, default_mode="day",
+GLARE = 0.012        # a real lens's veiling glare: a neutral lift of 1.2 % of the frame's mean luminance
+TONEMAP = "grade"    # "grade": linear EXR -> grade() (default); "pbr": Blender's Khronos PBR Neutral straight to JPEG (--tonemap=pbr)
+
+
+def grade(lin: np.ndarray, exposure: float) -> np.ndarray:
+    """Scene-linear RGB -> display sRGB 0..1: exposure, the lens's veiling glare, then the Khronos PBR Neutral highlight
+    shoulder WITHOUT its toe. PBR Neutral subtracts up to 0.04 from every channel (x - 6.25 x^2 below 0.08): right for a
+    product shot, but it crushes the smallest channel of every shadow - the shaded siding came out #391e03 (saturation
+    0.96) where the owner's photos hold 0.07-0.20 in the same tones. Mid-tones pass unchanged (the sunlit deck keeps the
+    colour test's value); highlights roll off to white as in PBR Neutral."""
+    x = lin[..., :3].astype(np.float32) * np.float32(2.0 ** exposure)
+    lum = x @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    x = x + np.float32(GLARE * float(np.mean(np.clip(lum, 0.0, 4.0))))
+    peak = np.maximum(x.max(axis=-1, keepdims=True), 1e-6)
+    s, d = 0.8, 0.2
+    new = 1.0 - d * d / (np.maximum(peak, s) + d - s)
+    comp = peak > s
+    y = np.where(comp, x * (new / peak), x)
+    gm = np.where(comp, 1.0 - 1.0 / (0.15 * (peak - new) + 1.0), 0.0)
+    y = np.clip(y * (1.0 - gm) + new * gm, 0.0, 1.0)
+    return np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(y, 1 / 2.4) - 0.055)
+
+
+def grade_exr(exr_path: str, jpg_path: str, exposure: float, quality: int = 90) -> None:
+    """The rendered linear EXR (kept in OUT/_exr for re-grading) -> the graded JPEG."""
+    img = bpy.data.images.load(exr_path, check_existing=False)
+    w, h = img.size
+    px = np.empty(w * h * 4, np.float32)
+    img.pixels.foreach_get(px)
+    bpy.data.images.remove(img)
+    out = grade(px.reshape(h, w, 4)[::-1], exposure)
+    Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGB").save(jpg_path, quality=quality, subsampling=0)
+
+
+def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.65, modes=None, default_mode="day",
                  spec=None, date=None):
     """Render the named stations. A name may carry a time: "station@16:00" (that clock time on `date`, or a full
     "@YYYY-MM-DDTHH:MM") renders it with the sun moved there -> station_1600.jpg; "station@dusk" renders it at dusk ->
@@ -1499,8 +1762,17 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
     scn.cycles.blur_glossy = 1.0
     scn.render.resolution_x, scn.render.resolution_y = size
     scn.render.resolution_percentage = 100
-    scn.render.image_settings.file_format = "JPEG"
-    scn.render.image_settings.quality = 90
+    if TONEMAP == "grade":
+        # linear half-float EXR, then grade(): PBR Neutral's hue-true mid-tones and highlight roll-off without its toe;
+        # +0.65 EV puts the sunlit English Walnut on the colour test's #91715c
+        scn.render.image_settings.file_format = "OPEN_EXR"
+        scn.render.image_settings.color_depth = "16"
+        scn.render.image_settings.exr_codec = "ZIP"
+        scn.render.image_settings.color_mode = "RGB"
+        os.makedirs(os.path.join(out_dir, "_exr"), exist_ok=True)
+    else:
+        scn.render.image_settings.file_format = "JPEG"
+        scn.render.image_settings.quality = 90
     # Khronos PBR Neutral keeps a board's hue and saturation where AgX greys it (the deck colour is the point of the
     # picture); +0.75 EV is a photographer's exposure for a sunlit yard with the fill sky (the shade stays readable)
     scn.view_settings.view_transform = "Khronos PBR Neutral"
@@ -1540,10 +1812,14 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
             pos[2] = standing_z(D, spec, pos[0], pos[1]) + float(c["eye"])
         cam = camera(f"cam_{out_nm}", pos, c["at"], float(c.get("fov", 40)), size)
         scn.camera = cam
-        scn.render.filepath = os.path.join(out_dir, f"{out_nm}.jpg")
+        jpg = os.path.join(out_dir, f"{out_nm}.jpg")
+        scn.render.filepath = os.path.join(out_dir, "_exr", f"{out_nm}.exr") if TONEMAP == "grade" else jpg
         t = time.time()
         bpy.ops.render.render(write_still=True)
-        done[out_nm] = scn.render.filepath
+        if TONEMAP == "grade":
+            grade_exr(scn.render.filepath, jpg, scn.view_settings.exposure)
+            scn.render.filepath = jpg
+        done[out_nm] = jpg
         sv = LIGHTS.get("dusk_sun") if mode == "dusk" else (LIGHTS.get("sun_now") or base_sun)
         log[f"{out_nm}.jpg"] = dict(station=nm, mode=mode, when=iso, sun=[round(q, 4) for q in sv] if sv else None,
                                     sun_caption=sun_caption(spec, iso, sv) if (spec is not None and iso and sv) else "")
@@ -1565,6 +1841,11 @@ def main(argv):
     quick = bool(opts.get("--quick"))
     if opts.get("--black"):                 # --black=#hex sets the black powder-coat floor, --black=none renders the spec's colour as is
         globals()["BLACK_PC"] = "" if str(opts["--black"]).lower() in ("none", "off", "0") else str(opts["--black"])
+    if opts.get("--tonemap"):               # --tonemap=pbr: Blender's Khronos PBR Neutral straight to JPEG (the old path, +0.75 EV)
+        globals()["TONEMAP"] = "pbr" if str(opts["--tonemap"]).lower().startswith("pbr") else "grade"
+    if opts.get("--clouds") is not None and opts.get("--clouds") is not True:    # --clouds=0: a clear (hazy) sky
+        globals()["CLOUDS"] = float(opts["--clouds"])
+    ev_day = 0.65 if TONEMAP == "grade" else 0.75
     samples = int(opts.get("--samples", 48 if quick else 160))
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()
@@ -1597,10 +1878,10 @@ def main(argv):
     print(f"scene built in {time.time() - t:.0f}s: {len(bpy.data.objects)} objects", flush=True)
     if opts.get("--blend"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out_dir, "scene.blend"))
-    modes = dict(day=dict(exposure=float(opts.get("--exposure", 0.75)), samples=samples),
+    modes = dict(day=dict(exposure=float(opts.get("--exposure", ev_day)), samples=samples),
                  dusk=dict(exposure=float(opts.get("--dusk-exposure", 3.0)), samples=int(opts.get("--dusk-samples", samples)),
                            led=float(opts.get("--led", 1.0)), glow=float(opts.get("--glow", 1.0))))
-    render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", 0.75)),
+    render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", ev_day)),
                  modes=modes, default_mode=default_mode, spec=spec, date=when.split("T")[0])
 
 

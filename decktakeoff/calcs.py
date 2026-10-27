@@ -92,7 +92,6 @@ PRODUCTS = {
     "ABU88Z": dict(down=22405, up=4120, v=True, src="Simpson C-C-2026 (2 x 5/8\" anchors — not on a Diamond Pier)"),
     "ABU88RZ": dict(down=19870, up=4045, v=True, src="Simpson C-C-2026, rough 8x8 (2 x 5/8\" anchors)"),
     "ABU66Z": dict(down=18205, up=2475, v=True, src="Simpson C-C-2026 (1 x 5/8\" anchor)"),
-    "ABU66RZ": dict(down=18205, up=1905, v=False, src="Simpson C-C-2026, rough 6x6 (1 x 5/8\" anchor; structure.md 1,905-2,475 lb uplift) — verify"),
     "ABW66RZ": dict(down=12935, up=1190, v=True, src="Simpson C-C-2026 (1 x 1/2\" anchor)"),
     "LUS210Z": dict(down=1000, up=500, v=False, src="Simpson C-C LUS210 (DF/SP) — conservative reading, verify"),
     "HUCQ210-2-SDS": dict(down=2500, up=1000, v=False, src="Simpson C-C HUCQ210-2-SDS — conservative reading, verify"),
@@ -1213,36 +1212,54 @@ class Calc:
                                    f"P = {down:,.0f} lb (governing ASD combination) vs {pr['down']:,} lb" + (f"; uplift {col['up']:,.0f} lb vs {pr['up']:,} lb" if col["up"] > 0 else "; no net uplift"))
                     self.add(ck)
             if col.get("on_footing"):
-                key = (col["size"], self.footing_info(col)["type"])
-                b = base_req.setdefault(key, dict(down=0.0, up=0.0, lat=0.0, ids=[]))
+                fi_ = self.footing_info(col)
+                key = (col["size"], fi_["type"], bool(fi_.get("own")))         # the stair's own 12" caissons get their own row
+                b = base_req.setdefault(key, dict(down=0.0, up=0.0, lat=0.0, ids=[], part=col["part"], model=fi_.get("model", ""), dia=fi_.get("dia")))
                 b["down"] = max(b["down"], down); b["up"] = max(b["up"], col["up"]); b["lat"] = max(b["lat"], col.get("Vb", 0.0))
                 b["ids"].append(col["id"])
-        from .catalog import POST_BASE
-        for (size, ftype), b in base_req.items():
-            sku = POST_BASE.get(size, {}).get("concrete" if ftype in ("caisson", "existing", "concrete") else ftype, "")
-            pr = PRODUCTS.get(sku)
-            lab = f"{size} column base on {ftype.replace('_', ' ')} ({len(b['ids'])} columns)"
-            if pr is None:
-                self.add(Check(f"K-BASE-{size}", "Caps & bases", lab, "Post base — no catalog part", b["down"], 0, "lb",
-                               "IRC R507.4.1; ESR-1895 §5.2; Simpson C-C-2026",
-                               f"required (worst column): down {b['down']:,.0f} lb · uplift {b['up']:,.0f} lb · lateral {b['lat']:,.0f} lb · 1\" standoff. "
-                               f"No Simpson 8x8 base takes the pier's single cast-in bolt (ABU88 / APB88 / CPT88 need two anchors): an engineer-detailed "
-                               f"HDG standoff base on the pier bolt, or a tenoned foot in an ABU66Z / ABW66RZ", status="REVIEW"))
+        from .catalog import POST_BASE, TIMBER_BASE
+        from .takeoff import _deck_base
+        for (size, ftype, own), b in base_req.items():
+            conc = ftype in ("caisson", "existing", "concrete")
+            pspec = self.parts[b["part"]].spec
+            if conc and size in TIMBER_BASE and size == pspec.framing.post_size:
+                # the base the takeoff orders on concrete (ABU88RZ under a rough 8x8): the deck's columns and the stair's own posts alike
+                sku = _deck_base(pspec, pspec.framing.hardware_finish == "black").replace("_black", "")
             else:
-                if self.spec.framing.post_rough and sku.endswith("Z") and (sku[:-1] + "RZ") in PRODUCTS:
+                sku = POST_BASE.get(size, {}).get("concrete" if conc else ftype, "")
+            pr = PRODUCTS.get(sku)
+            cid = f"K-BASE-{size}" + ("-ST" if own else "")
+            lab = (f"{size} post base on the stair's own {b['model']}s ({len(b['ids'])} posts)" if own
+                   else f"{size} column base on {ftype.replace('_', ' ')} ({len(b['ids'])} columns)")
+            req = f"required (worst column): down {b['down']:,.0f} lb · uplift {b['up']:,.0f} lb · lateral {b['lat']:,.0f} lb · 1\" standoff. "
+            if pr is None and not conc:
+                self.add(Check(cid, "Caps & bases", lab, "Post base — no catalog part", b["down"], 0, "lb",
+                               "IRC R507.4.1; ESR-1895 §5.2; Simpson C-C-2026",
+                               req + f"No Simpson 8x8 base takes the pier's single cast-in bolt (ABU88 / APB88 / CPT88 need two anchors): an engineer-detailed "
+                               f"HDG standoff base on the pier bolt, or a tenoned foot in an ABU66Z / ABW66RZ", status="REVIEW"))
+            elif pr is None:
+                self.add(Check(cid, "Caps & bases", lab, f"Post base {sku or '(none)'}", b["down"], 0, "lb", "Simpson C-C-2026",
+                               req + f"no published value on file for {sku or 'this post size'}: confirm the base against the catalog", status="REVIEW"))
+            else:
+                if pspec.framing.post_rough and sku.endswith("Z") and (sku[:-1] + "RZ") in PRODUCTS:
                     sku = sku[:-1] + "RZ"
                     pr = PRODUCTS[sku]
                 r_d, r_u = b["down"] / pr["down"], (b["up"] / pr["up"] if b["up"] else 0.0)
                 two = sku.startswith(("ABU88", "APB88", "CPT88"))
                 on_dp = ftype == "diamond_pier"
-                self.add(Check(f"K-BASE-{size}", "Caps & bases", lab, f"Post base {sku}", b["down"] if r_u <= r_d else b["up"],
+                anchors = "two 5/8\" anchors" if two else "the 5/8\" anchor"
+                where_ = (f" · {anchors} cast in each {b['model']}, 1\" standoff" if own
+                          else f" · anchors cast in the {ftype} (standard catalog condition), 1\" standoff" if not on_dp else "")
+                note = ("the second anchor in the 5-5/8\" pier plinth (edge distance, the head's concrete limit) is not a catalog condition: "
+                        "Pin Foundations and the engineer confirm; the pier's own uplift (chart) governs uplift" if two and on_dp else "")
+                if own and two and not on_dp:
+                    note = f"two cast-in anchors in a {b['dia'] or STAIR_CAISSON_DIA:g}\" shaft: the engineer confirms their embedment and edge distance (ACI 318-14 Ch. 17)"
+                self.add(Check(cid, "Caps & bases", lab, f"Post base {sku}", b["down"] if r_u <= r_d else b["up"],
                                pr["down"] if r_u <= r_d else pr["up"], "lb", pr["src"],
                                f"down {b['down']:,.0f} / {pr['down']:,} lb · uplift {b['up']:,.0f} / {pr['up']:,} lb · lateral {b['lat']:,.0f} lb"
                                + (" · two 5/8\" anchors: the cast-in pier bolt + one drilled into the pier head (owner 27 Oct)" if two and on_dp else "")
-                               + (f" · anchors cast in the {ftype} (standard catalog condition), 1\" standoff" if not on_dp else ""),
-                               status="REVIEW" if (two and on_dp) else "",
-                               note=("the second anchor in the 5-5/8\" pier plinth (edge distance, the head's concrete limit) is not a catalog condition: "
-                                     "Pin Foundations and the engineer confirm; the pier's own uplift (chart) governs uplift" if two and on_dp else "")))
+                               + where_,
+                               status="REVIEW" if (two and on_dp) else "", note=note))
 
     def footing_info(self, col: dict) -> dict:
         """The footing under a column, from the layout: type, model / diameter, depth, capacity (the engine's numbers)."""
@@ -1630,9 +1647,21 @@ class _CalcMore(Calc):
             dl = 5 * wL * span ** 4 / (384 * sec.E() * I)
             self.add(Check(f"{ftag}.3", group, mem, "Deflection, live (L/360)", dl, span / 360.0, "in", "IRC Table R301.7",
                            f"Δ = 5 wL L⁴/384 E'I on the throat = {dl:.3f}\" vs {span:.1f}/360 = {span / 360:.3f}\"", tags=tags))
+            # DCA6's 6'-0" is a prescriptive limit: past it, with the NDS rows above passing, the span is the engineer's call (REVIEW) —
+            # a flight the spec leaves without a mid-run carrier (owner, 27 Oct) shows its full run here
+            r_nds = max(M / S / sec.Fb(1.0), 1.5 * V / A / sec.Fv(1.0), dl / (span / 360.0))
+            note4 = ""
+            if span > 72.0 and r_nds <= 1.0:
+                note4 = (("no mid-run carrier on this flight (the stair's mid_support is off)" if not n_car else f"{n_car} carrier{'s' if n_car > 1 else ''}")
+                         + f": over DCA6's prescriptive 6'-0\" for cut 2x12 stringers; the NDS checks on the throat (bending, shear, deflection) pass, worst ratio {r_nds:.2f} — "
+                         "the engineer accepts the span or details a support")
             self.add(Check(f"{ftag}.4", group, mem, "Span between supports (DCA6 6'-0\")", span, 72.0, "in", "AWC DCA6 Fig. 24 (cut 2x12 stringers)",
-                           f"horizontal span {span:.1f}\" vs 72\"", tags=tags))
-            self.add(Check(f"{ftag}.5", group, mem, "Throat (5\" min.)", 5.0, th, "in", "AWC DCA6 Fig. 24", f"throat {th:.2f}\" ≥ 5\"", tags=tags))
+                           f"horizontal span {span:.1f}\" vs 72\"", status="REVIEW" if note4 else "", note=note4, tags=tags))
+            margin = th - 5.0
+            m_txt = f"{margin:.2f}" if margin >= 0.01 else f"{margin:.3f}"
+            note5 = f"{m_txt}\" over the 5\" minimum (under 1/8\"): the engineer confirms the cut throat" if 0.0 <= margin < 0.125 else ""
+            self.add(Check(f"{ftag}.5", group, mem, "Throat (5\" min.)", 5.0, th, "in", "AWC DCA6 Fig. 24", f"throat {th:.2f}\" ≥ 5\"",
+                           status="REVIEW" if note5 else "", note=note5, tags=tags))
             R = (wD + wL) * span / 2.0
             if R > worst[0] + worst[1]:
                 worst = (wD * span / 2.0, wL * span / 2.0, trib)
@@ -1922,7 +1951,8 @@ class _CalcMore(Calc):
             for ck in flexure_checks(rr, f"{tag}L{li + 1}R", grp, mem, self.scope, tags=tags):
                 self.add(ck)
             # corner posts and footings: the layout's landing_post_h (frame bottom above the grade under the landing, the yard's fall
-            # included) less the footing's top and the base; the stair's own 12" caissons and 6x6 posts when own_footings > 0
+            # included) less the footing's top and the base; on the stair's own 12" caissons when own_footings > 0 — always the deck's
+            # post and base (owner 27 Oct: 8x8 rough on ABU88RZ, no 6x6 / ABU66)
             Rd = max(rr.dead.R); Rl = max(sum(max(0.0, l.R[q]) for l in rr.lives) for q in range(2))
             own = int(getattr(st, "own_footings", 0) or 0)
             lph = list(getattr(st, "landing_post_h", None) or [])
@@ -1934,7 +1964,7 @@ class _CalcMore(Calc):
                 hland = g.total_rise_in - sum(f.rise_in for f in g.flights[:li + 1]) - float(getattr(sd, "landing_grade_in", None) or 0.0)
                 hp = max(6.0, hland - 1.0 - LUMBER_ACTUAL[P.spec.framing.joist_size][1] - (DP_STANDOFF if P.spec.framing.footing_type == "diamond_pier" else self.stair_standoff(P, 0)))
                 hsrc = "from the flights' rise"
-            size = "6x6" if own else P.spec.framing.post_size
+            size = P.spec.framing.post_size
             foot = self.stair_caisson(P) if own else None
             model = None
             if not own and P.spec.framing.footing_type == "diamond_pier":
@@ -1967,8 +1997,9 @@ class _CalcMore(Calc):
                     weight=math.pi * (dia / 24.0) ** 2 * depth / 12.0 * CONCRETE_PCF, own=True)
 
     def stair_carriers(self, P: _Part, k: int, st, sd, name: str, tags: List[str]):
-        """A flight longer than DCA6's 6' cut-stringer span sits on carriers: a 2-ply 2x6 under the stringers on two posts
-        (the stair's own 12" caissons when own_footings, else the deck's footings)."""
+        """A flight the spec gives a mid-run carrier (Stair.mid_support): a 2-ply 2x6 under the stringers on two of the deck's posts
+        (on the stair's own 12" caissons when own_footings, else the deck's footings). With mid_support off there is none: the
+        stringer rows show the full flight (beyond DCA6's 6'-0" it is the engineer's REVIEW)."""
         if not getattr(st, "mid_support", False):
             return
         c = self.c
@@ -1982,7 +2013,7 @@ class _CalcMore(Calc):
         fracs = list(st.carrier_fracs or [0.5])
         own = int(getattr(st, "own_footings", 0) or 0)
         car = section("(2)2x6", P.spec.framing.joist_species, P.spec.framing.joist_grade)
-        size = "6x6" if own else P.spec.framing.post_size
+        size = P.spec.framing.post_size                    # the deck's post and base under the stairs too (owner 27 Oct)
         pb = LUMBER_ACTUAL.get(size, (5.5, 5.5))[0]
         for fi in (st.carrier_flights or []):
             fg = g.flights[fi]
@@ -2326,6 +2357,7 @@ def _review_and_assumptions(k: _CalcMore) -> Tuple[List[str], List[str]]:
         "Verify every connector value marked \"verify\" against Simpson C-C-2026 / the current ESRs (LUS210Z, HUCQ210-2-SDS, H2.5AZ, CS16, A35Z): these rows use conservative catalog readings.",
         _base_review(k),
         *_footing_review(k),
+        *_stair_review(k),
         "LedgerLOK is checked at a 1/2\" lag equivalence of 375 lb per screw: confirm with ESR-1078's ledger table for the joist spans here. Verify each ledger lands on a solid band (no brick veneer, IRC R507.9.1.1) and the hold-downs reach interior framing.",
         f"Wind Exposure {c.exposure} is used (conservative for the greenbelt behind the lot; IRC default B). Ke = 1.0 (ASCE 7-16 Table 26.9-1 allows about 0.82 at this elevation).",
         f"Seismic SDS taken at {c.sds:g} (top of SDC B); wind governs the deck's lateral design in both directions here.",
@@ -2367,6 +2399,25 @@ def _footing_review(k) -> List[str]:
         out.append(f"Caissons: capacity = end bearing at the presumptive {k.c.soil_psf:,.0f} psf + the engine's ≈{CAISSON_SKIN_PSF:g} psf skin-friction estimate — confirm the soil "
                    "(Buick loam, CL/ML; a soils report if Centennial's R401.2 amendment applies), size the shafts and their reinforcing, and the cast-in anchors. "
                    "Centennial R109.1.1: the footing inspection is by a Colorado PE.")
+    return out
+
+
+def _stair_review(k) -> List[str]:
+    """The stringer rows left to the engineer (REVIEW): a flight past DCA6's 6'-0" whose NDS rows pass, a throat within 1/8" of 5"."""
+    out = []
+    groups: Dict[Tuple[str, str, str], List[Tuple[str, str]]] = {}
+    for ck in k.checks:              # one line per stair and finding: the flights with the same throat share it
+        if ck.result == "REVIEW" and ck.note and ck.what.startswith(("Span between supports (DCA6", "Throat (5")):
+            what = f"horizontal span {_ftin(ck.demand)}" if ck.what.startswith("Span") else f"throat {ck.capacity:.2f}\""
+            m = re.search(r"flight (\d+)", ck.member)
+            groups.setdefault((ck.member.split(":")[0], what, ck.note), []).append((ck.id, m.group(1) if m else ""))
+    for (label, what, note), rows in groups.items():
+        fl = [f for _, f in rows if f]
+        where = f", flight{'s' if len(fl) > 1 else ''} {' and '.join(fl)}" if fl else ""
+        out.append(f"{' / '.join(i for i, _ in rows)} — {label}{where}: {what}; {note}.")
+    for ck in k.checks:              # the stair's own caissons carry the deck's post and base
+        if ck.id.startswith("K-BASE") and ck.id.endswith("-ST") and ck.note:
+            out.append(f"{ck.member}: {ck.what.replace('Post base ', '')} — {ck.note}.")
     return out
 
 
@@ -2442,22 +2493,33 @@ def _package(k: _CalcMore, scopes: List[str]) -> Package:
 
 
 def calc_package(base_spec, options: Sequence[Tuple[str, object]] = (), exposure: Optional[str] = None) -> Package:
-    """The base deck's checks, then for each option (label, spec) the checks it adds or changes (a member whose demand moves
-    by more than 1%, or a new member: the yard stair, the roof's load path), labeled with the option."""
+    """The base deck's checks, then for each option (label, spec) the checks it adds or changes (a new member — the yard stair,
+    the roof's load path — or one whose result, demand or capacity differs by more than 1% from every earlier scope's row),
+    labeled with the option."""
     kb = _analyze(base_spec, "Base", exposure)
     pkg = _package(kb, ["Base"])
-    seen = {ck.id: ck for ck in kb.checks}
+
+    def same(ck, b):            # the same member and result, demand and capacity within 1%
+        return (b.member == ck.member and ck.result == b.result and abs(ck.demand - b.demand) <= 0.01 * max(1.0, abs(b.demand))
+                and abs(ck.capacity - b.capacity) <= 0.01 * max(1.0, abs(b.capacity)))
+    seen: Dict[str, List[Check]] = {}
+    for ck in kb.checks:
+        seen.setdefault(ck.id, []).append(ck)
     for label, spec in options:
         ko = _analyze(spec, label, exposure)
+        added = 0
         for ck in ko.checks:
-            b = seen.get(ck.id)
-            if b is None or abs(ck.demand - b.demand) > 0.01 * max(1.0, abs(b.demand)) or ck.result != b.result:
+            # every earlier scope counts: two exclusive layouts of one stair (Options 2 / 2B) each show their own rows
+            if not any(same(ck, b) for b in seen.get(ck.id, [])):
                 ck.scope = label
                 pkg.checks.append(ck)
-                seen[ck.id] = ck
+                seen.setdefault(ck.id, []).append(ck)
+                added += 1
+        if not added:
+            pkg.assumptions.append(f"{label}: analyzed — no check differs from the base or the options above (member, result, demand and capacity within 1%).")
         for col in _package(ko, [label]).columns:
-            old = next((c_ for c_ in reversed(pkg.columns) if c_["id"] == col["id"]), None)
-            if old is None or abs(col["P"] - old["P"]) > 0.01 * max(1, old["P"]):
+            if not any(c_["id"] == col["id"] and c_.get("label") == col.get("label") and c_.get("model") == col.get("model")
+                       and abs(col["P"] - c_["P"]) <= 0.01 * max(1, c_["P"]) for c_ in pkg.columns):    # against every earlier scope's row, like the checks
                 pkg.columns.append(dict(col, scope=label))
         r2, a2 = _review_and_assumptions(ko)
         for x in r2:
@@ -2699,12 +2761,13 @@ def calc_sheets(pkg_or_spec, meta: Optional[dict] = None, standalone: bool = Fal
         page: List[Tuple[str, object]] = []
         hgt = 20.0
         pages = []
-        for kind, obj in rows:
+        for i_, (kind, obj) in enumerate(rows):
             h = _row_height(kind, obj)
-            if hgt + h > BODY_H - 14 and page:
+            nxt = _row_height(*rows[i_ + 1]) if (kind == "member" and i_ + 1 < len(rows)) else 0.0     # a member line keeps its first check
+            if hgt + h + nxt > BODY_H - 14 and page:
                 pages.append(page); page = []; hgt = 20.0
                 if kind == "check":           # repeat the member line on a new sheet
-                    prev = next((o_ for k_, o_ in reversed(rows[:rows.index((kind, obj))]) if k_ == "member"), None)
+                    prev = next((o_ for k_, o_ in reversed(rows[:i_]) if k_ == "member"), None)
                     if prev:
                         page.append(("member", prev + " (cont.)")); hgt += _row_height("member", prev)
             page.append((kind, obj)); hgt += h
@@ -2720,7 +2783,7 @@ def calc_sheets(pkg_or_spec, meta: Optional[dict] = None, standalone: bool = Fal
                             "Diamond Piers: bearing by soil, uplift, lateral, frost, spacing — ESR-1895, Pin Foundations chart"),
                "Lateral system": "House attachment (R507.9.2 hold-downs, ledger), deck diaphragm, knee braces at the end columns",
                "Inset stair & notch": "Stringers, notch headers and trimmer, the stair base ledger and the lower rim",
-               "Stairs to the yard": "Option: stringers, landing joists and rims, landing posts and piers, the stair on the deck rim",
+               "Stairs to the yard": "Option: stringers, landing joists and rims, the stair on the deck rim (its posts: Columns, Caps & bases, Footings)",
                "Louvered roof load path": "Option: roof post reactions to the deck — gravity, uplift chain, base moment",
                "Guards": "Guard posts and their blocking — IRC Table R301.5, ESR-4217"}.get(g, "")
         for pi, pg in enumerate(pages):
