@@ -1,0 +1,11 @@
+{
+ "_how": "Paste each published link here as it comes back (https://claude.ai/artifact/...). Empty = not published yet: the documents leave that link out, the hub merge refuses (or, with --preview, writes '#'). Order: URL_3D, then URL_ROOF (rebuild: build_fillmore.py roof proposal deliver), then URL_PROPOSAL and the rest.",
+ "URL_3D": "https://claude.ai/artifact/VqHCag1TLCgJkwHg7ekG5s",
+ "URL_ROOF": "https://claude.ai/artifact/MxJfePvEPLMxRDV9dcEtSk",
+ "URL_PROPOSAL": "https://claude.ai/artifact/5BSLYnyvEJCYiThaLSB5t8",
+ "URL_INTERNAL": "https://claude.ai/artifact/PKrd8C7nAw6kipPUboDKWA",
+ "URL_COST": "https://claude.ai/artifact/FHu5h4u3WSMmyYUPaUwLyw",
+ "URL_PERMIT": "https://claude.ai/artifact/JgunjbDfW3FxHNRUeMPYqP",
+ "URL_DD": "https://claude.ai/artifact/Vdq7Z9ALGEiaBehrFuHp5P",
+ "URL_DD_OPTS": ""
+}

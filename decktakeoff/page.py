@@ -372,7 +372,7 @@ def _reads_levels(t, L, sm):
 LEVELS_CSS = """<style>
 .reads.levels { grid-template-columns:160px 1fr; }
 @media (max-width: 640px) { .reads.levels { grid-template-columns:1fr; } }
-@media print { #g-reads + .gal img { max-height:1.8in; object-fit:cover; } .reads.levels { gap:2px 12px; } .reads.levels dd { font-size:12.5px; line-height:1.4; }
+@media print { #g-reads + .gal img { max-height:1.6in; object-fit:cover; } #g-what + .tw td { padding-top:4px; padding-bottom:4px; } .reads.levels { gap:2px 12px; } .reads.levels dd { font-size:12.5px; line-height:1.4; }
   .reads.levels dt { font-size:11px; } #g-what { margin-top:18px; } }
 </style>"""
 
