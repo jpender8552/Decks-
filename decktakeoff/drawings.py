@@ -418,7 +418,7 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     sx = 710
     o.append(T(sx, 24, "FOOTING SCHEDULE", 9, 800, fill=GOLD))
     ft = L.frame
-    desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, base on 5/8\" Titen HD anchors after the cure",
+    desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)}, top {_caisson_top_words(L.spec)}, (4) #4 verticals + #3 ties, base on 5/8\" Titen HD anchors after the cure",
             "diamond_pier": f"Diamond Pier {ft.footing_model} (head + 4 x 50\" pins), 3,300 lb allowable",
             "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, standoff base set after the cure",
             "existing": ("Existing caissons and columns stay — verify plumb, bearing and condition; new column caps (engineered)" if L.spec.framing.existing_posts
@@ -3235,6 +3235,13 @@ def _post_rows(levels, boxes) -> list:
     return rows
 
 
+def _caisson_top_words(s) -> str:
+    """Where the caisson tops sit: "6\" above grade", or per part on a composite ("7\" above grade / flush with the slab")."""
+    tops = sorted({float(((p_ if isinstance(p_, dict) else {}).get("framing") or {}).get("caisson_above_in", s.framing.caisson_above_in))
+                   for p_ in (getattr(s.geometry, "parts", None) or [])} or {float(s.framing.caisson_above_in)}, reverse=True)
+    return " / ".join("flush with the slab" if a_ == 0 else f"{ftin(a_)} above grade" for a_ in tops)
+
+
 def _footing_words(s, CL, t=None, short: bool = False) -> str:
     """The footing as this job builds it, read from the spec (framing.footing_type, the frame's diameter / depth / model) with
     the post base the order carries: short = the name ('20" x 3'-6" drilled caisson'), else the full description."""
@@ -3246,7 +3253,7 @@ def _footing_words(s, CL, t=None, short: bool = False) -> str:
                 + (" + a 5/8\" anchor into the head" if base.startswith("ABU88") else ""))
     if fr.footing_type == "caisson":
         return (f"{int(ft.footing_dia_in)}\" x {ftin(ft.footing_depth_in)} drilled caisson" if short else
-                f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}) + 6\" above grade, (4) #4 verticals + #3 ties, "
+                f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), top {_caisson_top_words(s)}, (4) #4 verticals + #3 ties, "
                 f"{base} base set after the cure on 5/8\" Titen HD anchors")
     if fr.footing_type == "concrete":
         return f"{int(ft.footing_dia_in)}\" concrete pier" if short else f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, {base} base set after the cure"
@@ -3908,11 +3915,12 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
 def _post_base_name(s, t) -> str:
     """The post base the order carries: its Simpson SKU, or 'custom standoff' for a made-to-order base (a rough 8x8 on a
     Diamond Pier); post_base_sku() when the order has no base line."""
-    for l in getattr(t, "lines", None) or []:
-        if l.category == "Footings" and "base" in l.item.lower():
-            sku = getattr(l, "sku", "") or ""
-            return sku if re.match(r"^[A-Z]{2,}\d", sku) else "custom standoff"
-    return post_base_sku(s)
+    bases = [l for l in getattr(t, "lines", None) or [] if l.category == "Footings" and "base" in l.item.lower() and "anchor" not in l.item.lower()]
+    for l in bases:                      # the drilled anchors' line names the base too ("through the post base"): skip it
+        sku = getattr(l, "sku", "") or ""
+        if re.match(r"^[A-Z]{2,}\d", sku):
+            return sku
+    return "custom standoff" if bases else post_base_sku(s)
 
 
 def _composite_key(CL, S, t) -> list:
