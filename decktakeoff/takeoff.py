@@ -459,6 +459,10 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
         Q_.lumber.append((jsize, ln, "outline rim ply"))
     for i in sorted({r[0] for r in OF.rims}):
         lens = [math.hypot(r[4] - r[2], r[5] - r[3]) for r in OF.rims if r[0] == i]
+        if OF.side_kind[i] == "trimmer":     # an inset stair's notch: the inner face is a doubled trimmer the deck's full depth
+            Q_.cuts.append(CutPiece(f"Stair-notch trimmer (side {i + 1})", jsize, max(lens), len(lens),
+                                    f"{len(lens)}-ply, ledger to the front rim, laminated RSS 2 rows @ 12\"; a double hanger each end; the stringers and both headers hang on it"))
+            continue
         Q_.cuts.append(CutPiece(f"Rim side {i + 1} ({OF.side_kind[i]})", jsize, max(lens), len(lens),
                                 ("mitred both ends" if OF.side_kind[i] != "rim" else "square / mitred to the neighbours")
                                 + (", 1/2\" off the bay face — no ledger on the cantilevered bay" if OF.side_kind[i] == "bay45" else "")
@@ -487,7 +491,7 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     Q_.hangers_skew = sum((e in ("rim45", "bay45")) for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))
     Q_.hangers_field = sum((e == "ledger45") for _, _, _, ea, eb, _ in OF.joists for e in (ea, eb))     # a bay face runs at the house's angle, not 45
     rl_ = list(getattr(OF, "rim_ledger", []))
-    Q_.hangers_double = rl_.count("square")
+    Q_.hangers_double = rl_.count("square") + getattr(OF, "notch_hangers", 0)     # + an inset stair notch's trimmer ends and headers
     Q_.hangers_skew_double = 2 * len(OF.ledger_blocks) + rl_.count("skew45")
     Q_.hangers_field_double = rl_.count("field")
     Q_.skew_double_note = ("the two angled rims at the ledger block beside the bay" if OF.ledger_blocks else
@@ -498,8 +502,11 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     # fascia: every open side, its own mitred length
     Q_.fascia_pieces = []
     if spec.decking.fascia:
+        from .layout import step_skirt_layout
+        sk_ = step_skirt_layout(spec) if getattr(spec.geometry, "step_skirt", None) else None
+        skirted = {f_.edge for f_ in sk_.faces} if sk_ else set()          # the step skirt's vertical panels are the fascia there
         for e, kind in zip(L.outline_edges, OF.side_kind):
-            if kind in ("rim", "rim45"):
+            if kind in ("rim", "rim45") and e.name not in skirted:
                 Q_.fascia_pieces.append((f"fascia {e.name}", round(e.length + 1.5, 2)))
     # joist tape (2" on every joist + the ledger), 4" on rims and beams
     Q_.tape_joist_lf = (sum(b - a for _, a, b, *_ in OF.joists) + Q_.ledger_len) / 12.0

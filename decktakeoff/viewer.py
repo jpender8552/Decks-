@@ -105,6 +105,18 @@ function patternTex(kind, hex, seed) {
     for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) { for (let k = 0; k < 2; k++) {
       g.fillStyle = [shade(hex, -0.12), hex, shade(hex, 0.1), shade(hex, -0.05), shade(hex, 0.16)][Math.floor(rnd() * 5)];
       if ((i + j) % 2) g.fillRect(i * 2 * u + 1.5, j * 2 * u + k * u + 1.5, 2 * u - 3, u - 3); else g.fillRect(i * 2 * u + k * u + 1.5, j * 2 * u + 1.5, u - 3, 2 * u - 3); } }
+  } else if (kind === 'hbrick') {  // the house's face brick: running bond, 12 bricks x 36 courses per 8' tile, mottled buff tones, light mortar
+    const bh = 512 / 36, bw = 512 / 12, jt = 1.6;
+    g.fillStyle = shade(hex, 0.18); g.fillRect(0, 0, 512, 512);
+    for (let r = 0; r < 36; r++) { const off = (r % 2) * bw / 2; for (let c = -1; c < 13; c++) {
+      const tones = [shade(hex, -0.14), shade(hex, -0.06), hex, hex, shade(hex, 0.07), shade(hex, 0.14), '#c98d52', shade(hex, -0.22)];
+      g.fillStyle = tones[Math.floor(rnd() * tones.length)];
+      g.fillRect(c * bw + off + jt / 2, r * bh + jt / 2, bw - jt, bh - jt);
+      g.globalAlpha = 0.25; g.fillStyle = shade(hex, 0.25); g.fillRect(c * bw + off + jt / 2 + rnd() * bw * 0.5, r * bh + jt / 2, bw * (0.2 + rnd() * 0.3), bh - jt); g.globalAlpha = 1; } }
+    g.globalAlpha = 0.18; for (let i = 0; i < 6000; i++) { g.fillStyle = rnd() > 0.5 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 1); } g.globalAlpha = 1;
+  } else if (kind === 'rsawn') {   // stained rough-sawn plywood / cedar: faint vertical fibre streaks (the grooves are geometry)
+    for (let i = 0; i < 900; i++) { g.fillStyle = rnd() > 0.5 ? shade(hex, -0.09) : shade(hex, 0.07); g.globalAlpha = 0.25 + rnd() * 0.35;
+      g.fillRect(rnd() * 512, rnd() * 512, 0.6 + rnd() * 1.6, 30 + rnd() * 160); } g.globalAlpha = 1;
   } else if (kind === 'gravel') {
     for (let i = 0; i < 5000; i++) { g.fillStyle = [shade(hex, -0.25), shade(hex, -0.1), shade(hex, 0.12), shade(hex, 0.25)][Math.floor(rnd() * 4)]; g.beginPath(); g.arc(rnd() * 512, rnd() * 512, 1.5 + rnd() * 3, 0, 6.3); g.fill(); }
   }

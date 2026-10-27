@@ -348,6 +348,9 @@ def _reads_levels(t, L, sm):
     reads += [("Decking", decking), ("Rail", rail)]
     for ss, st in zip(stair_specs(t), L.stairs):
         reads.append((getattr(ss, "name", None) or "Stair", stair_words(ss, st, True)))
+    from .report import step_face_words
+    if step_face_words(t):
+        reads.append(("Step face", step_face_words(t)))
     lt = lights_of(t)
     if lt["total"]:
         reads.append(("Lighting", ", ".join(x for x in ((f"{lt['riser']} riser lights" if lt["riser"] else ""), (f"{lt['post_cap']} post-cap lights" if lt["post_cap"] else ""),

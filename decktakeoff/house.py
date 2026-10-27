@@ -25,7 +25,7 @@ IN = 1 / 12.0
 DEFAULT_COLORS = dict(siding="#c9c3a4", trim="#f3f1ea", fascia="#2e463b", roof="#6b655e", door="#ece9df", storm="#141414",
                       foundation="#a9a59c", interior="#3b3632", shutter="#f1efe8", glass="#b4c4cf", gutter="#2e463b", metal="#8f959b")
 # colours only the newer features use (painted fields, brick, vinyl frames, screens, blinds, chimney caps)
-EXTRA_COLORS = dict(accent="#5c3833", brick="#b08a5c", mortar="#a59d8f", frame="#e6e2d6", screen="#26282a", blind="#ece6d6",
+EXTRA_COLORS = dict(accent="#5c3833", brick="#b8945f", mortar="#c2b9a6", frame="#e6e2d6", screen="#26282a", blind="#ece6d6",
                     cap="#8a8680")
 
 
@@ -581,7 +581,181 @@ class _Builder:
             for xe in (x0, x1):
                 self.rake(xe, y0, zh, xe, y1, zl, th)
 
+    # --------------------------------------------------------------- general roofs: shed (any low side), hip, free planes
+    @staticmethod
+    def _out(s):
+        return {"+y": (0.0, 1.0), "-y": (0.0, -1.0), "+x": (1.0, 0.0), "-x": (-1.0, 0.0)}[s] if isinstance(s, str) else tuple(s)
+
+    def poly(self, pts, kind, mat, tag, lift=0.0):
+        """A planar polygon (3D points, CCW seen from its front) as a triangle fan mesh."""
+        p0 = pts[0]
+        tri = []
+        for i in range(1, len(pts) - 1):
+            tri += [p0, pts[i], pts[i + 1]]
+        self.mesh(kind, [[float(x), float(y), float(z) + lift] for x, y, z in tri], mat, tag=tag)
+
+    def eave(self, a, b, z, out, fh=0.6, th=0.2, soffit=None, gutter=True, fascia_mat="hfascia", soffit_mat="hsoffit",
+             gutter_mat="hfascia", tag="eave"):
+        """An eave along the axis-aligned line a->b (the fascia's outer face), roof top at z + th: the fascia board, the
+        5" K gutter hung on it, and a level box soffit `soffit` ft deep back toward the wall."""
+        ox, oy = self._out(out)
+        (xa, ya), (xb, yb) = a, b
+        x0, x1 = sorted((xa, xb)); y0, y1 = sorted((ya, yb))
+        def band(d0, d1, za, zb, kind, mat, tg):
+            if abs(oy) > 0.5:        # eave along x
+                ys = sorted((ya + oy * d0, ya + oy * d1))
+                self.add(kind, x0, x1, ys[0], ys[1], za, zb, mat, 0, tag=tg)
+            else:
+                xs = sorted((xa + ox * d0, xa + ox * d1))
+                self.add(kind, xs[0], xs[1], y0, y1, za, zb, mat, 0, tag=tg)
+        band(-0.07, 0.0, z - fh, z + th, "trim", fascia_mat, f"{tag}: fascia")
+        if gutter:
+            gt = z + th - 0.06
+            band(0.0, 0.40, gt - 0.40, gt - 0.34, "gutter", gutter_mat, f"{tag}: K gutter bottom")
+            band(0.33, 0.40, gt - 0.40, gt, "gutter", gutter_mat, f"{tag}: K gutter face")
+            band(0.36, 0.43, gt - 0.07, gt + 0.01, "gutter", gutter_mat, f"{tag}: K gutter lip")
+            band(0.0, 0.03, gt - 0.40, gt, "gutter", gutter_mat, f"{tag}: K gutter back")
+        if soffit:
+            band(-float(soffit), -0.07, z - fh, z - fh + 0.05, "roof", soffit_mat, f"{tag}: soffit")
+
+    def shed_any(self, r: dict):
+        """A shed roof whose low edge is on any side ("-y", "+x", "-x"): planes, fascia + gutter on the low edge, rakes."""
+        x0, x1, y0, y1 = r["rect"]
+        zl, zh = float(r["z_low"]), float(r["z_high"])
+        th = float(r.get("th", 0.2))
+        low = r["low"]
+        c = {"+x": ((x1, y0, zl), (x1, y1, zl), (x0, y1, zh), (x0, y0, zh)),
+             "-x": ((x0, y1, zl), (x0, y0, zl), (x1, y0, zh), (x1, y1, zh)),
+             "-y": ((x0, y0, zl), (x1, y0, zl), (x1, y1, zh), (x0, y1, zh))}[low]
+        # CCW from above: order the four corners counter-clockwise in plan
+        pts = list(c)
+        cx_, cy_ = sum(p[0] for p in pts) / 4, sum(p[1] for p in pts) / 4
+        pts.sort(key=lambda p: math.atan2(p[1] - cy_, p[0] - cx_))
+        self.poly(pts, "roof", r.get("mat", "shingle"), r.get("name", "shed roof"), lift=th)
+        a_, b_ = c[0][:2], c[1][:2]
+        self.eave(a_, b_, zl, low, fh=float(r.get("fascia_h", 0.6)), th=th, soffit=r.get("soffit"), gutter=r.get("gutter", True), tag=r.get("name", "shed roof"))
+        for p, q in ((c[1], c[2]), (c[3], c[0])):
+            self.rake(p[0], p[1], p[2], q[0], q[1], q[2], th)
+
+    def hip_roof(self, r: dict):
+        """A hip roof over the eave outline rect (fascia line): ridge along "axis" ("x" or "y"), pitch rise/12 (or z_ridge),
+        hipped ends listed in "hips" (default both; a missing end is a gable with rake boards), fascia + gutter + box soffit
+        on every eave, a ridge cap."""
+        x0, x1, y0, y1 = [float(v) for v in r["rect"]]
+        ze = float(r["z_eave"]); th = float(r.get("th", 0.2)); fh = float(r.get("fascia_h", 0.6))
+        axis = r.get("axis", "x")
+        mat = r.get("mat", "shingle")
+        hips = r.get("hips", ["x0", "x1"] if axis == "x" else ["y0", "y1"])
+        if axis == "x":
+            half = (y1 - y0) / 2; ym = (y0 + y1) / 2
+            zr = float(r["z_ridge"]) if "z_ridge" in r else ze + float(r["pitch"]) / 12.0 * half
+            run = (zr - ze) / (float(r["pitch"]) / 12.0) if "pitch" in r else half
+            xa = x0 + (run if "x0" in hips else 0.0); xb = x1 - (run if "x1" in hips else 0.0)
+            if xa > xb:
+                xa = xb = (x0 + x1) / 2
+            self.poly([(x0, y1, ze), (x1, y1, ze), (xb, ym, zr), (xa, ym, zr)][::-1], "roof", mat, "roof plane (front)", lift=th)
+            self.poly([(x1, y0, ze), (x0, y0, ze), (xa, ym, zr), (xb, ym, zr)][::-1], "roof", mat, "roof plane (back)", lift=th)
+            if "x0" in hips:
+                self.poly([(x0, y0, ze), (x0, y1, ze), (xa, ym, zr)][::-1], "roof", mat, "roof plane (hip end)", lift=th)
+            if "x1" in hips:
+                self.poly([(x1, y1, ze), (x1, y0, ze), (xb, ym, zr)][::-1], "roof", mat, "roof plane (hip end)", lift=th)
+            eaves = [((x0, y1), (x1, y1), "+y"), ((x0, y0), (x1, y0), "-y")]
+            eaves += [((x0, y0), (x0, y1), "-x")] if "x0" in hips else []
+            eaves += [((x1, y0), (x1, y1), "+x")] if "x1" in hips else []
+            rakes = ([] if "x0" in hips else [((x0, y0, ze), (x0, ym, zr)), ((x0, ym, zr), (x0, y1, ze))]) + \
+                    ([] if "x1" in hips else [((x1, y0, ze), (x1, ym, zr)), ((x1, ym, zr), (x1, y1, ze))])
+            ridge = ((xa, ym), (xb, ym))
+        else:
+            half = (x1 - x0) / 2; xm = (x0 + x1) / 2
+            zr = float(r["z_ridge"]) if "z_ridge" in r else ze + float(r["pitch"]) / 12.0 * half
+            run = (zr - ze) / (float(r["pitch"]) / 12.0) if "pitch" in r else half
+            ya = y0 + (run if "y0" in hips else 0.0); yb = y1 - (run if "y1" in hips else 0.0)
+            if ya > yb:
+                ya = yb = (y0 + y1) / 2
+            self.poly([(x1, y0, ze), (x1, y1, ze), (xm, yb, zr), (xm, ya, zr)][::-1], "roof", mat, "roof plane (side)", lift=th)
+            self.poly([(x0, y1, ze), (x0, y0, ze), (xm, ya, zr), (xm, yb, zr)][::-1], "roof", mat, "roof plane (side)", lift=th)
+            if "y0" in hips:
+                self.poly([(x0, y0, ze), (x1, y0, ze), (xm, ya, zr)], "roof", mat, "roof plane (hip end)", lift=th)
+            if "y1" in hips:
+                self.poly([(x1, y1, ze), (x0, y1, ze), (xm, yb, zr)], "roof", mat, "roof plane (hip end)", lift=th)
+            eaves = [((x0, y0), (x0, y1), "-x"), ((x1, y0), (x1, y1), "+x")]
+            eaves += [((x0, y0), (x1, y0), "-y")] if "y0" in hips else []
+            eaves += [((x0, y1), (x1, y1), "+y")] if "y1" in hips else []
+            rakes = ([] if "y0" in hips else [((x0, y0, ze), (xm, y0, zr)), ((xm, y0, zr), (x1, y0, ze))]) + \
+                    ([] if "y1" in hips else [((x0, y1, ze), (xm, y1, zr)), ((xm, y1, zr), (x1, y1, ze))])
+            ridge = ((xm, ya), (xm, yb))
+        skip = set(r.get("no_eave", []))           # eaves hidden against another roof / a wall
+        for a_, b_, o_ in eaves:
+            if o_ in skip:
+                continue
+            self.eave(a_, b_, ze, o_, fh=fh, th=th, soffit=r.get("soffit", 1.0), gutter=o_ not in set(r.get("no_gutter", [])),
+                      tag=r.get("name", "hip roof"))
+        for p, q in rakes:
+            self.rake(p[0], p[1], p[2], q[0], q[1], q[2], th)
+        (ra, rb) = ridge
+        if abs(ra[0] - rb[0]) + abs(ra[1] - rb[1]) > 0.05:
+            w_ = 0.42
+            if axis == "x":
+                self.add("roof", min(ra[0], rb[0]), max(ra[0], rb[0]), ra[1] - w_ / 2, ra[1] + w_ / 2, zr + th - 0.05, zr + th + 0.08, mat, 0, tag="ridge cap")
+            else:
+                self.add("roof", ra[0] - w_ / 2, ra[0] + w_ / 2, min(ra[1], rb[1]), max(ra[1], rb[1]), zr + th - 0.05, zr + th + 0.08, mat, 0, tag="ridge cap")
+
+    def planes_roof(self, r: dict):
+        """A free-form roof: "faces" (3D polygons, CCW from above), "eaves" [{a, b, z, out, soffit, gutter}],
+        "rakes" [[p, q]], "ridges" [[p, q]] (caps)."""
+        th = float(r.get("th", 0.2)); mat = r.get("mat", "shingle")
+        for f in r.get("faces", []):
+            pts = f["pts"] if isinstance(f, dict) else f
+            self.poly(pts, "roof", (f.get("mat", mat) if isinstance(f, dict) else mat), r.get("name", "roof plane"), lift=th)
+        for e in r.get("eaves", []):
+            self.eave(e["a"], e["b"], float(e["z"]), e["out"], fh=float(e.get("fascia_h", r.get("fascia_h", 0.6))), th=th,
+                      soffit=e.get("soffit", r.get("soffit")), gutter=e.get("gutter", True), tag=r.get("name", "roof"))
+        for p, q in r.get("rakes", []):
+            self.rake(p[0], p[1], p[2], q[0], q[1], q[2], th)
+        for p, q in r.get("ridges", []):
+            L_ = math.hypot(q[0] - p[0], q[1] - p[1])
+            if L_ < 0.05:
+                continue
+            ux_, uy_ = (q[0] - p[0]) / L_, (q[1] - p[1]) / L_
+            nx_, ny_ = -uy_ * 0.21, ux_ * 0.21
+            zt = max(p[2], q[2]) + th
+            quad = [[p[0] + nx_, p[1] + ny_, p[2] + th - 0.02], [q[0] + nx_, q[1] + ny_, q[2] + th - 0.02], [q[0], q[1], q[2] + th + 0.08],
+                    [p[0] + nx_, p[1] + ny_, p[2] + th - 0.02], [q[0], q[1], q[2] + th + 0.08], [p[0], p[1], p[2] + th + 0.08],
+                    [p[0], p[1], p[2] + th + 0.08], [q[0], q[1], q[2] + th + 0.08], [q[0] - nx_, q[1] - ny_, q[2] + th - 0.02],
+                    [p[0], p[1], p[2] + th + 0.08], [q[0] - nx_, q[1] - ny_, q[2] + th - 0.02], [p[0] - nx_, p[1] - ny_, p[2] + th - 0.02]]
+            self.mesh("roof", quad, mat, tag="ridge / hip cap")
+
+    def chimney(self, c: dict):
+        """A masonry chimney: the stack (brick) from z0 to z1, a cast crown overhanging it, a flue pipe with a rain cap."""
+        x0, x1, y0, y1 = [float(v) for v in c["rect"]]
+        z0, z1 = float(c.get("z0", 0.0)), float(c["z1"])
+        self.add("house", x0, x1, y0, y1, z0, z1, c.get("mat", "hbrick"), 0, tag=c.get("name", "chimney"))
+        ov = float(c.get("cap_over_in", 2.0)) * IN
+        ch = float(c.get("cap_h_in", 4.0)) * IN
+        if c.get("cap", True):
+            self.add("trim", x0 - ov, x1 + ov, y0 - ov, y1 + ov, z1, z1 + ch, c.get("cap_mat", "hcap"), 0, tag="chimney crown")
+        fl = c.get("flue")
+        if fl:
+            fx, fy = fl.get("at", [(x0 + x1) / 2, (y0 + y1) / 2])
+            r_ = float(fl.get("d_in", 8.0)) * IN / 2
+            fhh = float(fl.get("h_in", 14.0)) * IN
+            self.add("trim", fx - r_, fx + r_, fy - r_, fy + r_, z1 + ch, z1 + ch + fhh, "hmetal", 0, tag="flue pipe", shape="cyl")
+            self.add("trim", fx - r_ * 1.7, fx + r_ * 1.7, fy - r_ * 1.7, fy + r_ * 1.7, z1 + ch + fhh, z1 + ch + fhh + 0.06, "hmetal", 0, tag="flue rain cap")
+            self.add("trim", fx - r_ * 1.25, fx + r_ * 1.25, fy - r_ * 1.25, fy + r_ * 1.25, z1 + ch + fhh + 0.06, z1 + ch + fhh + 0.3, "hmetal", 0, tag="flue rain cap", shape="cyl")
+
+    def wbox(self, x, y, out, a0, a1, o0, o1, z0, z1, kind, mat, tag):
+        """A box beside a wall point (x, y): along-wall a0..a1, outward o0..o1 (the wall's outside is `out`)."""
+        ox, oy = self._out(out)
+        if abs(oy) > 0.5:
+            ys = sorted((y + oy * o0, y + oy * o1))
+            self.add(kind, x + a0, x + a1, ys[0], ys[1], z0, z1, mat, 0, tag=tag)
+        else:
+            xs = sorted((x + ox * o0, x + ox * o1))
+            self.add(kind, xs[0], xs[1], y + a0, y + a1, z0, z1, mat, 0, tag=tag)
+
     def downspout(self, d: dict):
+        if d.get("out", "+y") != "+y" or d.get("mat"):
+            return self.downspout_v2(d)
         x, y = d["at"]
         z1 = float(d["z1"])
         z0 = float(d.get("z0", 0.0))
@@ -589,11 +763,38 @@ class _Builder:
         self.add("gutter", x - s, x + s, y, y + 0.22, z0 + 0.6, z1, "htrim" if d.get("color") == "trim" else "siding", 0, tag="downspout")
         self.add("gutter", x - s, x + s, y, y + 1.2, z0, z0 + 0.3, "htrim" if d.get("color") == "trim" else "siding", 0, tag="downspout elbow + splash")
 
+    def downspout_v2(self, d: dict):
+        """A 2x3 downspout standing off a wall facing `out`, an elbow + splash block (or a kick-out) at the bottom."""
+        x, y = d["at"]
+        z1, z0 = float(d["z1"]), float(d.get("z0", 0.0))
+        out = d.get("out", "+y"); mat = d.get("mat", "hfascia")
+        self.wbox(x, y, out, -0.125, 0.125, 0.02, 0.2, z0 + 0.45, z1, "gutter", mat, "downspout")
+        self.wbox(x, y, out, -0.125, 0.125, 0.02, 0.75, z0 + 0.1, z0 + 0.45, "gutter", mat, "downspout elbow")
+        if d.get("strap", True):
+            for zz in (z0 + 0.3 * (z1 - z0), z0 + 0.7 * (z1 - z0)):
+                self.wbox(x, y, out, -0.15, 0.15, 0.0, 0.22, zz, zz + 0.06, "gutter", mat, "downspout strap")
+
     def lantern(self, d: dict):
+        if d.get("out", "+y") != "+y" or d.get("style"):
+            return self.lantern_v2(d)
         x, y, z = d["at"]
         self.add("storm", x - 0.22, x + 0.22, y + 0.02, y + 0.42, z - 0.55, z + 0.3, "storm", 0, tag="coach lantern")
         self.add("glass", x - 0.16, x + 0.16, y + 0.06, y + 0.38, z - 0.4, z + 0.15, "hglass", 0, tag="lantern glass")
         self.add("storm", x - 0.1, x + 0.1, y, y + 0.08, z - 0.7, z + 0.4, "storm", 0, tag="lantern back plate")
+
+    def lantern_v2(self, d: dict):
+        """A black coach lantern on a wall facing `out`: back plate, arm, a tapered cage with seeded-glass panes, a cap."""
+        x, y, z = d["at"]
+        out = d.get("out", "+y")
+        self.wbox(x, y, out, -0.11, 0.11, 0.0, 0.06, z - 0.62, z + 0.18, "storm", "storm", "lantern back plate")
+        self.wbox(x, y, out, -0.035, 0.035, 0.06, 0.32, z - 0.30, z - 0.22, "storm", "storm", "lantern arm")
+        self.wbox(x, y, out, -0.2, 0.2, 0.16, 0.56, z - 0.42, z - 0.36, "storm", "storm", "lantern base")
+        self.wbox(x, y, out, -0.16, 0.16, 0.2, 0.52, z - 0.36, z + 0.2, "glass", "hglass", "lantern glass")
+        for a0, a1, o0, o1 in ((-0.18, -0.15, 0.18, 0.54), (0.15, 0.18, 0.18, 0.54), (-0.18, 0.18, 0.18, 0.21), (-0.18, 0.18, 0.51, 0.54)):
+            self.wbox(x, y, out, a0, a1, o0, o1, z - 0.36, z + 0.2, "storm", "storm", "lantern cage")
+        self.wbox(x, y, out, -0.22, 0.22, 0.14, 0.58, z + 0.2, z + 0.3, "storm", "storm", "lantern cap")
+        self.wbox(x, y, out, -0.12, 0.12, 0.25, 0.47, z + 0.3, z + 0.42, "storm", "storm", "lantern cap")
+        self.wbox(x, y, out, -0.08, 0.08, 0.28, 0.44, z - 0.30, z + 0.05, "glass", "hglass", "lantern chimney glass")
 
     def window_well(self, d: dict):
         x0, x1 = d["x"]
@@ -622,6 +823,8 @@ def build_house(model: dict, add: Callable, rot_box: Callable, add_mesh: Callabl
             t = o.get("type", "window")
             if t == "door":
                 b.door(w, o)
+            elif t == "slider":
+                b.slider(w, o)
             elif t == "arch":
                 b.arch_window(w, o)
             elif t == "void":
@@ -631,16 +834,36 @@ def build_house(model: dict, add: Callable, rot_box: Callable, add_mesh: Callabl
     for g in model.get("gables", []):           # a gable end above an eave line: {a, b, z, peak_u, peak_z}
         b.gable_end({"a": g["a"], "b": g["b"], "z1": g["z"]}, float(g["peak_u"]), float(g["peak_z"]))
     for s in model.get("soffits", []):          # undersides of cantilevered floors / bays
+        if isinstance(s, dict):
+            x0, x1, y0, y1 = s["rect"]; z = float(s["z"])
+            add("trim", x0, x1, y0, y1, z - float(s.get("t", 0.08)), z, s.get("mat", "hsoffit"), 0, tag=s.get("name", "soffit"))
+            continue
         x0, x1, y0, y1, z = s
         add("trim", x0, x1, y0, y1, z - 0.08, z, "hsoffit", 0, tag="soffit")
     for m in model.get("masses", []):           # solid bodies behind the walls (blocks the light)
         x0, x1, y0, y1, z0, z1 = m
         add("house", x0, x1, y0, y1, z0, z1, "interior", 0, tag="house body")
     for r in model.get("roofs", []):
-        if r.get("type") == "shed":
-            b.shed_roof(r)
+        t = r.get("type")
+        if t == "shed":
+            if r.get("low", "+y") == "+y":
+                b.shed_roof(r)
+            else:
+                b.shed_any(r)
+        elif t == "hip":
+            b.hip_roof(r)
+        elif t == "planes":
+            b.planes_roof(r)
         else:
             b.gable_roof(r)
+    for c in model.get("chimneys", []):
+        b.chimney(c)
+    for g in model.get("gutters", []):          # free-standing eave runs: {a, b, z (roof top at the edge - th), out, ...}
+        b.eave(g["a"], g["b"], float(g["z"]), g["out"], fh=float(g.get("fascia_h", 0.6)), th=float(g.get("th", 0.2)),
+               soffit=g.get("soffit"), gutter=g.get("gutter", True), tag=g.get("name", "eave"))
+    for bl in model.get("blocks", []):         # solid pieces in a material: brick piers, sills, trim boxes, flashing
+        x0, x1, y0, y1, z0, z1 = bl["box"]
+        add(bl.get("kind", "house"), x0, x1, y0, y1, z0, z1, bl.get("mat", "hbrick"), 0, tag=bl.get("name", "block"))
     for d in model.get("downspouts", []):
         b.downspout(d)
     for d in model.get("lanterns", []):

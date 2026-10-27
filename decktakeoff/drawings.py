@@ -1340,9 +1340,10 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     if customer:
         flags = None
     S = scene or build_scene(L)
-    if any(getattr(b, "layer", "") == "site" for b in S.boxes):      # the yard model is for the 3D views, not the drawing sheets
+    S_roof = S                           # a louvered roof has its own sheet (A-403, louvered.sheet); the deck sheets leave it out
+    if any(getattr(b, "layer", "") in ("site", "louvered") for b in S.boxes):      # the yard model is for the 3D views, not the drawing sheets
         import dataclasses as _dc
-        S = _dc.replace(S, boxes=[b for b in S.boxes if getattr(b, "layer", "") != "site"])
+        S = _dc.replace(S, boxes=[b for b in S.boxes if getattr(b, "layer", "") not in ("site", "louvered")])
     _MAT_COLORS.clear()
     for k in ("deck", "border", "drink", "fascia"):
         if k in S.materials:
@@ -1373,6 +1374,9 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     cx = sheet_iso_covers(L, S, t, meta)
     if cx:
         out.append(("A-402", "Roof covers — exploded isometric, labeled", cx))
+    lv = __import__("decktakeoff.louvered", fromlist=["sheet"]).sheet(L, S_roof, t, meta)      # None without a louvered roof
+    if lv:
+        out.append(("A-403", "Louvered roof — plan, section, post", lv))
     out.append(("D-501", "Details", sheet_details_steel(L, S, t, meta) if L.spec.framing.system == "steel" else sheet_details(L, S, t, meta)))
     if L.spec.framing.system == "steel":
         out.append(("D-502", "Connection details — steel frame", sheet_details_steel_connections(L, S, t, meta)))

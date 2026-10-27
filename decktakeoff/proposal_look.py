@@ -170,7 +170,7 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
 }
 @media print {
   .optblock + .optblock { break-before:page; page-break-before:always; }
-  .optblock { margin-top:0.1in; border:0; }
+  .optblock { margin-top:0.1in; border:0; break-inside:avoid; page-break-inside:avoid; }
   .opt-head, .opt-body { padding-left:0.18in; padding-right:0.18in; }
   .opt-body { gap:10px; }
   .opt-blurb { font-size:12.5px; }

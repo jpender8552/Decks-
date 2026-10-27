@@ -36,6 +36,7 @@ SNAP_FT = 14.0 / 12             # a default post this close to the deck's rail c
 DIVIDER_CLEAR_IN = 24.0         # a breaker-line rail post closer than this to a roof post is dropped (the roof post is the post there)
 BRACKET_OC_FT = 2.0             # house-side beam wall brackets
 GUTTER_W, GUTTER_H = 2.5 * IN, 3.5 * IN
+RAIL_POST_INSET_FT = 2.5 * IN   # layout.RAIL_POST_INSET in feet (the post centre in from the frame face)
 HEX = {"black": "#141416", "linen": "#e9e3d3", "grey": "#6b6e70", "gray": "#6b6e70", "tan": "#b9a68a", "white": "#ecebe6",
        "mocha": "#5a4636", "bronze": "#4b3b2c"}
 
@@ -508,9 +509,13 @@ def draw_roof(add, q: dict) -> None:
         A("lvpost", px - p / 2 - 0.02, px + p / 2 + 0.02, py - p / 2 - 0.02, py + p / 2 + 0.02, zd + 0.04, zd + 0.36, tag="post base cover")
         A("lvpost", px - p / 2, px + p / 2, py - p / 2, py + p / 2, zd + 0.04, zb, tag=f"{q['post'] * 12:g}x{q['post'] * 12:g} aluminum post{rail}")
         out_y = 1 if py > (y0 + y1) / 2 else -1
-        if q["downspouts"] == "post":
-            yo = py + out_y * p / 2
-            A("lvdown", px - 0.09, px + 0.09, min(yo, yo + out_y * 0.3), max(yo, yo + out_y * 0.3), zd + 0.12, zd + 0.3, tag="downspout outlet (the downspout runs inside the post)")
+        if q["downspouts"] == "post":     # down inside the post, through the deck, then a 2x3 leader down the deck edge to grade + a kick-out
+            ye = py + out_y * (RAIL_POST_INSET_FT + 0.18)
+            ya, yb_ = sorted((ye - 0.1, ye + 0.1))
+            ztop = zd - 0.95
+            if ztop > 0.6:
+                A("lvdown", px - 0.13, px + 0.13, ya, yb_, 0.25, ztop, tag="downspout from inside the post, down the deck edge to grade")
+                A("lvdown", px - 0.13, px + 0.13, min(yb_, yb_ + out_y * 0.6), max(yb_, yb_ + out_y * 0.6) if out_y > 0 else ya, 0.05, 0.25, tag="downspout kick-out at grade")
         elif q["downspouts"] == "external":
             yo = py + out_y * p / 2
             ya, yb_ = sorted((yo, yo + out_y * 0.21))
@@ -621,8 +626,8 @@ def rail_points(spec, zones) -> List[Tuple[float, float, float]]:
     return out
 
 
-IRX_WALL_KIT = dict(each=42.0, source="EST — confirm the Impression Rail Express wall-mount bracket kit with D&D",
-                    desc="TimberTech Impression Rail Express wall-mount bracket kit, {color} — a rail panel end into a Suncoast roof post")
+IRX_WALL_KIT = dict(each=35.0, sku="AZTIXWBKTKITB", source="EST — not on a D&D quote yet (materials.md: AZTIXWBKTKITB ~$35)",
+                    desc="TimberTech Impression Rail Express Wall Mount Kit AZTIXWBKTKITB, {color} — a rail panel end into a Suncoast roof post")
 
 
 def takeoff_hook(t) -> None:
@@ -672,7 +677,8 @@ def takeoff_hook(t) -> None:
     ends = ends or 2 * n
     color = rl.color or "black"
     t.lines.append(Line("Rail", IRX_WALL_KIT["desc"].replace("{color}", color), ends, ends, "kit",
-                        f"exact  ({ends} panel end{'s' if ends != 1 else ''} on the {n} roof post{'s' if n != 1 else ''})", IRX_WALL_KIT["each"], IRX_WALL_KIT["source"]))
+                        f"exact  ({ends} panel end{'s' if ends != 1 else ''} on the {n} roof post{'s' if n != 1 else ''})", IRX_WALL_KIT["each"], IRX_WALL_KIT["source"],
+                        IRX_WALL_KIT["sku"]))
     xs = ", ".join(ftin(p.x) for p in roof)
     if "Rail" in t.schedule:
         t.schedule["Rail"] += (f"; {words} at {xs} from the left end of this level: the 6x6 aluminum post is base-plated on the deck over solid "
@@ -798,11 +804,11 @@ def post_loads(q: dict, dead_psf: float = 6.0, snow_psf: float = 30.0) -> List[d
 # ================================================================== the drawing sheet (A-403)
 def sheet(L, S, t, meta) -> Optional[str]:
     """A-403: the louvered roof over the deck — the plan (frame, zones, blades, posts on the rail line, the house beam on its
-    brackets), section A through the house wall, the roof and the deck (heights, clearances, the attachment), and detail 1:
-    the post on the deck edge (base plate over solid blocking / the column below, the rail panels bracketed into the post).
-    None when the job has no roof built. S is the full scene (the roof boxes included)."""
+    brackets), section A through the house wall, the roof and the deck (heights, clearance, the attachment), and detail 1:
+    the post on the deck edge (base plate over solid blocking / the column below, the rail brackets into the post). None
+    when the job has no roof built. S is the full scene (the roof boxes included)."""
     from .drawings import (T, TH, R, LN, C, PG, sheet as _sheet, plan_xform, elev_xform, dim_h, dim_v, INK, GOLD, MUTE, FILL,
-                           _panel, _lead, _PANEL)
+                           _panel, _lead)
     from .layout import RAIL_POST_INSET
     from .catalog import actual
     import textwrap
@@ -819,179 +825,196 @@ def sheet(L, S, t, meta) -> Optional[str]:
     BLACK, HOUSE, DECK = "#1d1d1f", FILL["house"], FILL["deck"]
     rp = RAIL_POST_INSET * IN
     front_posts = sorted([pt for pt in q["posts"] if pt["y"] > (y0 + y1) / 2], key=lambda pt: pt["x"])
+    jd = actual(spec.framing.joist_size)[1] * IN if spec.framing.joist_size else 9.25 * IN
 
     # ---------------------------------------------------------------- plan
     _panel(o, 14, 4, 560, 336, "PLAN", f"{q['brand'].upper()} LOUVERED ROOF OVER THE DECK")
-    px0, px1, py0, py1 = x0 - 3.0, x1 + 3.0, y0 - 2.6, y1 + 3.4
-    X, Y, sc = plan_xform(px0, px1, py0, py1, 34, 30, 520, 290)
+    px0, px1, py0, py1 = x0 - 2.5, x1 + 2.5, y0 - 2.2, y1 + 4.2
+    X, Y, sc = plan_xform(px0, px1, py0, py1, 30, 26, 528, 300)
     o.append(R(X(px0), Y(py0), (px1 - px0) * sc, (y0 - py0) * sc, HOUSE, INK, 0.8))
-    o.append(T(X(px0) + 6, Y(y0) - 6, "HOUSE WALL", 7.5, 900, fill=MUTE))
-    for s in surf:                       # the deck under and around the roof, clipped to the panel
-        a0, a1, b0, b1 = max(s["x0"], px0), min(s["x1"], px1), max(s["y0"], y0), min(s["y1"], py1)
+    o.append(T(X(px0) + 6, Y(py0) + 11, "HOUSE WALL", 7.2, 900, fill=MUTE))
+    for s_ in surf:                      # the deck under and around the roof, clipped to the panel
+        a0, a1, b0, b1 = max(s_["x0"], px0), min(s_["x1"], px1), max(s_["y0"], y0), min(s_["y1"], py1)
         if a1 - a0 > 0.05 and b1 - b0 > 0.05:
-            o.append(R(X(a0), Y(b0), (a1 - a0) * sc, (b1 - b0) * sc, DECK, INK, 0.8, 'fill-opacity="0.55"'))
-    for s in surf:
-        a0, a1 = max(s["x0"], px0), min(s["x1"], px1)
-        if a1 - a0 > 2.5 and s["y1"] < py1:
-            o.append(T(X((a0 + a1) / 2), Y(s["y1"]) + 11, f"{s['name'].upper()} · deck {ftin(s['z'] * 12)}", 6.6, 800, "middle", MUTE))
-    rails = [b for b in S.boxes if b.kind == "railpost" and px0 <= (b.x0 + b.x1) / 2 <= px1 and py0 <= (b.y0 + b.y1) / 2 <= py1]
-    ys_rail = sorted({round((b.y0 + b.y1) / 2, 2) for b in rails})
-    for yr in ys_rail:
-        xs_r = [(b.x0 + b.x1) / 2 for b in rails if abs((b.y0 + b.y1) / 2 - yr) < 0.05] + [pt["x"] for pt in front_posts if abs(pt["y"] - yr) < 0.1]
-        if len(xs_r) > 1:
-            o.append(LN(X(min(xs_r)), Y(yr), X(max(xs_r)), Y(yr), INK, 1.4))
-    for b in rails:
-        o.append(R(X(b.x0), Y(b.y0), max(2.5, (b.x1 - b.x0) * sc), max(2.5, (b.y1 - b.y0) * sc), INK, INK, 0.4))
-    # the frame: beams, the zone dividers, the blades
+            o.append(R(X(a0), Y(b0), (a1 - a0) * sc, (b1 - b0) * sc, DECK, INK, 0.8, 'fill-opacity="0.5"'))
+    for s_ in surf:
+        a0, a1 = max(s_["x0"], px0), min(s_["x1"], px1)
+        if a1 - a0 > 4.0 and s_["y1"] < py1:
+            o.append(T(X((a0 + a1) / 2), Y(s_["y1"]) + 22, f"{s_['name'].upper()} · DECK {ftin(s_['z'] * 12)}", 6.4, 800, "middle", MUTE))
     for b in [b for b in S.boxes if getattr(b, "layer", "") == LAYER and b.kind == "lvbeam"]:
         o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, BLACK, BLACK, 0.4))
     for bl in q["blades"]:
         px_, py_, _ = bl["pivot"]
         L_ = bl["length"] / 2
-        if q["louver_dir"] == "y":
-            o.append(LN(X(px_), Y(py_ - L_), X(px_), Y(py_ + L_), "#3c3c40", 2.4 if bl["motor"] else 0.9))
-        else:
-            o.append(LN(X(px_ - L_), Y(py_), X(px_ + L_), Y(py_), "#3c3c40", 2.4 if bl["motor"] else 0.9))
-    for zi, c in enumerate(q["zones"]):
-        cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
-        o.append(TH(X(cx_), Y(cy_) - 4, f"ZONE {zi + 1}", 8, 900, "middle", halo="#fff"))
-        o.append(TH(X(cx_), Y(cy_) + 7, f"{c['n_blades']} blades · 1 motor blade", 6.6, 700, "middle", halo="#fff"))
-    # posts on their plates
+        a_, b_ = ((X(px_), Y(py_ - L_)), (X(px_), Y(py_ + L_))) if q["louver_dir"] == "y" else ((X(px_ - L_), Y(py_)), (X(px_ + L_), Y(py_)))
+        o.append(LN(*a_, *b_, "#3c3c40", 2.6 if bl["motor"] else 0.8))
+    # the rail line on the deck edge (under the front beam): IRX posts hollow, the roof posts solid on their plates
+    rails = [b for b in S.boxes if b.kind == "railpost" and px0 <= (b.x0 + b.x1) / 2 <= px1 and y0 <= (b.y0 + b.y1) / 2 <= py1]
+    for yr in sorted({round(pt["y"], 2) for pt in front_posts if pt["on_rail"]}):
+        xs_r = [(b.x0 + b.x1) / 2 for b in rails if abs((b.y0 + b.y1) / 2 - yr) < 0.1] + [pt["x"] for pt in front_posts]
+        o.append(LN(X(max(px0, min(xs_r) - 0.0)), Y(yr), X(min(px1, max(xs_r + [px1]))), Y(yr), GOLD, 1.3, "5 3"))
+    for b in rails:
+        cx_, cy_ = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+        o.append(R(X(cx_) - 3, Y(cy_) - 3, 6, 6, "#fff", INK, 0.9))
     for pt in q["posts"]:
         pl_ = q["plate"]
-        o.append(R(X(pt["x"] - pl_ / 2), Y(pt["y"] - pl_ / 2), pl_ * sc, pl_ * sc, "#fff", INK, 0.7))
+        o.append(R(X(pt["x"] - pl_ / 2), Y(pt["y"] - pl_ / 2), pl_ * sc, pl_ * sc, "#fff", INK, 0.8))
         o.append(R(X(pt["x"] - p / 2), Y(pt["y"] - p / 2), p * sc, p * sc, BLACK, INK, 0.5))
-    # dimensions
-    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame", 8)
+    for zi, c in enumerate(q["zones"]):
+        cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
+        o.append(TH(X(cx_), Y(cy_) - 4, f"ZONE {zi + 1}", 8.4, 900, "middle", halo="#fff"))
+        o.append(TH(X(cx_), Y(cy_) + 8, f"{c['n_blades']} blades · 1 motor blade (heavy line)", 6.6, 700, "middle", halo="#fff"))
+    o.append(TH(X(x0) + 8, Y(y0 + w) + 11, (f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house"
+                                             if q["attach"] == "house" else f"rear {q['beam_label']} beam"), 6.6, 700, halo="#fff"))
+    o.append(TH(X(x0) + 8, Y(y1 - w) - 6, f"front {q['beam_label']} beam, integrated gutter + LED strip all round", 6.6, 700, halo="#fff"))
+    # dimensions: zones in the house band, the frame and post spans below, the depth at the right
+    if len(q["zones"]) > 1 and q["louver_dir"] == "y":
+        edges_ = [x0] + list(q["xs"]) + [x1]
+        for zi, (a_, b_) in enumerate(zip(edges_, edges_[1:])):
+            dim_h(o, X, Y(y0) - 8, a_, b_, f"zone {zi + 1}: {ftin((b_ - a_) * 12)}", 6.8)
     if len(front_posts) > 1:
         for a_, b_ in zip(front_posts, front_posts[1:]):
-            dim_h(o, X, Y(py1) - 26, a_["x"], b_["x"], f"{ftin((b_['x'] - a_['x']) * 12)} post to post", 7.4)
-    for zi, c in enumerate(q["zones"]):
-        if len(q["zones"]) > 1:
-            dim_h(o, X, Y(y0) + 14, c["x0"] - (w if zi == 0 else w / 2), c["x1"] + (w if zi == len(q["zones"]) - 1 else w / 2), f"zone {zi + 1} {ftin(((c['x1'] - c['x0']) + (w if zi in (0, len(q['zones']) - 1) else 0) + w / 2) * 12)}", 6.8)
-    dim_v(o, Y, X(x1) + 22, y0, y1, f"{ftin(q['D'] * 12)}", 8, left=False)
+            dim_h(o, X, Y(py1) - 26, a_["x"], b_["x"], f"{ftin((b_['x'] - a_['x']) * 12)} post to post", 7.2)
+    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame · {q['area']:g} SF", 8)
+    dim_v(o, Y, X(x1) + 18, y0, y1, ftin(q["D"] * 12), 8, left=False)
     if front_posts:
         fp = front_posts[0]
-        o.append(C(X(fp["x"]) - 16, Y(fp["y"]) + 16, 7, "#fff", INK, 0.8)); o.append(T(X(fp["x"]) - 16, Y(fp["y"]) + 19, "1", 7.5, 900, "middle"))
-    # the section cut A (through zone 1, across the house wall)
-    xa = (q["zones"][0]["x0"] + q["zones"][0]["x1"]) / 2 + (q["spacing"] / 2 if q["louver_dir"] == "y" else 0)
-    o.append(LN(X(xa), Y(py0) + 4, X(xa), Y(py1) - 36, GOLD, 1.1, "6 3"))
-    for yy_ in (Y(py0) + 4, Y(py1) - 36):
-        o.append(C(X(xa), yy_, 6.5, GOLD, INK, 0.6)); o.append(T(X(xa), yy_ + 3, "A", 7, 900, "middle", "#fff"))
-    o.append(TH(X(x0) + 6, Y(y0 + w) + 12, f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house"
-               if q["attach"] == "house" else f"rear {q['beam_label']} beam", 6.6, 700, halo="#fff"))
-    o.append(TH(X(x0) + 6, Y(y1 - w) - 5, f"front {q['beam_label']} beam · integrated gutter", 6.6, 700, halo="#fff"))
+        cxp, cyp = X(fp["x"]) + 16, Y(fp["y"]) + 13
+        o.append(C(cxp, cyp, 6.5, "#fff", INK, 0.8)); o.append(T(cxp, cyp + 3, "1", 7.2, 900, "middle"))
     rail_n = sum(1 for pt in q["posts"] if pt["on_rail"])
     if rail_n:
-        o.append(TH(X((x0 + x1) / 2), Y(py1) - 42, f"the {rail_n} roof post{'s are' if rail_n != 1 else ' is'} the rail post{'s' if rail_n != 1 else ''} on the deck edge (rail line {ftin(rp * 12)} in from the frame face)", 6.6, 700, "middle", halo="#fff"))
+        o.append(T(X((x0 + x1) / 2), Y(y1) + 11, f"rail line (gold): the {rail_n} roof post{'s are' if rail_n != 1 else ' is'} the rail post{'s' if rail_n != 1 else ''} there — rail posts hollow", 6.5, 700, "middle"))
+    # the section cut A (through zone 1, across the house wall)
+    z0_ = q["zones"][0]
+    xa = (z0_["x0"] + z0_["x1"]) / 2 + (q["spacing"] / 2 if q["louver_dir"] == "y" else 0.0)
+    o.append(LN(X(xa), Y(py0) + 5, X(xa), Y(y1) + 2, GOLD, 1.0, "6 3"))
+    for yy_ in (Y(py0) + 5,):
+        o.append(C(X(xa), yy_, 6.5, GOLD, INK, 0.6)); o.append(T(X(xa), yy_ + 3, "A", 7, 900, "middle", "#fff"))
 
     # ---------------------------------------------------------------- section A
     _panel(o, 584, 4, 402, 336, "A", "SECTION — HOUSE WALL, ROOF, DECK")
-    sy0, sy1 = y0 - 3.2, y1 + 3.6
-    z_lo = max(0.0, zd - 3.5)
-    Xs, Zs, scs = elev_xform(sy0, sy1, z_lo - 0.6, zt + 2.6, 600, 28, 300, 300)
-    o.append(R(Xs(sy0), Zs(zt + 2.2), (y0 - sy0) * scs, (zt + 2.2 - (z_lo - 0.6)) * scs, HOUSE, INK, 0.9))
-    o.append(T(Xs((sy0 + y0) / 2), Zs((zt + z_lo) / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
+    sy0, sy1 = y0 - 2.0, y1 + 4.8
+    z_lo, z_hi = zd - 3.2, zt + 3.4
+    Xs, Zs, scs = elev_xform(sy0, sy1, z_lo, z_hi, 596, 26, 330, 304)
+    o.append(R(Xs(sy0), Zs(z_hi - 0.2), (y0 - sy0) * scs, (z_hi - 0.2 - z_lo) * scs, HOUSE, INK, 0.9))
+    o.append(T(Xs((sy0 + y0) / 2) + 3, Zs((zd + zb) / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
     soff = 1.0
-    o.append(PG([(Xs(y0 - 0.3), Zs(zt + 0.05)), (Xs(y0 + soff), Zs(zt + 0.05)), (Xs(y0 + soff), Zs(zt + 0.6)), (Xs(y0 - 0.3), Zs(zt + 1.2))], "#cfc6b4", INK, 0.7))
-    _lead(o, Xs(y0 + soff * 0.6), Zs(zt + 0.4), Xs(y0 + 2.6), Zs(zt + 2.15), "existing eave: soffit / roof line (field verify)", 6.3)
-    # the deck: decking + frame band, the rail, the column below the roof post
-    jd = actual(spec.framing.joist_size)[1] * IN if spec.framing.joist_size else 9.25 * IN
-    yf = max((s["y1"] for s in surf if s["z"] == zd and s["x0"] - 0.1 <= xa <= s["x1"] + 0.1), default=y1)
+    o.append(PG([(Xs(y0), Zs(zt + 0.04)), (Xs(y0 + soff), Zs(zt + 0.04)), (Xs(y0 + soff), Zs(zt + 0.6)), (Xs(y0), Zs(zt + 1.15))], "#cfc6b4", INK, 0.7))
+    yf = max((s_["y1"] for s_ in surf if abs(s_["z"] - zd) < 0.01 and s_["x0"] - 0.1 <= xa <= s_["x1"] + 0.1), default=y1)
     o.append(R(Xs(y0), Zs(zd), (yf - y0 + 0.08) * scs, 0.1 * scs, DECK, INK, 0.7))
     o.append(R(Xs(y0), Zs(zd - 0.1), (yf - y0) * scs, jd * scs, FILL["timber"], INK, 0.6))
-    o.append(R(Xs(yf - 0.25), Zs(zd - 0.1 - jd), 0.25 * scs, 1.0 * scs, FILL["timber_dk"], INK, 0.4, 'stroke-dasharray="3 2"'))
     py = front_posts[0]["y"] if front_posts else y1 - p / 2
-    o.append(R(Xs(py - 0.33), Zs(zd - 0.1 - jd - 0.05), 0.67 * scs, max(0.1, zd - 0.15 - jd - z_lo + 0.6) * scs, FILL["timber"], INK, 0.6, 'stroke-dasharray="4 2"'))
-    _lead(o, Xs(py), Zs(zd - 2.2), Xs(py) + 26, Zs(zd - 2.6), "column / beam under the roof post — per the framing plan", 6.2)
-    # the roof
+    o.append(R(Xs(py - 0.33), Zs(zd - 0.1 - jd), 0.67 * scs, (zd - 0.1 - jd - z_lo) * scs, FILL["timber"], INK, 0.6, 'stroke-dasharray="4 2" fill-opacity="0.5"'))
     o.append(R(Xs(y0), Zs(zt), w * scs, h * scs, BLACK, INK, 0.5))
     o.append(R(Xs(y1 - w), Zs(zt), w * scs, h * scs, BLACK, INK, 0.5))
-    o.append(PG([(Xs(y0), Zs(zb)), (Xs(y0 + 0.03), Zs(zb)), (Xs(y0 + 0.03), Zs(zb - 0.42)), (Xs(y0), Zs(zb - 0.42))], BLACK))
-    o.append(R(Xs(y0), Zs(zb), (w - 0.02) * scs, 0.035 * scs, BLACK, INK, 0.3))
+    o.append(R(Xs(y0), Zs(zb), 0.05 * scs + 1, 0.42 * scs, BLACK, INK, 0.3))
+    o.append(R(Xs(y0), Zs(zb), (w - 0.02) * scs, 0.04 * scs + 1, BLACK, INK, 0.3))
     o.append(R(Xs(py - p / 2), Zs(zb), p * scs, (zb - zd) * scs, BLACK, INK, 0.5))
-    o.append(R(Xs(py - q["plate"] / 2), Zs(zd + 0.04), q["plate"] * scs, 0.04 * scs + 1, "#555", INK, 0.4))
+    o.append(R(Xs(py - q["plate"] / 2), Zs(zd + 0.05), q["plate"] * scs, 0.05 * scs + 1, "#555", INK, 0.4))
     ang = math.radians(q["angle_deg"])
-    if q["louver_dir"] == "y":            # blades run along the cut: one seen lengthwise beyond the cut
+    if q["louver_dir"] == "y":            # the blades run along the cut: the next blade seen lengthwise
         ext = abs(q["blade_w"] / 2 * math.sin(ang)) + q["blade_t"] / 2
-        o.append(R(Xs(y0 + w + 0.05), Zs(q["z_pivot"] + ext), (q["D"] - 2 * w - 0.1) * scs, 2 * ext * scs, "#6d6d72", INK, 0.4, 'fill-opacity="0.75"'))
-    else:                                  # blades cut across: each blade's section at its angle
-        for bl in q["blades"]:
-            if bl["zone"] != 0:
-                continue
+        o.append(R(Xs(y0 + w + 0.05), Zs(q["z_pivot"] + ext), (q["D"] - 2 * w - 0.1) * scs, 2 * ext * scs, "#77777c", INK, 0.4))
+    else:                                  # the blades cut across, each at its angle
+        for bl in [b for b in q["blades"] if b["zone"] == 0]:
             cy_, cz_ = bl["pivot"][1], bl["pivot"][2]
             pts_ = [(cy_ + u * math.cos(ang) - v * math.sin(ang), cz_ + u * math.sin(ang) + v * math.cos(ang)) for u, v in blade_profile(q["blade_w"], q["blade_t"])]
             o.append(PG([(Xs(a_), Zs(b_)) for a_, b_ in pts_], "#3c3c40", INK, 0.3))
-    # the rail tying into the post
-    rh = (spec.railing.height_in or 36.0) * IN
-    o.append(R(Xs(py - p / 2 - 0.45), Zs(zd + rh), 0.45 * scs, 0.12 * scs, BLACK, INK, 0.3, 'fill-opacity="0.6"'))
-    o.append(R(Xs(py - p / 2 - 0.45), Zs(zd + 0.4), 0.45 * scs, 0.1 * scs, BLACK, INK, 0.3, 'fill-opacity="0.6"'))
+    rh = float(spec.railing.height_in or 36.0) * IN          # the rail, cut at A: top rail, bottom rail, a baluster, the drink rail on top
+    o.append(R(Xs(py - 0.11), Zs(zd + rh), 0.22 * scs, 0.13 * scs, "#8a8a90", INK, 0.4))
+    o.append(R(Xs(py - 0.06), Zs(zd + 0.38), 0.12 * scs, 0.09 * scs, "#8a8a90", INK, 0.4))
+    o.append(R(Xs(py - 0.03), Zs(zd + rh - 0.13), 0.06 * scs, (rh - 0.13 - 0.38) * scs, "#8a8a90", INK, 0.3))
     if spec.railing.drink_rail:
-        o.append(R(Xs(py - 0.23), Zs(zd + rh + 0.2), 0.46 * scs, 0.08 * scs, DECK, INK, 0.4))
-    # heights
-    dim_v(o, Zs, Xs(sy1) - 6, z_lo - 0.6 if z_lo <= 0.01 else z_lo, zd, (f"{ftin(zd * 12)} above the patio" if z_lo <= 0.01 else ""), 6.6, left=True)
-    dim_v(o, Zs, Xs(sy1) - 6, zd, zb, f"{ftin((zb - zd) * 12)} clear", 7, left=True)
-    dim_v(o, Zs, Xs(sy1) - 6, zb, zt, f"{h * 12:g}\"", 6.4, left=True)
-    dim_v(o, Zs, Xs(y0) + 12, zd, zt, f"{ftin((zt - zd) * 12)} deck to top of frame", 6.6, left=False)
-    dim_h(o, Xs, Zs(zt) - 12, y0, y1, ftin(q["D"] * 12), 7.2)
-    o.append(T(Xs(sy1) - 4, Zs(zt) + 3, f"TOP OF FRAME {ftin(zt * 12)}", 6.4, 800, "end", MUTE))
-    o.append(T(Xs(sy1) - 4, Zs(zd) - 3, f"DECK {ftin(zd * 12)}", 6.4, 800, "end", MUTE))
-    _lead(o, Xs(y0 + w / 2), Zs(zb - 0.3), Xs(y0 + 1.2), Zs(zb - 1.3), f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing", 6.2)
-    _lead(o, Xs(y1 - w / 2), Zs(zt - h / 2), Xs(y1 - 3.6), Zs(zt + 1.2), f"front {q['beam_label']} beam, integrated gutter + LED strip", 6.2)
-    _lead(o, Xs(py), Zs(zd + 4.5), Xs(py) - 74, Zs(zd + 5.6), f"{p * 12:g}x{p * 12:g} aluminum post = the rail post, downspout inside", 6.2)
-    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"]), Xs((y0 + y1) / 2) - 40, Zs(zb - 0.9), f"{q['blade_w'] * 12:g}\" blades @ {q['spacing'] * 12:g}\", drawn {q['angle_deg']:g}° open (0-{ANGLE_RANGE[1]:g}°)", 6.2)
+        o.append(R(Xs(py - 0.23), Zs(zd + rh + 0.21), 0.46 * scs, 0.08 * scs, DECK, INK, 0.4))
+    xr = 596 + 330 + 8
+    dim_v(o, Zs, xr, zd, zb, f"{ftin((zb - zd) * 12)} clear", 7, left=False)
+    dim_v(o, Zs, xr, zb, zt, f"{h * 12:g}\"", 6.2, left=False)
+    dim_v(o, Zs, xr + 22, zd, zt, f"{ftin((zt - zd) * 12)} deck to top", 7, left=False)
+    dim_h(o, Xs, Zs(zt + 1.6), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
+    o.append(T(Xs(y1) + 8, Zs(zt) + 9, f"TOP OF FRAME {ftin(zt * 12)}", 6.2, 800, "start", MUTE))
+    o.append(T(Xs(yf) + 8, Zs(zd) - 4, f"DECK {ftin(zd * 12)}", 6.2, 800, "start", MUTE))
+    o.append(T(Xs(yf) + 8, Zs(zd) + 6, "above the patio" if zd > 3 else "above grade", 6.0, 600, "start", MUTE))
+    _lead(o, Xs(y0 + soff * 0.5), Zs(zt + 0.5), Xs(y0 + 1.6), Zs(zt + 2.9), "existing eave / soffit — field verify", 6.2)
+    _lead(o, Xs(y0 + 0.02), Zs(zb - 0.25), Xs(y0 + 0.9), Zs(zb - 1.15), f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing", 6.2)
+    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.6), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
+    _lead(o, Xs(py), Zs(zd + 2.6), Xs(y0 + 3.4), Zs(zd + 2.1), f"{p * 12:g}x{p * 12:g} aluminum post: the rail post, downspout inside", 6.2)
+    _lead(o, Xs(py - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.0), "rail (cut): the panels hang on wall-mount brackets in the post", 6.2)
+    _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "column / beam under the roof post (framing plan)", 6.2)
 
     # ---------------------------------------------------------------- detail 1: the post on the deck edge
-    _panel(o, 584, 346, 402, 260, "1", "POST ON THE DECK EDGE — THE RAIL POST")
-    dx0, dz0, s1 = 640, 590, 13.0           # px per inch
-    def DX(v): return dx0 + v * s1 * 0.55
-    def DZ(v): return dz0 - v * s1 * 0.55
-    # deck edge: rim plies, blocking, decking, fascia (inches from the frame face, z from the frame bottom)
+    _panel(o, 584, 346, 402, 260, "1", "THE ROOF POST ON THE DECK EDGE — IT IS THE RAIL POST")
+    k_ = 3.8                                 # px per inch
     jd_in = jd * 12
-    o.append(R(DX(-3.0), DZ(jd_in), 3.0 * s1 * 0.55, jd_in * s1 * 0.55, FILL["timber"], INK, 0.7))
-    o.append(R(DX(-6.0), DZ(jd_in), 3.0 * s1 * 0.55, jd_in * s1 * 0.55, FILL["timber_dk"], INK, 0.6))
-    o.append(R(DX(-24.0), DZ(jd_in), 18.0 * s1 * 0.55, jd_in * s1 * 0.55, FILL["timber"], INK, 0.5, 'fill-opacity="0.55"'))
-    o.append(T(DX(-15), DZ(jd_in / 2), "solid blocking", 6.2, 800, "middle"))
-    o.append(R(DX(0), DZ(jd_in + 1.0), 0.5 * s1 * 0.55, (jd_in + 1.0) * s1 * 0.55, DECK, INK, 0.5))
-    o.append(R(DX(-26.0), DZ(jd_in + 1.0), 26.97 * s1 * 0.55, 1.0 * s1 * 0.55, DECK, INK, 0.6))
-    zbase = jd_in + 1.0
-    pin = rp * 12
-    pc = -pin                                # post centre, inches from the frame face (negative = inboard)
+    zbase = jd_in + 1.0                      # the deck surface over the rim (inches above the rim's bottom)
     pl_in, p_in = q["plate"] * 12, p * 12
-    o.append(R(DX(pc - pl_in / 2), DZ(zbase + 0.5), pl_in * s1 * 0.55, 0.5 * s1 * 0.55, "#555", INK, 0.6))
-    o.append(R(DX(pc - p_in / 2), DZ(zbase + 22), p_in * s1 * 0.55, 21.5 * s1 * 0.55, BLACK, INK, 0.6))
-    o.append(R(DX(pc - p_in / 2 - 0.25), DZ(zbase + 4.3), (p_in + 0.5) * s1 * 0.55, 3.8 * s1 * 0.55, "#2a2a2e", INK, 0.5))
-    for bx in (pc - pl_in / 2 + 0.8, pc + pl_in / 2 - 0.8):
-        o.append(LN(DX(bx), DZ(zbase + 0.6), DX(bx), DZ(zbase - jd_in * 0.85), INK, 1.4))
-        o.append(R(DX(bx) - 2.5, DZ(zbase + 0.9), 5, 2.5, INK, INK, 0.3))
-    o.append(R(DX(pc - p_in / 2 - 4.0), DZ(zbase + 21.0), 4.0 * s1 * 0.55, 1.4 * s1 * 0.55, BLACK, INK, 0.3, 'fill-opacity="0.65"'))
-    o.append(R(DX(pc - p_in / 2 - 4.0), DZ(zbase + 4.5), 4.0 * s1 * 0.55, 1.0 * s1 * 0.55, BLACK, INK, 0.3, 'fill-opacity="0.65"'))
-    o.append(R(DX(pc + p_in / 2), DZ(zbase + 2.4), 3.0 * s1 * 0.55, 1.6 * s1 * 0.55, "#444", INK, 0.4))
-    o.append(T(DX(pc) + 2, DZ(zbase + 23.5), "post continues to the front beam", 6.2, 700, "middle", MUTE))
-    _lead(o, DX(pc + pl_in / 2 - 0.3), DZ(zbase + 0.25), DX(4.5), DZ(zbase + 8.0), f"{pl_in:g}\" base plate on the decking, through-bolted into solid blocking / the column below", 6.0)
-    _lead(o, DX(pc), DZ(zbase + 3.0), DX(4.5), DZ(zbase + 14.0), "base cover over the plate and bolts", 6.0)
-    _lead(o, DX(pc + p_in / 2 + 1.5), DZ(zbase + 1.6), DX(4.5), DZ(zbase + 4.0), "downspout outlet (the downspout runs inside the post)", 6.0)
-    _lead(o, DX(pc - p_in / 2 - 2.0), DZ(zbase + 21.7), DX(-24), DZ(zbase + 27.5), "rail top rail on a wall-mount bracket into the post", 6.0)
-    _lead(o, DX(pc - p_in / 2 - 2.0), DZ(zbase + 5.0), DX(-24), DZ(zbase + 12.0), "bottom rail bracket into the post", 6.0)
-    _lead(o, DX(-1.5), DZ(jd_in * 0.5), DX(-25), DZ(-3.5), f"doubled {spec.framing.joist_size or '2x10'} rim + fascia", 6.0)
-    o.append(LN(DX(0), DZ(-1.5), DX(pc), DZ(-1.5), INK, 0.6)); o.append(LN(DX(0), DZ(-0.6), DX(0), DZ(-2.4), INK, 0.6)); o.append(LN(DX(pc), DZ(-0.6), DX(pc), DZ(-2.4), INK, 0.6))
-    o.append(T((DX(0) + DX(pc)) / 2, DZ(-1.5) + 9, f"{ftin(pin)} — post centre on the rail line", 6.0, 700, "middle"))
+    rh_in = float(spec.railing.height_in or 36.0)
+    # (a) elevation from the yard: the post on the deck, the rail panels both sides, the rim and fascia, the column below
+    ex, ez = 706, 584
+    def EX(v): return ex + v * k_
+    def EZ(v): return ez - v * k_
+    o.append(T(EX(-28), 380, "ELEVATION", 6.6, 900, fill=MUTE)); o.append(T(EX(-28), 389, "from the yard", 6.0, 700, fill=MUTE))
+    o.append(R(EX(-28), EZ(jd_in + 1.0), 56 * k_, (jd_in + 1.0) * k_, DECK, INK, 0.6))
+    o.append(T(EX(-27), EZ(jd_in / 2) + 2, "fascia over the doubled rim", 5.8, 700))
+    o.append(R(EX(-3.75), EZ(0), 7.5 * k_, 2.5 * k_, FILL["timber"], INK, 0.6, 'stroke-dasharray="3 2"'))
+    o.append(R(EX(-28), EZ(zbase), 56 * k_, 1.0 * k_, DECK, INK, 0.6))
+    for sg in (-1, 1):                      # the rail panels, bracketed into the post's sides
+        xa_, xb_ = sorted((sg * p_in / 2, sg * 27.5))
+        o.append(R(EX(xa_), EZ(zbase + rh_in), (xb_ - xa_) * k_, 1.6 * k_, "#3a3a3e", INK, 0.4))
+        o.append(R(EX(xa_), EZ(zbase + 4.4), (xb_ - xa_) * k_, 1.1 * k_, "#3a3a3e", INK, 0.4))
+        if spec.railing.drink_rail:
+            o.append(R(EX(xa_), EZ(zbase + rh_in + 2.6), (xb_ - xa_) * k_, 1.0 * k_, DECK, INK, 0.4))
+        xv = xa_ + 2.6
+        while xv < xb_ - 0.5:
+            o.append(R(EX(xv), EZ(zbase + rh_in - 1.6), 0.75 * k_, (rh_in - 1.6 - 4.4) * k_, "#3a3a3e", "none", 0))
+            xv += 4.5
+        bx_ = sg * p_in / 2 + (0 if sg > 0 else -1.4)
+        o.append(R(EX(bx_), EZ(zbase + rh_in + 0.6), 1.4 * k_, 2.6 * k_, INK, INK, 0.3))
+        o.append(R(EX(bx_), EZ(zbase + 5.0), 1.4 * k_, 2.0 * k_, INK, INK, 0.3))
+    o.append(R(EX(-pl_in / 2), EZ(zbase + 0.5), pl_in * k_, 0.5 * k_ + 1, "#555", INK, 0.5))
+    o.append(R(EX(-p_in / 2 - 0.25), EZ(zbase + 4.0), (p_in + 0.5) * k_, 3.5 * k_, "#2c2c30", INK, 0.5))
+    o.append(R(EX(-p_in / 2), EZ(zbase + 44.0), p_in * k_, 40.0 * k_, BLACK, INK, 0.6))
+    o.append(R(EX(-1.5), EZ(zbase + 2.4), 3.0 * k_, 1.8 * k_, "#55555a", INK, 0.4))
+    _lead(o, EX(p_in / 2 + 0.7), EZ(zbase + rh_in - 0.6), EX(10), EZ(zbase + rh_in + 8.5), "wall-mount brackets: top and bottom rail into the post", 5.8)
+    _lead(o, EX(0.5), EZ(zbase + 3.2), EX(10), EZ(zbase + 15.5), "downspout outlet (it runs inside the post)", 5.8)
+    _lead(o, EX(-pl_in / 2 + 0.6), EZ(zbase + 0.3), EX(-27), EZ(zbase + 13.0), f"{pl_in:g}\" base plate + base cover", 5.8)
+    _lead(o, EX(-2.5), EZ(-1.0), EX(10), EZ(-0.5), "column / beam under the post (framing plan)", 5.8)
+    # (b) section through the deck edge: the post centre on the rail line, the plate over solid blocking
+    sx, sz = 952, 584
+    def SX(v): return sx + v * k_
+    def SZ(v): return sz - v * k_
+    rp_in = rp * 12
+    o.append(T(SX(-30), 380, "SECTION", 6.6, 900, fill=MUTE))
+    o.append(R(SX(-30), SZ(jd_in), 24.0 * k_, jd_in * k_, FILL["timber"], INK, 0.5, 'fill-opacity="0.55"'))
+    o.append(R(SX(-6.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber_dk"], INK, 0.6))
+    o.append(R(SX(-3.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber"], INK, 0.6))
+    o.append(R(SX(0), SZ(jd_in + 1.0), 0.5 * k_ + 1, (jd_in + 1.0) * k_, DECK, INK, 0.5))
+    o.append(R(SX(-30), SZ(zbase), 30.97 * k_, 1.0 * k_, DECK, INK, 0.6))
+    for bx in (-rp_in - pl_in / 2 + 0.9, -rp_in + pl_in / 2 - 0.9):
+        o.append(LN(SX(bx), SZ(zbase + 0.6), SX(bx), SZ(zbase - jd_in * 0.8), INK, 1.4))
+    o.append(R(SX(-rp_in - pl_in / 2), SZ(zbase + 0.5), pl_in * k_, 0.5 * k_ + 1, "#555", INK, 0.5))
+    o.append(R(SX(-rp_in - p_in / 2), SZ(zbase + 28.0), p_in * k_, 27.5 * k_, BLACK, INK, 0.6))
+    o.append(T(SX(-18), SZ(jd_in / 2) + 2, "solid blocking", 5.8, 800, "middle"))
+    o.append(LN(SX(0), SZ(-2.4), SX(-rp_in), SZ(-2.4), INK, 0.6)); o.append(LN(SX(0), SZ(-1.4), SX(0), SZ(-3.4), INK, 0.6))
+    o.append(LN(SX(-rp_in), SZ(-1.4), SX(-rp_in), SZ(-3.4), INK, 0.6))
+    o.append(T(SX(-rp_in / 2), SZ(-2.4) + 9, f"{ftin(rp_in)}", 6.0, 800, "middle"))
+    _lead(o, SX(-rp_in), SZ(zbase + 20), SX(-29), SZ(zbase + 36), "post centre on the rail line, in from the frame face", 5.8)
+    _lead(o, SX(-rp_in + pl_in / 2 - 0.9), SZ(zbase - 3.0), SX(-29), SZ(zbase + 25), "through-bolts into the blocking", 5.8)
 
-    # ---------------------------------------------------------------- notes
+    # ---------------------------------------------------------------- what it is
     _panel(o, 14, 346, 560, 260, "", "WHAT IT IS")
     loads = post_loads(q, snow_psf=float(spec.site.ground_snow_psf or 30))
     notes = scope_words(q) + [
-        f"Frame {q['beam_label']} aluminum (Suncoast spans: 2x8 to 15', 2x10 to 18', 4x8 to 22' between posts); longest span here {ftin(q['span_ft'] * 12)}.",
-        f"Blades span up to {BLADE_SPAN_MAX_FT:g}' (snow-load dependent); one motor blade per zone, {MOTOR_SF:g} SF a motor at most.",
-        f"Posts carry ~{max(x['total_lb'] for x in loads):,} lb each ({max(x['trib_sf'] for x in loads):g} SF at {6:g} psf dead + {spec.site.ground_snow_psf:g} psf snow) — the framing under each post is sized for it; Suncoast's engineering for the site's snow and wind governs the roof.",
-        "House side: the brackets go into the wall framing (field verify the soffit, the wall and the framing behind it); flashing and sealant at every fastener.",
-    ] + [n for n in q["notes"]]
-    yy = 372
+        f"Frame {q['beam_label']} aluminum (Suncoast spans: 2x8 to 15', 2x10 to 18', 4x8 to 22' between posts); the longest span here is {ftin(q['span_ft'] * 12)}.",
+        f"Blades span up to {BLADE_SPAN_MAX_FT:g}' (snow-load dependent); one motor blade per zone, up to {MOTOR_SF:g} SF a motor.",
+        f"Each post carries about {max(x['total_lb'] for x in loads):,} lb ({max(x['trib_sf'] for x in loads):g} SF at 6 psf dead + {spec.site.ground_snow_psf:g} psf snow): the framing under it takes it down to the footings. Suncoast's engineering for the site's snow and wind governs the roof.",
+        "House side: the brackets go into the wall framing — field verify the eave, the wall and the framing behind it; flashed and sealed at every fastener.",
+    ] + list(q["notes"])
+    yy = 371
     for ln in notes:
-        for k_, w_ in enumerate(textwrap.wrap(ln, 108)):
-            o.append(T(26 if k_ == 0 else 34, yy, ("· " if k_ == 0 else "") + w_, 7.2, 500)); yy += 10
-        yy += 2
-        if yy > 596:
+        for k2, w_ in enumerate(textwrap.wrap(ln, 112)):
+            o.append(T(26 if k2 == 0 else 33, yy, ("· " if k2 == 0 else "") + w_, 7.1, 500)); yy += 9.6
+        yy += 2.4
+        if yy > 598:
             break
     return _sheet("A-403", f"{q['brand']} louvered roof — plan, section, post", "The roof over the deck: frame, zones, blades, posts on the rail line, the house beam on its brackets; heights; the post on the deck edge", o,
                   "Plan and section not to a common scale · dimensions govern · Suncoast's shop drawings and engineering govern the roof", meta)

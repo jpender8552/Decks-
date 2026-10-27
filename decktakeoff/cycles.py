@@ -140,6 +140,92 @@ class Tex:
         hm = Image.fromarray((np.clip(hgt * 0.85 + 0.15 * (g * 0.1 + 0.5), 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))
         return self._save(nm, im), self._save("h_" + nm, hm)
 
+    def brick(self, hexc: str, mortar: str = "#c2b9a6", course_in: float = 8.0 / 3.0, brick_in: float = 8.0) -> Tuple[str, str, float]:
+        """Running-bond face brick (house.py "hbrick"): 12 bricks x 36 courses per tile (8 ft wide, 36 courses tall), every
+        brick its own tone (buff / tan / a few orange-flashed and darker ones, iron specks, a sandy face), struck mortar joints
+        recessed (height map). Returns (colour, height, tile height in ft) — the tile is 8 ft along the wall."""
+        nm = f"brick_{hexc.strip('#')}_{mortar.strip('#')}_{course_in:.3f}_{brick_in:.2f}.png"
+        th_ft = 36 * course_in / 12.0
+        if self.path(nm):
+            return self.path(nm), self.path("h_" + nm), th_ft
+        S = 2048
+        rng = np.random.default_rng(13)
+        base = np.array(_srgb255(hexc), float)
+        mort = np.array(_srgb255(mortar), float)
+        col = np.zeros((S, S, 3)) + mort
+        hgt = np.zeros((S, S)) + 0.22
+        ch = S / 36.0                                 # px per course
+        bw = S / 12.0                                 # px per brick (incl. joint)
+        jt = max(3, int(round(0.375 / course_in * ch)))       # 3/8" joints
+        yy, xx = np.mgrid[0:int(ch) + 2, 0:int(bw) + 2]
+        for r in range(36):
+            off = (r % 2) * bw / 2 + rng.uniform(-3, 3)
+            y0 = int(round(r * ch)); y1 = int(round((r + 1) * ch)) - jt
+            for c in range(12):
+                x0 = int(round(c * bw + off)); x1 = int(round((c + 1) * bw + off)) - jt
+                # tone: most bricks near the base, some lighter / darker, a few orange-flashed
+                k = rng.normal(0, 0.075)
+                tint = np.array([1.0, 1.0, 1.0])
+                u = rng.random()
+                if u < 0.12:
+                    tint = np.array([1.06, 0.96, 0.86])            # orange flash
+                elif u < 0.2:
+                    tint = np.array([0.86, 0.84, 0.82]); k -= 0.06  # darker / browner
+                elif u < 0.3:
+                    tint = np.array([1.04, 1.04, 1.02]); k += 0.05  # pale
+                c_ = np.clip(base * (1 + k) * tint, 0, 255)
+                h_, w_ = y1 - y0, x1 - x0
+                if h_ <= 2 or w_ <= 2:
+                    continue
+                # wire-cut face: mottled between a pale cream and a warmer tan (low-frequency blobs), a sandy grain,
+                # a little kiln flash toward one end, a few small iron specks
+                mot = np.zeros((h_, w_))
+                for _ in range(int(rng.integers(2, 5))):
+                    cy_, cx_ = rng.uniform(0, h_), rng.uniform(0, w_)
+                    sy_, sx_ = rng.uniform(0.3, 0.9) * h_, rng.uniform(0.15, 0.45) * w_
+                    mot += rng.uniform(-1, 1) * np.exp(-(((np.arange(h_)[:, None] - cy_) / sy_) ** 2 + ((np.arange(w_)[None, :] - cx_) / sx_) ** 2))
+                mot = np.clip(0.5 + 0.5 * mot, 0, 1)[..., None]
+                pale = c_ * np.array([1.16, 1.15, 1.12]); warm = c_ * np.array([0.97, 0.88, 0.78])
+                patch = warm * (1 - mot) + pale * mot
+                patch *= (1 + 0.045 * rng.normal(0, 1, (h_, w_)))[..., None]
+                grad = np.linspace(-1, 1, w_)[None, :] * rng.normal(0, 0.04)
+                patch *= (1 + grad)[..., None]
+                for _ in range(int(rng.integers(0, 4))):
+                    sy, sx = int(rng.integers(0, h_)), int(rng.integers(0, w_))
+                    patch[sy:sy + 2, sx:sx + 2] *= 0.7
+                ey = np.minimum(np.arange(h_), h_ - 1 - np.arange(h_)); ex = np.minimum(np.arange(w_), w_ - 1 - np.arange(w_))
+                e = np.minimum.outer(ey, ex)                       # px to the nearest brick edge: rounded arrises
+                hb = np.clip(0.55 + e / 4.0, 0, 1.0) + 0.06 * rng.normal(0, 1, (h_, w_))
+                cols_ = (np.arange(x0, x1) % S)                     # wrap around the tile edge (seamless)
+                col[y0:y1, cols_] = patch
+                hgt[y0:y1, cols_] = hb
+        g = rng.normal(0, 1, (S, S))
+        col *= (1 + 0.03 * g[..., None])
+        im = Image.fromarray(np.clip(col, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7))
+        hm = Image.fromarray((np.clip(hgt, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.0))
+        return self._save(nm, im), self._save("h_" + nm, hm), th_ft
+
+    def rsawn(self, hexc: str) -> Tuple[str, str]:
+        """Rough-sawn plywood / cedar face (house.py siding_texture "rsawn"): fine vertical fibre streaks and saw texture in
+        a solid stain, 8 ft tile (the grooves themselves are geometry)."""
+        nm = f"rsawn_{hexc.strip('#')}.png"
+        if self.path(nm):
+            return self.path(nm), self.path("h_" + nm)
+        S = 1024
+        rng = np.random.default_rng(17)
+        base = np.array(_srgb255(hexc), float)
+        # vertical streaks: 1-D noise across x, stretched along y, plus fine fibres and a faint cross-saw pattern
+        streak = np.cumsum(rng.normal(0, 1, S)); streak = (streak - np.convolve(streak, np.ones(61) / 61, mode="same"))
+        streak = streak / (np.abs(streak).max() + 1e-6)
+        fib = rng.normal(0, 1, (S // 8, S))
+        fib = np.asarray(Image.fromarray(((fib - fib.min()) / np.ptp(fib) * 255).astype(np.uint8)).resize((S, S), Image.BICUBIC)).astype(float) / 255 - 0.5
+        saw = np.sin(np.linspace(0, 2 * math.pi * 90, S))[:, None] * rng.normal(0, 1, (1, S)) * 0.15
+        v = 0.06 * streak[None, :] + 0.08 * fib + 0.03 * saw + 0.025 * rng.normal(0, 1, (S, S))
+        col = np.clip(base[None, None, :] * (1 + v[..., None]), 0, 255)
+        im = Image.fromarray(col.astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.5))
+        h = (np.clip(0.5 + 2.5 * v, 0, 1) * 255).astype(np.uint8)
+        return self._save(nm, im), self._save("h_" + nm, Image.fromarray(h).filter(ImageFilter.GaussianBlur(0.8)))
+
     def grass(self) -> Tuple[str, str]:
         nm = "grass2.png"
         if self.path(nm):
@@ -369,6 +455,25 @@ class Mats:
             nt.links.new(img.outputs["Color"], bsdf.inputs["Base Color"])
             self._bump(nt, bsdf, hi.outputs["Color"], 0.8, 0.04)
             bsdf.inputs["Roughness"].default_value = 0.95
+        elif pat == "hbrick":
+            # the house's face brick: an image tile on world-aligned UVs (8 ft = 1 UV), stretched in v to 36 courses
+            c, h, th_ft = self.tex.brick(md["color"], md.get("mortar", "#c2b9a6"), float(md.get("course_in", 8.0 / 3.0)),
+                                         float(md.get("brick_in", 8.0)))
+            tc = nt.nodes.new("ShaderNodeTexCoord"); mp = nt.nodes.new("ShaderNodeMapping")
+            mp.inputs["Scale"].default_value = (1.0, 8.0 / th_ft, 1.0)
+            nt.links.new(tc.outputs["UV"], mp.inputs["Vector"])
+            img = self._img(nt, c); hi = self._img(nt, h, non_color=True)
+            nt.links.new(mp.outputs["Vector"], img.inputs["Vector"]); nt.links.new(mp.outputs["Vector"], hi.inputs["Vector"])
+            self._tint(nt, img.outputs["Color"], bsdf)
+            self._bump(nt, bsdf, hi.outputs["Color"], 0.75, 0.025)
+            bsdf.inputs["Roughness"].default_value = 0.93
+        elif pat == "rsawn":
+            # stained rough-sawn plywood / cedar (T1-11): fibre streaks + a saw texture; the grooves are geometry
+            c, h = self.tex.rsawn(md["color"])
+            img = self._img(nt, c); hi = self._img(nt, h, non_color=True)
+            self._tint(nt, img.outputs["Color"], bsdf)
+            self._bump(nt, bsdf, hi.outputs["Color"], 0.18, 0.006)
+            bsdf.inputs["Roughness"].default_value = rough
         elif pat in ("lap", "batten", "brick", "stone", "seam", "gravel"):
             # procedural: colour + noise (geometry carries the courses on the measured house)
             nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 18.0; nz.inputs["Detail"].default_value = 6.0

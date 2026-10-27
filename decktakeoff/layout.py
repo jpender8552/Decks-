@@ -396,7 +396,9 @@ def decking_layout(spec: DeckSpec, W: float, D: float, n_bearing: int) -> Deckin
     k = max(1, int(math.ceil(field_len / (STOCK_LENGTHS_FT[-1] * 12 - 1))))
     piece = field_len / k
     stock = _stock_for(piece)
-    if k > 1:
+    if k > 1 and spec.geometry.outline and direction == "parallel" and (dk.dividers or dk.divider_x_ft):
+        notes.append(f"field run {ftin(field_len)} is over a {STOCK_LENGTHS_FT[-1]}' board: the outline plan lays it in panels between breaker boards, every board one piece (no butt joints)")
+    elif k > 1:
         notes.append(f"field boards butt-joint: {k} pieces per row, stagger joints on alternating joists")
     # borders and fascia
     border, fascia = [], []
@@ -1123,6 +1125,304 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
     return of
 
 
+# ================================================================== inset stairs: the notch, its framing, the step-face skirt
+NOTCH_POST_OFFSET = 1.0      # notch posts stand 1" in from the face the notch is cut in (clear of the lower level's fascia and board nose)
+SKIRT_GAP_BOTTOM = 0.25      # step-skirt panels stand 1/4" off the lower level's boards
+SKIRT_GAP_TREAD = 0.125      # cheek panels stand 1/8" off the treads they meet
+
+
+def inset_notch(spec: DeckSpec, side: str) -> Optional[dict]:
+    """The notch an inset stair sits in, read from the outline: its inner face is the side the stair names ("edge:N"); the
+    sides either side of it are the cheeks (parallel, both ending on one face line — the face the notch is cut in).
+    Inches, plan frame: axis (the travel axis, "x" or "y"), face / out (the inner and the outer face on that axis), lo / hi
+    (the notch's span across it), depth, width, sgn (+1 when the deck lies on the + side of the inner face), direction
+    (inner face -> outer face, as the scene names it), i_face / i_cheeks (0-based outline sides), corners (the two outer
+    corners). None when the side is not such a notch."""
+    if not str(side).startswith("edge:") or not spec.geometry.outline:
+        return None
+    poly = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
+    n = len(poly)
+    try:
+        i = int(str(side).split(":")[1]) - 1
+    except ValueError:
+        return None
+    if n < 6 or not 0 <= i < n:
+        return None
+    a, b = poly[i], poly[(i + 1) % n]
+    pa, nb = poly[(i - 1) % n], poly[(i + 2) % n]
+    if abs(a[0] - b[0]) < 0.5:
+        k, c = 0, 1                  # the inner face runs along y: the stair travels along x
+    elif abs(a[1] - b[1]) < 0.5:
+        k, c = 1, 0
+    else:
+        return None
+    if abs(pa[c] - a[c]) > 0.5 or abs(nb[c] - b[c]) > 0.5 or abs(pa[k] - nb[k]) > 0.5:
+        return None                  # the neighbours are not two parallel cheeks ending on one face line
+    face, out = a[k], pa[k]
+    if abs(face - out) < 6.0:
+        return None
+    sgn = 1.0 if face > out else -1.0
+    lo, hi = sorted((a[c], b[c]))
+    pt = (lambda al, ac: (al, ac)) if k == 0 else (lambda al, ac: (ac, al))
+    return dict(axis="xy"[k], face=face, out=out, lo=lo, hi=hi, depth=abs(face - out), width=hi - lo, sgn=sgn,
+                direction=("-" if sgn > 0 else "+") + "xy"[k], i_face=i, i_cheeks=((i - 1) % n, (i + 1) % n),
+                corners=[pt(out, lo), pt(out, hi)])
+
+
+def notch_pt(nt: dict, along: float, across: float) -> Tuple[float, float]:
+    """A point given along a notch's travel axis and across it, as plan (x, y) inches."""
+    return (along, across) if nt["axis"] == "x" else (across, along)
+
+
+def _frame_notches(spec: DeckSpec, of: "OutlineFrame", poly, ins, jb: float, plies: int) -> None:
+    """Inset stairs: each notch framed as a stair opening at the deck's edge — the inner face a doubled trimmer the deck's
+    full depth (ledger to front rim, a concealed-flange double hanger at each end), the cheek rims doubled headers hung on
+    it (double hangers), the joists inside the notch's width tails hung on the headers (the outline clip does that), a
+    picture-frame joist beside the trimmer under the field ends at the stair's top border. The posts under the headers'
+    outer ends and the carrier under the stringer feet go with the stair (StairLayout.notch)."""
+    for s in spec.stairs:
+        if not getattr(s, "inset", False):
+            continue
+        nt = inset_notch(spec, s.side)
+        if nt is None:
+            continue
+        if nt["axis"] != "x":
+            of.notes.append(f"stair notch on {s.side}: its inner face crosses the joists — framed by the outline rims (the inner-face rim is the header); "
+                            "run the cheek rims to the next support as trimmers")
+            continue
+        i_f, face, sgn = nt["i_face"], nt["face"], nt["sgn"]
+        mid = (nt["lo"] + nt["hi"]) / 2
+        tri = []
+        for k in range(plies):
+            X = face + sgn * (k + 0.5) * jb
+            cr = _col_cross(ins, X)
+            pairs = list(zip(cr[0::2], cr[1::2]))
+            before = [p for p in pairs if p[1][0] <= mid]
+            after = [p for p in pairs if p[0][0] >= mid]
+            (ya, ia) = before[-1][0] if before else (nt["lo"], i_f)
+            (yb, ib) = after[0][1] if after else (nt["hi"], i_f)
+            tri.append((k, X, ya, yb, of.side_kind[ia], of.side_kind[ib]))
+        # the trimmer replaces the inner face's short rim; the cheek rims (headers) stop on its face
+        of.rims = [r for r in of.rims if r[0] != i_f] + [(i_f, k, X, ya, X, yb) for k, X, ya, yb, _, _ in tri]
+        hdr = []
+        for j, r in enumerate(of.rims):
+            if r[0] in nt["i_cheeks"]:
+                i_, k_, x0, y0, x1, y1 = r
+                if abs(x0 - face) < abs(x1 - face):
+                    x0 = face
+                else:
+                    x1 = face
+                of.rims[j] = (i_, k_, x0, y0, x1, y1)
+                hdr.append(abs(x1 - x0))
+        # joists: none inside the trimmer's footprint; a picture-frame joist beside it the deck's full depth
+        t_lo, t_hi = sorted((face, face + sgn * plies * jb))
+        of.joists = [q for q in of.joists if not (q[0] + jb / 2 > t_lo - 0.25 and q[0] - jb / 2 < t_hi + 0.25)]
+        X_pf = face + sgn * (plies * jb + 1.5 + jb / 2)
+        cr = _col_cross(ins, X_pf)
+        pf = next(((ya, ia, yb, ib) for (ya, ia), (yb, ib) in zip(cr[0::2], cr[1::2]) if ya <= mid <= yb), None)
+        if pf is not None:
+            of.joists = [q for q in of.joists if abs(q[0] - X_pf) >= jb + 0.25]
+            of.joists.append((X_pf, pf[0], pf[2], of.side_kind[pf[1]], of.side_kind[pf[3]], "PF joist (stair notch)"))
+            of.joists.sort(key=lambda q: (q[0], q[1]))
+        of.side_kind[i_f] = "trimmer"
+        of.notch_hangers += 4
+        t_len = (tri[0][3] - tri[0][2]) if tri else 0.0
+        of.notches.append(dict(side=s.side, trimmer=[(X, ya, yb, ea, eb) for _, X, ya, yb, ea, eb in tri], headers=hdr, pf_joist=X_pf if pf else None))
+        of.notes.append(f"stair notch on {s.side} ({ftin(nt['width'])} x {ftin(nt['depth'])}): {plies}-ply {spec.framing.joist_size} trimmer {ftin(t_len)} "
+                        f"({tri[0][4] if tri else ''} to {tri[0][5] if tri else ''}) at the top riser, a double hanger at each end; {plies}-ply headers at the cheeks "
+                        f"hung on it (double hangers), tail joists hung on the headers; a picture-frame joist beside the trimmer")
+
+
+@dataclass
+class SkirtFace:
+    """One outline side of the step face clad in vertical panels (inches; z relative to the deck surface, negative down)."""
+    edge: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float                 # the outline side; the panels' back face lies on it
+    nx: float
+    ny: float                 # outward normal
+    a0: float                 # the clad span along the side from (x0, y0) — past a notch corner it runs on over the cheek panel's edge
+    a1: float
+    panels: List[List[Tuple[float, float, float]]] = field(default_factory=list)   # per panel, its pieces (a, b, z_bottom): one, or one per tread it steps over
+    studs: List[Tuple[float, float]] = field(default_factory=list)                 # (position along the side, z_bottom): 2x4 nailers hung from the rim, behind the panels
+    rows: List[Tuple[float, float, float]] = field(default_factory=list)           # (a, b, z_centre): 2x4 blocking rows between the studs, the panels' mid and bottom nailers
+    cheek: bool = False
+
+
+@dataclass
+class StepSkirt:
+    faces: List[SkirtFace]
+    drop: float               # deck surface to the lower level's surface
+    panel_w: float
+    gap: float
+    z_top: float              # panel tops (under the picture-frame board)
+    rim_bottom: float         # rim / header bottoms: the nailers hang below them
+    notes: List[str] = field(default_factory=list)
+
+    def panel_heights(self) -> List[float]:
+        return [round(self.z_top - min(z for _, _, z in p), 2) for f in self.faces for p in f.panels]
+
+    def panel_screws(self) -> int:
+        """2 at the rim, 2 at every blocking row the panel crosses."""
+        n = 0
+        for f in self.faces:
+            for p in f.panels:
+                a, b, zb = min(q[0] for q in p), max(q[1] for q in p), min(q[2] for q in p)
+                n += 2 + 2 * sum(1 for ra, rb, zc in f.rows if ra < b - 1 and rb > a + 1 and zc - 1.75 > zb - 0.01)
+        return n
+
+    def furring_pieces(self) -> List[Tuple[float, str]]:
+        return ([(round(self.rim_bottom - zb, 2), "skirt stud") for f in self.faces for _, zb in f.studs]
+                + [(round(b - a, 2), "skirt blocking") for f in self.faces for a, b, _ in f.rows])
+
+
+def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
+    """geometry.step_skirt: the face between two levels (and an inset stair's notch cheeks) clad in the decking fascia set
+    VERTICALLY — panels the fascia's width, cut to height, 1/8" seams — on 2x4 nailers: the rim at the top, studs hung from
+    the rim at <= 16" with blocking rows at mid-height and at the bottom. Panels are laid out from the notch corners, so the
+    full panels frame the stair and the cut panels land at the far ends; a face panel at a notch corner runs on over the
+    cheek panel's edge. On a cheek every panel stops 1/8" above the tread it meets (cut stepped over a riser line)."""
+    sk = spec.geometry.step_skirt
+    if not sk or not spec.geometry.outline:
+        return None
+    f = decking_facts(spec.decking.collection)
+    fas = FASCIA[f["material"]]
+    fas_t, bt = fas["thick"], f["thick"]
+    jd = actual(spec.framing.joist_size)[1]
+    drop = float(sk.get("drop_in", 36.0))
+    gap = float(sk.get("gap_in", 0.125))
+    oc = float(sk.get("stud_oc_in", 16.0))
+    w = float(sk.get("panel_in", fas["width"]))
+    z_top, rim_bot = -bt, -(bt + jd)
+    pb = actual(spec.framing.post_size)[0]
+    notes: List[str] = []
+    # the inset stairs' notches: their cheeks step down with the treads; their posts take the corner nailer's place
+    nts = []
+    tread_w = 2 * f["width"] + spec.deck_gap + NOSE
+    for s in spec.stairs:
+        if getattr(s, "inset", False):
+            nt = inset_notch(spec, s.side)
+            if nt is not None:
+                r_t = RISER[f["material"]]["thick"] if s.closed_risers else 0.0
+                rise_ = s.total_rise_in or drop
+                geo_ = eng.stair_geometry(rise_, nt["width"], True, tread_w, flights=s.flights or None)
+                run_ = (nt["depth"] + fas_t - r_t) / max(1, geo_.treads)
+                if not eng.TREAD_MIN <= run_ <= tread_w + 1.0:
+                    run_ = tread_w
+                a_c = nt["out"] + nt["sgn"] * (NOTCH_POST_OFFSET + pb / 2)
+                nts.append((nt, run_, geo_.riser_in, r_t, geo_.treads, [notch_pt(nt, a_c, nt["lo"] - pb / 2), notch_pt(nt, a_c, nt["hi"] + pb / 2)]))
+    edges = {e.name: e for e in outline_poly_edges(spec)}
+    names = list(sk.get("edges") or [])
+    if not names:
+        for nt, *_ in nts:          # default: the cheeks and every open side on the face line the notch is cut in
+            names += [f"edge:{i + 1}" for i in nt["i_cheeks"]]
+            k_ = 0 if nt["axis"] == "x" else 1
+            names += [e.name for e in edges.values() if e.exposed and abs((e.x0, e.y0)[k_] - nt["out"]) < 0.6 and abs((e.x1, e.y1)[k_] - nt["out"]) < 0.6]
+    faces: List[SkirtFace] = []
+    for name in dict.fromkeys(names):
+        e = edges.get(name)
+        if e is None or not e.exposed or e.length < 2.0:
+            notes.append(f"step skirt: {name} is not an open outline side — skipped")
+            continue
+        if abs(e.x1 - e.x0) > 0.5 and abs(e.y1 - e.y0) > 0.5:
+            notes.append(f"step skirt: {name} is angled — vertical panels are laid on square sides only; skipped")
+            continue
+        L_ = e.length
+        ux, uy = (e.x1 - e.x0) / L_, (e.y1 - e.y0) / L_
+        nx, ny = -uy, ux                                       # outward: the outline runs clockwise, inward is (uy, -ux)
+        idx = int(name.split(":")[1]) - 1
+        cheek = next((t for t in nts if idx in t[0]["i_cheeks"]), None)
+        a0, a1 = 0.0, L_
+        start_end = False                                      # lay the panels from the side's end (True) or its start
+        for t in nts:
+            for cx, cy in t[0]["corners"]:
+                if math.hypot(e.x0 - cx, e.y0 - cy) < 0.6:
+                    a0 = 0.0 if cheek else -fas_t
+                elif math.hypot(e.x1 - cx, e.y1 - cy) < 0.6:
+                    a1 = L_ if cheek else L_ + fas_t
+                    start_end = True
+        sf = SkirtFace(name, e.x0, e.y0, e.x1, e.y1, nx, ny, a0, a1, cheek=cheek is not None)
+        def along_u(p, t=cheek):
+            """Distance from the notch's inner face at position p along this side (cheeks)."""
+            nt = t[0]
+            px, py = e.x0 + ux * p, e.y0 + uy * p
+            return abs((px if nt["axis"] == "x" else py) - nt["face"])
+        def floor_z(p, t=cheek):
+            if t is None:
+                return -drop
+            nt, run_, rise_, r_t, T, _ = t
+            k = min(T, max(1, int(math.floor((along_u(p) - r_t) / run_)) + 1))
+            return -k * rise_
+        # panels
+        spans, pos = [], (a1 if start_end else a0)
+        while (pos > a0 + 0.05) if start_end else (pos < a1 - 0.05):
+            if start_end:
+                a, b = max(a0, pos - w), pos; pos = a - gap
+            else:
+                a, b = pos, min(a1, pos + w); pos = b + gap
+            spans.append((a, b))
+        if len(spans) > 1 and spans[-1][1] - spans[-1][0] < 3.0:
+            # a sliver at the far end: rip the last full panel and the sliver to two equal panels instead
+            (pa, pb_), (qa, qb) = spans[-2], spans[-1]
+            lo_, hi_ = min(pa, qa), max(pb_, qb)
+            half = (hi_ - lo_ - gap) / 2
+            spans[-2:] = sorted([(lo_, lo_ + half), (hi_ - half, hi_)], reverse=start_end)
+        for a, b in spans:
+            cuts = [a, b]
+            if cheek is not None:
+                nt, run_, rise_, r_t, T, _ = cheek
+                ua, ub = along_u(a), along_u(b)
+                for k in range(1, T):
+                    u_k = k * run_ + r_t                       # where the floor drops from tread k to tread k + 1
+                    if min(ua, ub) < u_k < max(ua, ub):        # the panel steps over that riser line: cut it there
+                        cuts.append(a + (u_k - ua) / (ub - ua) * (b - a))
+            cuts = sorted(set(round(c, 4) for c in cuts))
+            gap_ = SKIRT_GAP_TREAD if cheek is not None else SKIRT_GAP_BOTTOM
+            sf.panels.append([(p0, p1, floor_z((p0 + p1) / 2) + gap_) for p0, p1 in zip(cuts, cuts[1:]) if p1 - p0 > 0.05])
+        # nailers below the rim: studs <= oc apart (not where a notch post stands), blocking rows at mid-height and the bottom
+        n_iv = max(1, int(math.ceil((L_ - 3.5) / oc - 1e-9)))
+        posts = [p for t in nts for p in t[5]]
+        for i in range(n_iv + 1):
+            p = 1.75 + (L_ - 3.5) * i / n_iv
+            px, py = e.x0 + ux * p - nx * 0.75, e.y0 + uy * p - ny * 0.75
+            if any(abs(px - qx) < pb / 2 + 2.5 and abs(py - qy) < pb / 2 + 2.5 for qx, qy in posts):
+                continue
+            zb = floor_z(p) + (0.5 if cheek is not None else SKIRT_GAP_BOTTOM + 0.25)
+            if rim_bot - zb >= 4.0:
+                sf.studs.append((round(p, 2), round(zb, 2)))
+        if sf.studs:
+            z_rows = [-drop + SKIRT_GAP_BOTTOM + 1.75]
+            z_rows.append((rim_bot + z_rows[0] + 1.75) / 2)
+            st_pos = sorted(p for p, _ in sf.studs)
+            for zc in z_rows:
+                run_a = None
+                for p0, p1 in zip(st_pos, st_pos[1:]):
+                    ok = floor_z(p0) < zc - 1.95 and floor_z(p1) < zc - 1.95 and p1 - p0 <= oc + 8.0
+                    if ok and run_a is None:
+                        run_a = p0
+                    if not ok and run_a is not None:
+                        sf.rows.append((round(run_a + 0.75, 2), round(p0 - 0.75, 2), round(zc, 2))); run_a = None
+                if run_a is not None:
+                    sf.rows.append((round(run_a + 0.75, 2), round(st_pos[-1] - 0.75, 2), round(zc, 2)))
+        faces.append(sf)
+    if not faces:
+        return None
+    sk_ = StepSkirt(faces, drop, w, gap, z_top, rim_bot, notes)
+    hs = sk_.panel_heights()
+    sk_.notes.append(f"step skirt: {len(hs)} vertical {spec.decking.collection} {spec.decking.fascia_color or spec.decking.color} fascia panels "
+                     f"({w:g}\" wide, cut to height, {gap:g}\" seams; {', '.join(f.edge for f in faces)}), tallest {inches_frac_(max(hs))}, "
+                     f"on {sum(len(f.studs) for f in faces)} 2x4 nailers hung from the rim at {oc:g}\" and blocking rows at mid-height and the bottom")
+    return sk_
+
+
+def inches_frac_(v: float) -> str:
+    n = round(v * 8)
+    whole, rem = divmod(int(n), 8)
+    return f'{whole}"' if rem == 0 else f'{whole}-{rem // math.gcd(rem, 8)}/{8 // math.gcd(rem, 8)}"'
+
+
 # ================================================================== stairs
 def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> List[StairLayout]:
     out = []
@@ -1130,8 +1430,31 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
     composite = f["material"] != "Wood"
     tread_w = 2 * dkl.bw + dkl.gap + NOSE          # two deck boards + gap + nosing over the riser
     for s in spec.stairs:
+        # an inset stair takes its width and its run from the notch it sits in: the treads span cheek skirt to cheek skirt and
+        # the bottom riser lands flush with the skirt on the face the notch is cut in
+        nt = inset_notch(spec, s.side) if getattr(s, "inset", False) else None
+        ins_notes: List[str] = []
+        if getattr(s, "inset", False) and nt is None:
+            ins_notes.append(f"inset stair on {s.side}: that outline side is not a notch face (two parallel cheeks either side of it) — drawn and counted as an ordinary stair")
+        if nt is not None:
+            import copy as _copy
+            skirt_t = FASCIA[f["material"]]["thick"] if spec.decking.fascia else 0.0
+            r_t = RISER[f["material"]]["thick"] if s.closed_risers else 0.0
+            clear = round(nt["width"] - 2 * skirt_t, 3)
+            if abs(clear - s.width_in) > 0.5:
+                ins_notes.append(f"inset stair: the notch is {ftin(nt['width'])} wide, so the treads run {ftin(clear)} between the cheek skirts (the stair asks {ftin(s.width_in)})")
+            s = _copy.copy(s)
+            s.width_in = clear
         rise = s.total_rise_in if s.total_rise_in else spec.geometry.height_in
         geo = eng.stair_geometry(rise, s.width_in, composite, tread_w, flights=s.flights or None)
+        if nt is not None:
+            run_fit = (nt["depth"] + skirt_t - r_t) / max(1, geo.treads)
+            if eng.TREAD_MIN <= run_fit <= tread_w + 1.0:
+                geo = eng.stair_geometry(rise, s.width_in, composite, round(run_fit, 3), flights=s.flights or None)
+            else:
+                ins_notes.append(f"inset stair: the notch is {ftin(nt['depth'])} deep — {geo.treads} treads would run {run_fit:.2f}\"; make it "
+                                 f"{ftin(geo.treads * tread_w + r_t - skirt_t)} deep for {tread_w:.2f}\" treads (bottom riser flush with the skirt)")
+            geo.guard_required = False         # its sides are the notch cheeks (walls); the deck's own guard runs round the notch
         pieces_per_board = max(1, int(math.floor(144 / (s.width_in + 0.25))))
         tread_pieces = geo.treads * 2
         riser_pieces = geo.risers if s.closed_risers else 0
@@ -1198,6 +1521,29 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         out.append(StairLayout(s.side, s.width_in, geo, 2, tread_pieces, riser_pieces, 0 if box else geo.stringers, geo.stringer_stock_ft, max(frails) if frails else s.rails, secs, stair_posts,
                                s.landing, opening, notes, mid and not box, (round(longest / 2.0, 1) if mid else 0.0) if not box else 0.0, frails, land_secs, land_posts, round(land_lf, 1),
                                carriers if not box else [], fracs, build="box" if box else "stringers", skirts=bool(s.skirts) or box))
+        sl = out[-1]
+        sl.handrail, sl.handrail_side, sl.option = getattr(s, "handrail", "") or "", getattr(s, "handrail_side", "") or "right", getattr(s, "option", "") or ""
+        if sl.handrail == "each flight":
+            sl.handrail_lf = round(sum(math.hypot(fg.run_in, fg.rise_in - geo.riser_in) for fg, r_ in zip(geo.flights, frails) if r_) / 12.0, 1)
+        if nt is not None:
+            pb = actual(spec.framing.post_size)[0]
+            a_c = nt["out"] + nt["sgn"] * (NOTCH_POST_OFFSET + pb / 2)          # the notch posts' and the foot carrier's line
+            standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(spec.framing.footing_type, CONC_STANDOFF)
+            post_len = max(6.0, spec.geometry.height_in - f["thick"] - actual(spec.framing.joist_size)[1] - standoff)
+            sl.inset, sl.notch_posts, sl.notch_post_len = True, 2, round(post_len, 1)
+            sl.notch = dict(nt, post_line=a_c, posts=[notch_pt(nt, a_c, nt["lo"] - pb / 2), notch_pt(nt, a_c, nt["hi"] + pb / 2)],
+                            skirt_t=skirt_t, riser_t=r_t, run=geo.tread_in, carrier_len=round(nt["width"], 2), carrier_top=-(rise + f["thick"]))
+            if sl.handrail in ("guard posts", ""):
+                sl.handrail = "guard posts"
+                fg = geo.flights[0]
+                sl.handrail_lf = round(math.hypot(fg.run_in + r_t, fg.rise_in - geo.riser_in) / 12.0, 1)
+            sl.notes += [f"inset in the {ftin(nt['width'])} x {ftin(nt['depth'])} notch on {s.side}: the stringers hang on the trimmer at the top riser (LSCZ) and bear on a "
+                         f"(2){spec.framing.joist_size} carrier at the foot, hung between {sl.notch_posts} {spec.framing.post_size} posts at the notch's outer corners "
+                         f"(they carry the header ends too), each on a footing; the cheeks are clad in the step skirt, the deck's picture-frame board is the top nosing"]
+            if geo.handrail_required:
+                sl.notes.append(f"graspable handrail on the {sl.handrail_side} going down, bracketed to the deck guard's posts along that cheek, 34–38\" over the nosings, "
+                                f"top riser to bottom riser ({sl.handrail_lf:g}' of rail)")
+        sl.notes += ins_notes
     return out
 
 
@@ -1586,6 +1932,18 @@ def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -
     else:
         div_x = []
     bounds = [xmin] + div_x + [xmax]
+
+    def _on_deck(xb: float, y: float) -> bool:
+        """A breaker line lies on the deck at y: inside the outline, or on its edge (a breaker on a house-wall line). A breaker
+        set off a house corner stops at the corner; behind it the rows end at the house wall."""
+        if _poly_inside(poly, xb, y):
+            return True
+        for (ax, ay), (bx, by) in zip(poly, poly[1:] + poly[:1]):
+            dx, dy = bx - ax, by - ay
+            t_ = max(0.0, min(1.0, ((xb - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy or 1e-9)))
+            if math.hypot(ax + t_ * dx - xb, ay + t_ * dy - y) < 0.6:
+                return True
+        return False
     # ---- rows per panel
     for pi, (pa, pb) in enumerate(zip(bounds, bounds[1:])):
         # the panel's outermost front: the outline's highest y inside the panel (vertices and the crossings at its sides)
@@ -1634,8 +1992,10 @@ def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -
                     continue
                 if yb1 - yb0 < 1.0:
                     continue
-                left = "divider" if abs(x0_ - lo) < 0.05 and pi > 0 else ("house" if kinds[ia] == "house" else "border")
-                right = "divider" if abs(x1_ - hi) < 0.05 and pi < len(bounds) - 2 else ("house" if kinds[ib] == "house" else "border")
+                at_l = abs(x0_ - lo) < 0.05 and pi > 0 and _on_deck(pa, yc)
+                at_r = abs(x1_ - hi) < 0.05 and pi < len(bounds) - 2 and _on_deck(pb, yc)
+                left = "divider" if at_l else ("house" if kinds[ia] == "house" else "border")
+                right = "divider" if at_r else ("house" if kinds[ib] == "house" else "border")
                 for k_, (i_, x_) in (("l", (ia, x0_)), ("r", (ib, x1_))):
                     (ex0, ey0), (ex1, ey1) = poly[i_], poly[(i_ + 1) % len(poly)]
                     if kinds[i_] == "house" and abs(ex0 - ex1) > 0.5 and abs(ey0 - ey1) > 0.5:
@@ -1660,7 +2020,7 @@ def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -
             y_hi = min(y_hi, min(tops))
         y_lo = y_hi - bw - gap
         for r in plan.rows:
-            if (r.x0 + 1.0 < x < r.x1 - 1.0) or (abs(r.x1 - (x - trim_d)) < 0.1) or (abs(r.x0 - (x + trim_d)) < 0.1):
+            if (r.x0 + 1.0 < x < r.x1 - 1.0) or (r.right == "divider" and abs(r.x1 - (x - trim_d)) < 0.1) or (r.left == "divider" and abs(r.x0 - (x + trim_d)) < 0.1):
                 y_lo = min(y_lo, r.y0)
         lab = next((f"D{a.name}/{b.name}" for a, b in zip(zl, zl[1:]) if abs(b.x0 - x) < 0.6), f"D@{ftin(x)}")
         plan.dividers.append((x, y_lo, y_hi, lab))
@@ -1673,6 +2033,9 @@ def build_field_plan(spec: DeckSpec, zl: List[ZoneLayout], dkl: DeckingLayout) -
                     plan.borders.append((x0, y0, x1, y1, "border"))
     if plan.dropped:
         plan.notes.append(f"{plan.dropped} sliver{'s' if plan.dropped != 1 else ''} under 6\" beside the breakers / bay {'are' if plan.dropped != 1 else 'is'} not laid as {'boards' if plan.dropped != 1 else 'a board'} (the border or breaker covers)")
+    long_ = [q for q in plan.rows if q.length > stock_max - 2.0]
+    if long_:
+        plan.notes.append(f"{len(long_)} row{'s' if len(long_) != 1 else ''} over a {max(STOCK_LENGTHS_FT)}' board (longest {ftin(max(q.length for q in long_))}) — add a breaker line")
     return plan
 
 
