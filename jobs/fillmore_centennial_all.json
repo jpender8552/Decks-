@@ -2464,45 +2464,6 @@
    ],
    "blocks": [
     {
-     "name": "bed under the B floor strip (grade)",
-     "kind": "ground",
-     "mat": "hsoil",
-     "box": [
-      7.5833,
-      27.5,
-      -2.0,
-      0.0,
-      -0.6,
-      1.9
-     ]
-    },
-    {
-     "name": "curb under the B floor strip",
-     "kind": "ground",
-     "mat": "foundation",
-     "box": [
-      27.5,
-      28.0,
-      -2.0,
-      0.0,
-      -0.4,
-      0.35
-     ]
-    },
-    {
-     "name": "terrace slab under the C cantilever",
-     "kind": "ground",
-     "mat": "foundation",
-     "box": [
-      28.0,
-      50.1667,
-      -2.0,
-      0.0,
-      -0.42,
-      0.0
-     ]
-    },
-    {
      "name": "tall window: maroon band between the units",
      "kind": "trim",
      "mat": "haccent",
