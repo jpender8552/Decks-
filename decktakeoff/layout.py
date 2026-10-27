@@ -215,6 +215,7 @@ class StairLayout:
     option: str = ""                     # the option this stair belongs to (Stair.option)
     landing_footings: int = 0            # landing posts standing on the deck's own footings (Stair.landing_footing "deck"): 4 per landing
     landing_post_h: List[float] = field(default_factory=list)   # per landing: its frame bottom above the stair's foot (in)
+    own_footings: int = 0                # posts on the stair's own 12" caissons (Stair.landing_footing "caisson12"): landing + carrier posts
 
 
 @dataclass
@@ -330,8 +331,9 @@ class Layout:
 
     @property
     def stair_support_posts(self) -> int:
-        return (sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support)
-                + sum(getattr(st, "landing_footings", 0) for st in self.stairs))      # landing posts on the deck's own footings
+        return (sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support and not getattr(st, "own_footings", 0))
+                + sum(getattr(st, "landing_footings", 0) for st in self.stairs if not getattr(st, "own_footings", 0)))   # landing posts on the deck's own footings
+                                                                                                                         # (a stair on its own 12" caissons counts none here)
 
     @property
     def n_footings(self) -> int:
@@ -1563,13 +1565,17 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
                                carriers if not box else [], fracs, build="box" if box else "stringers", skirts=bool(s.skirts) or box))
         sl = out[-1]
         sl.handrail, sl.handrail_side, sl.option = getattr(s, "handrail", "") or "", getattr(s, "handrail_side", "") or "right", getattr(s, "option", "") or ""
-        if getattr(s, "landing_footing", "") == "deck" and s.landings and len(geo.flights) > 1:
-            # the landing posts stand on the deck's own footings: counted with the deck's posts (Layout.n_footings, the post lumber)
+        lft_ = getattr(s, "landing_footing", "") or ""
+        if lft_ in ("deck", "caisson12") and s.landings and len(geo.flights) > 1:
+            # the landing posts stand on the deck's own footings: counted with the deck's posts (Layout.n_footings, the post lumber) —
+            # or ("caisson12") on the stair's own 12" caissons with its carrier posts (own_footings, below)
             sl.landing_footings = 4 * len(s.landings)
             for li in range(len(s.landings)):
                 fi = min(li, len(geo.flights) - 2)               # the flight this landing is the foot of (a turn square + its big landing share one level)
                 below = sum(fg.rise_in for fg in geo.flights[fi + 1:]) - float(getattr(s, "landing_grade_in", None) or 0.0)   # + the yard's fall under it
                 sl.landing_post_h.append(round(below - f["thick"] - actual(spec.framing.joist_size)[1], 2))
+        if lft_ == "caisson12":
+            sl.own_footings = sl.landing_footings + (2 * max(1, len(sl.carrier_flights)) * max(1, len(sl.carrier_fracs)) if sl.mid_support else 0)
         if sl.handrail == "each flight":
             sl.handrail_lf = round(sum(math.hypot(fg.run_in, fg.rise_in - geo.riser_in) for fg, r_ in zip(geo.flights, frails) if r_) / 12.0, 1)
         if nt is not None:

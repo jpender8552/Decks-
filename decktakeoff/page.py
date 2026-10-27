@@ -265,6 +265,9 @@ def _stack(p, sold: float = None):
              ("Work — carries the margin", money(p.work, True)), (gc_name(p.gc_lines, "General conditions") + " at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
              (f"Sell — check or ACH at {p.gm:.1%} GM" + (f" ({p.rail_note})" if p.rail_note else ""), f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor" + (" (the deck at 40%, rail at its rate)" if p.rail_note else ""), money(p.sell_floor)),
              ("Financed", f"<b>{money(p.retail)}</b> · {money(p.monthly)}/mo at 6.99% × 10 yr"), ("Gross profit", money(p.gp))]
+    ss_, sw_ = float(getattr(p, "stair_sell", 0) or 0), float(getattr(p, "stair_work", 0) or 0)
+    if ss_:                                  # the owner's stair rule (extras.stair_rule): what the stairs sell for, their cost, their margin
+        stack.append(("Stairs at the owner's rule — sell · their cost · margin", f"{money(ss_)} · {money(sw_)} · {1 - sw_ / ss_:.1%}"))
     if sold:
         stack[7] = ("SOLD — check or ACH", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF")
         stack += [("Margin on the sold price (gross profit ÷ sell, GC at cost)", f"<b>{p.gp / p.sell:.1%}</b>"),
@@ -294,6 +297,9 @@ def _cost_stack(p, t):
     out = ['<h2 class="kicker">Cost to build <span class="tag">materials at invoice · labor at the rate card · site services at cost</span></h2>']
     rows = [("Materials — every line of the order", money(p.materials, True)), (f"Sales tax {p.tax_rate:.2%} on materials", money(tax_raw, True)),
             ("Labor", money(p.labor, True)), (gc_name(p.gc_lines, "Site & project services") + " at cost", money(p.gc, True)), ("<b>Total cost to build</b>", f"<b>{money(total, True)}</b>")]
+    ss_, sw_ = float(getattr(p, "stair_sell", 0) or 0), float(getattr(p, "stair_work", 0) or 0)
+    if ss_:                                  # the owner's stair rule: the stairs' cost inside the total, what they sold for, their margin
+        rows.append((f"of which the stairs — sold at the owner's rule for {money(ss_)}, {1 - sw_ / ss_:.1%} margin", money(sw_, True)))
     out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in rows) + "</tbody></table></div>")
     cats = t.by_category()
     out.append("<h3>Materials by category</h3>")
@@ -515,7 +521,7 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
     from .report import lights_of
     show_fin = spec.extras.show_financing
     out, rows = [], []
-    tc = tf = 0.0
+    sums = []                                # per block: its number, its group, check and financed with its add-ons
     for i, o in enumerate(blocks, 1):
         ok = re.sub(r"[^a-z0-9]+", "-", str(o.get("key") or f"opt{i}").lower()).strip("-")
         title, num = o.get("title") or f"Option {i}", o.get("number") or f"Option {i}"
@@ -599,11 +605,28 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
         out.append("".join(h))
         rows.append((f"{num} — {title}", c, f, m, False, basis))
         rows += [(lab, ca, fa, ma, True, ab_) for lab, ca, fa, ma, _, _, ab_ in adds]
-        tc += c + sum(a[1] for a in adds)
-        tf += f + sum(a[2] for a in adds)
+        sums.append((num, str(o.get("group") or ""), c + sum(a[1] for a in adds), f + sum(a[2] for a in adds)))
+    # "the deck with every option": options that share a group (the two yard-stair layouts) are one or the other — the group's
+    # first option counts in the total, and every other one gets a total of its own in its place
+    first = {}
+    for num, g, sc, sf in sums:
+        if g and g not in first:
+            first[g] = (num, sc, sf)
+    tc = sum(sc for _n, g, sc, _f in sums if not g) + sum(v[1] for v in first.values())
+    tf = sum(sf for _n, g, _c, sf in sums if not g) + sum(v[2] for v in first.values())
+    members = {g: [n for n, gg, _c, _f in sums if gg == g] for g in first}
+    alts = [(f"The deck with every option, with {n} in place of {first[g][0]}",
+             (p.sell + tc - first[g][1] + sc, p.retail + tf - first[g][2] + sf, _monthly(p.retail + tf - first[g][2] + sf)))
+            for n, g, sc, sf in sums if g and first[g][0] != n]
+    multi = [g for g in first if len(members[g]) > 1]
+
+    def _both(ns):
+        return ("Options " + " and ".join(n[len("Option "):] for n in ns)) if all(n.startswith("Option ") for n in ns) else " and ".join(ns)
     head = ('<h2 class="kicker pb" id="g-options">Options <span class="tag">each priced on its own, added to the deck price · '
             + ("its own renders" if any("<figure>" in x for x in out) else "the whole installed difference") + "</span></h2>")
-    return dict(html=head + "".join(out), rows=rows, total=(p.sell + tc, p.retail + tf, _monthly(p.retail + tf)), show_fin=show_fin)
+    return dict(html=head + "".join(out), rows=rows, total=(p.sell + tc, p.retail + tf, _monthly(p.retail + tf)), show_fin=show_fin,
+                total_label="The deck with every option" + (", with " + " and ".join(first[g][0] for g in multi) if multi else ""),
+                totals=alts, group_note=" ".join(f"{_both(members[g])} are one or the other." for g in multi))
 
 
 def _options_summary(ob) -> str:
@@ -612,9 +635,9 @@ def _options_summary(ob) -> str:
     show_fin = ob["show_fin"]
     body = [[(f'<span class="sub">{E(lab)}</span>' if sub else E(lab)), _sign(c)] + ([_sign(f), _sign(m) + "/mo"] if show_fin else [])
             for lab, c, f, m, sub, _b in ob["rows"]]
-    tc, tf, tm = ob["total"]
-    body.append(["<b>The deck with every option</b>", f"<b>{money(tc)}</b>"] + ([f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>"] if show_fin else []))
-    return ("<p>Each line is the whole difference, installed, added to the deck price above.</p>"
+    for lab, (tc, tf, tm) in [(ob.get("total_label") or "The deck with every option", ob["total"])] + list(ob.get("totals") or []):
+        body.append([f"<b>{E(lab)}</b>", f"<b>{money(tc)}</b>"] + ([f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>"] if show_fin else []))
+    return ("<p>Each line is the whole difference, installed, added to the deck price above." + (f" {E(ob['group_note'])}" if ob.get("group_note") else "") + "</p>"
             + table(["Option", "Check or ACH"] + (["Financed", "Monthly"] if show_fin else []), body, "optsum", ["l", "r"] + (["r", "r"] if show_fin else [])))
 
 
@@ -622,8 +645,8 @@ def _options_internal(ob) -> str:
     """The internal set: every option as the proposal prices it, with how each number was made — an engine delta, an
     owner-set price, or an ESTIMATE the owner has not set (the lead confirms it before anything goes to the client)."""
     rows = [[(("&nbsp;&nbsp;" + E(lab)) if sub else f"<b>{E(lab)}</b>"), _sign(c), _sign(f), _sign(m) + "/mo", E(b)] for lab, c, f, m, sub, b in ob["rows"]]
-    tc, tf, tm = ob["total"]
-    rows.append(["<b>The deck with every option</b>", f"<b>{money(tc)}</b>", f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>", ""])
+    for lab, (tc, tf, tm) in [(ob.get("total_label") or "The deck with every option", ob["total"])] + list(ob.get("totals") or []):
+        rows.append([f"<b>{E(lab)}</b>", f"<b>{money(tc)}</b>", f"<b>{money(tf)}</b>", f"<b>{money(tm)}/mo</b>", E(ob.get("group_note") or "")])
     est = [lab for lab, c, f, m, sub, b in ob["rows"] if "ESTIMATE" in b]
     return ('<h2 class="kicker" id="g-options">Options in the proposal <span class="tag">internal · how each price was made</span></h2>'
             + (f'<p><b>ESTIMATE — not set by the owner:</b> {E("; ".join(est))}. Confirm the number before the proposal goes to the client.</p>' if est else "")

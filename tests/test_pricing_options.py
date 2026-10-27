@@ -133,3 +133,28 @@ def test_footings_and_rail_words_follow_the_spec():
     r["railing"].update(drink_rail=True, drink_rail_mount="over")
     for sysname in ("IRX Baluster", s.railing.system):
         assert "modern top rail" not in rail_words(DeckSpec.from_dict(r), sysname)
+
+
+def test_grouped_options_count_once_and_get_their_own_total(tmp_path):
+    from decktakeoff.page import render_page
+    base = DeckSpec.from_dict(json.load(open(ROOT / "examples/jason_ct.json")))
+    opts = [dict(key="a", number="Option 1", title="Lights", price=1000),
+            dict(key="b", number="Option 2", title="Stair A", price=5000, group="yard stair", addons=[dict(label="lights A", price=300)]),
+            dict(key="c", number="Option 2B", title="Stair B", price=7000, group="yard stair", addons=[dict(label="lights B", price=400)])]
+    r = render_page(base, str(tmp_path / "g"), mode="proposal", key="g", render=False, options=opts, viewer_url="")
+    h, s = Path(r["html"]).read_text(), r["pricing"].sell
+    assert f"${s + 1000 + 5300:,.0f}" in h and f"${s + 1000 + 7400:,.0f}" in h and f"${s + 1000 + 5300 + 7400:,.0f}" not in h
+    assert "with Option 2B in place of Option 2" in h and "Options 2 and 2B are one or the other." in h
+
+
+def test_stair_rule_cost_on_internal_pages_price_only_for_the_client(tmp_path):
+    from decktakeoff.page import render_page
+    d = json.load(open(ROOT / "jobs/deck_20x20_castlerock.json"))      # Vintage, one stair: the owner's per-riser price applies
+    d.setdefault("extras", {})["stair_rule"] = True
+    s = DeckSpec.from_dict(d)
+    p = run(s)[2]
+    assert p.stair_sell > 0 and dict(p.allocation).get("Stairs") == round(p.stair_sell)
+    hi = Path(render_page(s, str(tmp_path / "i"), mode="internal", key="s", render=False)["html"]).read_text()
+    assert "Stairs at the owner's rule" in hi and f"${p.stair_sell:,.0f}" in hi
+    hp = re.sub(r"<(script|style)\b.*?</\1>", "", Path(render_page(s, str(tmp_path / "p"), mode="proposal", key="s", render=False, viewer_url="")["html"]).read_text(), flags=re.S)
+    assert "owner's rule" not in hp and "their cost" not in hp
