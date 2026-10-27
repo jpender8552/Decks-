@@ -26,7 +26,7 @@ DEFAULT_COLORS = dict(siding="#c9c3a4", trim="#f3f1ea", fascia="#2e463b", roof="
                       foundation="#a9a59c", interior="#3b3632", shutter="#f1efe8", glass="#b4c4cf", gutter="#2e463b", metal="#8f959b")
 # colours only the newer features use (painted fields, brick, vinyl frames, screens, blinds, chimney caps)
 EXTRA_COLORS = dict(accent="#5c3833", brick="#b8945f", mortar="#c2b9a6", frame="#e6e2d6", screen="#26282a", blind="#ece6d6",
-                    cap="#8a8680")
+                    cap="#8a8680", soil="#3f3328")
 
 
 def _shade(hexc: str, k: float) -> str:
@@ -69,6 +69,7 @@ def materials(model: dict) -> Dict[str, dict]:
         hscreen=dict(color=c["screen"], rough=0.9, opacity=0.6, label="insect screen"),
         hblind=dict(color=c["blind"], rough=0.6, label="blinds"),
         hcap=dict(color=c["cap"], rough=0.85, label="chimney cap"),
+        hsoil=dict(color=c["soil"], rough=1.0, label="bed / soil at the house"),
     )
     return out
 
