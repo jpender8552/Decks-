@@ -608,7 +608,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if getattr(st, "skirts", False):
             # stepped fascia skirts: one piece per side, cut to the step profile from a 12" fascia board
             for fg in st.geo.flights:
-                Qz.fascia_pieces += [(f"stair skirt ({st.side}, stepped)", round(fg.treads * st.geo.tread_in + 1.0, 1))] * 2
+                if fg.treads:
+                    Qz.fascia_pieces += [(f"stair skirt ({st.side}, stepped)", round(fg.treads * st.geo.tread_in + 1.0, 1))] * 2
         if getattr(st, "build", "stringers") == "box":
             # a framed box per tread: 2x6 front + back rims across the width, cross members at 16" — no stringers, no hanger board
             ncm = int(math.ceil(st.width / 16.0)) + 1
@@ -618,6 +619,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                                  f"front + back rims, {ncm} cross members @ 16\" between — rip to {st.geo.riser_in - 0.94:.2f}\" (riser less the tread)"))
             continue
         for fi, fg in enumerate(st.geo.flights):
+            if not fg.treads:
+                continue            # a single riser down onto a landing: the landing frame takes the riser, no stringers
             Qz.lumber += [("2x12", fg.stringer_len_in, "stair stringer")] * st.stringers
             cuts.append(CutPiece(f"Stair stringers ({st.side}" + (f", flight {fi + 1}" if multi else "") + ")", "2x12", fg.stringer_len_in, st.stringers,
                                  f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
@@ -1004,7 +1007,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                               f"exact  ({cf:.1f} cf incl. 25% compaction)", 6.5, "est."))
             continue
         d = PRICEBOOK["hardware"]["LSCZ"]
-        n_sc = st.stringers * len(st.geo.flights)
+        n_sc = st.stringers * sum(1 for fg in st.geo.flights if fg.treads)
         lines.append(Line("Hardware", d["desc"], n_sc, n_sc, "ea", f"exact  ({st.side} stair, 1 per stringer at the rim" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else "") + ")", d["each"], d["source"], "LSCZ"))
         if getattr(st, "inset", False) and st.notch:
             n_a = 2 * st.notch_posts + st.stringers

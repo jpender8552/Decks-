@@ -1346,6 +1346,20 @@ def set_sun(v):
     LIGHTS["sun_now"] = tuple(v)
 
 
+def standing_z(D, spec, x: float, y: float) -> float:
+    """The walking surface under a camera station: the top of the deck board / tread under (x, y), else the yard's grade
+    (geometry.site_model), else 0. Stations with an "eye" height follow the deck and the grade as they change."""
+    tops = [b["z1"] for b in D["boxes"] if b["kind"] in ("board", "border", "tread") and not b.get("rot")
+            and b["x0"] - 0.25 <= x <= b["x1"] + 0.25 and b["y0"] - 0.25 <= y <= b["y1"] + 0.25]
+    if tops:
+        return max(tops)
+    sm = getattr(spec.geometry, "site_model", None) if spec is not None else None
+    if sm:
+        from decktakeoff.landscape import grade_at
+        return float(grade_at(sm, x, y))
+    return 0.0
+
+
 def camera(name, pos, at, fov_v_deg, size):
     scn = bpy.context.scene
     cd = bpy.data.cameras.new(name)
@@ -1439,7 +1453,10 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
             set_sun(base_sun)
         scn.view_settings.exposure = float(c.get("exposure", ms.get("exposure", exposure)))
         scn.cycles.samples = int(c.get("samples", ms.get("samples", samples)))
-        cam = camera(f"cam_{out_nm}", c["pos"], c["at"], float(c.get("fov", 40)), size)
+        pos = list(c["pos"])
+        if c.get("eye") is not None:            # a person's eye height above whatever they stand on (the deck, else the yard)
+            pos[2] = standing_z(D, spec, pos[0], pos[1]) + float(c["eye"])
+        cam = camera(f"cam_{out_nm}", pos, c["at"], float(c.get("fov", 40)), size)
         scn.camera = cam
         scn.render.filepath = os.path.join(out_dir, f"{out_nm}.jpg")
         t = time.time()

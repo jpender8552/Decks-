@@ -564,13 +564,13 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             h.append('<ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in facts) + "</ul>")
         elif facts:
             h.append('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in facts) + "</dl>")
+        if o.get("note") or o.get("url"):          # the note (the roof's own document) sits with the words, before the pictures
+            h.append('<p class="opt-note">' + E(o.get("note", "")) + (f' <a href="{E(o["url"])}">{E(o.get("url_text") or o["url"])}</a>' if o.get("url") else "") + "</p>")
         if imgs:
             h.append('<div class="gal">' + "".join(imgs) + "</div>")
         for lab, ca, fa, ma, note, figs, _ab in adds:
             h.append(f'<div class="opt-addon"><div class="oa-line"><b>{E(lab)}</b><span>{_sign(ca)} check or ACH' + (f" · {_sign(fa)} financed · {_sign(ma)}/mo" if show_fin else "") + "</span></div>"
                      + (f'<span class="fine">{E(note)}</span>' if note else "") + ('<div class="gal">' + "".join(figs) + "</div>" if figs else "") + "</div>")
-        if o.get("note") or o.get("url"):
-            h.append('<p class="opt-note">' + E(o.get("note", "")) + (f' <a href="{E(o["url"])}">{E(o.get("url_text") or o["url"])}</a>' if o.get("url") else "") + "</p>")
         h.append("</div></section>")
         out.append("".join(h))
         rows.append((f"{num} — {title}", c, f, m, False, basis))

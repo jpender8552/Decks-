@@ -758,7 +758,7 @@ def takeoff_hook(t) -> None:
                 cnt = PRICEBOOK["hardware"]["HeadLOK6_50"].get("count", 50)
                 need = 4 * n_rp
                 ln.net = ln.order = int(math.ceil(need / cnt)) if need else 0
-                ln.why = f"{need} needed  ({n_rp} rail posts x 4; the {n} roof post{'s' if n != 1 else ''} bolt down through their own base plates)"
+                ln.why = f"{need} needed  ({n_rp} rail posts x 4; the {n_roof} roof post{'s' if n_roof != 1 else ''} bolt down through their own base plates)"
     t.lines[:] = [ln for ln in t.lines if not (ln.order == 0 and ln.net == 0 and ln.category in ("Rail", "Hardware") and ("post" in ln.item.lower() or "HeadLOK" in ln.item))]
     ends = 0
     rxy = [(p.x, p.y) for p in roof]
@@ -766,12 +766,13 @@ def takeoff_hook(t) -> None:
         for e in (s_.p0, s_.p1):
             if e is not None and any(abs(e[0] - a) < 0.6 and abs(e[1] - b) < 0.6 for a, b in rxy):
                 ends += 1
-    ends = ends or 2 * n
+    ends = ends or 2 * n_roof
     color = rl.color or "black"
     t.lines.append(Line("Rail", IRX_WALL_KIT["desc"].replace("{color}", color), ends, ends, "kit",
                         f"exact  ({ends} panel end{'s' if ends != 1 else ''} on the {n_roof} roof post{'s' if n_roof != 1 else ''})", IRX_WALL_KIT["each"], IRX_WALL_KIT["source"],
                         IRX_WALL_KIT["sku"]))
-    xs = ", ".join(ftin(p.x) for p in roof)
+    ids = sorted({(p.roof if isinstance(p.roof, tuple) else (p.x, p.y)) for p in roof})
+    xs = ", ".join(ftin(i_[0]) for i_ in ids)
     if "Rail" in t.schedule:
         t.schedule["Rail"] += (f"; {words} at {xs} from the left end of this level: the 6x6 aluminum post is base-plated on the deck over solid "
                                f"blocking / the column below and the rail panels hang on wall-mount brackets screwed into it")

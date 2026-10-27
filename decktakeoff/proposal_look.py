@@ -176,7 +176,9 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
   .opt-blurb { font-size:12.5px; }
   .opt-scope { font-size:11.5px; }
   .optblock .gal { gap:8px; }
-  .optblock figure img { max-height:2.45in; object-fit:cover; }
+  .optblock figure img { max-height:2.3in; object-fit:cover; }
+  .opt-addon figure img { max-height:1.95in; }
+  .opt-addon .fine { font-size:11px; }
   .opt-addon { break-inside:avoid; page-break-inside:avoid; }
   .v3d-link { break-inside:avoid; page-break-inside:avoid; }
   .facts-cols > div { break-inside:avoid; page-break-inside:avoid; }

@@ -1415,8 +1415,8 @@ window.cfg = {
     applyOptions(); applySun(); if (o.view) goView(o.view, true); syncUI(); renderer.render(scene, cam); },
   render: function () { renderer.render(scene, cam); },
   timeFrames: function (n) { var px = new Uint8Array(4); renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    var t0 = performance.now(); for (var i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
-    return (performance.now() - t0) / n; },
+    var t0 = performance.now(); for (var i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); }
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return (performance.now() - t0) / n; },
   info: function () { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes: GMESH.length, fixtures: FX.length, fxn: FXN, maxFragmentUniforms: maxFU }; }
 };
 setLouvers(S.louver);

@@ -532,6 +532,13 @@ def post_label(plan: "LightPlan", n: Optional[int] = None) -> str:
     return f"{n} {lab}{'s' if n != 1 else ''}" if n is not None else lab + "s"
 
 
+def post_where(plan: "LightPlan") -> str:
+    """Where a post light sits, in the homeowner's words: "on the deck side of every rail post, just below the drink rail" /
+    "on top of every rail post" (every other post when the job says so)."""
+    every = "every" if plan.cfg.get("every", 1) == 1 else "every other"
+    return (f"on the deck side of {every} rail post, just below the drink rail" if plan.post_kind == "accent" else f"on top of {every} rail post")
+
+
 NUM = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 
 

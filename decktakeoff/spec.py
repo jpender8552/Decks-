@@ -270,7 +270,7 @@ class Extras:
     ledger_on_brick_veneer: bool = False
     ledger_on_cantilevered_floor: bool = False
     privacy_wall: bool = False
-    lighting: bool = False               # True = the riser + post-cap lights at the defaults (same as lights = {})
+    lighting: bool = False               # True = the riser + post lights at the defaults (same as lights = {})
     lights: Optional[dict] = None        # low-voltage LED lights: {"riser": true, "post_cap": true, ...} — keys and defaults in lighting.py (DEFAULTS); None = off
     gm: Optional[float] = None           # gross-margin override (default 42.5%, 40% floor)
     gm_below_floor: bool = False         # the owner set a margin under the 40% floor on purpose — use it as given
