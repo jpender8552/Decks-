@@ -100,7 +100,7 @@ def materials(model: dict) -> Dict[str, dict]:
         shrub2=dict(color=c["shrub2"], rough=0.9),
         rock=dict(color=c["rock"], pattern="gravel", rough=1.0, label="river rock"),
         soil=dict(color=c["soil"], pattern="gravel", rough=1.0, label="bare soil"),
-    )
+    ))
 
 
 # ------------------------------------------------------------------ geometry helpers
