@@ -69,7 +69,7 @@ function grainTex(hexes, vertical, count, alpha, seed) {
   g.globalAlpha = 1;
   const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
-function patternTex(kind, hex, seed) {
+function patternTex(kind, hex, seed, md) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 512; const g = c.getContext('2d'); let s = seed;
   const rnd = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
   g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
@@ -105,11 +105,11 @@ function patternTex(kind, hex, seed) {
     for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) { for (let k = 0; k < 2; k++) {
       g.fillStyle = [shade(hex, -0.12), hex, shade(hex, 0.1), shade(hex, -0.05), shade(hex, 0.16)][Math.floor(rnd() * 5)];
       if ((i + j) % 2) g.fillRect(i * 2 * u + 1.5, j * 2 * u + k * u + 1.5, 2 * u - 3, u - 3); else g.fillRect(i * 2 * u + k * u + 1.5, j * 2 * u + 1.5, u - 3, 2 * u - 3); } }
-  } else if (kind === 'hbrick') {  // the house's face brick: running bond, 12 bricks x 36 courses per 8' tile, mottled buff tones, light mortar
-    const bh = 512 / 36, bw = 512 / 12, jt = 1.6;
+  } else if (kind === 'hbrick') {  // the house's face brick: running bond, 12 bricks across the 8' tile, courses at the material's course_in (8'/tile), mottled buff tones, light mortar
+    const nc = Math.round(96 / ((md && md.course_in) || 2.6667)), bh = 512 / nc, bw = 512 / 12, jt = 1.6;
     g.fillStyle = shade(hex, 0.18); g.fillRect(0, 0, 512, 512);
-    for (let r = 0; r < 36; r++) { const off = (r % 2) * bw / 2; for (let c = -1; c < 13; c++) {
-      const tones = [shade(hex, -0.14), shade(hex, -0.06), hex, hex, shade(hex, 0.07), shade(hex, 0.14), '#c98d52', shade(hex, -0.22)];
+    for (let r = 0; r < nc; r++) { const off = (r % 2) * bw / 2; for (let c = -1; c < 13; c++) {
+      const tones = [shade(hex, -0.14), shade(hex, -0.06), hex, hex, shade(hex, 0.07), shade(hex, 0.14), shade(hex, 0.04), shade(hex, -0.22)];
       g.fillStyle = tones[Math.floor(rnd() * tones.length)];
       g.fillRect(c * bw + off + jt / 2, r * bh + jt / 2, bw - jt, bh - jt);
       g.globalAlpha = 0.25; g.fillStyle = shade(hex, 0.25); g.fillRect(c * bw + off + jt / 2 + rnd() * bw * 0.5, r * bh + jt / 2, bw * (0.2 + rnd() * 0.3), bh - jt); g.globalAlpha = 1; } }
@@ -126,7 +126,7 @@ const TEX = {};
 function texFor(mat, vertical, variant) {
   const k = mat + (vertical ? 'V' : 'H') + variant; if (TEX[k]) return TEX[k];
   const m = D.materials[mat];
-  if (m.pattern) { TEX[k] = patternTex(m.pattern, m.color, 5 + mat.length * 3); return TEX[k]; }
+  if (m.pattern) { TEX[k] = patternTex(m.pattern, m.color, 5 + mat.length * 3, m); return TEX[k]; }
   let pal = m.palette || [shade(m.color, -0.18), shade(m.color, -0.08), m.color, shade(m.color, 0.08), shade(m.color, 0.16)];
   if (m.palette && variant !== 1) pal = pal.map(h => shade(h, variant === 0 ? -0.07 : 0.07));
   TEX[k] = grainTex(pal, vertical, m.palette ? 110 : 80, m.palette ? 0.6 : 0.55, 11 + mat.length * 7 + variant * 13); return TEX[k];

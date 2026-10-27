@@ -241,8 +241,15 @@ def colonise(rng, trunks: List[np.ndarray], A: np.ndarray, D: float, di: float, 
     parent index (n,) (-1 for a root) and a trunk flag (n,)."""
     P, par, trunk = [], [], []
     for poly in trunks:
+        last = -1
         for i, p in enumerate(poly):
-            P.append(p); par.append(len(P) - 2 if i else -1); trunk.append(True)
+            if i == 0 and P:                                 # a chain that starts on an existing node forks from it
+                dd = np.linalg.norm(np.asarray(P) - np.asarray(p), axis=1)
+                if dd.min() < 1e-6:
+                    last = int(dd.argmin())
+                    continue
+            P.append(p); par.append(last); trunk.append(True)
+            last = len(P) - 1
     P = np.array(P, float); par = np.array(par, int); trunk = np.array(trunk, bool)
     nA = len(A)
     alive = np.ones(nA, bool)
@@ -374,11 +381,11 @@ class Plants:
         Rz = (ztop - zc0) / 2
         cx, cy, cz = x + lx, y + ly, zc0 + Rz
         # the envelope: a main ellipsoid + lobes on its upper / outer part (an irregular, lobed crown)
-        lobes = [(cx, cy, cz, R * 0.78, Rz * 0.85)]
-        for k in range(int(rng.integers(6, 10))):
-            a = rng.uniform(0, 2 * math.pi); f = rng.uniform(0.35, 0.72)
-            zz = cz + Rz * rng.uniform(-0.35, 0.7)
-            lobes.append((cx + R * f * math.cos(a), cy + R * f * math.sin(a), zz, R * rng.uniform(0.32, 0.55), Rz * rng.uniform(0.3, 0.5)))
+        lobes = [(cx, cy, cz, R * 0.8, Rz * 0.88)]
+        for k in range(int(rng.integers(8, 13))):
+            a = rng.uniform(0, 2 * math.pi); f = rng.uniform(0.4, 0.8)
+            zz = cz + Rz * rng.uniform(-0.45, 0.75)
+            lobes.append((cx + R * f * math.cos(a), cy + R * f * math.sin(a), zz, R * rng.uniform(0.3, 0.52), Rz * rng.uniform(0.28, 0.48)))
         D = max(0.8, R / 13.0) / max(0.55, det) ** 0.5
         n_att = int(np.clip(math.pi * R * R * Rz * 1.3 / (1.5 * D) ** 3 * (0.6 + 0.4 * det), 400, 4500))
         box = np.array([[cx - R * 1.3, cy - R * 1.3, zc0], [cx + R * 1.3, cy + R * 1.3, ztop]])
@@ -397,11 +404,16 @@ class Plants:
             A = A[np.linalg.norm(A - pc, axis=1) > R * rng.uniform(0.12, 0.22)]
         trunks = []
         stem_r = float(t.get("stem_r", 0.22 + R * 0.03))
+        split = z0 + (0.35 * cb if stems > 1 else 0.0)                 # a multi-stem tree: one trunk that forks
+        if stems > 1:
+            bot = np.array([x, y, z0 - 0.3]); fk = np.array([x + lx * 0.2, y + ly * 0.2, split])
+            n = max(2, int((split - z0) / D))
+            trunks.append(bot + (fk - bot) * np.linspace(0, 1, n + 1)[:, None])
         for s in range(stems):
             a = 2 * math.pi * s / stems + rng.uniform(-0.4, 0.4)
-            lean = (R * 0.28 if stems > 1 else 0.0) * rng.uniform(0.7, 1.1)
+            lean = (R * 0.3 if stems > 1 else 0.0) * rng.uniform(0.7, 1.1)
             top = np.array([x + lx * 0.6 + lean * math.cos(a), y + ly * 0.6 + lean * math.sin(a), zc0 + Rz * 0.25])
-            bot = np.array([x + 0.15 * math.cos(a) * (stems > 1), y + 0.15 * math.sin(a) * (stems > 1), z0 - 0.3])
+            bot = np.array([x + lx * 0.2, y + ly * 0.2, split]) if stems > 1 else np.array([x, y, z0 - 0.3])
             n = max(3, int(np.linalg.norm(top - bot) / D))
             tt = np.linspace(0, 1, n + 1)[:, None]
             bend = np.sin(math.pi * tt) * np.array([rng.uniform(-0.6, 0.6), rng.uniform(-0.6, 0.6), 0.0])
@@ -415,15 +427,17 @@ class Plants:
         P = smooth_nodes(P, par, trk, passes=2)
         self._branches(P, par, r, det, tint=(0.95, 0.93, 0.9, 1) if cotton else (1, 1, 1, 1))
         # leaves: cluster cards at the thin ends
+        rel = np.sqrt(((P[:, 0] - cx) ** 2 + (P[:, 1] - cy) ** 2) / R ** 2 + ((P[:, 2] - cz) / Rz) ** 2)
         thin = (r < 0.03 * f * 2.6 + 0.02) & ~trk
-        tips = np.nonzero(thin)[0]
+        cand = np.nonzero((thin | (rel > 0.55)) & ~trk & (P[:, 2] > zc0))[0]
         crown_area = math.pi * R * R
-        card = (1.25 if R > 9 else 1.0) / max(0.6, det) ** 0.35
-        n_cards = int(3.6 * crown_area * (0.7 + 0.3 * det) / (card * card * 0.42))
-        if not len(tips):
+        card = (1.7 if R > 9 else 1.35) / max(0.6, det) ** 0.35
+        n_cards = int(8.0 * crown_area * (0.65 + 0.35 * det) / (card * card * 0.42))
+        if not len(cand):
             return
-        pick = tips[rng.integers(0, len(tips), n_cards)]
-        C = P[pick] + rng.normal(0, 0.45 * D, (n_cards, 3))
+        w_ = np.clip(rel[cand], 0.2, 1.2) ** 2 * np.where(thin[cand], 1.5, 1.0)
+        pick = cand[rng.choice(len(cand), n_cards, p=w_ / w_.sum())]
+        C = P[pick] + rng.normal(0, 0.6 * D, (n_cards, 3))
         out = _unit(np.c_[C[:, 0] - cx, C[:, 1] - cy, (C[:, 2] - cz) * 0.6])
         Nn = _unit(rng.normal(size=(n_cards, 3)) + 0.7 * out + np.array([0, 0, 0.55]))
         T = _rand_perp(Nn, rng)
@@ -461,9 +475,10 @@ class Plants:
             Rz = R * (1.0 - f) ** 0.92 + 0.35
             core_r.append((z, Rz))
             nb = int(rng.integers(5, 8))
+            wf = rng.uniform(0.85, 1.12)                                # whorl to whorl: some reach further
             for b in range(nb):
                 az = k0 + wi * 2.39996 + 2 * math.pi * b / nb + rng.uniform(-0.25, 0.25)
-                L = Rz * rng.uniform(0.82, 1.08)
+                L = Rz * wf * rng.uniform(0.85, 1.2)
                 if L < 0.4:
                     continue
                 e0 = math.radians(-14 + 44 * f ** 1.4 + rng.uniform(-6, 6))
@@ -481,7 +496,7 @@ class Plants:
                 br = 0.025 + 0.06 * L / max(R, 1)
                 seg0 += list(pts[:-1]); seg1 += list(pts[1:]); rr0 += list(np.linspace(br, 0.012, ns + 1)[:-1]); rr1 += list(np.linspace(br, 0.012, ns + 1)[1:])
                 # sprays along the branch, both sides, alternating, from 15% out; and a terminal one
-                ns_ = max(2, int(L * 5.0 * min(1.0, det + 0.25)))
+                ns_ = max(3, int(L * 7.0 * min(1.0, det + 0.25)))
                 ts = np.sort(rng.uniform(0.15, 1.0, ns_))
                 bp = np.array([np.interp(ts, tt, pts[:, c]) for c in range(3)]).T
                 fwd = _unit(np.gradient(bp, axis=0) + 1e-6) if len(bp) > 1 else np.array([[ca, sa, 0.0]])
@@ -489,10 +504,13 @@ class Plants:
                 lat = _unit(np.cross(fwd, np.array([0, 0, 1.0])) * side[:, None])
                 spread = rng.uniform(0.6, 1.1, ns_)[:, None]
                 dirn = _unit(fwd * np.cos(spread) + lat * np.sin(spread) + np.array([0, 0, -0.25]) * (1 - f))
-                size = (0.75 + 0.55 * rng.random(ns_)) * (0.55 + 0.45 * min(1.0, L / 3.0)) / max(0.6, det) ** 0.3
-                nrm = _unit(np.array([0, 0, 1.0]) + rng.normal(0, 0.35, (ns_, 3)) - 0.3 * dirn)
-                Cs.append(bp + dirn * size[:, None] * 0.5); Ns.append(nrm); Ts.append(dirn); Ws.append(size); Hs.append(size * 0.5)
-                Ds.append(np.clip(1 - ts, 0, 1) * 0.35 + 0.1)
+                size = (1.1 + 0.8 * rng.random(ns_)) * (0.55 + 0.45 * min(1.0, L / 3.0)) / max(0.6, det) ** 0.3
+                # each spray a crossed pair: one card lying about flat, one standing on its axis (seen from any side)
+                n1 = _unit(np.array([0, 0, 1.0]) + rng.normal(0, 0.45, (ns_, 3)))
+                n2 = _unit(np.cross(dirn, n1))
+                for nrm in (n1, n2):
+                    Cs.append(bp + dirn * size[:, None] * 0.45); Ns.append(nrm); Ts.append(dirn); Ws.append(size); Hs.append(size * 0.55)
+                    Ds.append(np.clip(1 - ts, 0, 1) * 0.35 + 0.1)
                 # curtain: a few hanging sprays under the outer half (the dense skirt of a blue spruce)
                 nc = max(1, ns_ // 3)
                 tc = rng.uniform(0.45, 1.0, nc)
@@ -513,7 +531,7 @@ class Plants:
         self.add(f"spray:{key}", cards(C, np.vstack(Ns), np.vstack(Ts), np.concatenate(Ws), np.concatenate(Hs), tiles,
                                        _tints(n, rng, np.concatenate(Ds), spread=0.12, warm=0.03)))
         # the dark core: a cone at ~55% of the crown radius (blocks the see-through a real spruce does not have)
-        zs = np.array([c[0] for c in core_r]); rs = np.array([c[1] for c in core_r]) * 0.55
+        zs = np.array([c[0] for c in core_r]); rs = np.array([c[1] for c in core_r]) * 0.42
         if len(zs) > 2:
             ring = 12
             a = 2 * math.pi * np.arange(ring) / ring
@@ -532,7 +550,7 @@ class Plants:
         key = self._texture("pine", lambda p, c1, c2: tuft_tex(p, c1, c2, seed=5))
         ztop = z0 + H
         self.add("bark", tubes([[x, y, z0 - 0.3]], [[x, y, ztop - 0.5]], [float(t.get("stem_r", 0.7))], [0.08], 10, (1.05, 0.88, 0.75, 1)))
-        tiers = int(t.get("tiers", 6)) * 2
+        tiers = int(t.get("tiers", 6)) * 3
         seg0, seg1, rr0, rr1 = [], [], [], []
         ends = []
         for i in range(tiers):
@@ -553,8 +571,8 @@ class Plants:
                 seg0 += [p0, mid]; seg1 += [mid, end]; rr0 += [br, br * 0.6]; rr1 += [br * 0.6, br * 0.25]
                 # side shoots off the outer 60%, each ending in a tuft cluster; a cluster at the end
                 ends.append((end, np.array([ca, sa, 0.35])))
-                for _ in range(int(rng.integers(2, 5))):
-                    tt = rng.uniform(0.4, 0.9)
+                for _ in range(int(rng.integers(5, 9))):
+                    tt = rng.uniform(0.3, 0.92)
                     sp = p0 + (end - p0) * tt
                     sd = _unit(np.array([ca, sa, 0.0]) + np.array([-sa, ca, 0.0]) * rng.uniform(-1.1, 1.1) + np.array([0, 0, rng.uniform(0.0, 0.6)]))
                     sl = L * rng.uniform(0.2, 0.35)
@@ -564,7 +582,7 @@ class Plants:
         self.add("bark", tubes(np.array(seg0), np.array(seg1), np.array(rr0), np.array(rr1), 5, (1.0, 0.85, 0.72, 1)))
         # tufts: each end carries a cluster of crossed tuft cards pointing out and up
         Cs, Ns, Ts, Ws = [], [], [], []
-        per = max(4, int(9 * min(1.0, det + 0.2)))
+        per = max(6, int(13 * min(1.0, det + 0.2)))
         for e, d in ends:
             d = _unit(d)
             n = per
@@ -572,8 +590,9 @@ class Plants:
             base = e + off
             fwd = _unit(np.tile(d, (n, 1)) + rng.normal(0, 0.45, (n, 3)) + np.array([0, 0, 0.35]))
             nr = _rand_perp(fwd, rng)
-            s = rng.uniform(1.0, 1.5, n) / max(0.6, det) ** 0.3
-            Cs.append(base + fwd * s[:, None] * 0.38); Ns.append(nr); Ts.append(fwd); Ws.append(s)
+            s = rng.uniform(1.5, 2.3, n) / max(0.6, det) ** 0.3
+            for nn in (nr, _unit(np.cross(fwd, nr))):                     # crossed: a tuft has volume
+                Cs.append(base + fwd * s[:, None] * 0.38); Ns.append(nn); Ts.append(fwd); Ws.append(s)
         C = np.vstack(Cs); n = len(C)
         Wv = np.concatenate(Ws)
         dist = np.sqrt((C[:, 0] - x) ** 2 + (C[:, 1] - y) ** 2) / max(R, 1)
@@ -629,8 +648,9 @@ class Plants:
         tips = np.nonzero(rr < 0.03)[0]
         if not len(tips):
             tips = np.arange(len(P))
-        card = 0.65
-        n_cards = int(4.5 * math.pi * r * r * (h / 3.0) ** 0.5 / (card * card * 0.42))
+        card = 0.75
+        n_cards = int(10.0 * math.pi * r * r * (h / 3.0) ** 0.5 / (card * card * 0.42))
+        tips = np.nonzero((par >= 0) & (P[:, 2] > z0 + 0.6))[0] if len(tips) < 40 else tips
         pick = tips[rng.integers(0, len(tips), n_cards)]
         C = P[pick] + rng.normal(0, 0.35 * D, (n_cards, 3))
         out = _unit(np.c_[C[:, 0] - x, C[:, 1] - y, (C[:, 2] - cz) * 0.8])

@@ -199,7 +199,7 @@ class Tex:
         """Running-bond face brick (house.py "hbrick"): 12 bricks x 36 courses per tile (8 ft wide, 36 courses tall), every
         brick its own tone (buff / tan / a few orange-flashed and darker ones, iron specks, a sandy face), struck mortar joints
         recessed (height map). Returns (colour, height, tile height in ft) — the tile is 8 ft along the wall."""
-        nm = f"brick_{hexc.strip('#')}_{mortar.strip('#')}_{course_in:.3f}_{brick_in:.2f}.png"
+        nm = f"brick2_{hexc.strip('#')}_{mortar.strip('#')}_{course_in:.3f}_{brick_in:.2f}.png"
         th_ft = 36 * course_in / 12.0
         if self.path(nm):
             return self.path(nm), self.path("h_" + nm), th_ft
@@ -222,12 +222,12 @@ class Tex:
                 k = rng.normal(0, 0.075)
                 tint = np.array([1.0, 1.0, 1.0])
                 u = rng.random()
-                if u < 0.12:
-                    tint = np.array([1.06, 0.96, 0.86])            # orange flash
-                elif u < 0.2:
-                    tint = np.array([0.86, 0.84, 0.82]); k -= 0.06  # darker / browner
-                elif u < 0.3:
-                    tint = np.array([1.04, 1.04, 1.02]); k += 0.05  # pale
+                if u < 0.06:
+                    tint = np.array([1.03, 0.97, 0.91])            # a light orange flash (a few)
+                elif u < 0.17:
+                    tint = np.array([0.88, 0.85, 0.82]); k -= 0.06  # darker / browner
+                elif u < 0.32:
+                    tint = np.array([1.04, 1.04, 1.03]); k += 0.05  # pale
                 c_ = np.clip(base * (1 + k) * tint, 0, 255)
                 h_, w_ = y1 - y0, x1 - x0
                 if h_ <= 2 or w_ <= 2:
@@ -1345,7 +1345,7 @@ def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: floa
     tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); nt.links.new(tm.outputs["Vector"], tr.inputs["Color"])
     mx = nt.nodes.new("ShaderNodeMixShader"); mx.inputs[0].default_value = 0.3
     nt.links.new(bsdf.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2]); nt.links.new(mx.outputs[0], out.inputs[0])
-    for k in range(3):
+    for k in range(6):
         g = _grass_patch(f"grass{k}", rng)
         me = bpy.data.meshes.new(f"grass_patch_{k}")
         me.from_pydata(g.v, [], g.f)
@@ -1379,10 +1379,17 @@ def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: floa
                     break
             if not ok or blocked(cx, cy):
                 continue
-            ob = bpy.data.objects.new(f"grass_{n}", patches[int(rng.integers(3))])
+            ob = bpy.data.objects.new(f"grass_{n}", patches[int(rng.integers(len(patches)))])
             ob.location = B(cx, cy, grade(cx, cy) - 0.02)
-            ob.rotation_euler = (0, 0, float(rng.integers(4)) * math.pi / 2 + float(rng.uniform(-0.05, 0.05)))
-            ob.scale = (cell, cell, float(rng.uniform(0.85, 1.15)))
+            # each patch lies in the slope's plane: a flat patch on the 12 % lawn buried its uphill blades and floated its
+            # downhill ones, and the 1-ft rows of steps read as mowing stripes
+            gx = (grade(cx + 0.5, cy) - grade(cx - 0.5, cy)) / cell
+            gy = (grade(cx, cy + 0.5) - grade(cx, cy - 0.5)) / cell
+            tilt = mathutils.Vector((0.0, 0.0, 1.0)).rotation_difference(mathutils.Vector(B(-gx, -gy, 1.0)).normalized())
+            spin = mathutils.Quaternion((0.0, 0.0, 1.0), float(rng.integers(4)) * math.pi / 2 + float(rng.uniform(-0.05, 0.05)))
+            ob.rotation_mode = "QUATERNION"
+            ob.rotation_quaternion = tilt @ spin
+            ob.scale = (cell * (1 if rng.random() < 0.5 else -1), cell, float(rng.uniform(0.85, 1.15)))
             col.objects.link(ob)
             n += 1
     print(f"grass: {n} patches", flush=True)
