@@ -777,6 +777,30 @@ def takeoff_hook(t) -> None:
         t.schedule["Rail"] += (f"; {words} at {xs} from the left end of this level: the 6x6 aluminum post is base-plated on the deck over solid "
                                f"blocking / the column below and the rail panels hang on wall-mount brackets screwed into it")
     t.notes.append(f"louvered roof: {words} at {xs} — no rail post kit there; {ends} wall-mount bracket kits")
+    # a rail post left standing next to a roof post: its surface base must clear the roof post's base plate
+    try:
+        surf = zone_surfaces(t.layout.zones, t.spec.geometry.height_in)
+        for r in [r_ for r_ in (t.spec.geometry.louvered_roofs or []) if built(r_)]:
+            q = resolve(r, surf)
+            half = q["plate"] * 12 / 2
+            for pt in q["posts"]:
+                cx, cy = pt["x"] * 12, pt["y"] * 12
+                for rp_ in rl.posts:
+                    if getattr(rp_, "roof", False):
+                        continue
+                    hb = rail_base_in(rl.system) / 2
+                    ox = (half + hb) - abs(rp_.x - cx)
+                    oy = (half + hb) - abs(rp_.y - cy)
+                    if ox > 0 and oy > 0:
+                        t.notes.append(f"louvered roof: the rail post at {ftin(rp_.x)}, {ftin(rp_.y)} ({rp_.kind}) sits {ftin(min(ox, oy))} into the roof post's "
+                                       f"{q['plate'] * 12:g}\" base plate at {ftin(cx)}, {ftin(cy)} — trim / notch the plate or move the post")
+    except Exception:            # a check, never a failure
+        pass
+
+
+def rail_base_in(system: str) -> float:
+    """The footprint of a surface-mount rail post's base (in): IRX's 3" post on its ~5" base; 2" posts ~4"."""
+    return 5.0 if "IRX" in (system or "") or "Impression" in (system or "") else 4.0
 
 
 # ================================================================== prices (sell = check / ACH)
