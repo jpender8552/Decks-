@@ -177,3 +177,47 @@ def test_engine_package_is_byte_identical():
         pytest.skip("no git")
     r = subprocess.run([git, "diff", "--quiet", "HEAD", "--", "decktakeoff", "tests"], cwd=MX.REPO)
     assert r.returncode == 0, "decktakeoff/ or tests/ differ from HEAD"
+
+
+# ---------------------------------------------------------------------------- the real job spec (authored from asbuilt.json)
+JOB = MX.SITE_DIR / "messner_spec.json"
+
+
+@pytest.fixture(scope="module")
+def messner(tmp_path_factory):
+    out = tmp_path_factory.mktemp("messner")
+    spec, ext = MX.load_job(JOB)
+    r = MX.render_permit_set([dict(spec=spec, title="Existing deck")], str(out), key="mx", name="149 Morning Sun Ave · Existing Deck — As Built", date_line="October 27, 2026")
+    page = Path(r["html"]).read_text()
+    sheets = dict((m.group(1), m.group(2)) for m in re.finditer(r'<div class="sheet-page" id="s-1-([A-Z]-\d+)"><h3>[^<]*</h3>(.*?</svg>)</div>', page, flags=re.S))
+    with MX.active(spec):
+        t, f, _ = decktakeoff.run(spec, with_pricing=False)
+        S = SC.build_scene(t.layout)
+    return spec, ext, t, S, sheets
+
+
+def test_messner_structure_from_the_as_built_model(messner):
+    spec, ext, t, S, sheets = messner
+    L = t.layout
+    assert [(z.name, z.W, z.D) for z in L.zones] == [("A", 546.0, 184.0), ("B", 69.0, 90.0)]
+    lines = sorted(L.beam_lines, key=lambda b: b.y)
+    assert [round(b.y) for b in lines] == [87, 172] and [b.n_posts for b in lines] == [7, 7] and all(b.size == "6x12" for b in lines)
+    st = L.stairs[0]
+    assert st.geo.risers == 16 and abs(st.geo.riser_in - 6.625) < 1e-6 and [fg.risers for fg in st.geo.flights] == [11, 5]
+    items = {ln.sku: ln for ln in t.lines if ln.sku}
+    assert items["DTT2Z"].net == 2 and len(L._mx_ties) == 2                     # one ledger run: one device near each end
+    assert items["H2.5A"].net == len(L.zones[0].frame.joist_x) + len(L.zones[0].frame.pf_x) + 2   # the outer beam only
+    assert len([b for b in S.boxes if b.kind == "brace"]) == 9 and all(b.rot_axis == "y" for b in S.boxes if b.kind == "brace")   # in the beam planes
+    assert [round(r) for r in L.zones[0].frame.blocking_rows_y] == [44, 87, 172]   # over both beams + the house-side bay's mid-span
+    assert not any("HUCQ" in ln.item for ln in t.lines)                            # single rims as built
+
+
+def test_messner_sheets_2025_numbering_and_verify(messner):
+    spec, ext, t, S, sheets = messner
+    assert {"G-001", "G-002", "G-003", "S-101", "A-301", "D-505"} <= set(sheets)
+    alltxt = " ".join(_txt(v) for v in sheets.values())
+    for k in ("CRC R321", "R324.4.4", "CWUIC 504.7.3", "R507.9.2", "2025 California Residential Code (CRC)", "(V)", "Field-verify (V)".upper()[:6]):
+        assert k in alltxt, k
+    for bad in ("R312.1", "R308.4.4", "R311.7.8", "2022 CRC", "ASCE 7-16", "GSX", "GS Exterior", "Fulton", "LedgerLOK", "Call 811"):
+        assert bad not in alltxt, bad
+    assert "FIELD-VERIFY (V)" in _txt(sheets["G-002"]) and "Footings" in _txt(sheets["G-001"]) and "Quik-Tube" in _txt(sheets["G-001"])

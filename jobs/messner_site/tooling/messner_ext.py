@@ -119,6 +119,18 @@ class Ext:
     wui_listing: str = ""
     brand: Any = None
     photos: List[dict] = field(default_factory=list)
+    code_edition: str = ""                      # "2025": the 2025 CRC / CWUIC section numbers (SECTIONS); "" -> the 2022 CRC (or the IRC)
+    verify: Any = field(default_factory=dict)   # field-verify items {key: what}: marked (V) where the sheets show them, listed on G-001 (VERIFY_KEYS)
+    joist_tie_lines: str = "all"                # where the hurricane ties are: "all" drop beams | "outer" (only the outermost beam line)
+    fascia_fastening: str = ""                  # the fascia bracket's fastening as built (over the maker's words)
+    stair_guard_in: Optional[float] = None      # the stair guard's height over the nosing line (None -> the deck guard's)
+    beam_notes: List[str] = field(default_factory=list)     # one line per beam, from the house out ("B1: the house-side joists hang from a header on it")
+    notes: List[dict] = field(default_factory=list)         # the general notes, [{"head", "items": [...]}] -> G-002 (+ G-003 ...)
+    site_plan: dict = field(default_factory=dict)           # {"json": siteplan.json (merged into site.plan), "svg": C-100.svg (the site plan sheet)}
+    knee_brace_layout: dict = field(default_factory=dict)   # the braces as built, by beam line from the house: {"inner": {"single": [post index, ...],
+                                                            #   "y": [...]}, "outer": {...}} — single: one brace toward mid-span, y: both ways along the
+                                                            #   beam; {} -> the engine's (both ways at every post). Braces stay in the beam's plane.
+    footing_words: str = ""                                 # S-100's footing description as built (over the engine's sizing words)
 
     @property
     def fascia(self) -> bool:
@@ -159,10 +171,25 @@ class Ext:
                     or self.knee_brace_size or self.knee_brace_bolts or self.fascia or self.glass or self.vertical)
 
 
-_FIELDS = {"railing": ("post_kind", "fascia_standoff_in", "infill", "glass_note", "stair_infill", "stair_handrail"),
-           "framing": ("joist_ties", "lateral_tie_model", "lateral_ties", "lateral_tie_positions_ft", "blocking_midspan", "knee_brace_size", "knee_brace_bolts"),
-           "extras": ("as_built", "as_built_note", "keep_connection_details"),
-           "site": ("codes", "design_criteria", "wui", "wui_listing", "as_built")}
+_FIELDS = {"railing": ("post_kind", "fascia_standoff_in", "infill", "glass_note", "stair_infill", "stair_handrail", "fascia_fastening", "stair_guard_in"),
+           "framing": ("joist_ties", "lateral_tie_model", "lateral_ties", "lateral_tie_positions_ft", "blocking_midspan", "knee_brace_size", "knee_brace_bolts",
+                       "joist_tie_lines", "beam_notes", "knee_brace_layout", "footing_words"),
+           "extras": ("as_built", "as_built_note", "keep_connection_details", "verify", "notes"),
+           "site": ("codes", "design_criteria", "wui", "wui_listing", "as_built", "code_edition", "site_plan")}
+
+# the code sections the sheets cite, by edition (2025: the 2025 CRC renumbered the guards, stairs, handrails, glazing and lighting
+# sections, and moved the wildfire rules to the 2025 CWUIC)
+SECTIONS = {
+    "2022": dict(code="2022 CRC", guard="R312.1", guard_where="R312.1.1", guard_height="R312.1.2", openings="R312.1.3", glazing="R308.4.4", glazing_mark="R308.1",
+                 stairs="R311.7", stair_width="R311.7.1", handrail="R311.7.8", stair_light="R303.7", wui="CRC R337", wui_deck="CRC R337.9", wui_flash="",
+                 footing_depth="R403.1.4", ledger="R507.9.1.3", ledger_flash="R507.2.4", asce="ASCE 7-16"),
+    "2025": dict(code="2025 CRC", guard="R321.1", guard_where="R321.1.1", guard_height="R321.1.2", openings="R321.1.3", glazing="R324.4.4", glazing_mark="R324.1",
+                 stairs="R318.7", stair_width="R318.7.1", handrail="R320", stair_light="R325.7", wui="CWUIC Ch. 5", wui_deck="CWUIC 504.7.3", wui_flash="CWUIC 504.7.3.1",
+                 footing_depth="R507.3.2", ledger="R507.9.1.3", ledger_flash="R507.9.1.5 / R703.4", asce="ASCE 7-22"),
+}
+# field-verify keys (extras.verify): where each is marked (V)
+VERIFY_KEYS = ("deck_edge", "height", "border_color", "ledger", "ledger_flashing", "beam_positions", "species", "splices", "post_stations", "post_lengths",
+               "post_caps", "knee_brace_bolts", "footings", "lateral_ties", "joist_ties", "guard_system", "guard_blocking", "glass_marks", "stair_landing", "stair_base")
 
 
 def _merge(a: dict, b: dict) -> dict:
@@ -185,6 +212,8 @@ def ext_from(merged: dict, base_dir: Optional[Path] = None) -> Ext:
     for k in ("brand", "photos"):
         if k in merged:
             kw[k] = merged[k]
+    if isinstance(kw.get("verify"), list):
+        kw["verify"] = {str(k): "" for k in kw["verify"]}
     ph = []
     for p in kw.get("photos") or []:
         p = dict(p)
@@ -205,6 +234,10 @@ def load_job(spec_path, extra_path=None, extra: Optional[dict] = None) -> Tuple[
     ex = json.load(open(extra_path)) if extra_path else (extra or {})
     merged = _merge(raw, ex)
     ext = ext_from(merged, Path(extra_path).resolve().parent if extra_path else spec_path.resolve().parent)
+    if isinstance(ext.notes, str):                               # the notes in a file of their own, beside the spec
+        nf = Path(ext.notes) if Path(ext.notes).is_absolute() else spec_path.resolve().parent / ext.notes
+        d = json.load(open(nf))
+        ext.notes = d.get("notes", []) if isinstance(d, dict) else d
     spec = DeckSpec.from_dict(merged)
     if ext.lateral_ties is not None or ext.tie_model != "DTT1Z":
         spec.framing.lateral_ties = ext.tie_count
@@ -212,6 +245,12 @@ def load_job(spec_path, extra_path=None, extra: Optional[dict] = None) -> Tuple[
         spec.site.wui_fire_zone = True
     if ext.fascia:
         spec.railing.post_kind = "fascia"
+    sp_json = Path(str((ext.site_plan or {}).get("json") or ""))
+    if str(sp_json) and sp_json.is_file():                       # the site-plan agent's plan frame: the engine's C-100 draws it
+        d = json.load(open(sp_json))
+        d = d.get("plan", d)
+        if isinstance(d, dict) and d.get("parcel"):
+            spec.site.plan = _merge(spec.site.plan or {}, d)
     spec._mx = ext
     return spec, ext
 
@@ -229,6 +268,24 @@ def _ca(spec, ext: Optional[Ext] = None) -> bool:
 
 def _code(spec) -> str:
     return "CRC" if _ca(spec) else "IRC"
+
+
+def _ed(spec) -> str:
+    ext = _ext(spec)
+    if ext and ext.code_edition:
+        return str(ext.code_edition)
+    return "2025" if any("2025" in c for c in ((ext.codes if ext else []) or [])) else "2022"
+
+
+def _sec(spec, key: str) -> str:
+    """A code section as this job cites it ("R321.1.2"); California only — the IRC keeps the engine's own."""
+    return SECTIONS.get(_ed(spec), SECTIONS["2022"]).get(key, "") if _ca(spec) else SECTIONS["2022"].get(key, "")
+
+
+def _v(key: str) -> str:
+    """ (V) when the job lists `key` among its field-verify items."""
+    ext = _CTX.get("ext")
+    return " (V)" if ext is not None and key in (ext.verify or {}) else ""
 
 
 # ============================================================================ the brand (PCG): brand.json + logos + the private line
@@ -318,6 +375,8 @@ def fascia_mount(spec) -> dict:
     d = dict(FASCIA_DEFAULT, **FASCIA_MOUNT.get(key, {}))
     if ext and ext.fascia_standoff_in is not None:
         d["standoff_in"] = float(ext.fascia_standoff_in)
+    if ext and ext.fascia_fastening:
+        d["rim_fastening"] = ext.fascia_fastening
     c = COLOR_CODE.get((spec.railing.color or "black").strip().lower(), "B")
     d["post_kit"] = d["post_kit"].replace("{c}", c)
     d["skus"] = {k: v.replace("{c}", c) for k, v in (d.get("skus") or {}).items()}
@@ -444,7 +503,10 @@ def _midspan_blocking(spec, L) -> None:
         fr = z.frame
         sups = sorted({jb if fr.ledger else fr.rim_plies * jb} | {b.cl_y for b in fr.beams})
         rows = list(fr.blocking_rows_y)
-        for a, b in zip(sups, sups[1:]):
+        spans = list(zip(sups, sups[1:]))
+        if str(_ext(spec).blocking_midspan).lower() == "house":    # only the house-side bay (ledger to the first beam)
+            spans = spans[:1]
+        for a, b in spans:
             m = round((a + b) / 2, 2)
             if b - a > 24 and not any(abs(r - m) < 6 for r in rows):
                 rows.append(m)
@@ -466,12 +528,19 @@ def tie_positions(spec, L) -> List[Tuple[float, float]]:
             out.append((x, z.wall_y))
         return out
     per_end = max(1, ext.tie_count // 2)
+    runs: List[list] = []
+    for z in zl:                                                  # adjacent ledgered zones on one wall line: one ledger run
+        if runs and abs(runs[-1][-1].wall_y - z.wall_y) < 0.5 and abs(runs[-1][-1].x0 + runs[-1][-1].W - z.x0) < 0.5:
+            runs[-1].append(z)
+        else:
+            runs.append([z])
     out = []
-    for z in zl:
-        js = sorted(z.frame.joist_x + z.frame.pf_x)
-        lo = [x for x in js if 0 < x <= 24.0][-per_end:] or [12.0]
-        hi = [x for x in js if 0 < z.W - x <= 24.0][:per_end] or [z.W - 12.0]
-        out += [(round(z.x0 + x, 2), z.wall_y) for x in lo + hi]
+    for run in runs:
+        js = sorted(x for z in run for x in (z.x0 + q for q in z.frame.joist_x + z.frame.pf_x))
+        a, b = run[0].x0, run[-1].x0 + run[-1].W
+        lo = [x for x in js if 0 < x - a <= 24.0][-per_end:] or [a + 12.0]
+        hi = [x for x in js if 0 < b - x <= 24.0][:per_end] or [b - 12.0]
+        out += [(round(x, 2), run[0].wall_y) for x in lo + hi]
     return out
 
 
@@ -513,14 +582,24 @@ def _mx_takeoff(t, spec, ext: Ext) -> None:
             d = CAT.PRICEBOOK["hardware"][ext.tie_model]
             ln.item, ln.unit_cost, ln.source, ln.sku = d["desc"] + " — lateral load connection", d["each"], d["source"], ext.tie_model
         if ln.sku in ("DTT1Z", "DTT2Z"):
+            if getattr(L, "_mx_ties", None):
+                ln.net = ln.order = len(L._mx_ties)                 # the devices where they are: per ledger run, not per zone
             n_dtt = ln.net
             ln.why = (f"exact  ({ext.tie_count} per ledger" + (" at the positions as built" if ext.lateral_tie_positions_ft else ", within 24\" of each end")
                       + f", through the ledger and band into a house floor joist — {_code(spec)} R507.9.2, {ext.tie_lb} lb each)")
+        if ln.sku == "H2.5AZ" and ext.joist_tie_lines == "outer":
+            yo = max(bl.y for bl in L.beam_lines if bl.kind == "drop")
+            n_o = sum(len(z.frame.joist_x) + len(z.frame.pf_x) + 2 for z in L.zones for bl in L.beam_lines
+                      if bl.kind == "drop" and abs(bl.y - yo) < 0.5 and z.name in bl.zones and any(abs(z.wall_y + b.cl_y - yo) < 0.5 for b in z.frame.beams))
+            ln.net = ln.order = n_o
+            ln.why = f"exact  ({n_o:g}: every joist and both rims at the outer beam; the inner beam's joists hang from a header)"
         if ln.sku == "H2.5AZ":
             n_tie = ln.net
             if ext.joist_ties and ext.joist_ties.upper() != "H2.5AZ":
                 ln.item, ln.sku, ln.source = ln.item.replace("H2.5AZ", ext.joist_ties), ext.joist_ties, ln.source + " (priced as the H2.5AZ)"
             ln.why = ln.why.replace("at each drop beam)", "at each drop beam — every joist-to-beam bearing)")
+            if ext.joist_tie_lines == "outer":
+                ln.why = ln.why.replace("— every joist-to-beam bearing", "")
         if ext.fascia and ln.category == "Rail" and "post kit" in ln.item:
             fm = fascia_mount(spec)
             pk = {k: sum(1 for p in L.rail.posts if p.kind == k) for k in ("CORNER", "END", "LINE")}
@@ -545,13 +624,27 @@ def _mx_takeoff(t, spec, ext: Ext) -> None:
             ln.item, ln.unit_cost, ln.source = ln.item.replace("4x4x", f"{ext.brace}x", 1), uc, src
         if ext.knee_brace_bolts and ln.category == "Hardware" and "— knee braces (" in ln.item:
             ln.category = "_drop"                               # the bolts as built go on one line below
+        if ext.as_built and spec.framing.rim_plies == 1 and ln.category == "Hardware" and "HUCQ" in ln.item:
+            ln.category = "_gone"                               # a single rim as built: no concealed-flange double hangers
+    t.lines = [ln for ln in t.lines if ln.category != "_gone"]
     if ext.knee_brace_bolts and any(ln.category == "_drop" for ln in t.lines):
         n_br = 2 * sum(bl.n_posts for bl in L.beam_lines)
+        if ext.knee_brace_layout:
+            n_br = sum(len(v.get("single") or []) + 2 * len(v.get("y") or []) for v in ext.knee_brace_layout.values())
         m = re.match(r"\((\d+)\)", ext.knee_brace_bolts.strip())
         nb = n_br * 2 * (int(m.group(1)) if m else 1)
+        if ext.knee_brace_layout:
+            sm_ = t.summary
+            if isinstance(sm_.get("posts"), str):
+                sm_["posts"] = re.sub(r"with \w+ knee braces", f"with {n_br} {ext.brace} knee braces in the beam planes", sm_["posts"])
+            t.schedule["Knee braces"] = (f"{n_br} {ext.brace} braces at 45° in the planes of the beams, " + "; ".join(
+                f"{k} row: " + ", ".join(x for x in ((f"single at posts {', '.join(str(i + 1) for i in v.get('single') or [])}" if v.get("single") else ""),
+                                                      (f"both ways at posts {', '.join(str(i + 1) for i in v.get('y') or [])}" if v.get("y") else "")) if x)
+                for k, v in ext.knee_brace_layout.items()) + f"; {ext.knee_brace_bolts}")
         uc, src = TK._item("hardware", "bolt_1/2x8")[1:]
         t.lines = [ln for ln in t.lines if ln.category != "_drop"]
-        t.lines.append(TK.Line("Hardware", f"Knee-brace bolts as built: {ext.knee_brace_bolts}", nb, nb + 2, "ea", f"+2  ({n_br} braces x 2 ends)", uc, src))
+        if m:                                                   # a bolt count as built: one line; unknown connections stay off the order
+            t.lines.append(TK.Line("Hardware", f"Knee-brace bolts as built: {ext.knee_brace_bolts}", nb, nb + 2, "ea", f"+2  ({n_br} braces x 2 ends)", uc, src))
     if ext.fascia and L.rail:
         n_blk = 2 * len(L.rail.posts)
         blen = L.frame.spacing - CAT.actual(jsize)[0]
@@ -575,12 +668,13 @@ def _mx_takeoff(t, spec, ext: Ext) -> None:
     if L.rail:
         sch["Rail"] = _rail_words(spec, L)
     if n_tie:
-        sch["Joist ties"] = f"{ext.joist_tie} at every joist-to-beam bearing: {n_tie:g} ties (every joist and both rims at each drop beam), the tie's nails in every hole"
+        sch["Joist ties"] = (f"{ext.joist_tie} at every joist-to-beam bearing on the outer beam: {n_tie:g} ties, the tie's nails in every hole" if ext.joist_tie_lines == "outer" else
+                             f"{ext.joist_tie} at every joist-to-beam bearing: {n_tie:g} ties (every joist and both rims at each drop beam), the tie's nails in every hole")
     if n_dtt:
         sch["Lateral"] = (f"{n_dtt:g} x {ext.tie_model}, {ext.tie_lb} lb each, " + ("at the positions as built" if ext.lateral_tie_positions_ft else "within 24\" of each end of the deck")
                           + f", through the ledger and band into a house floor joist ({_code(spec)} R507.9.2)")
     rows = sorted({r for z in L.zones for r in z.frame.blocking_rows_y})
-    sch["Blocking"] = (f"Solid {jsize} blocking rows at " + ", ".join(ftin(r) for r in rows) + " from the house (over each beam" + (", mid-span" if ext.blocking_midspan else "") + ")"
+    sch["Blocking"] = (f"Solid {jsize} blocking rows at " + ", ".join(ftin(r) for r in rows) + " from the house (over each beam" + ((", mid-span of the house-side bay" if str(ext.blocking_midspan).lower() == "house" else ", mid-span") if ext.blocking_midspan else "") + ")"
                        + ("; 2 blocks behind each fascia post" if ext.fascia else ""))
     if ext.as_built:
         _as_built_schedule(t, spec, ext)
@@ -701,8 +795,33 @@ def _mx_scene(S, L, ext: Ext) -> None:
     # ---- the stairs: vertical cable between a bottom rail and the top rail on the rake, posts at 70", a graspable handrail
     if ext.vertical or ext.stair_handrail != "none":
         _stair_guards(S, L, ext, zt, pw, h)
+    # ---- knee braces as built: only in the beam planes, at the posts the job names (framing.knee_brace_layout)
+    if ext.knee_brace_layout and spec.framing.knee_braces:
+        B[:] = [b for b in B if b.kind != "brace"]
+        kb_, kd_ = [v * IN for v in CAT.actual(ext.brace)]
+        lg = spec.framing.knee_leg_in * IN
+        Lb = lg * math.sqrt(2) + kd_
+        lines = sorted([bl for bl in L.beam_lines if bl.kind == "drop"], key=lambda q: q.y)
+        named = {"inner": lines[0] if lines else None, "outer": lines[-1] if lines else None}
+        for key, lay in ext.knee_brace_layout.items():
+            bl = named.get(key)
+            if bl is None:
+                continue
+            y, zb = bl.y * IN, (zt - bt - jd) - bl.depth * IN
+            xs = sorted(bl.posts_x)
+            mid = (bl.x0 + bl.x1) / 2
+            for kind_, idx in (("single", lay.get("single") or []), ("y", lay.get("y") or [])):
+                for i in idx:
+                    if not 0 <= i < len(xs):
+                        continue
+                    x = xs[i] * IN
+                    dirs = [1 if xs[i] < mid else -1] if kind_ == "single" else [1, -1]
+                    for sx in dirs:
+                        cx = x + sx * (CAT.actual(spec.framing.post_size)[0] * IN / 2 + lg / 2)
+                        B.append(Box("brace", cx - Lb / 2, cx + Lb / 2, y - kb_ / 2, y + kb_ / 2, zb - lg / 2 - kd_ / 2, zb - lg / 2 + kd_ / 2, "timber", 3,
+                                     tag=f"{ext.brace} knee brace (along the beam, as built)", rot=sx * math.pi / 4, rot_axis="y"))
     # ---- knee braces in the job's stock
-    if ext.brace != "4x4":
+    if ext.brace != "4x4" and not ext.knee_brace_layout:
         b_, d_ = [v * IN for v in CAT.actual(ext.brace)]
         for b in B:
             if b.kind == "brace" and "knee brace" in (b.tag or ""):
@@ -728,12 +847,23 @@ def _stair_guards(S, L, ext: Ext, zt: float, pw: float, h: float) -> None:
     hr = h
     treads = [b for b in B if b.kind == "tread"]
     tops = [b for b in B if b.kind == "toprail" and b.rot and b.rot_axis in ("x", "y") and "handrail" not in (b.tag or "")]
+    dz = ((ext.stair_guard_in or hr * 12) / 12.0 - hr)            # the stair guard's own height (railing.stair_guard_in) over the engine's
+    if abs(dz) > 1e-6:
+        for b in B:
+            if b in tops or (b.kind == "railpost" and (b.tag or "") == "stair post"):
+                b.z1 += dz
+                if b in tops:
+                    b.z0 += dz
+    first_side = {}
+    for tr in tops:                                               # one handrail per flight: the first rail of each flight's pair
+        k_ = (round(tr.rot, 3), tr.rot_axis, round((tr.y0 + tr.y1) / 2 if tr.rot_axis == "x" else (tr.x0 + tr.x1) / 2, 1))
+        first_side.setdefault(k_, tr)
     drop, new = set(), []
     for i_run, tr in enumerate(tops):
         ax, ac, half, z_top = _rake_fn(tr)
         vc = (tr.x0 + tr.x1) / 2 if ax == "x" else (tr.y0 + tr.y1) / 2       # the guard's line across the stair
         lo, hi = ac - half, ac + half                                           # the end posts' centres
-        z_tread = lambda a, z_top=z_top: z_top(a) - hr - 0.1                     # the tread line (the engine's top rail is hr + 0.1 over it)
+        z_tread = lambda a, z_top=z_top: z_top(a) - hr - dz - 0.1                # the tread line (the engine's top rail is hr + 0.1 over it)
         along = lambda b: ((b.y0 + b.y1) / 2) if ax == "x" else ((b.x0 + b.x1) / 2)
         across = lambda b: ((b.x0 + b.x1) / 2) if ax == "x" else ((b.y0 + b.y1) / 2)
         mk = (lambda kind, a0, a1, c0, c1, z0, z1, mat, tag="", rot=0.0: Box(kind, c0, c1, a0, a1, z0, z1, mat, 7, tag=tag, rot=rot, rot_axis="x")) if ax == "x" else \
@@ -756,7 +886,8 @@ def _stair_guards(S, L, ext: Ext, zt: float, pw: float, h: float) -> None:
                 if all(abs(a - pa) > pw / 2 + 0.01 for pa in posts_a):
                     new.append(mk("cable", a - 0.008, a + 0.008, vc - 0.008, vc + 0.008, zb(a) + 0.04, z_top(a) - 0.05, "cable", "vertical stair cable"))
                 a += pitch
-        if ext.stair_handrail != "none" and (ext.stair_handrail == "both" or i_run == 0):
+        k_ = (round(tr.rot, 3), tr.rot_axis, round(ac, 1))
+        if ext.stair_handrail != "none" and (ext.stair_handrail == "both" or first_side.get(k_) is tr):
             near = [t_ for t_ in treads if lo - 0.5 <= along(t_) <= hi + 0.5]
             if near:
                 mid = sum(across(t_) for t_ in near) / len(near)
@@ -859,6 +990,7 @@ _AS_BUILT_WORDS = [
     (r", plies laminated \(RSS screws 2 rows @ 12\"\)", ""), (r"GRK RSS 3-1/8\"", "structural screws"), (r", joist tape\b", ""),
     (r"\bthe owner's choice\b", "as built"), (r"House shown for context only \(the deck work only\)\.", "House shown for context only."), (r"\bDesign intent\b", "As built"),
     (r"\bdesign intent\b", "as built"), (r"; every member in the model — the cut list is on T-600", "; every member as built"),
+    (r"\s*Call 811(?: first| before drilling)?\.", ""),
 ]
 
 
@@ -869,8 +1001,14 @@ def _words(s: str) -> str:
     if not s or ext is None:
         return s
     if _ca(spec):
-        s = re.sub(r"\b2021 IRC\b", "2022 CRC", s)
+        s = re.sub(r"\b2021 IRC\b", SECTIONS[_ed(spec)]["code"], s)
+        s = re.sub(r"\b2022 CRC\b", SECTIONS[_ed(spec)]["code"], s)
         s = re.sub(r"\bIRC\b", "CRC", s)
+        if _ed(spec) == "2025":                                 # the 2025 CRC's numbers for the engine's 2021 IRC sections
+            for pat, rep_ in ((r"\bR312\.1\.2\b", "R321.1.2"), (r"\bR312\.1\.3\b", "R321.1.3"), (r"\bR312\.1\.1\b", "R321.1.1"), (r"\bR312(?:\.1)?\b", "R321.1"),
+                              (r"\bR311\.7\.8(?:\.\d+)?\b", "R320"), (r"\bR311\.7", "R318.7"), (r"\bR308\.4\.4\b", "R324.4.4"), (r"\bR308\.1\b", "R324.1"),
+                              (r"\bR303\.7\b", "R325.7"), (r"\bR403\.1\.4\b", "R507.3.2"), (r"CRC R337(?:\.\d+)*", "CWUIC 504.7.3"), (r"\bASCE 7-16\b", "ASCE 7-22")):
+                s = re.sub(pat, rep_, s)
         s = s.replace("IWUIC", "CRC R337").replace("a Colorado PE", "a California-licensed engineer").replace("Colorado PE", "California-licensed engineer")
         s = re.sub(r"Guard 36\" min above the deck; openings under 4\" \(CRC R312\)\.?", f"Guard {spec.railing.height_in:g}\" (CRC R312.1.2: 42\" min.); openings reject a 4\" sphere (R312.1.3)", s)
     if ext.as_built:
@@ -899,7 +1037,10 @@ def _wrap_member_key(orig):
         out = []
         for lab, pred, where, pick in ks:
             if "knee brace at 45" in lab:
-                lab = f"{ext.brace} knee brace at 45°, both directions, " + (ext.knee_brace_bolts or "through-bolted each end")
+                lab = (f"{ext.brace} knee brace at 45°, " + ("in the planes of the beams" if ext.knee_brace_layout else "both directions") + ", "
+                       + (ext.knee_brace_bolts or "through-bolted each end") + _v("knee_brace_bolts"))
+            elif ext.as_built and ext.footing_words and pred(Box("post", 0, 1, 0, 1, 0, 1, "timber")) and " post on " in lab:
+                lab = lab.split(" post on ")[0] + " post on its existing cast-in base" + _v("footings")
             elif lab.startswith("Double ") and "rim" in lab and ext.as_built:
                 lab = lab.split(",")[0]
             elif pred(Box("toprail", 0, 1, 0, 1, 0, 1, "railmetal")) and L.rail:
@@ -940,6 +1081,15 @@ def _wrap_all_sheets(orig):
         photos = photo_sheets(ext.photos, meta)
         at = next((i for i, x in enumerate(out) if x[0].startswith("D-")), len(out))
         out = out[:at] + photos + out[at:]
+        notes = notes_sheets(ext.notes, meta)
+        if notes:                                                # the job's own general notes replace the engine's G-002
+            out = [out[0]] + notes + [x for x in out[1:] if x[0] != "G-002"]
+        svg_c = Path(str((ext.site_plan or {}).get("svg") or ""))
+        if str(svg_c) and svg_c.is_file():                       # a finished site plan (the site-plan agent's C-100.svg) as the C-100 sheet
+            c100 = ("C-100", "Site plan", site_plan_sheet(svg_c, meta))
+            out = [x for x in out if x[0] != "C-100"]
+            at = next((i for i, x in enumerate(out) if not x[0].startswith("G-")), len(out))
+            out = out[:at] + [c100] + out[at:]
         if ext.callouts:
             out.append(("D-505", "Connection details — guard, ties, bracing", sheet_d505(L, _CTX["S"], t, meta)))
         index = [(n_, ttl) for n_, ttl, _ in out]
@@ -959,23 +1109,23 @@ def _criteria(spec, ext: Ext, L, t) -> List[Tuple[str, str]]:
     site = spec.site
     live, dead, guard = g("live_psf", 40), g("dead_psf", 10), g("guard_lb", 200)
     snow = g("snow_psf", site.ground_snow_psf)
-    rows = [("Live load", f"{live:g} psf uniform, deck ({code} Table R301.5)"), ("Dead load", f"{dead:g} psf, deck framing and decking"),
+    rows = [("Live load", f"{live:g} psf uniform, deck ({code} Table R301.5)"), ("Dead load", f"{g('dead_psf_text', str(dead) + ' psf, deck framing and decking')}"),
             ("Guard load", f"{guard:g} lb concentrated at the top in any direction; infill 50 lb on 1 SF ({code} Table R301.5, footnote)"),
             ("Ground snow", f"{snow:g} psf" + (" — none at this site; the 40 psf live load governs" if not snow else "")),
-            ("Wind", f"{g('wind_vult_mph', site.wind_speed_mph):g} mph Vult, Exposure {g('wind_exposure', 'C')}, Risk Category {g('risk_category', 'II')} (ASCE 7-16)"),
+            ("Wind", g("wind_text") or f"{g('wind_vult_mph', site.wind_speed_mph):g} mph Vult, Exposure {g('wind_exposure', 'C')}, Risk Category {g('risk_category', 'II')} ({g('asce', _sec(spec, 'asce') or 'ASCE 7-16')})"),
             ("Seismic", "SDC " + str(g("seismic_sdc", site.seismic_design_category)) + "".join(f" · {lab} {g(k)}" for k, lab in (("ss", "Ss"), ("s1", "S1"), ("sds", "SDS"), ("sd1", "SD1"), ("site_class", "Site Class")) if g(k) is not None)
-             + f" · Risk Category {g('risk_category', 'II')} (ASCE 7-16)"),
-            ("Footing depth", f"{g('footing_min_in', g('frost_in', site.frost_depth_in)):g}\" min. below undisturbed grade ({code} R403.1.4)" + (" — no frost line at this site" if _ca(spec) else "")),
+             + f" · Risk Category {g('risk_category', 'II')} ({g('asce', _sec(spec, 'asce') or 'ASCE 7-16')})"),
+            ("Footing depth", f"{g('footing_min_in', g('frost_in', site.frost_depth_in)):g}\" min. below undisturbed grade, on firm native soil ({code} {_sec(spec, 'footing_depth') or 'R403.1.4'})" + _v("footings")),
             ("Soil bearing", f"{g('soil_psf', site.soil_bearing_psf):,.0f} psf presumptive ({code} Table R401.4.1) — no soils report"),
             ("Design total", f"{live + dead:g} psf on the deck")]
     if ext.wui:
-        rows.append(("Wildfire", f"Wildland-Urban Interface fire area: {code} R337 — decking per R337.9, the guard noncombustible aluminum (see the WUI notes)"))
+        rows.append(("Wildfire", f"Wildland-Urban Interface fire area: {_sec(spec, 'wui') or code + ' R337'} — walking surfaces per {_sec(spec, 'wui_deck') or 'R337.9'}, the guard aluminum and glass (see the WUI notes)"))
     rows.append(("Engineering", "Stamped structural design by a California-licensed engineer governs" if spec.extras.engineered and _ca(spec)
                  else "Stamped structural design governs" if spec.extras.engineered else f"Prescriptive — the members as built checked against {code} R507"))
     key = lambda k: str(k).split(" (")[0].strip().lower()
     for k, v in dc.items():                                    # any other value is a row of its own
         if k not in ("live_psf", "dead_psf", "guard_lb", "snow_psf", "wind_vult_mph", "wind_exposure", "risk_category", "seismic_sdc", "ss", "s1", "sds", "sd1",
-                     "site_class", "footing_min_in", "frost_in", "soil_psf"):
+                     "site_class", "footing_min_in", "frost_in", "soil_psf", "dead_psf_text", "asce", "wind_text"):
             rows.append((str(k).replace("_", " ").capitalize(), str(v)))
     for lab, txt in (ext.design_criteria if isinstance(ext.design_criteria, list) else []):
         hit = next((i for i, (k_, _) in enumerate(rows) if key(k_) == key(lab)), None)
@@ -997,7 +1147,7 @@ def _codes(spec, ext: Ext) -> List[str]:
 def _structure(spec, ext: Ext, L, t) -> List[Tuple[str, str]]:
     sm, sch = t.summary, t.schedule
     bls = L.beam_lines or []
-    rows = [("Footings", sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]),
+    rows = [("Footings", ext.footing_words or sm["posts"].split(" on ")[-1]), ("Posts", sm["posts"].split(" on ")[0]),
             ("Beams", "; ".join(f"{b.label} — {b.n_posts} posts" for b in bls) if bls else "none"), ("Joists", sm["joists"]), ("Rims", sm["rims"]),
             ("Ledger", sch.get("Ledger", "—"))]
     for k in ("Joist ties", "Lateral", "Blocking", "Knee braces"):
@@ -1050,12 +1200,20 @@ def sheet_g001(L, S, t, meta, index) -> str:
     if ext.wui:
         code = _code(s)
         dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
-        rows_w = [f"The site is in a Wildland-Urban Interface fire area: {code} R337 applies to the deck as built.",
-                  f"Decking ({code} R337.9): {dk} — " + (ext.wui_listing or "its ignition-resistant listing as recorded (SFM 12-7A-4 / ASTM E2632); submit the listing"),
+        w_all, w_deck = _sec(s, "wui") or f"{code} R337", _sec(s, "wui_deck") or f"{code} R337.9"
+        rows_w = [f"The site is in a Wildland-Urban Interface fire area: {w_all} applies to the deck as built.",
+                  f"Walking surfaces ({w_deck}): {dk} — " + (ext.wui_listing or "its ignition-resistant listing as recorded (SFM 12-7A-4 / ASTM E2632); submit the listing")]
+        if _sec(s, "wui_flash"):
+            rows_w.append(f"Deck-to-wall flashing: 6\" min. metal flashing applied vertically on the wall at every deck-to-wall line ({_sec(s, 'wui_flash')})" + _v("ledger_flashing"))
+        rows_w += [
                   f"Guard: {fascia_mount(s)['name'] or CAT.rail_name(s.railing.system)} — noncombustible aluminum posts and rails"
                   + (", tempered glass infill" if ext.glass else "") + (", stainless cable on the stairs" if ext.vertical else ""),
                   "The deck's framing, fascia and the area below kept clear of combustible storage and debris."]
         right.append(("WILDFIRE (WUI) NOTES", [("", textwrap.wrap(x, wrapR)) for x in rows_w]))
+    if ext.verify:
+        right.append(("FIELD-VERIFY (V)", [("", textwrap.wrap("(V) marks a value taken from the photos, sketches or the 2018 design: the owner verifies it in the field before "
+                                                              f"the final submittal. The {len(ext.verify)} items are listed first on " + ("G-002." if ext.notes else "this sheet."), wrapR))]
+                      + ([] if ext.notes else [("", textwrap.wrap(f"{k.replace('_', ' ')}: {v}" if v else k.replace('_', ' '), wrapR)) for k, v in ext.verify.items()])))
     o = []
     fsl, lhl = _blocks_fit(left, 8, 606)
     _draw_blocks(o, left, 24, 8, fsl, lhl, accent=br["accent_b"])
@@ -1085,7 +1243,8 @@ def _hook_s101(body: List[str]) -> List[str]:
         fr = z.frame
         rim_t = fr.rim_plies * jb
         xs = [z.x0 + x for x in fr.joist_x + fr.pf_x] + [z.x0 + rim_t / 2, z.x0 + z.W - rim_t / 2]
-        for b in [b for b in fr.beams if b.kind == "drop"]:
+        yo = max((z_.wall_y + b_.cl_y for z_ in L.zones for b_ in z_.frame.beams if b_.kind == "drop"), default=0)
+        for b in [b for b in fr.beams if b.kind == "drop" and (ext.joist_tie_lines != "outer" or abs(z.wall_y + b.cl_y - yo) < 0.5)]:
             yy = Y((z.wall_y + b.cl_y) * IN)
             for x in xs:
                 xx = X(x * IN)
@@ -1121,17 +1280,19 @@ def _hook_s101(body: List[str]) -> List[str]:
                 o.append(PGN([(X(a * IN), Y(b_ * IN)) for a, b_ in pts], br["accent_b"], "none", 0))
     # the legend, in the plan window's emptiest corner
     n_tie = next((ln.net for ln in t.lines if ln.sku in ("H2.5A", "H2.5AZ", ext.joist_tie)), n_h)
-    items = [("tri", f"{ext.joist_tie} at every joist-to-beam bearing — {n_tie:g} ties (D-505 / 3)")] if n_h else []
+    items = [("tri", f"{ext.joist_tie} at every joist-to-beam bearing{' on the outer beam' if ext.joist_tie_lines == 'outer' else ''} — {n_tie:g} ties{_v('joist_ties')} (D-505 / 3)")] if n_h else []
     if ties:
-        items.append(("sq", f"{ext.tie_model} lateral-load device at the ledger — {len(ties)} x {ext.tie_lb} lb ({_code(s)} R507.9.2; D-505 / 4)"))
+        items.append(("sq", f"{ext.tie_model} lateral-load device at the ledger — {len(ties)} x {ext.tie_lb} lb{_v('lateral_ties')} ({_code(s)} R507.9.2; D-505 / 4)"))
     if any(z.frame.blocking_rows_y for z in L.zones):
-        items.append(("line", "Solid blocking rows: one over every beam" + (", one at mid-span of every span" if ext.blocking_midspan else "")))
+        items.append(("line", "Solid blocking rows: one over every beam" + ((", one at mid-span of the house-side bay" if str(ext.blocking_midspan).lower() == "house" else ", one at mid-span of every span") if ext.blocking_midspan else "")))
     if ext.fascia and L.rail:
-        items.append(("post", f"Fascia-mounted guard post ({len(L.rail.posts)}), solid 2x blocking behind each (D-505 / 1-2)"))
+        items.append(("post", f"Fascia-mounted guard post ({len(L.rail.posts)}), solid 2x blocking behind each{_v('guard_blocking')} (D-505 / 1-2)"))
     if s.framing.knee_braces:
-        items.append(("brace", f"{ext.brace} knee braces both ways at every beam post (D-505 / 5)"))
+        items.append(("brace", f"{ext.brace} knee braces both ways at every beam post{_v('knee_brace_bolts')} (D-505 / 5)"))
+    for bn in ext.beam_notes:
+        items.append(("note", bn))
     if items:
-        wl, hl = 352, 16 + 12 * len(items)
+        wl, hl = 380, 16 + 12 * len(items)
         occ = [(X(b.x0), Y(b.y0), X(b.x1), Y(b.y1)) for b in S.boxes if b.kind in ("tread", "riser", "board", "border", "fascia", "rim", "joist", "house", "footing", "post") and b.layer != "site"]
         def free(x_, y_):
             return not any(x_ < q[2] + 4 and q[0] - 4 < x_ + wl and y_ < q[3] + 4 and q[1] - 4 < y_ + hl for q in occ)
@@ -1149,9 +1310,11 @@ def _hook_s101(body: List[str]) -> List[str]:
                 o.append(R(lx + 8, yy - 4, 10, 3, BLUE, "none", 0))
             elif sym == "post":
                 o.append(R(lx + 10, yy - 6, 6, 6, "#ffffff", INK, 0.8)); o.append(R(lx + 18, yy - 4.5, 7, 3, br["accent_b"], "none", 0))
+            elif sym == "note":
+                o.append(T(lx + 13, yy, "·", 9, 900, "middle"))
             else:
                 o.append(LN(lx + 9, yy, lx + 17, yy - 6, FILL_DK, 2))
-            o.append(T(lx + 30, yy, txt, 6.6, 600))
+            o.append(T(lx + 30, yy, textwrap.shorten(txt, 92, placeholder="…"), 6.6, 600))
     return body + o
 
 
@@ -1196,19 +1359,24 @@ def _hook_a301(body: List[str]) -> List[str]:
             o.append(R(Yv(b.y0), Z(b.z1), max(1.2, (b.y1 - b.y0) * sc), (b.z1 - b.z0) * sc, "#a9c6da" if b.kind == "glasspanel" else DW.FILL["railmetal"], INK, 0.3))
     targets = []
     bl_drop = [b for b in deep.frame.beams if b.kind == "drop"]
-    for b in bl_drop[:1]:
-        targets.append(((Yv((deep.wall_y + b.cl_y) * IN), Z(jbot) - 1), f"{ext.joist_tie} each joist to the beam ({_count(t, ext.joist_tie)}; D-505 / 3)"))
+    bl_t = bl_drop[-1:] if ext.joist_tie_lines == "outer" else bl_drop[:1]
+    for b in bl_t:
+        targets.append(((Yv((deep.wall_y + b.cl_y) * IN), Z(jbot) - 1), f"{ext.joist_tie} each joist to the {'outer ' if ext.joist_tie_lines == 'outer' else ''}beam ({_count(t, ext.joist_tie)}{_v('joist_ties')}; D-505 / 3)"))
         targets.append(((Yv((deep.wall_y + b.cl_y) * IN) + 6, Z(jbot + jd / 2)), "Solid blocking row over the beam"))
+    for i_b, (b, bn) in enumerate(zip(sorted(bl_drop, key=lambda q: q.cl_y), ext.beam_notes)):
+        if bl_t and b is bl_t[0]:
+            continue
+        targets.append(((Yv((deep.wall_y + b.cl_y) * IN) - 4, Z(jbot - b.depth * IN / 2)), bn + _v("beam_positions")))
     if s.framing.knee_braces:
         targets.append(((Yv((deep.wall_y + bl_drop[0].cl_y) * IN - 1.2) if bl_drop else Yv(deep.wall_y * IN + 3), Z(jbot - 1.0)),
-                        f"{ext.brace} knee brace, " + (ext.knee_brace_bolts or "through-bolted each end") + " (D-505 / 5)"))
+                        f"{ext.brace} knee brace, " + (ext.knee_brace_bolts or "through-bolted each end") + _v("knee_brace_bolts") + " (D-505 / 5)"))
     if getattr(L, "_mx_ties", None):
-        targets.append(((Yv(deep.wall_y * IN + 0.15), Z(jbot + jd / 2)), f"Ledger; {ext.tie_model} lateral devices, {_code(s)} R507.9.2 (D-505 / 4)"))
+        targets.append(((Yv(deep.wall_y * IN + 0.15), Z(jbot + jd / 2)), f"Ledger{_v('ledger')}; {ext.tie_model} lateral devices{_v('lateral_ties')}, {_code(s)} R507.9.2 (D-505 / 4)"))
     if ext.fascia and L.rail:
         yf = S.y_front + fascia_offset_in(s) * IN
-        targets.append(((Yv(yf), Z(jbot + 0.3)), "Fascia-mounted guard post on its bracket, solid blocking behind (D-505 / 1)"))
+        targets.append(((Yv(yf), Z(jbot + 0.3)), f"Fascia-mounted guard post on its bracket{_v('guard_system')}, solid blocking behind{_v('guard_blocking')} (D-505 / 1)"))
     if ext.glass:
-        targets.append(((Yv(S.y_front + fascia_offset_in(s) * IN if ext.fascia else S.y_front), Z(zt + 1.6)), f"Tempered safety-glass infill ({_code(s)} R308.4.4)"))
+        targets.append(((Yv(S.y_front + fascia_offset_in(s) * IN if ext.fascia else S.y_front), Z(zt + 1.6)), f"Tempered safety-glass infill ({_code(s)} R308.4.4){_v('glass_marks')}"))
     # the words in a column under the deck, clear of the brace; each leader from the end of its first line to the member
     lx, ly = Yv(deep.wall_y * IN + 0.45), Z(zt - (L.frame.post_len * IN) * 0.42 - 1.2)
     for i, ((tx, ty), txt) in enumerate(targets):
@@ -1339,8 +1507,8 @@ def _fascia_post_drawing(o, x, y, w, h, small=False) -> None:
               "its foot flush with the bracket's at the rim's bottom edge", rc)
     _lab(o, xo + fas + sto / 2, rt + jd * k * 0.5, tx, max(yy + 8, yd - 18), f"{fm['bracket'].split(' (')[0].capitalize()}; {fm['post_screws']}", rc)
     bc = int((w - 28) / (6.3 * 0.53))
-    yy = _lab(o, xo + fas + 1, rt + jd * k * 0.3, x + 14, rb + 12, fm["rim_fastening"].capitalize() + ".", bc) + 3
-    yy = _lab(o, xo - ply * 3, rt + jd * k * 0.8, x + 14, yy, f"(2) {s.framing.joist_size} solid blocks between the joists behind every post, tight to the rim, nailed to the joists.", bc) + 3
+    yy = _lab(o, xo + fas + 1, rt + jd * k * 0.3, x + 14, rb + 12, fm["rim_fastening"][:1].upper() + fm["rim_fastening"][1:] + _v("guard_system") + ".", bc) + 3
+    yy = _lab(o, xo - ply * 3, rt + jd * k * 0.8, x + 14, yy, f"(2) {s.framing.joist_size} solid blocks between the joists behind every post, tight to the rim, nailed to the joists{_v('guard_blocking')}.", bc) + 3
     _lab(o, x + 40, rt + jd * k * 0.5, x + 14, yy, f"Joist to rim: Simpson {hang} face-mount hanger at every joist; the rim plies fastened together.", bc)
 
 
@@ -1392,8 +1560,9 @@ def sheet_d505(L, S, t, meta) -> str:
     for yy in (146,):
         o.append(C(x + 156, y + yy, 1.3, INK, "none", 0)); o.append(C(x + 164, y + yy, 1.3, INK, "none", 0))
     n_t = next((ln.net for ln in t.lines if ln.sku in (ext.joist_tie, "H2.5AZ", "H2.5A")), 0)
-    DW._lead(o, x + 160, y + 112, x + 190, y + 60, f"Simpson {ext.joist_tie} hurricane tie, joist to beam, the nails Simpson lists in every hole")
-    DW._lead(o, x + 80, y + 160, x + 24, y + 236, f"{n_t:g} ties: every joist and both rims at each drop beam" + (f" ({len([b for b in L.beam_lines if b.kind == 'drop'])} beams)" if L.beam_lines else ""))
+    DW._lead(o, x + 160, y + 112, x + 190, y + 60, f"Simpson {ext.joist_tie} hurricane tie, joist to beam, the nails Simpson lists in every hole{_v('joist_ties')}")
+    DW._lead(o, x + 80, y + 160, x + 24, y + 236, (f"{n_t:g} ties: every joist and both rims at the outer beam; the inner beam's joists hang from a header" if ext.joist_tie_lines == "outer" else
+                                                   f"{n_t:g} ties: every joist and both rims at each drop beam" + (f" ({len([b for b in L.beam_lines if b.kind == 'drop'])} beams)" if L.beam_lines else "")))
     DW._lead(o, x + 250, y + 110, x + 220, y + 236, "Solid blocking row over the beam between the joists")
     # 4 lateral load, plan
     x, y = P[3]; DW._panel(o, x, y, W3, H2, "4", f"LATERAL LOAD — {ext.tie_model} ({code} R507.9.2)")
@@ -1410,7 +1579,7 @@ def sheet_d505(L, S, t, meta) -> str:
     DW.dim_h(o, lambda v: v, y + 200, ends[-1] + 2.5, x + W3 - 20, "24\" max.", 6.2, up=False)
     yy = _lab(o, ends[0] + 2.5, y + 143, x + 14, y + 222,
               f"({ext.tie_count}) Simpson {ext.tie_model}, {ext.tie_lb} lb each, within 24\" of each end of the deck: one on a deck joist with the screws the device "
-              f"calls for, a 1/2\" threaded rod through the ledger and the band to a second device on a house floor joist", 84)
+              f"calls for, a 1/2\" threaded rod through the ledger and the band to a second device on a house floor joist{_v('lateral_ties')}", 84)
     _lab(o, x + 160, y + 103, x + 14, yy + 4, f"{s.ledger_size} ledger to the house band ({code} R507.9.1); the devices are in addition to the ledger fasteners", 84)
     # 5 knee brace
     x, y = P[4]; DW._panel(o, x, y, W3, H2, "5", f"KNEE BRACE — {ext.brace}, BOTH DIRECTIONS")
@@ -1427,7 +1596,7 @@ def sheet_d505(L, S, t, meta) -> str:
         if two:
             DW._bolt(o, bx_ + (6 if bx_ > x + 150 else -6), by_ - 6)
     DW.dim_h(o, lambda v: v, y + 274, x + 170, x + 252, f"{ftin(s.framing.knee_leg_in)} leg", 6.2, up=False)
-    _lab(o, x + 214, y + 126, x + 184, y + 192, f"{ext.brace} brace at 45°, " + (ext.knee_brace_bolts or "(1) 1/2\" through-bolt each end") + ", 2\" min. edge distance", 32)
+    _lab(o, x + 214, y + 126, x + 184, y + 192, f"{ext.brace} brace at 45°, " + (ext.knee_brace_bolts or "(1) 1/2\" through-bolt each end") + ", 2\" min. edge distance" + _v("knee_brace_bolts"), 32)
     _lab(o, x + 92, y + 126, x + 16, y + 192, f"The same toward the house at every post, up to a {jsz} block between two joists", 30)
     # 6 the stair guard
     x, y = P[5]
@@ -1563,7 +1732,100 @@ def photo_sheets(photos: List[dict], meta: dict) -> List[Tuple[str, str, str]]:
     return out
 
 
-HOOKS = {"S-101": _hook_s101, "A-301": _hook_a301, "A-201": _hook_a201, "D-501": _hook_d501}
+def _hook_s100(body: List[str]) -> List[str]:
+    """The footing schedule's estimates marked: post stations, lengths and the footings themselves as the job lists them (V); the
+    engine's footing sizing words give way to the footings as built (framing.footing_words)."""
+    ext = _CTX["ext"]
+    if ext.footing_words:
+        i_id = next((i for i, x in enumerate(body) if '>ID<' in x and x.startswith('<text x="710.0"')), None)
+        if i_id is not None:
+            desc = [i for i, x in enumerate(body[:i_id]) if x.startswith('<text x="710.0"') and 'font-size="8"' in x]
+            if desc:
+                y0 = float(re.search(r'y="([\d.]+)"', body[desc[0]]).group(1))
+                n_l = len(desc)
+                ws = textwrap.wrap(ext.footing_words, 58)
+                fs_ = 8.0 if len(ws) <= n_l else max(6.0, 8.0 * n_l / len(ws))
+                ws = textwrap.wrap(ext.footing_words, int(58 * 8.0 / fs_))[:max(n_l, int(n_l * 11 / (fs_ * 1.25)))]
+                new = [T(710, y0 + j * fs_ * 1.25, ln, round(fs_, 1), 500) for j, ln in enumerate(ws)]
+                body = [x for i, x in enumerate(body) if i not in desc]
+                at = desc[0]
+                body = body[:at] + new + body[at:]
+    keys = [k for k in ("post_stations", "post_lengths", "footings") if k in (ext.verify or {})]
+    if not keys:
+        return body
+    txt = ("(V) " + "; ".join({"post_stations": "post stations estimated from the photos and the owner's sketch",
+                               "post_lengths": "post lengths ~9' inner / ~11' outer",
+                               "footings": "footing size and depth not seen"}[k] for k in keys) + " — field-verify")
+    o = [T(710, 560 + 9 * j, ln, 6.8, 700, fill="#b3261e") for j, ln in enumerate(textwrap.wrap(txt, 58)[:4])]
+    return body + o
+
+
+# ---------------------------------------------------------------------------- G-002..: the job's general notes, paginated
+def notes_sheets(notes: List[dict], meta: dict) -> List[Tuple[str, str, str]]:
+    """The general notes as the job writes them ([{"head", "items"}], an item "- ..." a bullet under the one before): numbered per
+    section, three columns a sheet, as many sheets as they take (G-002, G-003, ...); the field-verify (V) list goes first."""
+    if not notes:
+        return []
+    ext = _CTX.get("ext")
+    if ext is not None and ext.verify:
+        notes = [{"head": "Field-verify (V)", "items": ["(V) on these sheets marks a value taken from the owner's sketches, the site photos or the 2018 design. "
+                                                        "The owner verifies each one in the field and reports any difference before the final submittal:"]
+                  + [f"- {k.replace('_', ' ').capitalize()}: {v}" if v else f"- {k.replace('_', ' ').capitalize()}" for k, v in ext.verify.items()]}] + list(notes)
+    fs, lh, cw = 6.9, 8.6, 82
+    cols, y0, y_max = (20, 348, 676), 12, 604
+    blocks = []                                                   # (lines [(indent, text, bold, color)], keep-with-next)
+    br = _CTX["brand"]
+    for sec in notes:
+        blocks.append(([(0, str(sec.get("head", "")).upper(), True, br["accent_b"])], True))
+        n = 0
+        for it in sec.get("items") or []:
+            it = str(it)
+            if it.startswith("- "):
+                ls = textwrap.wrap(it[2:], cw - 8)
+                blocks.append(([(14, ("· " if i == 0 else "  ") + ln, False, INK) for i, ln in enumerate(ls)], False))
+            else:
+                n += 1
+                ls = textwrap.wrap(it, cw - 4)
+                blocks.append(([(0, f"{n}.", True, br["accent_b"])] + [(10, ln, False, INK) for ln in ls], False))
+    pages, cur, ci, y = [], [], 0, y0
+    for k, (lines, keep) in enumerate(blocks):
+        h = lh * (len(lines) - (1 if lines[0][1][-1:] == "." and lines[0][0] == 0 and len(lines) > 1 else 0)) + (6 if keep else 2)
+        nxt = lh * len(blocks[k + 1][0]) if keep and k + 1 < len(blocks) else 0
+        if y + h + nxt > y_max:
+            ci += 1; y = y0
+            if ci == len(cols):
+                pages.append(cur); cur, ci = [], 0
+        x = cols[ci]
+        if lines[0][1][-1:] == "." and lines[0][0] == 0 and len(lines) > 1 and lines[0][2]:     # a number and its text on one line
+            cur.append(T(x, y, lines[0][1], fs, 800, fill=lines[0][3]))
+            for j, (ind, ln, b, c) in enumerate(lines[1:]):
+                cur.append(T(x + 13, y + j * lh, ln, fs, 700 if b else 400, fill=c))
+            y += lh * (len(lines) - 1) + 2
+        else:
+            for j, (ind, ln, b, c) in enumerate(lines):
+                cur.append(T(x + ind, y + j * lh, ln, fs + (1.2 if keep else 0), 800 if b else 400, fill=c))
+            y += lh * len(lines) + (6 if keep else 2)
+    if cur:
+        pages.append(cur)
+    out = []
+    for i, o in enumerate(pages):
+        num = f"G-{2 + i:03d}"
+        ttl = "General notes" + (f" ({i + 1} of {len(pages)})" if len(pages) > 1 else "")
+        out.append((num, ttl, mx_sheet(num, ttl, "The code and County requirements for the deck as built — read with G-001 and the details", o, "No scale", meta)))
+    return out
+
+
+def site_plan_sheet(path: Path, meta: dict) -> str:
+    """A finished site plan (the site-plan agent's C-100.svg) inside this set's title block, scaled into the drawing field."""
+    raw = re.sub(r"<\?xml[^>]*\?>\s*", "", path.read_text())
+    m = re.search(r'viewBox="([-\d.\s]+)"', raw)
+    vb = m.group(1) if m else "0 0 1000 700"
+    inner = re.sub(r"^\s*<svg\b[^>]*>|</svg>\s*$", "", raw.strip())
+    body = [f'<svg x="0" y="0" width="1000" height="612" viewBox="{vb}" preserveAspectRatio="xMidYMid meet">{inner}</svg>']
+    return mx_sheet("C-100", "Site plan", "The parcel, the house and the deck as built, distances to the lot lines", body, "Plan · see the scale and north arrow on the plan", meta)
+
+
+HOOKS = {"S-101": _hook_s101, "A-301": _hook_a301, "A-201": _hook_a201, "D-501": _hook_d501, "S-100": _hook_s100}
 
 
 # ============================================================================ the permit set: the engine's page under the job's brand
@@ -1600,7 +1862,7 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
 def brand_page(page: str, spec, ext: Ext, br: dict, name: str) -> str:
     """The permit page under the brand: the band's mark and line, the title, the cover words, the footer and the colors."""
     ab = ext.as_built
-    code = "2022 CRC" if _ca(spec) else "2021 IRC"
+    code = SECTIONS[_ed(spec)]["code"] if _ca(spec) else "2021 IRC"
     mark = (f'<img src="{br["logo_dark"]}" alt="{_html.escape(br["name"])}" style="height:44px;width:auto;display:block;margin-bottom:6px">' if br.get("logo_dark")
             else f'<span style="display:inline-block;border-left:3px solid {br["accent_b"]};padding-left:10px;font-weight:900;font-size:22px;letter-spacing:.14em;color:#fff">{_html.escape(br["short"])}</span>')
     page = page.replace('<div class="kick">GS Exterior Experts · Deck Division · permit set</div>',

@@ -1,0 +1,248 @@
+{
+ "_source": "Authored from jobs/messner_site/asbuilt.json (the as-built model). The engine's frame: x along the house, left to right standing in the yard facing the house (south at x = 0, north on the right — asbuilt x mirrored, x = 615\" - x_asbuilt); y out from the house. The job-local fields (fascia posts, glass, vertical cable, ties, braces as built, (V) items, notes) are read by jobs/messner_site/tooling/messner_ext.py; the engine ignores them.",
+ "job": "149 Morning Sun Ave — existing deck, as built",
+ "client": "Adam Messner and Allison Rhodes Messner, Trustees of The 2017 Messner Family Trust",
+ "site": {
+  "address": "149 Morning Sun Ave",
+  "city": "Mill Valley",
+  "state": "CA",
+  "zip": "94941",
+  "ground_snow_psf": 0,
+  "wind_speed_mph": 95,
+  "frost_depth_in": 12,
+  "soil_bearing_psf": 1500,
+  "seismic_design_category": "D2",
+  "wui_fire_zone": true,
+  "notes": "APN 051-091-11 · unincorporated Marin County (Almonte / Tamalpais Area Community Plan) · zoning R1 · flood Zone X · average slope 36.7 % (footing setbacks per CRC R403.1.7)",
+  "code_edition": "2025",
+  "codes": [
+   "2025 California Residential Code (CRC), Part 2.5",
+   "2025 California Building Code (CBC), Part 2, where engineered design is used",
+   "2025 California Electrical Code (CEC), Part 3",
+   "2025 California Energy Code, Part 6",
+   "2025 California Wildland-Urban Interface Code (CWUIC), Part 7, Ch. 5, as amended by MCC 19.04.064",
+   "2025 California Existing Building Code, Part 10",
+   "2025 California Green Building Standards Code (CALGreen), Part 11",
+   "Marin County Code Title 19 (Ord. 3838, eff. 2026-01-01)"
+  ],
+  "design_criteria": {
+   "occupancy": "R-3 / U accessory deck; Type V-B (CRC)",
+   "live_psf": 40,
+   "dead_psf": 12,
+   "dead_psf_text": "12 psf actual, including the PVC decking — engineer of record [V]",
+   "guard_lb": 200,
+   "snow_psf": 0,
+   "wind_text": "Vult [___] mph, Risk Category II, Exposure [B/C], Kzt [___] (CBC 1609, ASCE 7-22) — engineer of record",
+   "seismic_sdc": "D (ASCE 7-22) / D2 (CRC Table R301.2.2.1.1)",
+   "sds": 1.31,
+   "sd1": 1.3,
+   "site_class": "default",
+   "asce": "ASCE 7-22",
+   "footing_min_in": 12,
+   "soil_psf": 1500,
+   "stair_treads": "40 psf, or 300 lb on 4 sq in. (CRC Table R301.5)",
+   "fire_area": "LRA, not a Very High FHSZ; inside the County Urban-Wildland Interface area -> CWUIC Ch. 5 (CWUIC 501.1, MCC 19.04.064)"
+  },
+  "wui": true,
+  "wui_listing": "SFM 8110-2042:0001 (Class A) and 8170-2042:0504 cover the 5.5\" board; ICC-ES / CCRR-0101: joists 16\" o.c. max."
+ },
+ "geometry": {
+  "size_mode": "frame",
+  "height_in": 129,
+  "height_high_in": 153,
+  "attachment": "ledger",
+  "picture_frame": true,
+  "board_direction": "parallel",
+  "zones": [
+   {
+    "name": "A",
+    "width_in": 546,
+    "depth_in": 184,
+    "label": "Main deck"
+   },
+   {
+    "name": "B",
+    "width_in": 69,
+    "depth_in": 90,
+    "label": "North strip — the stair leaves its north end"
+   }
+  ]
+ },
+ "framing": {
+  "system": "dimensional",
+  "joist_size": "2x10",
+  "joist_species": "DF",
+  "joist_grade": "#2 PT (verify the grade stamp)",
+  "joist_spacing_in": 16,
+  "rim_plies": 1,
+  "ledger_size": "2x12",
+  "ledger_fastener": "1/2 bolt",
+  "hanger": "LUS210Z",
+  "post_size": "6x6",
+  "footing_type": "concrete",
+  "joist_tape": false,
+  "knee_braces": true,
+  "knee_leg_in": 30,
+  "beams": [
+   {
+    "kind": "drop",
+    "size": "6x12",
+    "species": "DF",
+    "setback_in": 94.25,
+    "zones": [
+     "A"
+    ],
+    "posts_x_ft": [
+     0.5,
+     7.917,
+     15.417,
+     22.917,
+     30.417,
+     37.917,
+     50.75
+    ]
+   },
+   {
+    "kind": "drop",
+    "size": "6x12",
+    "species": "DF",
+    "setback_in": 0.25,
+    "zones": [
+     "B"
+    ]
+   },
+   {
+    "kind": "drop",
+    "size": "6x12",
+    "species": "DF",
+    "setback_in": 9.25,
+    "zones": [
+     "A"
+    ],
+    "posts_x_ft": [
+     0.5,
+     7.917,
+     15.417,
+     22.917,
+     30.417,
+     37.917,
+     45.25
+    ]
+   }
+  ],
+  "joist_ties": "H2.5A",
+  "joist_tie_lines": "outer",
+  "lateral_tie_model": "DTT2Z",
+  "lateral_ties": 2,
+  "blocking_midspan": "house",
+  "knee_brace_size": "6x6",
+  "knee_brace_bolts": "end connections not visible — per the engineer of record (2018 detail: 5/8\" x 10\" lag each end + LTP4 each side)",
+  "knee_brace_layout": {
+   "outer": {
+    "single": [
+     0,
+     6
+    ],
+    "y": [
+     1,
+     3,
+     5
+    ]
+   },
+   "inner": {
+    "single": [
+     0
+    ]
+   }
+  },
+  "beam_notes": [
+   "B1 (inner, ~87\" from the house): the house-side joists hang from a continuous header on it (LUS-type hangers, A35 / LTP4-type clips header to beam)",
+   "B2 (outer, ~172\" from the house): the joists bear on top, Simpson H2.5A at each joist"
+  ],
+  "footing_words": "Existing round concrete piers ~12-14\" dia., 4-12\" above grade, cast-in post bases (CBSQ66-type); 2018 design: 12\" Quik-Tube pier on a 15\" sq x 12\" spread footing, 36\" min. into competent bearing, (4) #4 vert + #3 ties — size and depth as built to be verified (V)"
+ },
+ "decking": {
+  "brand": "TimberTech",
+  "collection": "Vintage",
+  "color": "Weathered Teak",
+  "profile": "grooved",
+  "border_collection": "Vintage",
+  "border_color": "Mahogany",
+  "border_rows": 2,
+  "fascia": true
+ },
+ "railing": {
+  "system": "IRX",
+  "color": "Black",
+  "height_in": 42,
+  "post_kind": "fascia",
+  "infill": "glass",
+  "stair_infill": "vertical",
+  "stair_handrail": "one",
+  "stair_guard_in": 38,
+  "fascia_fastening": "bracket to the rim: (2) galvanized hex lags + washers per flange (4 per bracket) through the PVC fascia into the rim, as seen; an engineered connection on wood (ESR-4217 covers the bracket into concrete only)",
+  "glass_note": "Infill: fully tempered safety glass, [1/4\"] nominal min., CPSC 16 CFR 1201 Cat. II, each panel permanently marked (CRC R324.1) — confirm the etched mark (V); glazing in a guard is a hazardous location (CRC R324.4.4); the panels are infill, the posts and top rail carry the guard load"
+ },
+ "stairs": [
+  {
+   "side": "end:right",
+   "name": "Stair to the lower yard",
+   "width_in": 36,
+   "position_in": 54,
+   "total_rise_in": 106,
+   "flights": [
+    11,
+    5
+   ],
+   "turn": "left",
+   "landings": [
+    [
+     36,
+     36
+    ]
+   ],
+   "rails": 2,
+   "flight_rails": [
+    2,
+    2
+   ],
+   "landing": "grade",
+   "stringer_size": "2x12",
+   "closed_risers": true,
+   "mid_support": false
+  }
+ ],
+ "extras": {
+  "as_built": true,
+  "engineered": true,
+  "ledger_on_cantilevered_floor": true,
+  "as_built_note": "Dimensions, members and hardware are from the owner's sketches, 27 site photos (26 Oct 2026) and the 2018 design (M. Tepperman); values marked (V) are to be field-verified by the owner before the final submittal. The sheets record the deck as it stands.",
+  "verify": {
+   "deck_edge": "the owner's dimensions are to the deck edge (fascia face vs. framing not stated)",
+   "height": "the surface is ~10'-9\" (inner row) to 12'-9\" (outer) over the pier tops — tape one height",
+   "border_color": "the darker brown Vintage border board's color",
+   "ledger": "2x12 PT ledger; 1/2\"-5/8\" bolts or lags with plate washers ~1 per joist bay — type, length, spacing",
+   "ledger_flashing": "flashing not visible; CWUIC 504.7.3.1 6\" vertical metal flashing at the deck-to-wall line",
+   "beam_positions": "B1 at ~87\" and B2 at ~172\" from the house (tape from the house to each beam face)",
+   "species": "beams PT DF or redwood (no incising seen)",
+   "splices": "every beam splice over a post",
+   "post_stations": "post-to-post spacing (estimated ~90\" o.c.)",
+   "post_lengths": "~9' inner / ~11' outer",
+   "post_caps": "cap and leg fasteners (screw holes look empty)",
+   "knee_brace_bolts": "brace end connections (none visible)",
+   "footings": "pier size and depth (expose one, or the engineer certifies)",
+   "lateral_ties": "one DTT2Z seen at the ledger; count and photograph each, and the anchorage inside",
+   "joist_ties": "H2.5A at the outer beam (~10 seen)",
+   "guard_system": "IRX system, glass part numbers and the bracket fastening",
+   "guard_blocking": "blocking behind the rim at each guard post (not visible)",
+   "glass_marks": "the safety-glazing mark on each panel",
+   "stair_landing": "3' stair width and the 3'x3' landing (code minimums: tape them)",
+   "stair_base": "the lower flight sits on a PT plank at grade, no concrete pad seen"
+  },
+  "notes": "messner_notes.json"
+ },
+ "brand": {
+  "dir": "jobs/messner_site/brand"
+ },
+ "photos": []
+}

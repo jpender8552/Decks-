@@ -1,0 +1,196 @@
+{
+ "_source": "Drafted by the compliance review (scratchpad messner/compliance/g002_notes.md, 27 Oct 2026) for the 2025 CRC / CWUIC; values known from asbuilt.json filled in, (V) = field-verify, [ ] = for the engineer of record or the owner to complete. Sections 2 and 3 (codes, design criteria) are on G-001.",
+ "notes": [
+  {
+   "head": "1. Project description",
+   "items": [
+    "Scope of work. This permit legalizes an existing (as-built), owner-built, elevated wood deck at the rear of the existing single-family dwelling. It covers the deck, the intermediate stair landing and the exterior stair to the lower yard.",
+    "- The deck is about 51 ft long (51'-3\" along the house) (V) and its walking surface is about 10'-9\" to 12'-9\" above the lower yard (V).",
+    "- Deck area is about 741 sq ft (V); stair and landing area is [___] sq ft.",
+    "- There is no change of use or occupancy, and no new conditioned floor area.",
+    "Existing vs. new work. Work shown is existing as-built construction unless it is tagged NEW and clouded. NEW items are corrective work required for code compliance and are built under this permit.",
+    "Applicant/builder. Owners: Adam Messner and Allison Rhodes Messner, Trustees of The 2017 Messner Family Trust. Assessor's parcel number: 051-091-11.",
+    "Zoning and planning. Zoning district R1. Setbacks and any Design Review determination: [per Marin County Planning, reference ___]."
+   ]
+  },
+  {
+   "head": "4. General notes",
+   "items": [
+    "Field verification. Before any corrective work, the owner verifies all existing dimensions, member sizes, connections and conditions shown, and reports any difference to the engineer of record and the building inspector. Dimensions marked \"(V.I.F.)\" were verified in the field on [date].",
+    "Concealed work. Existing work that inspection cannot see was verified as listed in the Verification Log on this sheet: footings, ledger attachment and flashing, guard post blocking, and tension-tie anchorage. Concealed elements are exposed as the building official directs, or certified by the engineer of record's field observation letter dated [___].",
+    "Photo log. The dated photo log [reference] is part of this submittal. Each photo is identified by grid location (posts A1-A7 inner row, B1-B7 outer row, L1-L4 landing).",
+    "Prescriptive and engineered portions. Deck framing not identified as engineered complies with CRC Section R507 (prescriptive). These elements are engineered under CRC R301.1.3 and R301.1.3.1, and are shown on sheets stamped by a California-licensed engineer:",
+    "- the solid-sawn beams;",
+    "- the post-to-beam and post-base connections, where relied on for lateral load;",
+    "- the knee braces and their connections;",
+    "- the deck lateral-force-resisting system;",
+    "- the guard post attachment, where not covered by manufacturer test data.",
+    "Manufacturer's instructions. Products are installed per the manufacturer's current written installation instructions and evaluation reports. Where these conflict with the drawings, the more restrictive governs. Substitutions need approval from the engineer of record and the building official.",
+    "Discrepancies. Report any condition found during corrective work that differs from the drawings to the engineer of record before proceeding.",
+    "Special inspection. None is required for the prescriptive portions. If the engineer of record specifies post-installed adhesive anchors, provide special inspection per the anchor's evaluation report and CBC 1705. Otherwise use through-bolts or mechanical screw anchors."
+   ]
+  },
+  {
+   "head": "5. Structural materials",
+   "items": [
+    "Lumber.",
+    "- Joists, beams, posts, ledger, blocking and stair stringers: No. 2 or better [Douglas fir-larch / hem-fir], preservative-treated per AWPA U1, as CRC R507.2.1 and R304.1 require.",
+    "- Posts, and any member within 6 in. of grade or difficult to replace: Ground Contact (UC4A minimum).",
+    "- Field-cut ends, notches and holes in treated lumber are treated per AWPA M4 (CRC R304.1.1).",
+    "Beams. Solid-sawn [6x12] [species/grade], preservative-treated. Designed by the engineer of record. These beams are not covered by CRC Tables R507.5.",
+    "Fasteners.",
+    "- Nails, screws, lag screws and bolts in contact with preservative-treated wood: hot-dip galvanized (ASTM A153 Class D) or stainless steel, per CRC R304.3.1 and Table R507.2.3.",
+    "- Bolt holes are drilled 1/32 to 1/16 in. larger than the bolt.",
+    "- Washers go under every bolt head and nut.",
+    "- Where the site is within 300 ft of a salt-water shoreline, fasteners and connectors are Type 304 or 316 stainless steel.",
+    "Connectors.",
+    "- Metal connectors are Simpson Strong-Tie, or an approved equal with an evaluation report.",
+    "- Finish is ZMAX (G185) or hot-dip galvanized per ASTM A123, or stainless steel, per CRC R304.3.1.",
+    "- Every fastener hole receives the fastener the connector manufacturer specifies.",
+    "- See the connector schedule for each part.",
+    "Concrete.",
+    "- Minimum f'c = 2,500 psi at 28 days for piers and footings (CRC R402.2), unless the engineer of record specifies more.",
+    "- Concrete placed under this permit meets MCC Chapter 19.07 (low-carbon concrete) where the County applies it.",
+    "Flashing.",
+    "- Corrosion-resistant metal of nominal thickness not less than 0.019 in., or an approved nonmetallic material compatible with preservative-treated lumber (CRC R507.2.4).",
+    "- Aluminum flashing does not touch copper-treated lumber.",
+    "- Self-adhered membranes meet FGIA 711."
+   ]
+  },
+  {
+   "head": "6. Connector schedule (fill in from field verification)",
+   "items": [
+    "Joist to ledger — Simpson LUS[28/210] — [Z] — 10d HDG common, all face and joist holes — [existing / verify]",
+    "Joist to outer beam — Simpson H2.5A[Z] — [Z] — (10) 0.131 x 1-1/2 in. per manufacturer — [existing]",
+    "Joist to inner beam — Simpson H2.5AZ — Z — (10) 0.131 x 1-1/2 in. per manufacturer — [NEW if missing]",
+    "Post to beam — [model; rated, sized for 6x post and 6x beam] — per manufacturer — [verify / NEW]",
+    "Post to pier — [cast-in model] — per manufacturer — [existing]",
+    "Deck-to-house lateral — Simpson DTT2Z (2 min., within 24 in. of each end) — Z — per manufacturer, 1/2 in. rod/bolt — [1 existing, 1 NEW]",
+    "Knee brace ends — per engineer — HDG — per engineer — [NEW]",
+    "Stair stringer top — [model] — Z — per manufacturer — [verify]"
+   ]
+  },
+  {
+   "head": "7. Deck construction notes (CRC R507)",
+   "items": [
+    "Footings. Concrete piers are sized per CRC Table R507.3.1 for the tributary area and soil bearing shown. The bottom of each footing is at least 12 in. below undisturbed ground, on firm native soil. On slopes steeper than 1:3, footings meet the setback in CRC R403.1.7, or the engineer of record's or geotechnical recommendation.",
+    "Posts.",
+    "- Posts are 6x6 PT. Height, measured from the top of the pier to the underside of the beam, does not exceed CRC Table R507.4 (14 ft 0 in. for 6x6 at 40 psf live load) unless engineered.",
+    "- Each post is connected to its pier with an approved manufactured post base (CRC R507.4.1).",
+    "Beams.",
+    "- Each beam is continuous between bearings. Splices occur only over posts, with full bearing for each beam end (at least 1-1/2 in.).",
+    "- Beam cantilever is no more than 1/4 of the adjacent span (CRC R507.5.1).",
+    "- Beams are connected to posts with manufactured connectors sized for the post and beam (CRC R507.5.2).",
+    "Joists.",
+    "- Spans and cantilevers do not exceed CRC Table R507.6.",
+    "- Each joist bearing on a single-ply (solid) beam has a mechanical connector (CRC R507.6.1).",
+    "- Joists framing into the ledger are supported by approved joist hangers.",
+    "- Blocking or hangers at least 60 percent of joist depth are provided at joist ends and bearings. Rim joists are fastened to each joist end with 3-10d nails or 3 No. 10 x 3 in. screws (CRC R507.6.2).",
+    "Knee braces (ENGINEER). Knee braces are connected at both ends as detailed by the engineer of record [or: knee braces are removed per the engineer of record's evaluation]. Braces do not obstruct required escape paths.",
+    "Ledger.",
+    "- The ledger is at least a 2x8 PT No. 2. It is fastened to the existing house band joist with 1/2 in. [through-bolts/lag screws] at [__] in. o.c., staggered, with placement per CRC Table R507.9.1.3(2).",
+    "- The ledger does not support beams or girders, and it is not attached to veneer or stucco.",
+    "- The existing band joist is [2x solid-sawn / 1 in. engineered rim], bearing on the wall below (CRC R507.9.1.2).",
+    "Ledger flashing and WRB.",
+    "- Continuous flashing over the ledger with its vertical leg lapped under the water-resistive barrier, per CRC R507.9.1.5 through R507.9.1.8 and R703.4.",
+    "- Exterior wall covering ends above the deck surface.",
+    "Positive attachment. The deck is positively anchored to the house for vertical and lateral loads (CRC R507.8). Toenails and nails in withdrawal are not used. Where the connection cannot be verified at inspection, the deck is designed as self-supporting (ENGINEER).",
+    "Lateral load connection. Hold-down tension devices per CRC R507.9.2, Figure R507.9.2([1/2]):",
+    "- [Two] devices of at least [1,500] lb allowable capacity, each within 24 in. of each end of the deck;",
+    "- or four devices of at least 750 lb.",
+    "- Plus any additional lateral elements shown by the engineer of record.",
+    "Decking.",
+    "- TimberTech Advanced PVC decking, Vintage collection, color Weathered Teak.",
+    "- Installed per evaluation report CCRR-0101 (current revision) and TimberTech's installation instructions.",
+    "- Joists at 16 in. o.c. maximum, boards perpendicular. Butt joints fully supported.",
+    "- TimberTech-listed fasteners."
+   ]
+  },
+  {
+   "head": "8. Guard, handrail and stair notes (CRC R318, R320, R321, R324)",
+   "items": [
+    "Where guards are required. Guards are provided at all open sides of the deck, the landing and the stair where the walking surface is more than 30 in. above grade within 36 in. horizontally (CRC R321.1.1).",
+    "Guard height.",
+    "- Deck and landing guards: at least 42 in. above the adjacent walking surface (CRC R321.1.2).",
+    "- Stair guards: at least 34 in. above the line connecting the tread nosings.",
+    "Guard openings.",
+    "- No opening passes a 4 in. sphere at the deck and landing.",
+    "- At the stair, no opening passes a 4-3/8 in. sphere.",
+    "- The triangle formed by the riser, tread and bottom rail does not pass a 6 in. sphere (CRC R321.1.3).",
+    "Guard loads. Guards resist 200 lb applied in any direction at any point along the top. Infill resists 50 lb on 1 sq ft (CRC Table R301.5).",
+    "Deck guard system.",
+    "- TimberTech Impression Rail Express, black aluminum, 42 in., fascia-mounted posts, glass infill panels.",
+    "- Installed per TimberTech's Impression Rail Express, glass infill and fascia-mount installation guides, using only system components.",
+    "- Post spacing [___] in. o.c. maximum.",
+    "- Structural basis: [manufacturer test report/letter dated ___] or [engineer of record calculation, sheet ___], including wind on the glass infill.",
+    "Fascia post attachment.",
+    "- Each fascia-mounted post bracket is fastened with [___] into solid blocking or a joist.",
+    "- The rim or end joist is connected to adjacent joists to prevent rotation (CRC R507.10.1, R507.10.1.1).",
+    "- Fasteners do not rely only on end-grain withdrawal.",
+    "Glass.",
+    "- Glass in guards is a hazardous location (CRC R324.4.4).",
+    "- Each glass infill panel is fully tempered safety glazing, [1/4] in. nominal minimum, tested to CPSC 16 CFR 1201 Category II.",
+    "- Each panel is permanently marked per CRC R324.1, and the mark is visible after installation.",
+    "- Glass panels are infill. The top rail and posts carry the guard load.",
+    "Stair and landing guards.",
+    "- Vertical cable infill, [manufacturer/system], installed and tensioned per the manufacturer's instructions.",
+    "- Cable spacing and post spacing are such that a 4-3/8 in. sphere (stair) or a 4 in. sphere (landing) does not pass.",
+    "Stairs.",
+    "- Clear width 36 in. minimum (CRC R318.7.1).",
+    "- Riser height 7-3/4 in. maximum; tread depth 10 in. minimum. The greatest riser or tread in a flight does not exceed the smallest by more than 3/8 in. (CRC R318.7.5).",
+    "- Open risers do not pass a 4 in. sphere where more than 30 in. above grade (TimberTech riser boards provided).",
+    "- Nosings per CRC R318.7.5.3.",
+    "- Headroom 6 ft 8 in. minimum (CRC R318.7.2).",
+    "Landings.",
+    "- A landing at the top and bottom of each flight, at least as wide as the stair and at least 36 in. deep in the direction of travel (CRC R318.7.6).",
+    "- Bottom landing at grade: [concrete/paver], [__] in. x [__] in., slope 2 percent maximum (CRC R318.7.7).",
+    "Stair treads and stringers.",
+    "- TimberTech Advanced PVC treads on stringers spaced at [__] in. o.c. maximum, per the manufacturer's stair-tread requirements.",
+    "- Stringers are positively attached at the top with [connector] and anchored at the bottom to a concrete footing or pad.",
+    "Handrail.",
+    "- At least one side of each flight; continuous for the full length of the flight.",
+    "- Top of rail 34 to 38 in. above the tread nosings.",
+    "- Ends returned or terminated in newel posts.",
+    "- Graspable Type I or Type II profile, 1-1/2 in. minimum clearance from any wall (CRC R320).",
+    "- The guard top rail is not the required handrail.",
+    "Door landings. The deck surface at each exterior door is no more than 7-3/4 in. below the top of the threshold (1-1/2 in. at the required egress door where the door swings over the deck) (CRC R318.3).",
+    "Stair lighting. A light source illuminates the top landing of the exterior stair (CRC R325.7)."
+   ]
+  },
+  {
+   "head": "9. Wildland-urban interface notes (CWUIC Chapter 5, as amended by MCC 19.04.064)",
+   "items": [
+    "Applicability. The site is within the County Urban-Wildland Interface area (LRA, not a Very High FHSZ), within a Fire Hazard Severity Zone or a Wildland-Urban Interface Fire Area designated by the County. Where it is, the deck complies with CWUIC Section 504.7.3. Marin County applies CWUIC Chapter 5 to additions and modifications regardless of the date the existing building was built.",
+    "Walking surfaces.",
+    "- The walking surface of the deck, landing and stairs is TimberTech Advanced PVC, Vintage collection, Weathered Teak.",
+    "- It complies with CWUIC 504.7.3.2, Option [2: ignition-resistant building material] [or Option 6: SFM Standard 12-7A-4A with ASTM E84 Class B or better flame spread].",
+    "- State Fire Marshal Building Materials Listing Nos. 8110-2042:0001 (Class A) and 8170-2042:0504 (the 5.5 in. board) — current listings attached.",
+    "Deck-to-wall flashing. A minimum 6 in. metal flashing, applied vertically on the exterior of the wall, is installed at all deck-to-wall intersections (CWUIC 504.7.3.1).",
+    "Guards. Guards are aluminum and tempered glass (noncombustible).",
+    "Underside of the deck. The underside is open. Decks are excluded from CWUIC 504.7. The area under the deck is kept free of combustible storage and vegetation.",
+    "Defensible space. Vegetation management and defensible space are maintained per the fire district's requirements and Public Resources Code 4291 (and Board of Forestry Zone 0 regulations, if in effect at the time of permit issuance)."
+   ]
+  },
+  {
+   "head": "11. Final inspection items (MCC 19.14.020)",
+   "items": [
+    "Smoke alarms are installed per CRC R310 and Health and Safety Code 13113.7.",
+    "Carbon monoxide alarms are installed per CRC R311 and Health and Safety Code 17926, where the dwelling has a fuel-burning appliance or an attached garage.",
+    "Noncompliant plumbing fixtures are replaced with water-conserving fixtures per Civil Code 1101.4/1101.5 and CPC 401.3.",
+    "Required gate fall-over safeguards are installed per MCC Chapter 19.13."
+   ]
+  },
+  {
+   "head": "12. Verification log (concealed work)",
+   "items": [
+    "Footing size and depth (piers [A_ , B_]) — Hand excavation to bottom of footing; tape in photo — [owner / engineer]",
+    "Ledger fasteners, flashing, WRB — Deck boards removed at [3] locations",
+    "Band joist and tension-tie house anchorage — Interior access at [location]",
+    "Guard post blocking — Fascia removed at posts [__]",
+    "Knee brace connections — Visual and probe at each end",
+    "Glass safety marks — Each panel photographed",
+    "Connector models and finishes — Close-up photos at every post, beam and joist connection"
+   ]
+  }
+ ]
+}
