@@ -716,7 +716,8 @@ def _rail_points(spec, surf: List[dict]) -> List[Tuple[float, float, float]]:
     out = []
     for r in roofs:
         q = resolve(r, surf)
-        out += [(pt["x"] * 12.0, pt["y"] * 12.0, q["post"] * 12.0) for pt in q["posts"]]     # the layout keeps those a rail run passes within 12" of
+        out += [(pt["x"] * 12.0, pt["y"] * 12.0, q["post"] * 12.0) for pt in q["posts"] if pt["surface"]]   # on this layout's deck; the layout
+                                                                                                             # keeps those a rail run passes within 12" of
     return out
 
 

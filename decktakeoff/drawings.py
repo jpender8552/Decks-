@@ -3204,7 +3204,7 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
             "existing": "Existing caissons stay — verify plumb, bearing and condition (engineer)"}[s.framing.footing_type]
     y0 = 384
     o.append(T(30, y0, "FOOTING + POST SCHEDULE", 9, 800, fill=GOLD))
-    o.append(T(200, y0, textwrap.shorten(desc, 140, placeholder="…"), 7.4, 600))
+    o.append(T(200, y0, textwrap.shorten(desc.split(":")[0] + (f" · {_post_base_name(s, CL.parts[0].takeoff)} post bases" if s.framing.footing_type == "diamond_pier" else ""), 140, placeholder="…"), 7.4, 600))
     hdr = ("ID", "level", "line", "x", "y", "post", "load")
     cols = [0, 28, 74, 150, 206, 262, 310]
     per = 17
@@ -3219,7 +3219,7 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
             for v, dx in zip(vals, cols):
                 o.append(T(tx + dx, yy, textwrap.shorten(str(v), 15, placeholder="…"), 7.2, 500))
             yy += 10.4
-    notes = [("#", "FOUNDATION NOTES"),
+    notes = [("#", "FOUNDATION NOTES"), desc + ".",
              "x from the deck's left end, y from the main rear wall toward the yard (the plan frame of every sheet).",
              f"Post = top of the post base to the beam seat — field-measure each to the string line before cutting.",
              f"{len(rows)} footings: " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)

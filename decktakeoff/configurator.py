@@ -827,7 +827,7 @@ var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.
   var R = 11.5, mn = function (a) { return Math.min.apply(null, a); }, mx = function (a) { return Math.max.apply(null, a); };
   FXU.fxBox.value.set(mn(xs) - R, mx(xs) + R, mn(ys) - R, mx(ys) + R); FXU.fxY.value.set(mn(zs) - R, mx(zs) + 2.0);
 })();
-var FX_GAIN = [7.0, 1.7, 0.9];        // a riser spot, a post-cap lantern, an LED strip (its nearest point)
+var FX_GAIN = [7.0, 2.6, 0.9];        // a riser spot, a post-cap lantern, an LED strip (its nearest point)
 var FX_CHUNK = [
   '#define FX_N ' + FXN,
   'uniform vec4 fxA[FX_N]; uniform vec4 fxB[FX_N]; uniform vec3 fxCol; uniform float fxGain; uniform vec4 fxBox; uniform vec2 fxY;',
@@ -844,7 +844,8 @@ var FX_CHUNK = [
   '    if (b.w > 2.5) { float h = b.w - 3.0; vec3 t = vec3(b.x, 0.0, b.z); Lp = a.xyz + t * clamp(dot(P - a.xyz, t), -h, h); }',
   '    vec3 L = Lp - P; float d2 = dot(L, L); if (d2 > 121.0) continue;',
   '    float d = sqrt(d2); vec3 l = L / max(d, 0.001);',
-  '    float w = a.w / (1.0 + 2.6 * d2) * (1.0 - smoothstep(3.5, 11.0, d)) * max(dot(N, l), 0.0);',
+  '    float k = b.w < 1.5 ? 2.6 : (b.w < 2.5 ? 1.5 : 1.2);',
+  '    float w = a.w / (1.0 + k * d2) * (1.0 - smoothstep(3.5, 11.0, d)) * max(dot(N, l), 0.0);',
   '    if (b.w < 1.5) w *= smoothstep(b.w, min(1.0, b.w + 0.35), dot(-l, b.xyz));',
   '    else if (b.w < 2.5) w *= mix(0.12, 1.0, smoothstep(-0.2, 0.45, l.y));',
   '    else w *= smoothstep(0.0, 0.5, l.y);',
@@ -1044,7 +1045,7 @@ function setLouvers(deg) {
       var piv = P3(bl[0], bl[1], bl[2]), ax = P3(bl[3], bl[4], bl[5]).normalize();
       var acr = B.across || new THREE.Vector3(1, 0, 0);
       if (!B.across) { acr = up.clone().cross(ax); if (acr.lengthSq() < 1e-6) acr.set(1, 0, 0); acr.normalize(); }
-      var c0 = acr.clone().multiplyScalar(ca).addScaledVector(up, sa).multiplyScalar(bl[7] / (B.w0 || bl[7]));
+      var c0 = acr.clone().multiplyScalar(ca).addScaledVector(up, sa).multiplyScalar(1.03 * bl[7] / (B.w0 || bl[7]));   // 3% wider: closed blades seal
       var c1 = acr.clone().multiplyScalar(-sa).addScaledVector(up, ca).multiplyScalar(bl[8] / (B.t0 || bl[8]));
       var c2 = c0.clone().cross(c1).normalize().multiplyScalar(bl[6]);
       _M.set(c0.x, c1.x, c2.x, piv.x, c0.y, c1.y, c2.y, piv.y, c0.z, c1.z, c2.z, piv.z, 0, 0, 0, 1);
@@ -1203,7 +1204,7 @@ function applyGlow() {
   var lit = NIGHT;
   FXU.fxGain.value = lit;
   LED_M.forEach(function (m) { m.emissiveIntensity = 0.1 + 2.6 * lit; });
-  GLASS_M.forEach(function (m) { m.emissiveIntensity = 0.5 * lit; m.opacity = m.userData.op0 + (Math.min(0.92, m.userData.op0 + 0.6) - m.userData.op0) * lit; });
+  GLASS_M.forEach(function (m) { m.emissiveIntensity = 0.38 * lit; m.opacity = m.userData.op0 + (Math.min(0.92, m.userData.op0 + 0.6) - m.userData.op0) * lit; });
   if (HALO) HALO.material.uniforms.uGlow.value = lit;
 }
 
