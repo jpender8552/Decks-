@@ -20,7 +20,7 @@ Items marked **[confirm]** could not be read from the County's site, which block
 | # | Item | Who | Notes |
 |---|---|---|---|
 | A1 | **Setback answer from Planning** | PCG (site agent) and Adam | The deck must stay about 13.4 ft or more from the rear line and 3 ft from the sides (MCC 22.20.090 Table 3-1). If it is within 1 ft of the limit, the County requires a licensed surveyor's **Building Setback Certification** (Building Inspection Verification, MCC Ch. 22.20). If it encroaches, a Variance (MCC 22.54) or a redesign is needed first. |
-| A2 | **Permit history** | Adam | Ask Building & Safety for the parcel's permit history. If any permit covered the original (2018-design) deck, cite its number in Part A and the cover letter. |
+| A2 | **Permit history** | Adam | **Found: B.P. 157826, "Deck & Stairs", received 09/06/2017, issued 03/01/2018, owner-builder** (Marin open data, Building Permits Report). It is the 2018 Tepperman design. Ask Building & Safety for (1) its final or expiration status and inspection history, and (2) a copy of the approved plans and any site plan Planning reviewed. Cite 157826 in Part A and the cover letter. |
 | A3 | **Engineer engaged** | PCG and Adam | Send `engineer_scope_letter.md`. Stamped calcs and details are required for the beams, the lateral system and knee braces, the post caps, the fascia glass guard, the cantilevered-floor ledger, and the footings on slope. |
 | A4 | **Exposure day done; owner's measurements in** | Adam, with the engineer present | Use checklist sections 1 to 9 (compliance `checklist.md`). The photos feed the A-501 exhibit and the verification log on G-002. |
 | A5 | **Scope of the separate cedar stair and lower deck** | Adam and PCG | Show it on the site plan as exempt (CRC R105.2: 200 sf or less, 30" or less above grade, not attached), or include it. |
@@ -46,7 +46,7 @@ Items marked **[confirm]** could not be read from the County's site, which block
 
 **B2. Part A entries:**
 - **Role:** property owner.
-- **Project description** (draft): "Legalize (as-built) an existing elevated wood deck, intermediate landing and exterior stair at the rear of the single-family dwelling, approx. ___ sf; engineered per CRC R301.1.3; includes corrective work shown clouded/tagged NEW on the plans. No new floor area; no change of use."
+- **Project description** (draft): "Legalize (as-built) the existing elevated wood deck, intermediate landing and exterior stair at the rear of the single-family dwelling, approx. ___ sf, including the extension built after B.P. 157826 (original deck, issued 03/01/2018); engineered per CRC R301.1.3; includes corrective work shown clouded/tagged NEW on the plans. No new floor area; no change of use."
 - **Project cost:** PCG supplies a defensible replacement-value figure from the takeoff.
 - **Open code enforcement case** and "resolves the case": answer Yes or No [Adam to confirm].
 - **Septic:** [confirm].

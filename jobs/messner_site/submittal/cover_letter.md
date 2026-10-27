@@ -18,6 +18,8 @@ Dear Building and Safety staff:
 
 On behalf of the property owner, Adam Messner, PCG submits the enclosed documents for a building permit to legalize the existing elevated wood deck, intermediate landing and exterior stair at the rear of the single-family dwelling at the address above. The application does not add floor area or change the use of the dwelling.
 
+**Prior permit.** The original deck and stair at the north end were built under **Marin County Building Permit No. 157826** ("Deck & Stairs", owner-builder), issued March 1, 2018, to the 2018 design by Martin Tepperman. The deck was later extended to the south. This application covers the deck, landing and stair as they stand today, including that extension. We ask that the County file for B.P. 157826 be associated with this application.
+
 **Scope.**
 - **Deck:** about [741] sq ft, 51'-3" along the house by 15'-4" deep, with a walking surface about 10 to 13 ft above grade.
 - **Framing:** 2x10 joists on two lines of 6x12 beams, on 6x6 posts and concrete piers; a ledger at the house.
