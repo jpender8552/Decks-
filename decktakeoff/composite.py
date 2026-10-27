@@ -80,6 +80,10 @@ class CompositeLayout:
         self.multi = True
         self.notes = [f"{p.name}: {n}" for p in parts for n in p.layout.notes]
         self.wall_lf = round(sum(p.layout.wall_lf for p in parts), 1)
+        self.plan = None                    # each part lays its own field (its sheets show it); the steps list rows per zone
+        self.outline_edges = []
+        self.edge_posts = [ep for p in parts for ep in getattr(p.layout, "edge_posts", [])]
+        self.edge_post_len = max([getattr(p.layout, "edge_post_len", 0.0) for p in parts] or [0.0])
         xs, ys = [], []
         for p in parts:
             L = p.layout
@@ -98,12 +102,23 @@ class CompositeLayout:
     def outer_edge_lf(self) -> float:
         return round(sum(p.layout.outer_edge_lf for p in self.parts), 1)
 
+    @property
+    def n_footings(self) -> int:
+        return sum(p.layout.n_footings for p in self.parts)
+
+    @property
+    def stair_support_posts(self) -> int:
+        return sum(p.layout.stair_support_posts for p in self.parts)
+
 
 def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
     """The part as an ordinary DeckSpec: the job's products, site, framing and extras; the part's geometry, rail edges and stairs."""
     d = spec.to_dict()
     g = dict(d.get("geometry", {}))
-    for k in ("parts", "zones", "width", "depth", "width_in", "depth_in", "house_blocks", "house_openings", "cover"):
+    # the job-wide pieces are drawn once, in the global frame, by the composite scene: the measured house and yard, the
+    # house blocks, angled walls; a job-level outline is global too (a part brings its own, in its own frame)
+    for k in ("parts", "zones", "width", "depth", "width_in", "depth_in", "house_blocks", "house_openings", "cover",
+              "house_model", "site_model", "house_walls", "outline"):
         g.pop(k, None)
     g.update(part.get("geometry", {}))
     d["geometry"] = g

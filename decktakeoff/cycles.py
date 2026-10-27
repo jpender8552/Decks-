@@ -634,7 +634,11 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
     from decktakeoff.layout import build_layout
     from decktakeoff.scene import build_scene
     spec = DeckSpec.from_dict(json.load(open(spec_path)))
-    sc = build_scene(build_layout(spec))
+    if spec.geometry.parts:                 # a composite (two levels, a wrap): the parts placed in the global frame
+        from decktakeoff.composite import build_composite
+        sc = build_scene(build_composite(spec)[0].layout)
+    else:
+        sc = build_scene(build_layout(spec))
     D = sc.to_dict()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scn = bpy.context.scene

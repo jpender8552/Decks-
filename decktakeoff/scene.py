@@ -1147,45 +1147,86 @@ def step_captions(L: Layout) -> Dict[int, str]:
 SITE_KINDS = {"house", "wall", "roof", "trim", "glass", "ground", "gravel", "privacy"}
 
 
+def _place_box(b: Box, pl, prefix: str) -> Box:
+    """A part's box moved into the global frame: the bounds, a plan rotation (rot_box items), a vertical-plane rotation
+    (stringers, stair rails), a mitred board's outline and a mesh's vertices all go through the part's placement."""
+    x0, x1, y0, y1 = pl.box(b.x0, b.x1, b.y0, b.y1)
+    rot, axis = b.rot, b.rot_axis
+    tag = f"{prefix}: {b.tag}" if b.tag else ""
+    if b.rot and axis == "z":               # a box turned in plan about its centre: keep its own extents, turn the centre and the angle
+        cx, cy = pl.pt((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2)
+        dx, dy = pl.pt(math.cos(b.rot), math.sin(b.rot)); ox_, oy_ = pl.pt(0.0, 0.0)
+        rot = math.atan2(dy - oy_, dx - ox_)
+        hl, ht = (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2
+        x0, x1, y0, y1 = cx - hl, cx + hl, cy - ht, cy + ht
+    elif b.rot and pl.swaps:
+        axis = "x" if axis == "y" else "y"; rot = -rot
+    nb = Box(b.kind, x0, x1, y0, y1, b.z0, b.z1, b.mat, b.phase, tag, b.shape, b.tone, rot, axis, b.xg)
+    nb.layer = b.layer
+    if b.quad:
+        nb.quad = [list(pl.pt(q[0], q[1])) for q in b.quad]
+    if b.pts:
+        nb.pts = [[*pl.pt(q[0], q[1]), q[2]] for q in b.pts]
+    return nb
+
+
 def build_composite_scene(L) -> Scene:
-    """Each part's scene in its own frame, moved into the global frame; the house from its measured footprint."""
+    """Each part's scene in its own frame, moved into the global frame; the house and the yard drawn once, in the global
+    frame: the measured house model and site model when the job has them, else the house from its measured footprint."""
     spec = L.spec
-    zt = spec.geometry.height_in * IN
+    g = spec.geometry
+    zt = g.height_in * IN
     B: List[Box] = []
     add = lambda *a, **k: B.append(Box(*a, **k))
-    deck_boxes = []
     for p in L.parts:
         S = build_scene(p.layout)
-        pl = p.placement
         for b in S.boxes:
-            if b.kind in SITE_KINDS:
+            if b.kind in SITE_KINDS:       # each part's own ground and stand-in house
                 continue
-            x0, x1, y0, y1 = pl.box(b.x0, b.x1, b.y0, b.y1)
-            rot, axis = b.rot, b.rot_axis
-            if b.rot and pl.swaps:
-                axis = "x" if axis == "y" else "y"; rot = -rot
-            nb = Box(b.kind, x0, x1, y0, y1, b.z0, b.z1, b.mat, b.phase, f"{p.name}: {b.tag}" if b.tag else "", b.shape, b.tone, rot, axis)
-            B.append(nb); deck_boxes.append(nb)
+            B.append(_place_box(b, p.placement, p.name))
     x0, x1, y0, y1 = L.bbox
     H_house = zt + 9.5
-    # site
-    hx0 = min([x0] + [h[0] for h in spec.geometry.house_blocks]); hx1 = max([x1] + [h[1] for h in spec.geometry.house_blocks])
-    hy0 = min([y0] + [h[2] for h in spec.geometry.house_blocks]); hy1 = max([y1] + [h[3] for h in spec.geometry.house_blocks])
-    add("ground", hx0 - 60, hx1 + 60, hy0 - 40, hy1 + 70, -0.6, 0.0, "ground")
-    for p in L.parts:
-        for z in p.layout.zones:
-            gx0, gx1, gy0, gy1 = p.placement.box(z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5)
-            add("gravel", gx0, gx1, gy0, gy1, 0.0, 0.04, "gravel")
-    draw_house_from_spec(add, spec, zt, H_house)
+    hm, sm = getattr(g, "house_model", None), getattr(g, "site_model", None)
+    if hm:
+        from .house import build_house
+        def _mesh(kind, tri, mat, tag=""):
+            xs_ = [q[0] for q in tri]; ys_ = [q[1] for q in tri]; zs_ = [q[2] for q in tri]
+            B.append(Box(kind, min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), mat, 0, tag=tag, shape="mesh", pts=[[round(v, 3) for v in q] for q in tri]))
+        rb = lambda *a, **k: B.append(rot_box(*a, **k))
+        n_h = len(B)
+        build_house(hm, add, rb, _mesh)
+        for b_ in B[n_h:]:
+            b_.layer = "house"
+        if sm:
+            from .landscape import build_site
+            add("ground", x0 - 140, x1 + 140, y0 - 90, y1 + 160, -1.6, float(sm.get("beyond_z", -0.9)), "ground")
+            n0 = len(B)
+            build_site(sm, add, rb, _mesh, zt)
+            for b_ in B[n0:]:
+                b_.layer = "site"
+        else:
+            add("ground", x0 - 60, x1 + 60, y0 - 40, y1 + 70, -0.6, 0.0, "ground")
+    else:
+        hx0 = min([x0] + [h[0] for h in g.house_blocks]); hx1 = max([x1] + [h[1] for h in g.house_blocks])
+        hy0 = min([y0] + [h[2] for h in g.house_blocks]); hy1 = max([y1] + [h[3] for h in g.house_blocks])
+        add("ground", hx0 - 60, hx1 + 60, hy0 - 40, hy1 + 70, -0.6, 0.0, "ground")
+        for p in L.parts:
+            for z in p.layout.zones:
+                gx0, gx1, gy0, gy1 = p.placement.box(z.x0 * IN - 0.5, (z.x0 + z.W) * IN + 0.5, z.wall_y * IN, (z.wall_y + z.D) * IN + 0.5)
+                add("gravel", gx0, gx1, gy0, gy1, 0.0, 0.04, "gravel")
+        draw_house_from_spec(add, spec, zt, H_house)
     W = x1 - x0
-    # the viewer's camera framing wants the deck's extent: shift nothing, report the bbox
-    meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
-                zones=[dict(name=f"{p.name} {z.name}", label=z.label, x0=p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0],
-                            W=abs((p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[1]) - (p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)[0])),
-                            wall_y=0, D=0, front=0) for p in L.parts for z in p.layout.zones],
+    def zbox(p, z):
+        return p.placement.box(z.x0 * IN, (z.x0 + z.W) * IN, z.wall_y * IN, (z.wall_y + z.D) * IN)
+    meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=g.height_in,
+                zones=[dict(name=f"{p.name} {z.name}", label=z.label, x0=zbox(p, z)[0], W=zbox(p, z)[1] - zbox(p, z)[0],
+                            wall_y=zbox(p, z)[2], D=zbox(p, z)[3] - zbox(p, z)[2], front=zbox(p, z)[3],
+                            top=p.spec.geometry.height_in * IN) for p in L.parts for z in p.layout.zones],
                 edge=0.0, timber=spec.is_timber, oiled=spec.framing.finish == "oil", step_text=step_captions(L), composite=True, bbox=list(L.bbox))
     if sun_vector(spec.site):
         meta["sun"] = list(sun_vector(spec.site))
+    if sm and sm.get("cameras"):
+        meta["cameras"] = sm["cameras"]
     S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
     S.x_min = x0
     return S
