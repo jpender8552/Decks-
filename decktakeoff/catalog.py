@@ -55,6 +55,14 @@ DECKING = {
                      warranty="none", fire="Untreated wood: not WUI", wui=False, class_a=False, colors=["Cedar", "PT"]),
 }
 STOCK_LENGTHS_FT = [12, 16, 20]
+# lines that don't come in every GSX stock length: TimberTech 2026 — Vintage square-shoulder 16' and 20' only (ADB15516EW /
+# ADB15520EW; no 12' square, no 24'), grooved 12 / 16 / 20' (D&D quote 979610, TimberTech product guide)
+DECK_LENGTHS_FT = {("Vintage", "square"): (16, 20), ("Vintage", "grooved"): (12, 16, 20)}
+
+
+def deck_lengths(collection: str, profile: str = "square") -> tuple:
+    """The stock lengths (ft) a decking line is sold in, by profile — the GSX 12 / 16 / 20' otherwise."""
+    return DECK_LENGTHS_FT.get((collection, profile), tuple(STOCK_LENGTHS_FT))
 FASCIA = {"PVC": dict(thick=0.5, width=11.75, length=144.0), "Composite": dict(thick=0.58, width=11.95, length=144.0),
           "Wood": dict(thick=1.0, width=11.25, length=144.0)}
 RISER = {"PVC": dict(thick=0.75, width=7.25, length=144.0), "Composite": dict(thick=0.58, width=7.25, length=144.0),
@@ -127,10 +135,21 @@ TIMBER_BASE = {"8x8": ("APB88_black", "ABU88Z"), "6x6": ("ABU66Z_black", "ABU66Z
 DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ212-2-SDS", "4x8": "HUC410", "4x10": "HUC410", "4x12": "HUC410"}
 TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
-POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"}}
-POST_BASE_SCREWS = {"ABA66Z": 12, "ABA66RZ": 12, "ABU66Z": 12, "ABA44Z": 8}
-POST_CAP_SCREWS = {"CCQ76SDS2.5": 0, "BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8}
-FOOTING_CAPACITY_LB = {"DP-50/50": 3300, "DP-75/63": 6000}
+# an 8x8 on a Diamond Pier: no Simpson base takes a single pier bolt (ABA88Z doesn't exist; ABU88 needs two anchors) — a custom HDG standoff
+# base on the DP-75's 5/8" bolt, Pin Foundations + the engineer to approve (Fillmore materials review, 27 Oct 2026)
+POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"},
+             "8x8": {"diamond_pier": "DP_base_8x8_custom", "concrete": "ABU88Z"}}
+POST_BASE_SCREWS = {"ABA66Z": 12, "ABA66RZ": 12, "ABU66Z": 12, "ABA44Z": 8, "DP_base_8x8_custom": 0, "ABU88Z": 0}   # the 8x8 bases through-bolt
+POST_CAP_SCREWS = {"CCQ76SDS2.5": 0, "BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8,
+                   "CCQ68SDS2.5": 0, "ECCQ68SDS2.5": 0, "CCQ66SDS2.5": 0, "ECCQ66SDS2.5": 0, "CCQ88SDS2.5": 0}     # CCQ / ECCQ ship with their SDS screws
+# Pin Foundations Residential Load Chart (DOC0008, 2018): 1,500 psf silts / clays; 2,000 psf sands / gravels allow 4,400 / 6,400 lb
+FOOTING_CAPACITY_LB = {"DP-50/50": 3300, "DP-75/63": 4200}
+FOOTING_CAPACITY_LB_2000 = {"DP-50/50": 4400, "DP-75/63": 6400}
+
+
+def pier_capacity_lb(model: str, soil_psf: float = 1500.0) -> float:
+    """A Diamond Pier's allowable load on this soil (the chart's 1,500 psf column unless the soil is 2,000 psf or better)."""
+    return (FOOTING_CAPACITY_LB_2000 if soil_psf >= 2000 else FOOTING_CAPACITY_LB).get(model, 0)
 
 
 def post_cap(post: str, beam_size: str) -> str:

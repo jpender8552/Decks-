@@ -13,14 +13,14 @@ from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple
 
 from . import engineering as eng
-from .catalog import (rail_system_for, STOCK_LENGTHS_FT, DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
+from .catalog import (rail_system_for, STOCK_LENGTHS_FT, deck_lengths, DOUBLE_HANGER, FASCIA, H25_NAILS, HANGER_FOR_JOIST, HANGER_NAILS, LUMBER_STOCK_FT, POST_BASE, POST_BASE_SCREWS,
                       POST_CAP_SCREWS, PRICEBOOK, SPECIES_NAMES, TIMBER_BASE, actual, decking_facts, default_fastener_system, parse_beam,
                       RAIL_SYSTEMS)
 from .layout import OVERHANG_NO_FASCIA, NOSE, Layout, ZoneLayout, BeamLine, build_layout, LEDGER_T, RIM_PLY
 from .spec import post_words, post_base_sku, covers_of, DeckSpec
 from .units import ftin
 
-CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Benches", "Planters", "Porch cover", "Shade sail", "Finish", "Site"]
+CATEGORIES = ["Lumber", "Footings", "Hardware", "Flashing & waterproofing", "Decking", "Fasteners", "Fascia", "Rail", "Stairs", "Benches", "Planters", "Porch cover", "Shade sail", "Lighting", "Finish", "Site"]
 BOARD_STOCK_IN = {12: 144.0, 16: 192.0, 20: 240.0}
 
 
@@ -64,6 +64,9 @@ class Takeoff:
     timber_sf: float = 0.0            # timber surface for the oil option (every face that shows)
     model_lines: List[Line] = field(default_factory=list)   # the engine's own counts when the order came from the owner's quote
     order_ref: str = ""                                     # "Decks & Docks quote 979610"
+
+    def __post_init__(self):          # extras.lights: the Lighting lines, once per takeoff (a composite redoes them for the whole job)
+        from .lighting import finish_takeoff; finish_takeoff(self)
 
     def by_category(self) -> Dict[str, List[Line]]:
         out = defaultdict(list)
@@ -286,7 +289,7 @@ def _accumulate_field_plan(Q_: Q, spec: DeckSpec, L: Layout) -> None:
         Q_.clips += crossings * (2 if cortex else 1)
         Q_.bearing_points += crossings
     # cut the rows from stock: the short rows beside the steps and the bay come two or three to a board
-    packed = pack_boards([(f"panel {r.panel + 1}", r.length + 0.25) for r in P.rows], stocks=tuple(STOCK_LENGTHS_FT))
+    packed = pack_boards([(f"panel {r.panel + 1}", r.length + 0.25) for r in P.rows], stocks=deck_lengths(spec.decking.collection, spec.decking.profile))
     for stock, boards in sorted(packed.items()):
         Q_.field_boards[stock] += len(boards)
         multi = sum(1 for b in boards if len(b) > 1)
@@ -385,14 +388,15 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
         Q_.timber_ends += 2 * pieces_here
     # ---- decking: field boards per run, rips, cortex per run (an outline-laid plan is counted once, after the zones)
     runs = ([] if L.plan is not None else (_field_runs(spec, L, z, zi) if L.multi else [(dk.rows, dk.field_len, z.name)]))
+    _dl = deck_lengths(spec.decking.collection, spec.decking.profile)
     for n_rows, run_len, lab in runs:
         k = max(1, int(math.ceil(run_len / 240.0)))
         piece = run_len / k
-        stock = next((s for s in (12, 16, 20) if piece <= s * 12 + 0.01), 20)
+        stock = next((s for s in _dl if piece <= s * 12 + 0.01), _dl[-1])
         n_b, per = n_rows * k, 1
         # short rows: cut 2 or 3 from one longer board when that buys fewer LF (7' rows: two from a 16')
         for m in (2, 3):
-            st_m = next((s for s in (12, 16, 20) if m * (piece + 0.25) <= s * 12 + 0.01), None)
+            st_m = next((s for s in _dl if m * (piece + 0.25) <= s * 12 + 0.01), None)
             if st_m and int(math.ceil(n_rows * k / m)) * st_m < n_b * stock / per:
                 stock, n_b, per = st_m, int(math.ceil(n_rows * k / m)), m
         Q_.field_boards[stock] += n_b
@@ -683,7 +687,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
-        desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}" + (" rough" if spec.framing.post_rough and not timber else "")
+        if spec.framing.post_rough and not timber:       # rough-sawn full dimension: never "S4S" (the timber-frame wording)
+            desc = f"{nom}x{st} Douglas Fir #1 rough, full dimension (end grain sealed)" if (df1_post or nom.startswith('8x')) else f"{nom}x{st} #2 GC rough"
+        else:
+            desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}"
         lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if knee:
@@ -726,7 +733,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if base == "ABA66Z" and spec.framing.post_rough:
             base = "ABA66RZ"                # a rough-sawn 6x6 is a full 6": the R base, as every drawing calls it
         uc, src = _price("footings", base)
-        lines.append(Line("Footings", _desc("footings", base, base) + " on the pier bolt", n_posts, n_posts, "ea", "exact", uc, src, base))
+        lines.append(Line("Footings", _desc("footings", base, base) + " on the pier bolt", n_posts, n_posts, "ea", "exact", uc, src, base,
+                          "no stock Simpson base takes an 8x8 on a single pier bolt — Pin Foundations + the engineer approve the base" if base == "DP_base_8x8_custom" else ""))
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
     elif ft == "caisson":
         dia, depth = fr0.footing_dia_in, fr0.footing_depth_in
@@ -786,8 +794,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             if spec.framing.footing_type == "diamond_pier":     # the landing sits on the same footing the deck does
                 ucp, srcp = _price("footings", spec.framing.footing_model)
                 lines.append(Line("Stairs", f"Diamond Pier {spec.framing.footing_model} — landing {li + 1} footings", 4, 4, "ea", "exact  (one under each landing post)", ucp, srcp))
-                ucb, srcb = _price("footings", "ABA66Z" if spec.framing.post_size == "6x6" else "ABA44Z")
-                lines.append(Line("Stairs", f"Simpson {'ABA66Z' if spec.framing.post_size == '6x6' else 'ABA44Z'} post base on the pier bolt — landing {li + 1}", 4, 4, "ea", "exact", ucb, srcb))
+                lb_ = POST_BASE.get(spec.framing.post_size, {}).get("diamond_pier", "ABA44Z")
+                if lb_ == "ABA66Z" and spec.framing.post_rough:
+                    lb_ = "ABA66RZ"
+                ucb, srcb = _price("footings", lb_)
+                lines.append(Line("Stairs", f"{_desc('footings', lb_, 'Simpson ' + lb_)} on the pier bolt — landing {li + 1}", 4, 4, "ea", "exact", ucb, srcb))
             else:
                 uc, src = _price("footings", "concrete_pad")
                 lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
@@ -998,14 +1009,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                           "+2  (" + " · ".join(n for n in Qz.field_piece_note if n.split(":")[0] and True) + ")", uc, src))
     if Qz.rip_strips:
         n_rip = len(pack_boards([("rip", s) for s in Qz.rip_strips], stocks=(16,), kerf=0.125)[16]) if False else int(math.ceil(sum(s + 0.125 for s in Qz.rip_strips) / dk0.bw))
-        stock = 16 if timber else 12
+        stock = 16 if timber else min(deck_lengths(coll, "square"))
         uc, src = _price("decking", f"{brand}|{coll}|{stock}|square")
         if uc == 0.0:
             lf, src = _price("decking", f"{brand}|{coll}|per_lf"); uc = round(lf * stock, 2)
         lines.append(Line("Decking", f"{brand} {coll} {color} 1x6x{stock} Square Edge — rip boards at the house", n_rip, n_rip, "ea",
                           "exact  (" + " · ".join(f"{s:.2f}\"" for s in Qz.rip_strips) + " strips)", uc, src))
     if spec.geometry.picture_frame and Qz.border_pieces:
-        packed_b = pack_boards(Qz.border_pieces, stocks=(16, 20) if timber or L.multi else (12, 16, 20))
+        packed_b = pack_boards(Qz.border_pieces, stocks=tuple(s_ for s_ in ((16, 20) if timber or L.multi else (12, 16, 20)) if s_ in deck_lengths(bcoll, "square")) or deck_lengths(bcoll, "square"))
         for s_, boards in sorted(packed_b.items()):
             key = f"{brand}|{bcoll}|{s_}|square"
             uc, src = _price("decking", key)
@@ -1017,12 +1028,13 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         for name, Lb in Qz.border_pieces:
             cuts.append(CutPiece(name.capitalize(), f"{bcoll} {bcolor} square", Lb, 1, "mitre at the corners; dividers on the doubled joist"))
     for st in stairs:
-        per_board = max(1, int(math.floor(144 / (st.width + 0.25))))
+        tl = min(deck_lengths(coll, "square"))        # the shortest square-edge stock the line is sold in (Vintage: 16')
+        per_board = max(1, int(math.floor(tl * 12 / (st.width + 0.25))))
         nb = int(math.ceil(st.tread_pieces / per_board))
-        uc, src = _price("decking", f"{brand}|{coll}|12|square")
+        uc, src = _price("decking", f"{brand}|{coll}|{tl}|square")
         if uc == 0.0:
-            lf, src = _price("decking", f"{brand}|{coll}|per_lf"); uc = round(lf * 12, 2)
-        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x12 Square Edge — treads ({st.side} stair)", nb, nb + 1, "ea",
+            lf, src = _price("decking", f"{brand}|{coll}|per_lf"); uc = round(lf * tl, 2)
+        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{tl} Square Edge — treads ({st.side} stair)", nb, nb + 1, "ea",
                           f"+1  ({st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
         if st.riser_pieces:
             nr = int(math.ceil(st.riser_pieces / per_board))
@@ -1037,7 +1049,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
 
     # ================= BUILT-INS: benches (4x4 legs wrapped in deck board, 2x4 seat frame) and planters (2x4 box, OSB, deck-board skin)
     from .scene import bench_segments, planter_segments
-    uc12, src12 = _price("decking", f"{brand}|{coll}|12|square")
+    bl = min(deck_lengths(coll, "square"))           # built-ins cut from the shortest square-edge stock sold (Vintage: 16')
+    uc12, src12 = _price("decking", f"{brand}|{coll}|{bl}|square")
     if uc12 == 0.0:
         lf, src12 = _price("decking", f"{brand}|{coll}|per_lf"); uc12 = round(lf * 12, 2)
     dcx = PRICEBOOK["decking"]["Cortex_TimberTech_350"]
@@ -1060,8 +1073,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             pieces += [("seat", Lb_ + 1)] * 3 + [("apron", Lb_ + 1)] + ([("back slat", Lb_ + 1)] * 3 if back else [])
             pieces += [("post wrap", back - 0.5)] * (4 * n_l) + [("leg wrap", seat - 6.5)] * (4 * n_l)
             prev_end = (x1, y1)
-        nb = sum(len(v) for v in pack_boards(pieces, stocks=(12,)).values())
-        lines.append(Line("Benches", f"{brand} {coll} {color} 1x6x12 Square Edge — bench seats, aprons, back slats and post wraps ({len(bsegs)} sections, {ftin(blf * 12)})", nb, nb + 1, "ea",
+        nb = sum(len(v) for v in pack_boards(pieces, stocks=(bl,)).values())
+        lines.append(Line("Benches", f"{brand} {coll} {color} 1x6x{bl} Square Edge — bench seats, aprons, back slats and post wraps ({len(bsegs)} sections, {ftin(blf * 12)})", nb, nb + 1, "ea",
                           f"+1  ({len(pieces)} pieces packed into 12' boards)", uc12, src12))
         post_len = 44.0                                          # rim bottom to the back's top
         n44 = int(math.ceil(n_back / 2)) + int(math.ceil(n_front / 8))
@@ -1080,8 +1093,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     if ds:
         wd = (float(ds["x1"]) - float(ds["x0"])) * 12; dd = float(ds.get("depth_in", 21)); rr = float(ds.get("rise_in", 7))
         rows = int(math.ceil(dd / 5.55))
-        nb = sum(len(v) for v in pack_boards([("tread", wd + 1)] * rows + [("riser", wd + 1)] + [("end", dd + 1)] * 2, stocks=(12,)).values())
-        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x12 Square Edge — door step tread rows, riser and returns ({ftin(wd)} x {dd:g}\", {rr:g}\" rise)", nb, nb + 1, "ea", "+1", uc12, src12))
+        nb = sum(len(v) for v in pack_boards([("tread", wd + 1)] * rows + [("riser", wd + 1)] + [("end", dd + 1)] * 2, stocks=(bl,)).values())
+        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{bl} Square Edge — door step tread rows, riser and returns ({ftin(wd)} x {dd:g}\", {rr:g}\" rise)", nb, nb + 1, "ea", "+1", uc12, src12))
         n26 = int(math.ceil((2 * wd + (int(math.ceil(wd / 16)) + 1) * dd) * 1.1 / (12 * 12)))
         uc26, src26 = _lumber_price("2x6", 12)
         lines.append(Line("Stairs", f"2x6x12 #1 True Frame — door step box (rim + joists at 16\"), on the deck", n26, n26 + 1, "ea", "+1", uc26, src26))
@@ -1098,8 +1111,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             studs += 2 * (int(math.ceil(Lp / 12)) + 1) + 4
             plates_lf += 2 * 2 * (Lp + w) / 12
             osb_sf += (2 * (Lp + w) * h + Lp * w) / 144
-        nb = sum(len(v) for v in pack_boards(pieces, stocks=(12,)).values())
-        lines.append(Line("Planters", f"{brand} {coll} {color} 1x6x12 Square Edge — planter skin on all sides + picture-frame cap ({len(psegs)} planter{'s' if len(psegs) > 1 else ''}, {ftin(plf * 12)})", nb, nb + 1, "ea",
+        nb = sum(len(v) for v in pack_boards(pieces, stocks=(bl,)).values())
+        lines.append(Line("Planters", f"{brand} {coll} {color} 1x6x{bl} Square Edge — planter skin on all sides + picture-frame cap ({len(psegs)} planter{'s' if len(psegs) > 1 else ''}, {ftin(plf * 12)})", nb, nb + 1, "ea",
                           f"+1  ({len(pieces)} pieces packed into 12' boards)", uc12, src12))
         n24 = int(math.ceil((studs * 16 / 12 + plates_lf) / 8 * 1.1))
         lines.append(Line("Planters", "2x4x8 #2 PT — planter walls: studs 12\" OC, top and bottom plates, all treated", n24, n24 + 1, "ea", f"+1  ({studs} studs + {plates_lf:.0f} LF plates)", *P2X4))
@@ -1166,17 +1179,18 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         sched["Field"] = f"CONCEALoc at every joist in every gap ({Qz.clips})"
     elif fsys == "Cortex":
         rip_screws = sum(2 * (int(round(r / fr0.spacing)) + 2) for r in [0]) if not Qz.rip_strips else int(len(Qz.rip_strips) * 2 * (Qz.bearing_points / max(1, len(Qz.field_piece_note))))
-        n = Qz.clips + rip_screws
+        n = Qz.clips + rip_screws + stair_face          # stair treads and risers are Cortex face-screwed too, in the field color
         d = PRICEBOOK["decking"]["Cortex_TimberTech_350"]
         boxes = int(math.ceil(n / d["count"]))
         lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {color} plugs (350 ct / 100 SF)", boxes, boxes, "box",
-                          f"{n} screws  (2 per board at every bearing point" + (", rips included" if Qz.rip_strips else "") + f") · {boxes * d['count']} supplied", d["each"], d["source"]))
+                          f"{n} screws  (2 per board at every bearing point" + (", rips included" if Qz.rip_strips else "") + (f", stair treads + risers {stair_face}" if stair_face else "")
+                          + f") · {boxes * d['count']} supplied", d["each"], d["source"]))
         if bcolor != color or Qz.border_screws:
             nb = Qz.border_screws
             bboxes = max(1, int(math.ceil(nb / d["count"])))
             lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {bcolor} plugs — borders + dividers", bboxes, bboxes, "box", f"{nb} screws", d["each"], d["source"]))
         sched["Field"] = f"Cortex face screws with color-matched plugs: 2 per board at every joist and at both ends of every run, color-matched plugs ({n} field + {Qz.border_screws} border/divider)"
-        face = 0; stair_face = 0
+        face = Qz.fascia_screws; stair_face = 0         # the fascia still takes its own screws (below)
     else:
         n = Qz.clips
         d = PRICEBOOK["decking"]["CapTor_xd_350"]
@@ -1192,13 +1206,21 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                           f"{nb} screws  (border/divider {Qz.border_screws}" + (f" · stairs {stair_face}" if stair_face else "") + f") · {bboxes * d['count']} supplied", d["each"], d["source"]))
         sched["Picture frame + stairs"] = "Cortex face screws with color-matched plugs: borders and dividers 2 per bearing point, stair treads 2 per stringer per board"
         face -= Qz.border_screws; stair_face = 0
+    fascia_pvc = dkf["material"] == "PVC" and Qz.fascia_screws and face >= Qz.fascia_screws and "TOPLoc_PVC_fascia_100" in PRICEBOOK["decking"]
+    if fascia_pvc:      # Advanced PVC fascia takes TimberTech TOPLoc fascia screws (color-matched heads), not deck screws
+        d = PRICEBOOK["decking"]["TOPLoc_PVC_fascia_100"]
+        packs = max(1, int(math.ceil(Qz.fascia_screws / d["count"])))
+        lines.append(Line("Fasteners", f"TimberTech TOPLoc fascia screws for Advanced PVC fascia, {spec.decking.fascia_color or color} (100 ct, 30 LF)", packs, packs, "pack",
+                          f"{Qz.fascia_screws} screws · {packs * d['count']} supplied", d["each"], d["source"]))
+        sched["Fascia"] = "TOPLoc fascia screws, color-matched: 2 at each board end, then alternate top / bottom every 12\" into the rim, pre-drilled"
+        face -= Qz.fascia_screws
     if face + stair_face:
         d = PRICEBOOK["decking"]["CapTor_xd_350"]
         tot = face + stair_face
         boxes = max(1, int(math.ceil(tot / d["count"])))
         lines.append(Line("Fasteners", f"Starborn Cap-Tor xd 2-3/4\" Epoxy {color} 350 ct", boxes, boxes, "box",
                           f"{tot} screws needed  (" + " · ".join(f"{k_} {v_}" for k_, v_ in (("first row", Qz.first_row), ("border", 0 if (spec.decking.border_fastener or '') == 'Cortex' else Qz.border_screws),
-                                                                         ("fascia", Qz.fascia_screws), ("stairs", stair_face)) if v_) + ")", d["each"], d["source"]))
+                                                                         ("fascia", 0 if fascia_pvc else Qz.fascia_screws), ("stairs", stair_face)) if v_) + ")", d["each"], d["source"]))
         cx_b = (spec.decking.border_fastener or "") == "Cortex"
         sched["Face screws"] = ("Cap-Tor xd color-matched ONLY at: first row 1 per joist on the house edge · " + ("" if cx_b else "borders 2 per bearing point @ 16\" · ")
                                 + "fascia 2 at each board end then alternate top/bottom every 12\", pre-drilled" + (" · stair treads 2 per stringer per board" if stairs and not cx_b else ""))
@@ -1230,9 +1252,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 lines.append(Line("Rail", d_ if "Fulton Rail 8'" in d_ or "panel" in d_.lower() or " kit" in d_.lower() else f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" {kind} panel {rl.color}", n, n, "ea",
                                   f"exact  (cut to {' / '.join(cuts_txt)})", uc, src))
                 if f"{sysn}|top_rail|{stock_in // 12}" in PRICEBOOK["rail"] and kind == "level":
-                    # a top rail sold apart from the infill kit (Impression Rail Express: Modern / Classic profile)
-                    d_, uc, src = _item("rail", f"{sysn}|top_rail|{stock_in // 12}")
-                    lines.append(Line("Rail", d_.replace("{color}", rl.color), n, n, "ea", "exact  (one per bay, cut with its panel)", uc, src))
+                    if spec.railing.drink_rail and f"{sysn}|panel_cover|{stock_in // 12}" in PRICEBOOK["rail"]:
+                        # under a drink rail the top rail is replaced by the universal panel cover the drink-rail clips grip (TimberTech guide)
+                        d_, uc, src = _item("rail", f"{sysn}|panel_cover|{stock_in // 12}")
+                        lines.append(Line("Rail", d_.replace("{color}", rl.color), n, n, "ea", "exact  (one per bay — replaces the top rail under the drink rail)", uc, src))
+                    else:
+                        # a top rail sold apart from the infill kit (Impression Rail Express: Modern / Classic profile)
+                        d_, uc, src = _item("rail", f"{sysn}|top_rail|{stock_in // 12}")
+                        lines.append(Line("Rail", d_.replace("{color}", rl.color), n, n, "ea", "exact  (one per bay, cut with its panel)", uc, src))
             if (timber or sysd.get("surface")) and f"{sysn}|post_kit" in PRICEBOOK["rail"]:
                 d_, uc, src = _item("rail", f"{sysn}|post_kit")
                 d_ = d_.replace("{color}", rl.color)
@@ -1267,9 +1294,17 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             packed_d = pack_boards(pieces, stocks=(16,))
             nb = sum(len(v) for v in packed_d.values())
             uc, src = _price("decking", f"{spec.decking.brand}|{dcoll}|16|square")
-            lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge laid flat on the top rail, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
-            d_, uc, src = _item("hardware", f"{sysn.lower()}_drink_rail_bracket_kit" if f"{sysn.lower()}_drink_rail_bracket_kit" in PRICEBOOK["hardware"] else "drink_rail_bracket_kit")
-            lines.append(Line("Rail", d_, len(rl.sections), len(rl.sections), "kit", "exact  (one per bay)", uc, src))
+            on_ = ("on the drink-rail clips over the universal panel covers" if f"{sysn}|panel_cover|8" in PRICEBOOK["rail"] else "laid flat on the top rail")
+            lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge {on_}, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
+            kkey = f"{sysn.lower()}_drink_rail_bracket_kit" if f"{sysn.lower()}_drink_rail_bracket_kit" in PRICEBOOK["hardware"] else "drink_rail_bracket_kit"
+            d_, uc, src = _item("hardware", kkey)
+            kc = PRICEBOOK["hardware"][kkey].get("clips")
+            if kc:      # a clip kit (IRX: 12 clips) — 6 clips on an 8' bay, 4 on a 6'
+                clips = sum(6 if s_.panel_stock_in >= 96 else 4 for s_ in rl.sections)
+                nk = int(math.ceil(clips / kc))
+                lines.append(Line("Rail", d_, nk, nk, "kit", f"{clips} clips  (6 per 8' bay, 4 per 6') · {nk * kc} supplied", uc, src))
+            else:
+                lines.append(Line("Rail", d_, len(rl.sections), len(rl.sections), "kit", "exact  (one per bay)", uc, src))
         for st in stairs:
             sc = Counter(s_.panel_stock_in for s_ in st.stair_sections)
             for stock_in, n in sorted(sc.items()):
@@ -1279,6 +1314,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 else:
                     uc, src = _price("rail", f"{sysn}|panel|{stock_in // 12}|stair")
                     lines.append(Line("Stairs", f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" STAIR panel {rl.color} ({st.side} stair)", n, n, "ea", "exact", uc, src))
+                    if f"{sysn}|top_rail|{stock_in // 12}" in PRICEBOOK["rail"]:      # the stair panel ships without its top rail too
+                        d_, uc, src = _item("rail", f"{sysn}|top_rail|{stock_in // 12}")
+                        lines.append(Line("Stairs", d_.replace("{color}", rl.color) + f" — stair rail ({st.side} stair)", n, n, "ea", "exact  (one per stair panel, cut on the rake)", uc, src))
             if st.stair_posts:
                 uc, src = _price("rail", f"{sysn}|post|STAIR")
                 lines.append(Line("Stairs", f"{rname} {sysd['post_w']:g}\" STAIR post {rl.color} w/ brackets, cap ({st.side} stair)", st.stair_posts, st.stair_posts, "ea",
@@ -1303,7 +1341,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 if l.category in ("Rail", "Stairs") and " post " in l.item and '2"' in l.item:
                     l.item = l.item.replace('2"', f'{ps:g}"')
                     l.note = (l.note + " · " if l.note else "") + f"{ps:g}\" post — confirm the SKU and price with {sysn} (priced at the stock post rate)"
-        if not timber:
+        if f"{sysn}|accessory_kit" in PRICEBOOK["rail"]:      # the maker's touch-up + bracket jig kit (IRX AZTIXACCKITB)
+            d_, uc, src = _item("rail", f"{sysn}|accessory_kit")
+            lines.append(Line("Rail", d_.replace("{color}", rl.color), 1, 1, "ea", "exact  (cut ends, bracket jig)", uc, src))
+        elif not timber:
             uc, src = _price("rail", "touchup_paint")
             tu = "Rust-Oleum flat black touch-up (cut ends)" if "black" in (rl.color or "black").lower() else f"{rbrand} {rl.color} touch-up paint (cut ends)"
             lines.append(Line("Rail", tu, 1, 1, "ea", "exact", uc, src))
@@ -1468,6 +1509,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             c_.member = _side(c_.member)
         notes[:] = [_side(n_) for n_ in notes]
     t = Takeoff(spec, L, lines, cuts, sched, summary, notes, joist_lf, timber_sf)
+    if spec.geometry.louvered_roofs:      # roof posts that are rail posts: no rail post kit there, wall-mount brackets for the panels
+        __import__("decktakeoff.louvered", fromlist=["takeoff_hook"]).takeoff_hook(t)
     if spec.framing.system == "steel":
         from .steel import steel_frame
         steel_frame(t)

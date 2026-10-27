@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 
 from . import engineering as eng
 from .catalog import (rail_system_for, DECKING, FASCIA, NOSE, RAIL_SYSTEMS, RISER, STOCK_LENGTHS_FT, actual, decking_facts,
-                      parse_beam, FOOTING_CAPACITY_LB)
+                      parse_beam, FOOTING_CAPACITY_LB, pier_capacity_lb)
 from .spec import DeckSpec, RailOpening
 from .units import ftin
 
@@ -151,6 +151,7 @@ class RailPost:
     y: float
     kind: str      # END | LINE | CORNER | STAIR
     tag: str
+    # rail_layout_edges sets .roof = True (an attribute, not a field) where a louvered-roof post IS the rail post
 
 
 @dataclass
@@ -203,6 +204,15 @@ class StairLayout:
     carrier_fracs: List[float] = field(default_factory=lambda: [0.5])   # where the carriers sit along each such flight's run (0 = top riser)
     build: str = "stringers"            # "stringers" | "box" (framed 2x6 box step, no stringers)
     skirts: bool = False                 # stepped fascia skirts on both open sides
+    inset: bool = False                  # recessed in a notch of the outline (layout.inset_notch): the notch's framing is counted with the frame
+    notch: Optional[dict] = None         # the notch it sits in (inches, plan frame) — inset_notch() plus the posts and the foot carrier
+    notch_posts: int = 0                 # posts at the notch's outer corners (header ends + the stringer-foot carrier), each on a footing
+    notch_post_len: float = 0.0
+    handrail: str = ""                   # "" | "each flight" | "guard posts" (Stair.handrail)
+    handrail_side: str = "right"
+    handrail_lf: float = 0.0             # graspable handrail length, all flights
+    lands_on: str = ""                   # the composite part a "deck" landing stair lands on (set by composite.build_composite)
+    option: str = ""                     # the option this stair belongs to (Stair.option)
 
 
 @dataclass
@@ -318,7 +328,8 @@ class Layout:
 
     @property
     def stair_support_posts(self) -> int:
-        return sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support)
+        return (sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support)
+                + sum(getattr(st, "notch_posts", 0) for st in self.stairs))     # an inset stair's notch posts stand on footings too
 
     @property
     def n_footings(self) -> int:
@@ -663,7 +674,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         ph_ok = (worst_load <= cap_post, cap_post)
     else:
         ph_ok = eng.post_ok(fr.post_size, post_len)
-    cap_lb = FOOTING_CAPACITY_LB.get(fr.footing_model, 0) if fr.footing_type == "diamond_pier" else 0
+    cap_lb = pier_capacity_lb(fr.footing_model, spec.site.soil_bearing_psf) if fr.footing_type == "diamond_pier" else 0
     if fr.footing_type == "concrete":
         dia = eng.concrete_footing_diameter(worst_load, spec.site.soil_bearing_psf)
         depth = spec.site.frost_depth_in + 6
@@ -675,8 +686,8 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         dia, depth = 0.0, 50.0
     model = fr.footing_model if fr.footing_type == "diamond_pier" else fr.footing_type
     if fr.footing_type == "diamond_pier" and worst_load > cap_lb:
-        if worst_load <= FOOTING_CAPACITY_LB["DP-75/63"]:
-            model = "DP-75/63"; cap_lb = FOOTING_CAPACITY_LB[model]
+        if worst_load <= pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf):
+            model = "DP-75/63"; cap_lb = pier_capacity_lb(model, spec.site.soil_bearing_psf)
             notes.append(f"post load {worst_load:,.0f} lb exceeds DP-50/50 (3,300 lb) — upgraded to DP-75/63")
         else:
             notes.append(f"post load {worst_load:,.0f} lb exceeds Diamond Pier capacity — add posts (shorter beam spans) or switch to concrete piers")
@@ -700,8 +711,10 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
 
 
 # ================================================================== railing
-def _split_run(total_ctc: float, panel_max_cut: float, post_w: float, allow: float) -> int:
+def _split_run(total_ctc: float, panel_max_cut: float, post_w: float, allow: float, ctc_cap: Optional[float] = None) -> int:
     max_ctc = panel_max_cut + post_w + 2 * allow
+    if ctc_cap:                         # the maker's maximum post spacing (IRX: 96" c-c) governs when the panel would allow more
+        max_ctc = min(max_ctc, ctc_cap)
     return max(1, int(math.ceil(total_ctc / max_ctc - 1e-9)))
 
 
@@ -751,7 +764,7 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
                 continue
             k0 = "CORNER" if (abs(a - start) < 0.01 and corner_at_start) else "END"
             k1 = "CORNER" if (abs(b - end) < 0.01 and corner_at_end) else "END"
-            n = _split_run(p1 - p0, max(panels.values()), post_w, allow)
+            n = _split_run(p1 - p0, max(panels.values()), post_w, allow, sysd.get("max_ctc"))
             ctc = (p1 - p0) / n
             xs = [p0 + i * ctc for i in range(n + 1)]
             for i, s in enumerate(xs):
@@ -774,7 +787,8 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
     return RailLayout(r.system, r.color, r.height_in, posts, sections, round(rail_lf / 12.0), round(perim / 12.0, 1), openings, notes)
 
 
-def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[RailOpening], forced_x: Optional[List[float]] = None) -> Optional[RailLayout]:
+def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[RailOpening], forced_x: Optional[List[float]] = None,
+                      fixed_pts: Optional[List[Tuple[float, float, float]]] = None) -> Optional[RailLayout]:
     """Rail along named outline edges (multi-zone plans). Posts at the ends of every selected edge and evenly between at
     the system's max post spacing; a post shared by two selected edges is a CORNER."""
     r = spec.railing
@@ -866,12 +880,25 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
         for a, b in segs:
             p0 = (t_first if (t_first is not None and a < 0.5) else a + RP)
             p1 = (t_last if (t_last is not None and b > L - 0.5) else b - RP)
+            # louvered-roof posts on this run's post line (louvered.rail_points): each is a fixed rail post, one within 14" of
+            # a segment end takes that end's place; a divider post within 24" of one is dropped (the roof post is the post there)
+            roof_t = {}
+            for fp in (fixed_pts or []):
+                t_ = (fp[0] - e.x0) * ux + (fp[1] - e.y0) * uy
+                if abs((fp[0] - e.x0) * nx + (fp[1] - e.y0) * ny - RP) < 1.0 and p0 - 14 <= t_ <= p1 + 14:
+                    roof_t[round(t_, 3)] = float(fp[2]) if len(fp) > 2 else 6.0
+            for t_ in sorted(roof_t):
+                if abs(t_ - p0) <= 14:
+                    p0 = t_
+                elif abs(t_ - p1) <= 14:
+                    p1 = t_
             if p1 - p0 < 12:
                 continue
             # fixed posts: segment ends + any divider line that falls on this run (posts on the divider lines)
             fixed = [p0, p1]
             if forced_x and abs(uy) < 1e-6:            # a run along the front: t is x
-                fixed += [fx - e.x0 for fx in forced_x if p0 + 12 < fx - e.x0 < p1 - 12]
+                fixed += [fx - e.x0 for fx in forced_x if p0 + 12 < fx - e.x0 < p1 - 12 and all(abs(fx - e.x0 - t_) >= 24 for t_ in roof_t)]
+            fixed += [t_ for t_ in roof_t if p0 < t_ < p1]
             fixed = sorted(set(round(v, 3) for v in fixed))
             ts = []
             for fa, fb in zip(fixed, fixed[1:]):
@@ -882,9 +909,11 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
             for i, t in enumerate(ts):
                 kind = "END" if i in (0, len(ts) - 1) else "LINE"
                 placed.append(add_post(e.x0 + ux * t + nx * RP, e.y0 + uy * t + ny * RP, kind, f"{e.name} {i + 1}"))
+                if any(abs(t - t_) < 0.6 for t_ in roof_t):
+                    placed[-1].roof = True
             for (fa, fb), (pa, pb) in zip(zip(ts, ts[1:]), zip(placed, placed[1:])):
                 ctc = fb - fa
-                cut = ctc - post_w - 2 * allow
+                cut = ctc - post_w - 2 * allow - sum((w_ - post_w) / 2 for t_, w_ in roof_t.items() if min(abs(t_ - fa), abs(t_ - fb)) < 0.6)
                 stock = next((st for st, mx in sorted(panels.items()) if cut <= mx + 1e-6), max(panels))
                 sections.append(RailSection(e.name, round(ctc, 2), stock, round(cut, 2), p0=(pa.x, pa.y), p1=(pb.x, pb.y)))
             rail_lf += (b - a)
@@ -1375,7 +1404,8 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
                     prev = max(q for q in posts if q < px and q - a <= max_piece)
                     pieces.append((a, prev)); a = prev
             pieces.append((a, x1))
-            if timber:
+            if timber or (spec.framing.post_size in TIMBER_CAP and parse_beam(b.size)[1].startswith("6x")):
+                # a 6x beam on 8x8 / 6x6 posts: CCQ mid-line, ECCQ at a beam end (the end cap is a different part)
                 cap_mid, cap_end = TIMBER_CAP.get(spec.framing.post_size, ("CCQ68SDS2.5", "ECCQ68SDS2.5"))
             else:
                 cap_mid = cap_end = post_cap(spec.framing.post_size, b.size)
@@ -1401,8 +1431,8 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             z.frame.footing_load_lb = max(z.frame.footing_load_lb, ld)
     for z in zl:
         fr = z.frame
-        if fr.footing_type == "diamond_pier" and fr.footing_load_lb > fr.footing_capacity_lb and fr.footing_load_lb <= FOOTING_CAPACITY_LB["DP-75/63"]:
-            fr.footing_model = "DP-75/63"; fr.footing_capacity_lb = FOOTING_CAPACITY_LB["DP-75/63"]
+        if fr.footing_type == "diamond_pier" and fr.footing_load_lb > fr.footing_capacity_lb and fr.footing_load_lb <= pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf):
+            fr.footing_model = "DP-75/63"; fr.footing_capacity_lb = pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf)
     return lines
 
 
@@ -1716,7 +1746,8 @@ def build_layout(spec: DeckSpec) -> Layout:
             notes.append(plan.summary())
             notes += plan.notes
         oedges = outline_poly_edges(spec) if (g.outline and any(str(n).startswith("edge:") for n in (spec.railing.edges or []) + [q.side for q in spec.stairs])) else []
-        rl = rail_layout_edges(spec, oedges or edges, [q.opening for q in st], forced_x=[d[0] for d in divs])
+        rl = rail_layout_edges(spec, oedges or edges, [q.opening for q in st], forced_x=[d[0] for d in divs],
+                               fixed_pts=(__import__("decktakeoff.louvered", fromlist=["rail_points"]).rail_points(spec, zl) if spec.geometry.louvered_roofs else None))
         notes.append(f"{len(zl)} zones, {sum(q.W for q in zl) / 12:.1f}' along the house, outline "
                      + " · ".join(f"{e.name} {ftin(e.length)}" for e in edges if e.exposed))
         for ln in lines:

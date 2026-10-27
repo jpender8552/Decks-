@@ -89,13 +89,15 @@ def test_flags(result):
 
 
 def test_quote_pricing(result):
-    """The handoff stack: materials 35,678.80 x 1.15 -> tax 4% -> labor 24,080.76 -> GC 7,200 at cost -> 42.5% GM -> $123,291 check / $132,571 financed."""
+    """The handoff stack: materials x 1.15 -> tax 4% -> labor 24,080.76 -> GC 7,200 at cost -> 42.5% GM. At the 7 Sep handoff prices the
+    materials were 35,678.80 ($123,291 check); the 27 Oct pricebook carries the D&D GSEXT1 quote 979610 / SO 6622045 prices (8x8 DF
+    rough, Vintage, Cortex collated, IRX), so the same takeoff now prices 37,864.42 -> $127,838 check / $137,460 financed."""
     t, f, p = result
     assert p.material_factor == 1.15 and p.tax_rate == 0.04 and p.gm == 0.425
     assert abs(p.labor - 24080.76) < 0.01
     assert p.gc == 7200
-    assert abs(p.materials - 35678.80) / 35678.80 < 0.02
-    assert abs(p.sell - 123291) / 123291 < 0.01
+    assert abs(p.materials - 37864.42) / 37864.42 < 0.02
+    assert abs(p.sell - 127838) / 127838 < 0.01
     assert p.retail == round(p.sell / 0.93)
     assert p.engineering == (1800, 3000)
     assert sum(v for _, v in p.allocation) == p.sell
