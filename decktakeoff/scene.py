@@ -422,8 +422,11 @@ def build_scene(L) -> Scene:
         if fascia:
             # fascia on every open side, outside the rim, mitred at the corners
             Pq = [(float(x), float(y)) for x, y in spec.geometry.outline]
+            from .layout import step_skirt_layout
+            _sk = step_skirt_layout(spec) if getattr(spec.geometry, "step_skirt", None) else None
+            _skirted = {f_.edge for f_ in _sk.faces} if _sk else set()       # the step skirt's vertical panels are the fascia there
             for e_, kind_ in zip(L.outline_edges, OF.side_kind):
-                if kind_ not in ("rim", "rim45"):
+                if kind_ not in ("rim", "rim45") or e_.name in _skirted:
                     continue
                 ex0, ey0, ex1, ey1 = e_.x0 * IN, e_.y0 * IN, e_.x1 * IN, e_.y1 * IN
                 Le = math.hypot(ex1 - ex0, ey1 - ey0); ux_, uy_ = (ex1 - ex0) / Le, (ey1 - ey0) / Le
@@ -682,11 +685,105 @@ def build_scene(L) -> Scene:
                 else:
                     add("drink", xa - bw / 2, xa + bw / 2, y0_ - pw / 2, y1_ + pw / 2, zt + h + 0.06, zt + h + 0.06 + bt, "drink", 7, tone=tone())
 
+    # ---------------- the step-face skirt (geometry.step_skirt): vertical fascia panels cut to height, on 2x4 nailers hung from the rim
+    from .layout import step_skirt_layout, RAIL_POST_INSET as _RP
+    SK = step_skirt_layout(spec) if getattr(spec.geometry, "step_skirt", None) else None
+    for f_ in (SK.faces if SK else []):
+        Lf_ = math.hypot(f_.x1 - f_.x0, f_.y1 - f_.y0)
+        def _strip(a, b, o0, o1, f_=f_, ux_=(f_.x1 - f_.x0) / Lf_, uy_=(f_.y1 - f_.y0) / Lf_):
+            """Plan box (feet) of the strip a..b along the side (inches), o0..o1 off it (inches, + outward)."""
+            pts = [((f_.x0 + ux_ * p + f_.nx * o) * IN, (f_.y0 + uy_ * p + f_.ny * o) * IN) for p in (a, b) for o in (o0, o1)]
+            return min(q[0] for q in pts), max(q[0] for q in pts), min(q[1] for q in pts), max(q[1] for q in pts)
+        for i_, pieces in enumerate(f_.panels):
+            tn_ = tone()
+            for a, b, zb in pieces:
+                x0_, x1_, y0_, y1_ = _strip(a, b, 0.0, fas_t / IN)
+                add("fascia", x0_, x1_, y0_, y1_, zt + zb * IN, zt + SK.z_top * IN, "fascia", 6, tag=f"step skirt {f_.edge} panel {i_ + 1}", tone=tn_)
+        for p, zb in f_.studs:
+            x0_, x1_, y0_, y1_ = _strip(p - 1.75, p + 1.75, -1.5, 0.0)
+            add("block", x0_, x1_, y0_, y1_, zt + zb * IN, zt + SK.rim_bottom * IN, "timber", 5, tag="step skirt stud")
+        for a, b, zc in f_.rows:
+            x0_, x1_, y0_, y1_ = _strip(a, b, -1.5, 0.0)
+            add("block", x0_, x1_, y0_, y1_, zt + (zc - 1.75) * IN, zt + (zc + 1.75) * IN, "timber", 5, tag="step skirt blocking")
+
+    def draw_inset_stair(st):
+        """An inset stair (layout.inset_notch): from the trimmer at the notch's inner face down to the lower level, its bottom
+        riser flush with the step skirt; treads and risers between the cheek skirts; stringers hung on the trimmer, bearing on
+        the foot carrier between the two notch posts; the graspable handrail on the guard posts along one cheek."""
+        nt, g = st.notch, st.geo
+        ax, face, sgn = nt["axis"], nt["face"], nt["sgn"]
+        r_, run_, R, T = g.riser_in, g.tread_in, g.risers, g.treads
+        r_t, s_t, bt_in, jd_in = nt["riser_t"], nt["skirt_t"], bt / IN, jd / IN
+        va, vb = nt["lo"] + s_t + 0.125, nt["hi"] - s_t - 0.125
+        rs = 1.0 if nt["direction"] in ("-x", "+y") else -1.0            # the stringer / rail pitch, as the flights draw it
+        r_ax = "y" if ax == "x" else "x"
+        def bx(kind, u0_, u1_, v0_, v1_, z0_, z1_, mat, phase, tag="", rot=0.0, tone_=0.0):
+            """Stair-local inches (u from the inner face toward the outer face, v across, z from the deck surface) -> a box."""
+            a0, a1 = sorted((face - sgn * u0_, face - sgn * u1_))
+            x0_, x1_, y0_, y1_ = (a0, a1, v0_, v1_) if ax == "x" else (v0_, v1_, a0, a1)
+            add(kind, x0_ * IN, x1_ * IN, y0_ * IN, y1_ * IN, zt + z0_ * IN, zt + z1_ * IN, mat, phase, tag=tag, rot=rs * rot, rot_axis=r_ax, tone=tone_)
+        for k in range(1, R + 1):
+            bx("riser", (k - 1) * run_, (k - 1) * run_ + r_t, va, vb, -k * r_, -(k - 1) * r_ - bt_in, "fascia", 6, tag=f"riser {k} {st.side}", tone_=tone())
+            if k <= T:
+                bx("tread", (k - 1) * run_ + r_t, k * run_ + r_t + NOSE, va, vb, -k * r_ - bt_in, -k * r_, "deck", 6, tag=f"tread {k} {st.side}", tone_=tone())
+        # stringers: their top edge under the back of every tread, hung on the trimmer, the foot cut level onto the carrier
+        th = math.atan2(r_, run_)
+        dep = 11.25
+        c_top = nt["carrier_top"]
+        z_edge = lambda u: -r_ - bt_in - 0.25 - (u - r_t) * math.tan(th)
+        u_end = min(T * run_, r_t + (-r_ - bt_in - 0.25 - (c_top - jd_in) - dep / math.cos(th)) / math.tan(th))
+        Ls, uc = u_end / math.cos(th), u_end / 2
+        zc = z_edge(uc) - (dep / 2) / math.cos(th)
+        n_s = max(2, st.stringers)
+        for i in range(n_s):
+            v = va + 0.75 + (vb - va - 1.5) * i / (n_s - 1)
+            bx("stringer", uc - Ls / 2, uc + Ls / 2, v - 0.75, v + 0.75, zc - dep / 2, zc + dep / 2, "timber", 5, tag=f"stringer {st.side}", rot=th)
+        # the foot carrier between the notch posts, and the posts on their footings
+        u_c = sgn * (face - nt["post_line"])
+        bx("beam", u_c - 1.5, u_c + 1.5, nt["lo"], nt["hi"], c_top - jd_in, c_top, "timber", 4, tag=f"stair foot carrier {st.side}")
+        for px, py in nt["posts"]:
+            x, y = px * IN, py * IN
+            if ft == "diamond_pier":
+                add("footing", x - 0.45, x + 0.45, y - 0.45, y + 0.45, -0.2, 0.3, "concrete", 1, tag="Diamond Pier"); base_top = 0.3
+            elif ft in ("caisson", "existing"):
+                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, 0.5, "concrete", 1, tag="caisson", shape="cyl"); base_top = 0.5
+            else:
+                add("footing", x - 0.6, x + 0.6, y - 0.6, y + 0.6, -1.0, 0.15, "concrete", 1, shape="cyl"); base_top = 0.15
+            add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
+            add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, jbot, "timber", 2, tag=f"stair notch post {st.side}")
+        # the graspable handrail: 34-38" over the nosing line (36"), from above the top riser to above the bottom riser, on
+        # brackets off the guard posts along the cheek on its side going down
+        if getattr(st, "handrail", "") == "guard posts" and L.rail:
+            lo_side = (nt["direction"] in ("-x", "+y")) == ((getattr(st, "handrail_side", "right") or "right") == "right")
+            cheek = nt["lo"] if lo_side else nt["hi"]
+            sgn_c = 1.0 if lo_side else -1.0                               # into the notch from that cheek
+            v_h = cheek + sgn_c * (s_t + 1.75)
+            z_n = lambda u: -r_ * (u - r_t - NOSE) / run_
+            u_t, u_b = 0.0, T * run_ + r_t
+            Lh = math.hypot(u_b - u_t, z_n(u_t) - z_n(u_b))
+            um = (u_t + u_b) / 2
+            bx("toprail", um - Lh / 2, um + Lh / 2, v_h - 0.75, v_h + 0.75, z_n(um) + 34.5, z_n(um) + 36.0, "railmetal", 7, tag="graspable handrail", rot=th)
+            pw_in = rail_system_for(spec.railing)["post_w"]
+            line_c = cheek - sgn_c * _RP                                    # the cheek guard's post line, on the deck
+            for q in L.rail.posts:
+                al, ac = (q.x, q.y) if ax == "x" else (q.y, q.x)
+                u_p = sgn * (face - al)
+                if abs(ac - line_c) < 1.0 and -1.0 <= u_p <= nt["depth"] + 1.0:
+                    v0_, v1_ = sorted((ac + sgn_c * pw_in / 2, v_h))
+                    zb_ = z_n(min(max(u_p, u_t), u_b)) + 33.5
+                    bx("toprail", u_p - 0.75, u_p + 0.75, v0_, v1_, zb_, zb_ + 1.0, "railmetal", 7, tag="handrail bracket")
+
     # ---------------- stairs: one or more flights (stringers as rotated boxes, treads, closed risers, stair rail), landings, pad
     house_rects = [tuple(float(v) for v in h[:4]) for h in (spec.geometry.house_blocks or [])]
     def in_house(px, py):
         return any(hx0 <= px <= hx1 and hy0 <= py <= hy1 for hx0, hx1, hy0, hy1 in house_rects)
     for st, ss in zip(L.stairs, spec.stairs):
+        _n0 = len(B)                       # this stair's first box: an option stair's boxes carry the option's layer
+        if getattr(st, "inset", False) and st.notch:
+            draw_inset_stair(st)
+            for b_ in (B[_n0:] if getattr(st, "option", "") else []):
+                b_.layer = f"option:{st.option}"
+            continue
         g = st.geo
         rise, run, width = g.riser_in * IN, g.tread_in * IN, st.width * IN
         side = st.side
@@ -958,7 +1055,8 @@ def build_scene(L) -> Scene:
             if fi == len(flights) - 1:
                 # the bottom: a lower deck or a pad in the last flight's frame
                 if st.landing == "deck":
-                    sbf(cur_dir, cur_u0, "board", trun - 0.4, trun + 4.0, cur_va - 0.5, cur_vb + 0.5, z_next - bt, z_next, "deck", 6, tag=f"lower deck at the {st.side} stair")
+                    if not getattr(st, "lands_on", ""):     # on another part of a composite its own boards are there (a patch would z-fight)
+                        sbf(cur_dir, cur_u0, "board", trun - 0.4, trun + 4.0, cur_va - 0.5, cur_vb + 0.5, z_next - bt, z_next, "deck", 6, tag=f"lower deck at the {st.side} stair")
                 elif st.landing != "grade":       # a new or existing pad; "grade" lands on the ground
                     sbf(cur_dir, cur_u0, "footing", trun - 0.4, trun + 3.6, cur_va - 0.5, cur_vb + 0.5, z_next - 0.3, z_next + 0.02, "concrete", 1, tag=f"landing pad {st.side}")
                 break
@@ -1010,6 +1108,41 @@ def build_scene(L) -> Scene:
             if st.landing_rail_lf and frails[fi]:
                 landing_guard(rects, z_next, openings)
             z_cur = z_next
+        if getattr(st, "option", ""):
+            # an option stair: every box it drew carries layer "option:<name>"; the deck guard it opens is drawn across the
+            # opening too, as layer "base:<name>" — a viewer shows one or the other
+            for b_ in B[_n0:]:
+                b_.layer = f"option:{st.option}"
+            if L.rail:
+                sysd_ = rail_system_for(spec.railing)
+                prof_ = sysd_.get("profile") or {}
+                trw_, trh_ = prof_.get("top", (0.12, 0.08))
+                brw_, brh_ = prof_.get("bottom", (0.12, 0.08))
+                bal_, bal_oc_ = prof_.get("baluster", 0.06), prof_.get("baluster_oc_in", 4.0) * IN
+                h_, RPf = L.rail.height * IN, _RP * IN
+                horiz_ = direction in ("+y", "-y")
+                frame_ = u0 - edge if direction == "+y" else (u0 + edge if direction == "-y" else u0)
+                line_ = frame_ + (-RPf if direction in ("+y", "+x") else RPf)
+                ea_, eb_ = v_a - RPf, v_b + RPf
+                pts_ = [((q.x, q.y) if horiz_ else (q.y, q.x)) for q in L.rail.posts]
+                if any(abs(al * IN - e_) < 0.3 and abs(ac * IN - line_) < 0.3 for al, ac in pts_ for e_ in (ea_, eb_)):
+                    n1_ = len(B)
+                    def _run(kind, w_, z0_, z1_, mat_, tag_="", tone_=0.0):
+                        if horiz_:
+                            add(kind, ea_, eb_, line_ - w_ / 2, line_ + w_ / 2, z0_, z1_, mat_, 7, tag=tag_, tone=tone_)
+                        else:
+                            add(kind, line_ - w_ / 2, line_ + w_ / 2, ea_, eb_, z0_, z1_, mat_, 7, tag=tag_, tone=tone_)
+                    _run("toprail", trw_, zt + h_ - trh_, zt + h_, "railmetal", f"guard across the {st.side} stair opening (without the option)")
+                    _run("botrail", brw_, zt + 0.25, zt + 0.25 + brh_, "railmetal")
+                    nb_ = int((eb_ - ea_) / bal_oc_)
+                    for k_ in range(1, nb_):
+                        t_ = ea_ + (eb_ - ea_) * k_ / nb_
+                        bx_ = (t_ - bal_ / 2, t_ + bal_ / 2, line_ - bal_ / 2, line_ + bal_ / 2) if horiz_ else (line_ - bal_ / 2, line_ + bal_ / 2, t_ - bal_ / 2, t_ + bal_ / 2)
+                        add("baluster", *bx_, zt + 0.25 + brh_, zt + h_ - trh_, "railmetal", 7)
+                    if spec.railing.drink_rail:
+                        _run("drink", bw, zt + h_ + 0.06, zt + h_ + 0.06 + bt, "drink", tone_=tone())
+                    for b_ in B[n1_:]:
+                        b_.layer = f"base:{st.option}"
 
     # ---------------- an existing stucco parapet on the open edges (stays; nothing in the takeoff)
     if spec.railing.existing_parapet:

@@ -279,10 +279,12 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Step face | {step_face_words(t)}. |")
     lt = lights_of(t)
     if lt["total"]:
-        w("| Lighting | " + ", ".join(x for x in ((f"{lt['riser']} LED riser lights, one in every riser" if lt["riser"] else ""),
-                                                   (f"{lt['post_cap']} LED post-cap lights, one on every rail post" if lt["post_cap"] else ""),
-                                                   (f"{lt['other']} more LED lights" if lt["other"] else "")) if x)
-          + ("; low voltage on a transformer" + (" with a photocell / timer" if "photo" in lt["transformer"].lower() or "timer" in lt["transformer"].lower() else "") if lt["transformer"] else "") + ". |")
+        _tr = lt["transformer"].lower()
+        w("| Lighting | " + " and ".join(x for x in ((f"{lt['riser']} LED riser lights (one in every riser)" if lt["riser"] else ""),
+                                                    (f"{lt['post_cap']} LED post-cap lights (one on every rail post)" if lt["post_cap"] else ""),
+                                                    (f"{lt['other']} more LED lights" if lt["other"] else "")) if x)
+          + (("; low voltage, on a transformer" + (" with a photocell and timer" if "photo" in _tr and "timer" in _tr else
+                                                     (" with a photocell" if "photo" in _tr else (" with a timer" if "timer" in _tr else "")))) if lt["transformer"] else "") + ". |")
     if s.is_timber:
         w(f"| Timbers | Douglas fir #1 {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, {s.framing.joist_size} joists at {fr.spacing:g}\"; "
           + ("unfinished, end grain sealed" if s.framing.finish != "oil" else "dark walnut oil, two coats, end grain sealed") + (". Tub bay doubled" if s.extras.hot_tub else "") + ". |")
@@ -444,6 +446,11 @@ def stair_words(ss, st, composite: bool = False) -> str:
         txt += ((" " + to) if (len(g.flights) > 1 and ss is not None) else (", down " + to)) if to else ""
     if ss is not None and getattr(ss, "inset", False):
         txt += ", set into the upper level so the bottom riser is flush with the face between the levels"
+    sides = max(list(getattr(st, "flight_rails", None) or []) + [int(getattr(st, "stair_rail_sides", 0) or 0)])
+    if sides:
+        txt += " · rail on both sides" if sides >= 2 else " · rail on one side"
+    elif ss is not None and getattr(ss, "handrail", ""):
+        txt += " · a handrail on one side"
     if st.landing_rail_lf:
         txt += " · guard rail on the landing"
     return txt

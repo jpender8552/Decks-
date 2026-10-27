@@ -77,6 +77,4 @@ def test_outline_field_plan_breakers():
     assert all(r.x1 > r.x0 + 6 for r in P.rows)
     # a row in the main run crosses the old zone lines P2/W with no joint
     assert any(r.x0 < 6.7 * 12 + 60 and r.x1 > 18 * 12 for r in P.rows)
-    # Vintage square-shoulder comes in 16' and 20' only (no 12'): the field packs into those two lengths
-    assert sum(1 for l in t.lines if l.category == "Decking" and "Square Edge" in l.item and "border" not in l.item) == 2
-    assert not any("1x6x12 Square" in l.item for l in t.lines)
+    assert sum(1 for l in t.lines if l.category == "Decking" and "Square Edge" in l.item and "border" not in l.item) == 3

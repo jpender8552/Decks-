@@ -622,6 +622,29 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             cuts.append(CutPiece(f"Stair stringers ({st.side}" + (f", flight {fi + 1}" if multi else "") + ")", "2x12", fg.stringer_len_in, st.stringers,
                                  f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
             Qz.lumber += [("2x6", st.width + 3, "stair kicker/hanger board")] * 2
+        if getattr(st, "inset", False) and st.notch:
+            # the inset stair's foot: a doubled carrier between the notch posts, the stringer feet bear on it (A35Z each)
+            cl_ = st.notch["carrier_len"]
+            Qz.lumber += [(jsize, cl_, "stair foot carrier")] * 2
+            cuts.append(CutPiece(f"Stair foot carrier ({st.side})", jsize, cl_, 2, "2-ply, laminated; hung between the notch posts in double hangers, top at the lower level's joist tops — the stringer feet bear on it"))
+            Qz.hangers_double += 2
+            Qz.notch_dh = getattr(Qz, "notch_dh", 0) + 6           # trimmer ends 2 + headers 2 + the foot carrier 2
+            Qz.a35_stair = getattr(Qz, "a35_stair", 0) + 2 * st.notch_posts + st.stringers
+    # the step-face skirt: 2x4 nailers hung below the rim (studs at 16" + blocking rows) behind the vertical panels
+    skirt = None
+    if getattr(spec.geometry, "step_skirt", None):
+        from .layout import step_skirt_layout
+        skirt = step_skirt_layout(spec)
+        if skirt:
+            fp = [(ln_, lab_) for ln_, lab_ in skirt.furring_pieces() if ln_ > 1.0]
+            ns_ = sum(1 for _, lab_ in fp if lab_ == "skirt stud")
+            if fp:
+                Qz.lumber += [("2x4", ln_, lab_) for ln_, lab_ in fp]
+                Qz.a35_stair = getattr(Qz, "a35_stair", 0) + ns_
+                cuts.append(CutPiece("Step-skirt nailers", "2x4", max(ln_ for ln_, _ in fp), len(fp),
+                                     f"{ns_} studs hung from the rim at 16\" (A35Z + 2 structural screws at the top) and {len(fp) - ns_} blocking pieces in rows at mid-height and the bottom, "
+                                     "outer faces flush with the rim face"))
+            notes += skirt.notes
     # rail post blocks (timber / IRX: 10-1/2" blocks at every rail post)
     n_rail_posts = (len(rl.posts) if rl else 0) + sum(s.stair_posts for s in stairs)
     knee = spec.framing.knee_braces and not timber and not spec.framing.existing_posts and spec.framing.system != "steel"
@@ -642,6 +665,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             desc = f"{nom}x{st} {SPECIES_NAMES['DF#1']}"
         elif nom in ("2x6", "2x8", "2x10", "2x12"):
             desc = f"{nom}x{st} {SPECIES_NAMES.get(jsp, jsp)}"
+        elif nom == "2x4":          # the step-skirt nailers (D&D: 2x4 #1 KDAT ground contact)
+            desc = f"{nom}x{st} #1 KDAT GC"
         else:
             desc = f"{nom}x{st}"
         lines.append(Line("Lumber", desc, n, n + 1, "ea", f"+1 cull  ({_summarize_labels(labels)})", uc, src))
@@ -691,6 +716,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _lumber_price(car, 12, timber)
             lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at each carrier ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
                               3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
+    for st_ in L.stairs:
+        if getattr(st_, "notch_posts", 0):       # an inset stair: posts at the notch's outer corners (header ends + the foot carrier)
+            post_pieces += [(spec.framing.post_size, st_.notch_post_len + 1.0, "stair notch post")] * st_.notch_posts
+            cuts.append(CutPiece(f"Stair notch posts ({st_.side})", spec.framing.post_size, st_.notch_post_len, st_.notch_posts,
+                                 "at the notch's outer corners under the rim / header corner (A35Z both ways) — field-measure; the foot carrier hangs between them"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
@@ -698,7 +728,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             desc = f"{nom}x{st} Douglas Fir #1 rough, full dimension (end grain sealed)" if (df1_post or nom.startswith('8x')) else f"{nom}x{st} #2 GC rough"
         else:
             desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if (timber or nom.startswith('8x')) else 'Douglas Fir #1' if df1_post else '#2 GC'}"
-        lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])))
+        lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])
+                          + [ftin(s_.notch_post_len) for s_ in L.stairs if getattr(s_, "notch_posts", 0)]))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     if knee:
         lg = spec.framing.knee_leg_in
@@ -739,9 +770,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         base = POST_BASE.get(spec.framing.post_size, {}).get("diamond_pier", "ABA66Z")
         if base == "ABA66Z" and spec.framing.post_rough:
             base = "ABA66RZ"                # a rough-sawn 6x6 is a full 6": the R base, as every drawing calls it
+        if spec.framing.post_size == "8x8" and model == "DP-50/50" and not spec.framing.post_rough:
+            base = "ECB88HDG"               # a 7-1/2" S4S 8x8 on the DP-50's single 1/2" bolt (a rough 8x8 won't fit it: custom base)
         uc, src = _price("footings", base)
         lines.append(Line("Footings", _desc("footings", base, base) + " on the pier bolt", n_posts, n_posts, "ea", "exact", uc, src, base,
-                          "no stock Simpson base takes an 8x8 on a single pier bolt — Pin Foundations + the engineer approve the base" if base == "DP_base_8x8_custom" else ""))
+                          "no stock Simpson base takes a rough 8x8 on a single pier bolt — Pin Foundations + the engineer approve the base" if base == "DP_base_8x8_custom"
+                          else "ECB88 on the DP-50 bolt — Pin Foundations + the engineer accept it" if base == "ECB88HDG" else ""))
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
     elif ft == "caisson":
         dia, depth = fr0.footing_dia_in, fr0.footing_depth_in
@@ -827,7 +861,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d_, uc, src, sku = _hw(dh, black)
         lines.append(Line("Hardware", d_, Qz.hangers_double, Qz.hangers_double, "ea",
                           "exact  (doubled joists under the dividers, hung rims at the flush beam)" if timber else
-                          "exact  (the doubled rims hung square on the ledger) — confirm stock" if getattr(Qz, "outline_ledgers", None) is not None else "exact  (2 side rims x 2 ends) — confirm stock", uc, src, sku))
+                          ("exact  (the doubled rims hung square on the ledger" + (f" · stair notch: trimmer ends 2, headers 2, foot carrier 2" if getattr(Qz, "notch_dh", 0) else "")
+                           + ") — confirm stock") if getattr(Qz, "outline_ledgers", None) is not None else "exact  (2 side rims x 2 ends) — confirm stock", uc, src, sku))
     if Qz.hangers_skew:
         lines.append(Line("Hardware", f"Simpson SUR{jsize.replace('2x', '2')}Z / SUL{jsize.replace('2x', '2')}Z skewed 45-degree hanger (right / left as the angle runs)", Qz.hangers_skew, Qz.hangers_skew + 2, "ea",
                           f"+2  (joist ends on the 45-degree rims, from the framing plan)", 9.5, "est. — confirm D&D stock"))
@@ -846,7 +881,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     n_skew2 = Qz.hangers_skew_double + getattr(Qz, "hangers_field_double", 0)
     n_long = Qz.hangers_single * nh + 14 * Qz.hangers_skew + 10 * getattr(Qz, "hangers_field", 0) + 16 * n_skew2
     n_short = (Qz.hangers_single * nj + 6 * Qz.hangers_skew + 7 * getattr(Qz, "hangers_field", 0) + 8 * n_skew2
-               + Qz.h25 * H25_NAILS + 4 * 12 * len(getattr(L, "edge_posts", None) or []))   # A35Z: 12 nails each, 4 per edge post
+               + Qz.h25 * H25_NAILS + 4 * 12 * len(getattr(L, "edge_posts", None) or [])   # A35Z: 12 nails each, 4 per edge post
+               + 12 * getattr(Qz, "a35_stair", 0))                                          # + the inset stair's notch posts / stringer feet and the skirt studs
     if timber:
         # 4x hangers take 16d into the header: from the ring-shank box, with the rim end-nailing and blocking toe-nails
         need16 = n_long + 6 * Qz.n_blocks + 4 * Qz.n_joists
@@ -968,6 +1004,19 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d = PRICEBOOK["hardware"]["LSCZ"]
         n_sc = st.stringers * len(st.geo.flights)
         lines.append(Line("Hardware", d["desc"], n_sc, n_sc, "ea", f"exact  ({st.side} stair, 1 per stringer at the rim" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else "") + ")", d["each"], d["source"], "LSCZ"))
+        if getattr(st, "inset", False) and st.notch:
+            n_a = 2 * st.notch_posts + st.stringers
+            d_, uc, src, sku = _hw("A35Z", black)
+            lines.append(Line("Hardware", f"Simpson A35Z framing angle — inset stair: the notch posts to the rim and header corners, the stringer feet to the foot carrier",
+                              n_a, n_a + 2, "ea", f"+2  ({st.notch_posts} posts x 2 + {st.stringers} stringer feet)", uc, src, sku))
+    if skirt and any(f_.studs for f_ in skirt.faces):
+        n_a = sum(len(f_.studs) for f_ in skirt.faces)
+        d_, uc, src, sku = _hw("A35Z", black)
+        lines.append(Line("Hardware", "Simpson A35Z framing angle — the step-skirt studs to the rim", n_a, n_a + 2, "ea", f"+2  ({n_a} studs, 1 each at the top)", uc, src, sku))
+        d_, uc, src = _item("hardware", "RSS_3-1/8_100")
+        n_rs = 2 * n_a + 4 * sum(max(0, sum(1 for p_, _ in f_.studs if a_ - 1 <= p_ <= b_ + 1) - 1) for f_ in skirt.faces for a_, b_, _ in f_.rows)
+        lines.append(Line("Hardware", d_ + " — step-skirt studs to the rim, blocking to the studs", 1, 1, "box",
+                          f"exact  ({n_rs} screws: 2 per stud top, 2 each end of every blocking piece)", uc, src))
     if spec.extras.hot_tub:
         d_, uc, src, sku = _hw("tub_bay_lot", False)
         lines.append(Line("Hardware", d_, 1, 1, "lot", f"tub bay in zone {spec.extras.hot_tub_zone or 'A'} — RFI to the engineer", uc, src))
@@ -1044,7 +1093,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{tl} Square Edge — treads ({st.side} stair)", nb, nb + 1, "ea",
                           f"+1  ({st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
         if st.riser_pieces:
-            nr = int(math.ceil(st.riser_pieces / per_board))
+            nr = int(math.ceil(st.riser_pieces / max(1, int(math.floor(144 / (st.width + 0.25))))))     # riser boards are 12' (not the tread stock)
             uc, src = _price("decking", f"{brand}|{coll}|riser")
             if uc == 0.0:
                 lf, src = _price("decking", "generic_riser_per_lf"); uc = round(lf * 12, 2)
@@ -1053,6 +1102,39 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         cuts.append(CutPiece(f"Stair treads ({st.side})", f"{coll} {color} square", st.width, st.tread_pieces, "2 boards per tread, nosing 3/4\" over the riser"))
         if st.riser_pieces:
             cuts.append(CutPiece(f"Stair risers ({st.side})", "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness"))
+    # the step-face skirt: the decking fascia set vertically, cut to height (4 to a 12' board), fastened at every nailer
+    if skirt:
+        hs = sorted(skirt.panel_heights(), reverse=True)
+        rem_ = []                                   # first fit into 12' fascia stock
+        for h_ in hs:
+            for i_, r_ in enumerate(rem_):
+                if r_ >= h_ + 0.125:
+                    rem_[i_] -= h_ + 0.125; break
+            else:
+                rem_.append(144.0 - h_ - 0.125)
+        fas_ = FASCIA[dkf["material"]]
+        fcol = spec.decking.fascia_color or color
+        uc, src = _price("decking", f"{brand}|{coll}|fascia")
+        if uc == 0.0:
+            lf, src = _price("decking", "generic_fascia_per_lf"); uc = round(lf * 12, 2)
+        full_ = sum(1 for h_ in hs if h_ >= max(hs) - 0.01)
+        lines.append(Line("Fascia", f"{brand} {coll} Fascia {fcol} {fas_['thick']:g}x{fas_['width']:g}x12 — step-face skirt, set vertically", len(rem_), len(rem_) + 1, "ea",
+                          f"+1  ({len(hs)} panels {fas_['width']:g}\" wide: {full_} at {inches_frac(max(hs), 8)} on the step face, {len(hs) - full_} stepped on the stair cheeks; "
+                          f"{int(144 // (max(hs) + 0.125))} to a board)", uc, src))
+        cuts.append(CutPiece("Step-skirt panels", f"fascia {fcol}", max(hs), len(hs),
+                             f"vertical, {fas_['width']:g}\" wide, {skirt.gap:g}\" seams, 1/4\" off the lower deck; the cheek panels cut stepped 1/8\" over the treads"))
+        n_ss = skirt.panel_screws()
+        if dkf["material"] == "PVC" and "TOPLoc_PVC_fascia_100" in PRICEBOOK["decking"]:
+            d = PRICEBOOK["decking"]["TOPLoc_PVC_fascia_100"]
+            packs = max(1, int(math.ceil(n_ss / d["count"])))
+            lines.append(Line("Fasteners", f"TimberTech TOPLoc fascia screws for Advanced PVC fascia, {fcol} (100 ct, 30 LF) — step-face skirt", packs, packs, "pack",
+                              f"{n_ss} screws  (2 at the rim and 2 at each blocking row per panel, pre-drilled) · {packs * d['count']} supplied", d["each"], d["source"]))
+        else:
+            d = PRICEBOOK["decking"]["CapTor_xd_350"]
+            packs = max(1, int(math.ceil(n_ss / d["count"])))
+            lines.append(Line("Fasteners", f"Starborn Cap-Tor xd 2-3/4\" Epoxy {fcol} 350 ct — step-face skirt", packs, packs, "box", f"{n_ss} screws (2 per nailer per panel)", d["each"], d["source"]))
+        sched["Step skirt"] = (f"vertical fascia panels on 2x4 nailers: 2 color-matched screws into the rim and 2 into each blocking row per panel, pre-drilled; "
+                               f"panels {skirt.gap:g}\" apart, 1/4\" off the lower deck, tight under the picture-frame board")
 
     # ================= BUILT-INS: benches (4x4 legs wrapped in deck board, 2x4 seat frame) and planters (2x4 box, OSB, deck-board skin)
     from .scene import bench_segments, planter_segments
@@ -1339,9 +1421,17 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                         lines.append(Line("Stairs", f"{rname} Rail {stock_in // 12}' x {rl.height:g}\" LEVEL panel {rl.color} — landing guard ({st.side} stair, {st.landing_rail_lf:g} LF)", n, n, "ea", "exact  (open sides of the landings)", uc, src))
                 uc, src = _price("rail", f"{sysn}|post|{'CORNER' if 'CORNER' in RAIL_SYSTEMS.get(sysn, {}).get('post_types', []) else 'POST'}")
                 lines.append(Line("Stairs", f"{rname} {sysd['post_w']:g}\" post {rl.color} w/ brackets, cap — landing guard ({st.side} stair)", st.landing_posts, st.landing_posts, "ea", "exact  (bay ends + turn corners)", uc, src))
-            if st.geo.handrail_required and st.stair_rail_sides:
+            hr_ = getattr(st, "handrail", "")
+            if st.geo.handrail_required and (st.stair_rail_sides or hr_):
                 uc, src = _price("rail", f"{sysn}|handrail_kit")
-                lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
+                if not hr_:
+                    lines.append(Line("Stairs", f"{sysn} graspable handrail kit ({st.side} stair)", 1, 1, "ea", "exact  (4+ risers — IRC R311.7.8)", uc, src))
+                else:     # "each flight": one along every railed flight; "guard posts": an inset stair's, bracketed to the guard posts along a cheek
+                    n_hr = max(1, sum(1 for r_ in st.flight_rails if r_)) if hr_ == "each flight" else 1
+                    d_hr = PRICEBOOK["rail"].get(f"{sysn}|handrail_kit", {}).get("desc")
+                    item = (d_hr.replace("{color}", rl.color) if d_hr else f"{sysn} graspable handrail kit")
+                    lines.append(Line("Stairs", item + f" ({st.side} stair" + (", one per flight" if hr_ == "each flight" else f", on the guard posts along the {st.handrail_side}-hand cheek") + ")",
+                                      n_hr, n_hr, "ea", f"exact  (4+ risers — IRC R311.7.8; {st.handrail_lf:g}' of rail, 34–38\" over the nosings)", uc, src))
         if spec.railing.post_size_in and rl:
             ps = spec.railing.post_size_in
             for l in lines:

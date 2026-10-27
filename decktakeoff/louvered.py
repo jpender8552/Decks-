@@ -198,6 +198,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     x0, x1 = sorted((float(q["x0"]), float(q["x1"])))
     y0, y1 = sorted((float(q["y0"]), float(q["y1"])))
     W, D = x1 - x0, y1 - y0
+    W_nom, D_nom = W, D                      # the size as sold (the price's area); the built frame can differ by a snap of an inch or two
     notes: List[str] = []
     p = float(q["post_in"]) * IN
     rp = _num(q.get("post_inset_in"), RAIL_POST_INSET) * IN
@@ -209,8 +210,12 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     shift = 0.0
     explicit = bool(q.get("posts"))
 
+    # the deck the roof stands on: the surfaces under its footprint, and any at their height that continue them
+    zs_ = {round(s_["z"], 3) for s_ in under}
+    own = [s_ for s_ in surfaces if round(s_["z"], 3) in zs_] if under else []
+
     def front_line(x):
-        s = _surface_at(surfaces, x, y1, tol=0.6)
+        s = _surface_at(own, x, y1, tol=0.6)
         if s is not None and abs(s["y1"] - y1) <= 1.0:
             return s, s["y1"] - rp
         return None, y1 - p / 2
@@ -229,23 +234,33 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     else:
         posts = default_posts(x0, x1)
         if q.get("snap", True):
-            best = None
-            for (px, py) in posts:
+            def corner_d(px, py):              # how far a default front post sits from the deck's rail corner post near it
                 s, yf = front_line(px)
                 if s is None or abs(py - yf) > 1e-6:
-                    continue
-                for xe, sgn in _front_corners(surfaces, s):
-                    xc = xe + sgn * rp
-                    d = xc - px
-                    if 0.01 < abs(d) <= SNAP_FT and (best is None or abs(d) < abs(best)):
-                        best = d
-            if best is not None:
-                shift = best
+                    return None
+                ds = [xe + sgn * rp - px for xe, sgn in _front_corners(surfaces, s)]
+                ds = [d for d in ds if abs(d) <= SNAP_FT]
+                return min(ds, key=abs) if ds else None
+            fr_ = [pt for pt in posts if abs(pt[1] - max(pp[1] for pp in posts)) < 1e-6]
+            dl = corner_d(*fr_[0]) if fr_ else None
+            dr = corner_d(*fr_[-1]) if len(fr_) > 1 else None
+            if dl is not None and dr is not None and (abs(dl) > 0.01 or abs(dr) > 0.01):    # both posts on corners: the frame fits between them
+                x0, x1 = x0 + dl, x1 + dr
+                notes.append(f"the frame fits the deck's rail corners: x {x0:.3f}-{x1:.3f} ({ftin((x1 - x0) * 12)} wide), both posts are the corner rail posts")
+            elif (dl if dl is not None else dr) is not None and abs(dl if dl is not None else dr) > 0.01:
+                shift = dl if dl is not None else dr
                 x0, x1 = x0 + shift, x1 + shift
-                posts = default_posts(x0, x1)
-                notes.append(f"the roof slid {ftin(abs(shift) * 12)} {'left' if shift < 0 else 'right'} so its corner post is the rail corner post: "
-                             f"frame x {x0:.3f}-{x1:.3f}")
+                notes.append(f"frame at x {x0:.3f}-{x1:.3f}: its corner post is the rail's corner post ({ftin(abs(shift) * 12)} "
+                             f"{'left' if shift < 0 else 'right'} of the x {x0 - shift:.3f}-{x1 - shift:.3f} asked for)")
+            if x1 - x0 != W:
+                W = x1 - x0
+            posts = default_posts(x0, x1)
 
+    if not explicit and posts:                 # posts on the rail line: the front beam's face lines up with theirs
+        yp = max(pt[1] for pt in posts)
+        if abs(yp + p / 2 - y1) < 2.0 * IN and yp + p / 2 != y1:
+            y1 = yp + p / 2
+            D = y1 - y0
     # ---- frame size: by the longest post-to-post span the beams carry
     front = sorted((pt for pt in posts if abs(pt[1] - max(pp[1] for pp in posts)) < 0.6), key=lambda t: t[0])
     span = max([b[0] - a[0] for a, b in zip(front, front[1:])] + [0.0])
@@ -308,7 +323,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     # ---- posts as built
     pts = []
     for (px, py) in posts:
-        s = _surface_at(surfaces, px, py)
+        s = _surface_at(own, px, py)
         zd = s["z"] if s else z_deck
         on_rail = bool(s) and abs(py - (s["y1"] - rp)) < 0.5 / 12 + 1e-6
         pts.append(dict(x=px, y=py, z_deck=zd, on_rail=on_rail, surface=s["name"] if s else ""))
@@ -318,6 +333,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     brackets = [x0 + 0.5 + k * BRACKET_OC_FT for k in range(int((W - 1.0) / BRACKET_OC_FT) + 1)] if house else []
     res = dict(src=r, name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], hex=HEX.get(str(q["color"]).lower(), "#141416"),
                 x0=x0, x1=x1, y0=y0, y1=y1, W=W, D=D, area=round(area, 2), shift=shift, attach="house" if house else "freestanding",
+                W_nom=W_nom, D_nom=D_nom, area_nom=round(W_nom * D_nom, 2),
                 beam=(bw_in, bh_in), beam_label=flabel, span_ft=round(span, 2), span_max_ft=lim, w=w, h=h,
                 z_deck=z_deck, z_attach=z_attach, z_top=z_top, z_bot=z_bot, z_pivot=z_piv, clear_ft=clear,
                 louver_dir=ldir, blade_w=bwid, blade_t=float(q["blade_t_in"]) * IN, motor_t=float(q["motor_t_in"]) * IN, spacing=sp,
@@ -618,10 +634,18 @@ def descriptors(L) -> List[dict]:
 def rail_points(spec, zones) -> List[Tuple[float, float, float]]:
     """layout.build_layout: (x, y, post size) in inches, the layout's frame, of the roof posts that stand on a deck-edge rail
     line — rail_layout_edges makes each a fixed rail post (one near a run's end takes that end)."""
+    return _rail_points(spec, zone_surfaces(zones, spec.geometry.height_in))
+
+
+def rail_points_rect(spec, W: float, D: float) -> List[Tuple[float, float, float]]:
+    """rail_points for a one-rectangle deck (W x D inches from the left frame face and the house)."""
+    return _rail_points(spec, [dict(name="A", x0=0.0, x1=W / 12.0, y0=0.0, y1=D / 12.0, z=spec.geometry.height_in / 12.0)])
+
+
+def _rail_points(spec, surf: List[dict]) -> List[Tuple[float, float, float]]:
     roofs = [r for r in (getattr(spec.geometry, "louvered_roofs", None) or []) if built(r)]
     if not roofs:
         return []
-    surf = zone_surfaces(zones, spec.geometry.height_in)
     out = []
     for r in roofs:
         q = resolve(r, surf)
@@ -716,8 +740,8 @@ def scope_words(q: dict) -> List[str]:
     nz = q["n_zones"]
     n_bl = len(q["blades"])
     rail_posts = sum(1 for p in q["posts"] if p["on_rail"])
-    W_, D_ = ftin(q["W"] * 12), ftin(q["D"] * 12)
-    out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area']:g} SF), {str(q['color']).lower()} powder-coated aluminum",
+    W_, D_ = ftin(q["W_nom"] * 12), ftin(q["D_nom"] * 12)
+    out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area_nom']:g} SF), {str(q['color']).lower()} powder-coated aluminum",
            f"{n_bl} louver blades, {q['blade_w'] * 12:g}\" wide on {q['spacing'] * 12:g}\" centres, in {nz} motor zone{'s' if nz != 1 else ''} "
            f"(one Gaposa motor blade each); the blades turn from closed to {ANGLE_RANGE[1]:g} degrees open by remote or app",
            f"{q['beam_label']} aluminum perimeter frame with the integrated gutter round every zone"
@@ -752,7 +776,8 @@ def roof_pricing(spec, L=None) -> dict:
                for sc in q["screens"]]
         s_sell = round(sum(x["sell"] for x in scr), 2)
         s_fin, s_mo = _finance(spec, s_sell)
-        rows.append(dict(name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], width_ft=q["W"], depth_ft=q["D"], area_sf=q["area"],
+        rows.append(dict(name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], width_ft=q["W_nom"], depth_ft=q["D_nom"],
+                         area_sf=round(roof_area_sf(r), 2), built=dict(width_ft=round(q["W"], 4), depth_ft=round(q["D"], 4), area_sf=q["area"]),
                          price_per_sf=(float(r["price_per_sf"]) if r.get("price_per_sf") is not None and r.get("price") is None else None),
                          sell=sell, financed=fin, monthly=mo, priced=q["priced"], option_name=option_name(q), scope=scope_words(q),
                          frame=dict(x0=q["x0"], x1=q["x1"], y0=q["y0"], y1=q["y1"], z_top=q["z_top"], z_deck=q["z_deck"], clear_ft=q["clear_ft"]),
@@ -768,7 +793,7 @@ def roof_pricing(spec, L=None) -> dict:
 
 
 def option_name(q: dict) -> str:
-    return q.get("option_name") or f"{q['brand']} louvered roof — {ftin(q['W'] * 12)} x {ftin(q['D'] * 12)}, motorized, {str(q['color']).lower()}"
+    return q.get("option_name") or f"{q['brand']} louvered roof — {ftin(q['W_nom'] * 12)} x {ftin(q['D_nom'] * 12)}, motorized, {str(q['color']).lower()}"
 
 
 def option_prices(spec, gm: float) -> list:
@@ -782,7 +807,7 @@ def option_prices(spec, gm: float) -> list:
             sell = round(roof_sell(r))
             fin, _ = _finance(spec, sell)
             out.append(OptionPrice(option_name(q), fin, sell, round(sell * (1 - gm), 2),
-                                   f"{q['area']:g} SF" + (f" at ${float(r['price_per_sf']):,.0f}/SF" if r.get("price_per_sf") is not None and r.get("price") is None else "")
+                                   f"{q['area_nom']:g} SF" + (f" at ${float(r['price_per_sf']):,.0f}/SF" if r.get("price_per_sf") is not None and r.get("price") is None else "")
                                    + " — its own document has the detail"))
         if q["screens"] and q["screens_priced"] == "option":
             sell = round(sum(sc["sell"] for sc in q["screens"]))
@@ -863,6 +888,13 @@ def sheet(L, S, t, meta) -> Optional[str]:
         pl_ = q["plate"]
         o.append(R(X(pt["x"] - pl_ / 2), Y(pt["y"] - pl_ / 2), pl_ * sc, pl_ * sc, "#fff", INK, 0.8))
         o.append(R(X(pt["x"] - p / 2), Y(pt["y"] - p / 2), p * sc, p * sc, BLACK, INK, 0.5))
+    for sc in q["screens"]:                # the screens option: the fabric line and its cassette, dashed
+        (ax_, ay_), (bx_, by_) = sc["a"], sc["b"]
+        o.append(LN(X(ax_), Y(ay_), X(bx_), Y(by_), "#5b6e8c", 2.0, "2 2"))
+        side_ = sc["plane"] == "x"
+        right_ = side_ and ax_ > (x0 + x1) / 2
+        o.append(TH(X((ax_ + bx_) / 2) + ((-4 if right_ else 4) if side_ else 0), (Y(ay_ + (by_ - ay_) * 0.22) if side_ else Y(ay_) - 4),
+                    f"{sc['side']} screen (option)", 6.0, 800, ("end" if right_ else "start") if side_ else "middle", "#3d4f6b", halo="#fff"))
     for zi, c in enumerate(q["zones"]):
         cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
         o.append(TH(X(cx_), Y(cy_) - 4, f"ZONE {zi + 1}", 8.4, 900, "middle", halo="#fff"))
@@ -878,7 +910,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     if len(front_posts) > 1:
         for a_, b_ in zip(front_posts, front_posts[1:]):
             dim_h(o, X, Y(py1) - 26, a_["x"], b_["x"], f"{ftin((b_['x'] - a_['x']) * 12)} post to post", 7.2)
-    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame · {q['area']:g} SF", 8)
+    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame · {q['area_nom']:g} SF", 8)
     dim_v(o, Y, X(x1) + 18, y0, y1, ftin(q["D"] * 12), 8, left=False)
     if front_posts:
         fp = front_posts[0]
@@ -1009,9 +1041,11 @@ def sheet(L, S, t, meta) -> Optional[str]:
     notes = scope_words(q) + [
         f"Frame {q['beam_label']} aluminum (Suncoast spans: 2x8 to 15', 2x10 to 18', 4x8 to 22' between posts); the longest span here is {ftin(q['span_ft'] * 12)}.",
         f"Blades span up to {BLADE_SPAN_MAX_FT:g}' (snow-load dependent); one motor blade per zone, up to {MOTOR_SF:g} SF a motor.",
-        f"Each post carries about {max(x['total_lb'] for x in loads):,} lb ({max(x['trib_sf'] for x in loads):g} SF at 6 psf dead + {spec.site.ground_snow_psf:g} psf snow): the framing under it takes it down to the footings. Suncoast's engineering for the site's snow and wind governs the roof.",
+        f"Each post carries about {int(round(max(x['total_lb'] for x in loads) / 50.0) * 50):,} lb ({max(x['trib_sf'] for x in loads):.0f} SF at 6 psf dead + {spec.site.ground_snow_psf:g} psf snow): the framing under it takes it down to the footings. Suncoast's engineering for the site's snow and wind governs the roof.",
         "House side: the brackets go into the wall framing — field verify the eave, the wall and the framing behind it; flashed and sealed at every fastener.",
-    ] + list(q["notes"])
+    ] + ([("Screens option — " + ", ".join(f"{sc['side']} {ftin(sc['width'] * 12)}" for sc in q["screens"]) + f" wide, {ftin(max(sc['max_drop'] for sc in q['screens']) * 12)} drop, "
+           + ("clear vinyl" if q["screens"][0]["fabric"] == "vinyl" else f"{q['screens'][0]['color']} mesh") + f"; {q['screens'][0]['housing'] * 12:g}\" housings under the frame "
+           + ("inside the rail" if q["screens"][0]["mount"] == "inside" else "on the beams' outer faces") + ", side tracks, a bottom bar down to the deck")] if q["screens"] else []) + list(q["notes"])
     yy = 371
     for ln in notes:
         for k2, w_ in enumerate(textwrap.wrap(ln, 112)):

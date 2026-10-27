@@ -687,7 +687,9 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     else:
         dia, depth = 0.0, 50.0
     model = fr.footing_model if fr.footing_type == "diamond_pier" else fr.footing_type
-    if fr.footing_type == "diamond_pier" and worst_load > cap_lb:
+    if fr.footing_type == "diamond_pier" and worst_load > cap_lb and spec.framing.footing_model_lock:
+        notes.append(f"post load {worst_load:,.0f} lb exceeds {model} ({cap_lb:,.0f} lb) — the owner's pier model stays: add posts (shorter beam spans)")
+    elif fr.footing_type == "diamond_pier" and worst_load > cap_lb:
         if worst_load <= pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf):
             model = "DP-75/63"; cap_lb = pier_capacity_lb(model, spec.site.soil_bearing_psf)
             notes.append(f"post load {worst_load:,.0f} lb exceeds DP-50/50 (3,300 lb) — upgraded to DP-75/63")
@@ -720,7 +722,8 @@ def _split_run(total_ctc: float, panel_max_cut: float, post_w: float, allow: flo
     return max(1, int(math.ceil(total_ctc / max_ctc - 1e-9)))
 
 
-def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpening]) -> Optional[RailLayout]:
+def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpening],
+                fixed_pts: Optional[List[Tuple[float, float, float]]] = None) -> Optional[RailLayout]:
     r = spec.railing
     if not r.system or r.system.lower() == "none" or not r.sides:
         return None
@@ -762,20 +765,40 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
             # post centres at the segment ends, inset RP from the frame face at run ends and at openings
             p0, p1 = a + RP, b - RP          # post pocket sits inside the rail section, never in the opening
             p0 = max(RP, min(p0, end - RP)); p1 = max(RP, min(p1, end - RP))
+            # louvered-roof posts on this run's post line (louvered.rail_points): fixed rail posts; one within 14" of an end takes it
+            roof_t = {}
+            if fixed_pts:
+                (ax_, ay_), (bx_, by_) = to_xy(0.0), to_xy(1.0)
+                for fp in fixed_pts:
+                    t_ = (fp[0] - ax_) * (bx_ - ax_) + (fp[1] - ay_) * (by_ - ay_)
+                    if abs((fp[0] - ax_) * (by_ - ay_) - (fp[1] - ay_) * (bx_ - ax_)) < 1.0 and p0 - 14 <= t_ <= p1 + 14:
+                        roof_t[round(t_, 3)] = float(fp[2]) if len(fp) > 2 else 6.0
+                for t_ in sorted(roof_t):
+                    if abs(t_ - p0) <= 14:
+                        p0 = t_
+                    elif abs(t_ - p1) <= 14:
+                        p1 = t_
             if p1 - p0 < 12:
                 continue
             k0 = "CORNER" if (abs(a - start) < 0.01 and corner_at_start) else "END"
             k1 = "CORNER" if (abs(b - end) < 0.01 and corner_at_end) else "END"
-            n = _split_run(p1 - p0, max(panels.values()), post_w, allow, sysd.get("max_ctc"))
-            ctc = (p1 - p0) / n
-            xs = [p0 + i * ctc for i in range(n + 1)]
+            fixed = sorted({p0, p1} | {t_ for t_ in roof_t if p0 < t_ < p1})
+            xs = []
+            for fa, fb in zip(fixed, fixed[1:]):
+                n = _split_run(fb - fa, max(panels.values()), post_w, allow, sysd.get("max_ctc"))
+                ctc = (fb - fa) / n
+                xs += [fa + i * ctc for i in range(n)]
+                cut = ctc - post_w - 2 * allow - sum((w_ - post_w) / 2 for t_, w_ in roof_t.items() if min(abs(t_ - fa), abs(t_ - fb)) < 0.6)
+                stock = next((st for st, mx in sorted(panels.items()) if cut <= mx + 1e-6), max(panels))
+                for _ in range(n):
+                    sections.append(RailSection(side, round(ctc, 2), stock, round(cut, 2)))
+            xs.append(fixed[-1])
+            n = len(xs) - 1
             for i, s in enumerate(xs):
                 kind = k0 if i == 0 else k1 if i == n else "LINE"
-                add_post(*to_xy(s), kind, f"{side} {i+1}")
-            cut = ctc - post_w - 2 * allow
-            stock = next((st for st, mx in sorted(panels.items()) if cut <= mx + 1e-6), max(panels))
-            for _ in range(n):
-                sections.append(RailSection(side, round(ctc, 2), stock, round(cut, 2)))
+                pp_ = add_post(*to_xy(s), kind, f"{side} {i+1}")
+                if any(abs(s - t_) < 0.6 for t_ in roof_t):
+                    pp_.roof = True
             rail_lf += (b - a)
 
     if "left" in r.sides:
@@ -1222,7 +1245,7 @@ def _frame_notches(spec: DeckSpec, of: "OutlineFrame", poly, ins, jb: float, pli
         pf = next(((ya, ia, yb, ib) for (ya, ia), (yb, ib) in zip(cr[0::2], cr[1::2]) if ya <= mid <= yb), None)
         if pf is not None:
             of.joists = [q for q in of.joists if abs(q[0] - X_pf) >= jb + 0.25]
-            of.joists.append((X_pf, pf[0], pf[2], of.side_kind[pf[1]], of.side_kind[pf[3]], "PF joist (stair notch)"))
+            of.joists.append((X_pf, pf[0], pf[2], of.side_kind[pf[1]], of.side_kind[pf[3]], "stair-notch joist"))
             of.joists.sort(key=lambda q: (q[0], q[1]))
         of.side_kind[i_f] = "trimmer"
         of.notch_hangers += 4
@@ -1440,7 +1463,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
             import copy as _copy
             skirt_t = FASCIA[f["material"]]["thick"] if spec.decking.fascia else 0.0
             r_t = RISER[f["material"]]["thick"] if s.closed_risers else 0.0
-            clear = round(nt["width"] - 2 * skirt_t, 3)
+            clear = round((nt["width"] - 2 * skirt_t) * 8) / 8          # to the 1/8": the outline is in feet
             if abs(clear - s.width_in) > 0.5:
                 ins_notes.append(f"inset stair: the notch is {ftin(nt['width'])} wide, so the treads run {ftin(clear)} between the cheek skirts (the stair asks {ftin(s.width_in)})")
             s = _copy.copy(s)
@@ -1706,6 +1729,10 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             x1 = last.x0 + last.W - hold
             boundaries = [m[2].x0 for m in members[1:]]
             allow_by_seg = [m[3].check.allowable_in for m in members]
+            if spec.framing.footing_type == "diamond_pier" and spec.framing.footing_model_lock:
+                cap_ = pier_capacity_lb(spec.framing.footing_model, spec.site.soil_bearing_psf)
+                allow_by_seg = [min(a_, cap_ / max(1e-6, m[3].trib_depth / 12.0 * m[2].frame.total_psf) * 12.0) if cap_ else a_
+                                for a_, m in zip(allow_by_seg, members)]
             end_in = 18.0 if timber else POST_END_OVERHANG
             explicit = None
             for bb in spec.framing.beams:
@@ -1780,7 +1807,8 @@ def build_beam_lines(spec: DeckSpec, zl: List[ZoneLayout]) -> List[BeamLine]:
             z.frame.footing_load_lb = max(z.frame.footing_load_lb, ld)
     for z in zl:
         fr = z.frame
-        if fr.footing_type == "diamond_pier" and fr.footing_load_lb > fr.footing_capacity_lb and fr.footing_load_lb <= pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf):
+        if (fr.footing_type == "diamond_pier" and not spec.framing.footing_model_lock and fr.footing_load_lb > fr.footing_capacity_lb
+                and fr.footing_load_lb <= pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf)):
             fr.footing_model = "DP-75/63"; fr.footing_capacity_lb = pier_capacity_lb("DP-75/63", spec.site.soil_bearing_psf)
     return lines
 
@@ -2138,7 +2166,8 @@ def build_layout(spec: DeckSpec) -> Layout:
     n_bearing = len(fr.joist_x) + len(fr.pf_x)
     dk = decking_layout(spec, W, D, n_bearing)
     st = stair_layouts(spec, W, D, dk)
-    rl = rail_layout(spec, W, D, [q.opening for q in st])
+    rl = rail_layout(spec, W, D, [q.opening for q in st],
+                     fixed_pts=(__import__("decktakeoff.louvered", fromlist=["rail_points_rect"]).rail_points_rect(spec, W, D) if spec.geometry.louvered_roofs else None))
     zl = [ZoneLayout("A", "", 0.0, 0.0, W, D, fr, dk, bool(spec.extras.hot_tub))]
     edges = outline_edges(zl, spec)
     lines = [BeamLine(b.kind, b.size, b.species, b.plies, b.width, b.depth, b.cl_y, b.x0, b.x0 + b.length, ["A"], list(b.posts_x), ["A"] * len(b.posts_x),

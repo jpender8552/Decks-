@@ -165,6 +165,7 @@ class Framing:
     footing_type: str = "diamond_pier"   # "diamond_pier" | "concrete" | "caisson" | "existing" (the caissons stay: standoff bases on epoxy anchors)
     existing_posts: bool = False         # the existing columns stay too: no post lumber or bases, new column caps / saddles engineered
     footing_model: str = "DP-50/50"
+    footing_model_lock: bool = False     # the owner's pier model stays (Fillmore: "We need DP-50"): posts are added instead of upgrading the pier
     knee_braces: bool = False                # 4x4 knee braces at 45 deg, both directions at every beam post (tall posts / lateral)
     knee_leg_in: float = 30.0                # brace leg (each way) from the post / beam intersection
     post_species: str = ""                   # deck posts: "" -> #2 GC treated; "DF#1" -> Douglas fir #1 (owner-specified)

@@ -159,8 +159,6 @@ def _layer_option(b) -> str:
     tag = (b.tag or "")
     if lay.startswith("option:"):
         return lay[len("option:"):].strip()
-    if tag.split(":")[-2:-1] and "Lighting option" in tag:
-        return "Lighting"
     if "Lighting option:" in tag:
         return "Lighting"
     if lay == "louvered":
@@ -245,11 +243,11 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade) ->
     views = []
     yc = (cams or {}).get("yard")
     if yc:
-        views.append(dict(key="yard", label="Yard", pos=yc["pos"], at=yc["at"], fov=yc.get("fov", 50), fit=W + 6))
+        views.append(dict(key="yard", label="Yard", pos=yc["pos"], at=yc["at"], fov=yc.get("fov", 50), fixed=True))
     else:
-        d = max(32.0, min(80.0, W * 0.78))
+        d = max(36.0, min(90.0, W * 0.92))
         zg = grade(cx, y1 + d)
-        views.append(dict(key="yard", label="Yard", pos=[cx + W * 0.06, y1 + d, zg + 5.5], at=[cx, cy, mid_top * 0.62], fov=46, fit=W + 6))
+        views.append(dict(key="yard", label="Yard", pos=[cx + W * 0.05, y1 + d, zg + 5.6], at=[cx, cy, mid_top * 0.95], fov=44, fit=W + 16))
     hi = max(parts, key=lambda p: p["top"])
     lo = min(parts, key=lambda p: p["top"])
     roof = next((r for r in roofs if r.get("frame")), None)
@@ -257,13 +255,10 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade) ->
         f = roof["frame"]
         zd = float(roof.get("z_deck") or hi["top"])
         rx0, rx1, ry0, ry1 = f["x0"], f["x1"], f["y0"], f["y1"]
-        far_right = (rx0 + rx1) / 2 >= cx
-        ex = rx1 - 2.2 if not far_right else rx0 + 2.2
-        tx = rx0 + (rx1 - rx0) * 0.3 if not far_right else rx1 - (rx1 - rx0) * 0.3
-        ex, tx = (rx1 - 2.2, rx0 + (rx1 - rx0) * 0.25)
+        ex, tx = rx1 - 2.2, rx0 + (rx1 - rx0) * 0.25
         views.append(dict(key="upper", label="Upper deck" if len(parts) > 1 else "Under the roof",
                           pos=[ex, ry1 - 1.6, zd + 5.4], at=[tx, ry0 + (ry1 - ry0) * 0.35, zd + 3.4], fov=64))
-    elif len(parts) > 1 or True:
+    else:
         # stand at the part's end away from the deck's middle, near the front, look along it
         far = hi["x1"] if (hi["x0"] + hi["x1"]) / 2 >= cx else hi["x0"]
         nxt = hi["x0"] if far == hi["x1"] else hi["x1"]
@@ -330,8 +325,6 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
             d = base
             for n in names:
                 if c >> bits[n] & 1:
-                    for p, v in patches[n]:
-                        pass
                     d = _apply(d, patches[n])
         spec, L, sc = _scene(d)
         if meta0 is None:
@@ -470,6 +463,8 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
     by0 = min(p["y0"] for p in parts); by1 = max(p["y1"] for p in parts)
     ztop = max([p["top"] for p in parts] + [float((r.get("frame") or {}).get("z_top", 0.0)) for r in roofs.values()])
     fixtures = _fixtures([(b, m) for b, m in union.values()], mats)
+    gboxes = [b for b, _m in union.values() if b.kind == "ground" and b.shape == "box"]
+    gbig = max(gboxes, key=lambda b: (b.x1 - b.x0) * (b.y1 - b.y0)) if gboxes else None
     opts = [dict(key=n, label=labels.get(n, n.title()), short=OPTION_SHORT.get(n, labels.get(n, n.title())), bit=bits[n], requires=req.get(n, []))
             for n in names]
     addr = f"{spec0.site.address}, {spec0.site.city}".strip(", ") if spec0.site.address else spec0.job
@@ -477,7 +472,8 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
                 default_on=[n for n in default_on if n in bits], mats=mats_out, mat_names=mat_names, kinds=kinds, layers=layers,
                 boxes=flat, stride=15, meshes=meshes, roofs=roofs_out, fixtures=fixtures, site=s, views=vws,
                 deck=dict(x0=bx0, x1=bx1, y0=by0, y1=by1, top=max(p["top"] for p in parts), z_max=ztop,
-                          parts=[dict(name=p["name"], top=p["top"]) for p in parts]))
+                          parts=[dict(name=p["name"], top=p["top"]) for p in parts]),
+                ground=dict(z=round(gbig.z1, 3) if gbig else 0.0, mat=gbig.mat if gbig else "ground"))
     stats.update(boxes=len(flat) // 15, meshes=len(meshes), combos=len(valid), fixtures=len(fixtures), roofs=len(roofs_out),
                  options=[o["key"] for o in opts], views=[v["key"] for v in vws])
     return data, stats
@@ -593,14 +589,16 @@ input[type=date] { font: 600 13px var(--body); color: var(--ink); background: va
 .views { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
 .views .btn { justify-content: center; }
 .note { font-size: 11.5px; color: var(--mute); line-height: 1.4; margin: 0; }
-.fold { display: none; }
+.grab { display: none; }
 @media (max-width: 760px) and (orientation: portrait), (max-width: 520px) {
   #app { flex-direction: column; }
   #panel { flex: 0 0 auto; width: auto; max-height: 47%; border-left: 0; border-top: 1px solid var(--line); gap: 10px;
     padding-block: 10px max(12px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  #panel.folded { max-height: 58px; overflow: hidden; }
+  #panel.folded { max-height: 44px; overflow: hidden; }
   .grp + .grp { padding-top: 10px; }
-  .fold { display: inline-flex; position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; }
+  .grab { display: flex; align-items: center; justify-content: center; gap: 8px; margin: -6px 0 -2px; min-height: 30px; background: none; border: 0;
+    color: var(--mute); font: 600 11px/1 var(--display); letter-spacing: .18em; text-transform: uppercase; cursor: pointer; }
+  .grab .bar { width: 34px; height: 4px; border-radius: 2px; background: var(--line); }
   .hint { bottom: 54px; }
   #g-view { display: none; }
   .vbar { display: flex !important; }
@@ -622,6 +620,7 @@ BODY = r"""<div id="app">
     <div class="fail" id="fail" hidden></div>
   </div>
   <aside id="panel" aria-label="Options and controls">
+    <button type="button" class="grab" id="fold" aria-label="Hide the controls" aria-expanded="true"><span class="bar"></span><span id="foldlab">Hide controls</span></button>
     <section class="grp" id="g-opts"><h2>Options</h2><div class="chips" id="chips"></div></section>
     <section class="grp" id="g-time">
       <h2><span>Sun and time</span><output id="tlab" for="t"></output></h2>
@@ -645,7 +644,6 @@ BODY = r"""<div id="app">
     </section>
     <section class="grp" id="g-view"><h2>View</h2><div class="views" id="views"></div></section>
     <p class="note" id="note"></p>
-    <button type="button" class="btn icon fold" id="fold" aria-label="Hide the controls" aria-expanded="true"><svg viewBox="0 0 16 16"><path id="foldpath" d="M3 6l5 5 5-5z"/></svg></button>
   </aside>
 </div>
 """
@@ -729,7 +727,7 @@ var sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 40, 20), new THREE.Shade
     ' vec3 c = h >= 0.0 ? mix(uHor, uTop, pow(clamp(h * 1.15, 0.0, 1.0), 0.5)) : mix(uHor, uGnd, smoothstep(0.0, 0.12, -h));',
     ' float cs = max(dot(d, uSun), 0.0);',
     ' c += uSunCol * uGlow * (0.55 * pow(cs, 6.0) + 0.45 * pow(cs, 48.0)) * (1.0 - smoothstep(0.0, 0.55, h) * 0.6);',
-    ' c += uSunCol * uDisc * smoothstep(0.99955, 0.9998, cs);',
+    ' c += uSunCol * uDisc * smoothstep(0.99994, 0.99998, cs);',
     ' gl_FragColor = vec4(c, 1.0); }'].join('\n')
 }));
 sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
@@ -742,7 +740,7 @@ var stars = (function () {
   var m = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6 * DPR, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false });
   var p = new THREE.Points(g, m); p.frustumCulled = false; p.renderOrder = -9; scene.add(p); return p;
 })();
-scene.fog = new THREE.Fog(0xcfd9e3, 260, 1300);
+scene.fog = new THREE.Fog(0xcfd9e3, 300, 2200);
 
 // ------------------------------------------------------------------ lights
 var hemi = new THREE.HemisphereLight(0xcfe0f2, 0x5b5546, 0.5); scene.add(hemi);
@@ -805,7 +803,7 @@ var FX = D.fixtures.slice(0, FXN);
 var fxA = [], fxB = [];
 for (var fi = 0; fi < FXN; fi++) { fxA.push(new THREE.Vector4()); fxB.push(new THREE.Vector4()); }
 var FXU = { fxA: { value: fxA }, fxB: { value: fxB }, fxCol: { value: new THREE.Color(1.0, 0.72, 0.45) }, fxGain: { value: 0 } };
-var FX_GAIN = [9.0, 3.2, 1.6];        // spot (riser), lantern cap, line (strip, per ft)
+var FX_GAIN = [7.0, 1.7, 0.9];        // a riser spot, a post-cap lantern, an LED strip (its nearest point)
 var FX_CHUNK = [
   '#define FX_N ' + FXN,
   'uniform vec4 fxA[FX_N]; uniform vec4 fxB[FX_N]; uniform vec3 fxCol; uniform float fxGain;',
@@ -816,9 +814,9 @@ var FX_CHUNK = [
   '    vec4 a = fxA[i]; if (a.w <= 0.0) continue;',
   '    vec4 b = fxB[i]; vec3 Lp = a.xyz;',
   '    if (b.w > 2.5) { float h = b.w - 3.0; vec3 t = vec3(b.x, 0.0, b.z); Lp = a.xyz + t * clamp(dot(P - a.xyz, t), -h, h); }',
-  '    vec3 L = Lp - P; float d2 = dot(L, L); if (d2 > 196.0) continue;',
+  '    vec3 L = Lp - P; float d2 = dot(L, L); if (d2 > 121.0) continue;',
   '    float d = sqrt(d2); vec3 l = L / max(d, 0.001);',
-  '    float w = a.w / (1.0 + 2.2 * d2) * (1.0 - smoothstep(5.0, 14.0, d)) * max(dot(N, l), 0.0);',
+  '    float w = a.w / (1.0 + 2.6 * d2) * (1.0 - smoothstep(3.5, 11.0, d)) * max(dot(N, l), 0.0);',
   '    if (b.w < 1.5) w *= smoothstep(b.w, min(1.0, b.w + 0.35), dot(-l, b.xyz));',
   '    else if (b.w < 2.5) w *= mix(0.12, 1.0, smoothstep(-0.2, 0.45, l.y));',
   '    else w *= smoothstep(0.0, 0.5, l.y);',
@@ -911,7 +909,8 @@ function boxInto(g, x0, x1, y0, y1, z0, z1, rot, axis, tone, mdef) {
     pushTri(g, [pts[0], pts[2], pts[3]], nw, [uvs[0], uvs[2], uvs[3]], c);
   }
 }
-var UNIT = { 1: new THREE.CylinderGeometry(0.5, 0.5, 1, 16).toNonIndexed(), 2: new THREE.IcosahedronGeometry(0.5, 1).toNonIndexed(), 3: new THREE.ConeGeometry(0.5, 1, 12).toNonIndexed() };
+function flatGeo(g) { return g.index ? g.toNonIndexed() : g; }
+var UNIT = { 1: flatGeo(new THREE.CylinderGeometry(0.5, 0.5, 1, 16)), 2: flatGeo(new THREE.IcosahedronGeometry(0.5, 1)), 3: flatGeo(new THREE.ConeGeometry(0.5, 1, 12)) };
 function shapeInto(g, shape, x0, x1, y0, y1, z0, z1, rot, axis) {
   var geo = UNIT[shape], P = geo.attributes.position, N = geo.attributes.normal, Uv = geo.attributes.uv;
   var w = x1 - x0, h = z1 - z0, d = y1 - y0;
@@ -960,6 +959,16 @@ Object.keys(GROUPS).forEach(function (k) {
   scene.add(mesh); GMESH.push(mesh);
   g.P = g.N = g.U = g.C = null;
 });
+
+// ------------------------------------------------------------------ the far field: a ground disc out to the fogged horizon
+(function () {
+  var g = new THREE.CircleGeometry(2600, 72); g.rotateX(-Math.PI / 2);
+  var P = g.attributes.position, uv = g.attributes.uv, per = TILE[(D.mats[D.ground.mat] || {}).pattern] || 8;
+  for (var i = 0; i < P.count; i++) uv.setXY(i, P.getX(i) / per, P.getZ(i) / per);
+  g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(P.count * 3).fill(1), 3));
+  var m = new THREE.Mesh(g, matFor(D.ground.mat, 'f'));
+  m.position.set(CX, D.ground.z - 0.04, CY); m.receiveShadow = true; m.renderOrder = -1; scene.add(m);
+})();
 
 // ------------------------------------------------------------------ louvered roofs: instanced blades turning about their own axes
 var BLADES = [];
@@ -1020,13 +1029,12 @@ function setLouvers(deg) {
 var SCR = [];
 (function () {
   if (!SCREENS.length) return;
-  var dc = document.createElement('canvas'); dc.width = dc.height = 8; var g = dc.getContext('2d'), id = g.createImageData(8, 8);
-  var bayer = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22,
-               3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
   SCREENS.forEach(function (s) {
     var md = D.mats[s.mat] || { color: '#1b1c1e', opacity: 0.8 };
     var open = 1 - (md.opacity == null ? 0.8 : md.opacity);
-    for (var i = 0; i < 64; i++) { var v = bayer[i] / 64 < open ? 0 : 255; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
+    // the shadow: a fine random weave the shadow map samples at random, so the shade under a screen is partial (the fabric's openness)
+    var dc = document.createElement('canvas'); dc.width = dc.height = 64; var g = dc.getContext('2d'), id = g.createImageData(64, 64), rs = 97;
+    for (var i = 0; i < 4096; i++) { rs = (rs * 16807) % 2147483647; var v = rs / 2147483647 < open ? 0 : 255; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
     g.putImageData(id, 0, 0);
     var dt = new THREE.CanvasTexture(dc); dt.magFilter = dt.minFilter = THREE.NearestFilter; dt.generateMipmaps = false; dt.wrapS = dt.wrapT = THREE.RepeatWrapping;
     var fm = new THREE.MeshStandardMaterial({ color: new THREE.Color(md.color || '#1b1c1e').convertSRGBToLinear(), roughness: md.rough == null ? 0.9 : md.rough,
@@ -1054,7 +1062,7 @@ function placeScreen(o, down) {
   if (fh > 0.02) {
     o.fab.scale.set(L, fh, 1); o.fab.position.copy(alongX ? P3(mid, line, zh + hemH + fh / 2) : P3(line, mid, zh + hemH + fh / 2));
     o.fab.rotation.set(0, alongX ? 0 : Math.PI / 2, 0);
-    o.fab.material.map.repeat.set(L / 1.2, fh / 1.2); o.dtex.repeat.set(L * 8, fh * 8);
+    o.fab.material.map.repeat.set(L / 1.2, fh / 1.2); o.dtex.repeat.set(L * 2.5, fh * 2.5);
   }
   o.hem.scale.copy(alongX ? new THREE.Vector3(L, hemH, hemT) : new THREE.Vector3(hemT, hemH, L));
   o.hem.position.copy(alongX ? P3(mid, line, zh + hemH / 2) : P3(line, mid, zh + hemH / 2));
@@ -1123,26 +1131,24 @@ function applySun() {
   var s = sunAt(S.date, S.min); SUN = s;
   var el = s.el, dir = P3(s.x, s.y, s.z).normalize();
   var ks = skyAt(el);
-  skyU.uTop.value.copy(ks[0]); skyU.uHor.value.copy(ks[1]); skyU.uGnd.value.copy(ks[1]).multiplyScalar(0.72);
+  skyU.uTop.value.copy(ks[0]); skyU.uHor.value.copy(ks[1]); skyU.uGnd.value.copy(ks[1]).multiplyScalar(0.85);
   skyU.uSun.value.copy(dir);
   skyU.uSunCol.value.copy(lerpC(C('#ffd2a0'), C('#fff6e6'), sstep(2, 30, el)));
   skyU.uGlow.value = sstep(-10, -1, el) * (0.55 + 0.6 * (1 - sstep(4, 35, el)));
   skyU.uDisc.value = sstep(-1.5, 0.5, el) * 1.4;
-  var hz = ks[1].clone().convertSRGBToLinear();
-  scene.fog.color.copy(hz);
+  scene.fog.color.copy(ks[1]);         // r128 mixes the fog in after the tone mapping and the sRGB encoding: the sky's own horizon colour
   var day = sstep(-1.0, 6.0, el), high = sstep(4, 40, el);
-  sun.intensity = day * (1.15 + 0.85 * high);
+  sun.intensity = day * (1.05 + 0.6 * high);
   sun.color.copy(sunRGB(el));
   hemi.color.copy(ks[0]).convertSRGBToLinear().lerp(new THREE.Color(0.85, 0.9, 1.0), 0.45);
   hemi.groundColor.copy(C('#5a5444')).convertSRGBToLinear().multiplyScalar(0.25 + 0.75 * day);
-  hemi.intensity = 0.07 + 0.18 * sstep(-12, -2, el) + 0.38 * sstep(-2, 25, el);
+  hemi.intensity = 0.035 + 0.17 * sstep(-12, -2, el) + 0.33 * sstep(-2, 25, el);
   NIGHT = 1 - sstep(-4, 3, el);
-  moon.intensity = 0.16 * (1 - sstep(-12, -3, el));
-  renderer.toneMappingExposure = 1.0 + 0.55 * NIGHT;
+  moon.intensity = 0.07 * (1 - sstep(-12, -3, el));
+  renderer.toneMappingExposure = 1.0 + 0.3 * NIGHT;
   stars.material.opacity = 0.9 * (1 - sstep(-14, -7, el));
   // the shadow box: the deck, the house beside it, and where their shadows fall
   if (day > 0) {
-    var tx = Math.max(-1, Math.min(1, s.z > 0.05 ? -s.x / s.z : -s.x / 0.05)), ty = s.z > 0.05 ? -s.y / s.z : -s.y / 0.05;
     var H = DK.z_max + 2, ext = 140;
     var gx = Math.max(-ext, Math.min(ext, -s.x / Math.max(0.06, s.z) * H)), gy = Math.max(-ext, Math.min(ext, -s.y / Math.max(0.06, s.z) * H));
     var x0 = DK.x0 - 14, x1 = DK.x1 + 14, y0 = DK.y0 - 10, y1 = DK.y1 + 14;
@@ -1163,7 +1169,6 @@ function applySun() {
   invalidate();
 }
 function applyGlow() {
-  var on = comboOf(S.on);
   var lit = NIGHT;
   FXU.fxGain.value = lit;
   LED_M.forEach(function (m) { m.emissiveIntensity = 0.15 + 5.5 * lit; });
@@ -1182,7 +1187,7 @@ function applyOptions() {
     var f = FX[i];
     if (!f || !shows(f[9], c)) { fxA[i].set(0, 0, 0, 0); fxB[i].set(0, 0, 0, 0); continue; }
     var p = P3(f[0], f[1], f[2]), a = P3(f[3], f[4], f[5]);
-    var gain = FX_GAIN[f[6]] * f[7] * (f[6] === 2 ? Math.max(1, f[8] * 2) : 1);
+    var gain = FX_GAIN[f[6]] * f[7];
     fxA[i].set(p.x, p.y, p.z, gain);
     if (f[6] === 0) fxB[i].set(a.x, a.y, a.z, Math.cos(62 * RAD));
     else if (f[6] === 1) fxB[i].set(0, -1, 0, 2.0);
@@ -1205,10 +1210,13 @@ var VIEWS = {}; D.views.forEach(function (v) { VIEWS[v.key] = v; });
 function viewPose(v) {
   var pos = P3(v.pos[0], v.pos[1], v.pos[2]), at = P3(v.at[0], v.at[1], v.at[2]), fov = v.fov || 50;
   var asp = stageW / Math.max(1, stageH);
-  if (v.fit) {                                       // a narrow screen: step back until the deck's width fits
-    var d = pos.distanceTo(at), hh = Math.atan(Math.tan(fov * RAD / 2) * asp), need = (v.fit / 2) / Math.tan(hh);
-    if (need > d) { var k = Math.min(2.6, need / d); pos = at.clone().add(pos.clone().sub(at).multiplyScalar(k)); }
-  } else if (asp < 0.9) fov = Math.min(80, fov * 1.18);
+  // a view is framed for a 3:2 screen: on a narrower one keep its width by opening the lens (a measured station stays put)
+  var hh = Math.atan(Math.tan(fov * RAD / 2) * 1.5), need = 2 * Math.atan(Math.tan(hh) / asp) / RAD;
+  if (need > fov) fov = Math.min(v.fixed ? 82 : 72, need);
+  if (v.fit && !v.fixed) {                           // still too narrow: step back until the deck's width fits
+    var d = pos.distanceTo(at), hx = Math.atan(Math.tan(fov * RAD / 2) * asp), dd = (v.fit / 2) / Math.tan(hx);
+    if (dd > d) { var k = Math.min(1.8, dd / d); pos = at.clone().add(pos.clone().sub(at).multiplyScalar(k)); }
+  }
   return { pos: pos, at: at, fov: fov };
 }
 function setPose(p) { tgt.copy(p.at); sph.setFromVector3(p.pos.clone().sub(p.at)); FOV = p.fov; updCam(); }
@@ -1320,7 +1328,8 @@ D.views.forEach(function (v) {
 });
 var panel = $('panel'), fold = $('fold');
 fold.addEventListener('click', function () { var f = panel.classList.toggle('folded'); fold.setAttribute('aria-expanded', f ? 'false' : 'true');
-  fold.setAttribute('aria-label', f ? 'Show the controls' : 'Hide the controls'); $('foldpath').setAttribute('d', f ? 'M3 10l5-5 5 5z' : 'M3 6l5 5 5-5z'); setTimeout(resize, 30); });
+  fold.setAttribute('aria-label', f ? 'Show the controls' : 'Hide the controls'); $('foldlab').textContent = f ? 'Show controls' : 'Hide controls';
+  panel.scrollTop = 0; setTimeout(resize, 30); });
 if (NOUI) { panel.hidden = true; vbar.style.display = 'none'; }
 $('note').textContent = 'Sun position for ' + D.address + ' (' + SITE.lat.toFixed(3) + '°, ' + SITE.lon.toFixed(3) + '°), local clock time. Lights switch on at dusk.';
 function onLabel() { var ks = OPT.filter(function (o) { return S.on[o.key]; }).map(function (o) { return o.short.toLowerCase(); }); return 'Base deck' + (ks.length ? ' + ' + ks.join(' + ') : ''); }
@@ -1354,7 +1363,7 @@ function writeURL() {
     var p = new URLSearchParams(location.search);
     var on = OPT.filter(function (o) { return S.on[o.key]; }).map(function (o) { return o.key; });
     if (on.length) p.set('opts', on.join(',')); else p.delete('opts');
-    p.set('date', S.date); p.set('t', clock(S.min).replace(/ (AM|PM)/, '') && (Math.floor(S.min / 60) + ':' + ('0' + S.min % 60).slice(-2)));
+    p.set('date', S.date); p.set('t', Math.floor(S.min / 60) + ':' + ('0' + Math.round(S.min % 60)).slice(-2));
     if (ROOF) p.set('louver', Math.round(S.louver)); p.set('view', S.view);
     history.replaceState(null, '', location.pathname + '?' + p.toString() + location.hash);
   } catch (e) { /* a sandboxed frame: the state stays in the page */ }
@@ -1404,7 +1413,9 @@ window.cfg = {
     if (o.screens != null) SCR.forEach(function (s) { S.scr[s.s.id] = o.screens; S.scrGoal[s.s.id] = null; });
     applyOptions(); applySun(); if (o.view) goView(o.view, true); syncUI(); renderer.render(scene, cam); },
   render: function () { renderer.render(scene, cam); },
-  timeFrames: function (n) { var t0 = performance.now(); for (var i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); } gl.finish(); return (performance.now() - t0) / n; },
+  timeFrames: function (n) { var px = new Uint8Array(4); renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var t0 = performance.now(); for (var i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+    return (performance.now() - t0) / n; },
   info: function () { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes: GMESH.length, fixtures: FX.length, fxn: FXN, maxFragmentUniforms: maxFU }; }
 };
 setLouvers(S.louver);

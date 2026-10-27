@@ -364,7 +364,8 @@ def _reads_levels(t, L, sm):
 LEVELS_CSS = """<style>
 .reads.levels { grid-template-columns:160px 1fr; }
 @media (max-width: 640px) { .reads.levels { grid-template-columns:1fr; } }
-@media print { #g-reads + .gal img { max-height:2.05in; object-fit:cover; } .reads.levels { gap:3px 12px; } .reads.levels dd { font-size:13px; } }
+@media print { #g-reads + .gal img { max-height:1.8in; object-fit:cover; } .reads.levels { gap:2px 12px; } .reads.levels dd { font-size:12.5px; line-height:1.4; }
+  .reads.levels dt { font-size:11px; } #g-what { margin-top:18px; } }
 </style>"""
 
 
@@ -427,10 +428,15 @@ def _added_facts(t0, t1) -> list:
     if l1["other"] > l0["other"]:
         rows.append(("Lights", f"{l1['other'] - l0['other']} more LED lights"))
     plan = getattr(t1, "lighting", None)
+    sw = ""
     if l1["transformer"] and not l0["transformer"] and plan is not None:     # the lighting engine's own words for how it switches
-        from .lighting import _switching
-        rows.append(("Power", _switching(plan)[0].upper() + _switching(plan)[1:] + "; it plugs into an outdoor GFCI outlet with an in-use cover"
-                     " (adding an outlet, if one is needed, is not included)"))
+        try:
+            from .lighting import _switching
+            sw = _switching(plan)
+        except Exception:
+            sw = ""
+    if sw:
+        rows.append(("Power", sw[0].upper() + sw[1:] + "; it plugs into an outdoor GFCI outlet with an in-use cover (adding an outlet, if one is needed, is not included)"))
     elif l1["transformer"] and not l0["transformer"]:
         tr = l1["transformer"].lower()
         rows.append(("Power", "low voltage from a transformer" + (" with a photocell and timer" if "photo" in tr and "timer" in tr else
@@ -1051,12 +1057,11 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in scope_words(q)) + "</ul>")
     # ---- size and placement
     under = sorted({f"{b[0]} {b[1]}" for b in _plan_boxes(L) if min(q["x1"], b[3]) - max(q["x0"], b[2]) > 0.5 and min(q["y1"], b[5]) - max(q["y0"], b[4]) > 0.5})
-    zl = {f"{b[0]} {b[1]}": b for b in _plan_boxes(L)}
     w('<h2 class="kicker pb" id="g-size">Size and placement <span class="tag">plan · house at the top</span></h2>')
     w(f'<figure class="plan-fig">{_roof_plan_svg(L, q)}<figcaption>The roof (hatched) and its posts over the deck; the darker the deck, the higher the level.</figcaption></figure>')
     reads = [("Size", f"{ftin(q['W'] * 12)} along the house x {ftin(q['D'] * 12)} out from it, {q['area']:g} SF"),
              ("Over", (", ".join(under) if under else "the deck") + (f" — {ftin(q['z_deck'] * 12)} above grade" if q["z_deck"] else "")),
-             ("House side", "attached at the house's soffit / roof line on wall brackets — no posts at the house" if q["attach"] == "house" else "freestanding, posts at every corner"),
+             ("House side", "attached to the house at the soffit / roof line — no posts at the house" if q["attach"] == "house" else "freestanding, posts at every corner"),
              ("Height", f"top of the frame {ftin((q['z_top'] - q['z_deck']) * 12)} above the deck; {ftin(q['clear_ft'] * 12)} clear under the beams")]
     if a.get("deck_note"):
         reads.append(("The deck", a["deck_note"]))
@@ -1066,7 +1071,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     st = [("Posts", f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
            + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} there — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else "")),
           ("Frame", f"{q['beam_label']} aluminum perimeter beams with the gutter built in" + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else "")),
-          ("House side", "the house-side beam hangs on wall brackets at the soffit / roof line" if q["attach"] == "house" else "posts at every corner")]
+          ("House side", "the house-side beam is carried on brackets at the soffit / roof line" if q["attach"] == "house" else "posts at every corner")]
     over = _posts_over_columns(L, q)
     if over is not None:
         st.append(("Under the posts", over))
@@ -1074,7 +1079,7 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     w('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in st) + "</dl>")
     # ---- controls, motor, gutters, lights
     groups = [("Controls and motor", facts.get("controls")), ("Gutters and drainage", facts.get("gutters")), ("Lights", facts.get("lights") if q["lights"] else None),
-              ("Sensors and accessories", facts.get("accessories"))]
+              ("Sensors and add-ons Suncoast offers", facts.get("accessories"))]
     groups = [(h_, v_) for h_, v_ in groups if v_]
     if groups:
         w('<h2 class="kicker" id="g-controls">Controls, motor, gutters, lights</h2><div class="facts-cols">'
@@ -1111,7 +1116,9 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     terms = ["This is a fixed-price proposal on the selections above. Check or ACH, or financed with approved credit. Numbers hold 30 days.",
              "The roof is priced on its own; the deck's price does not include it."] + list(a.get("terms") or [])
     w(PL.addon_invest(rows, (c, f, m), "".join(f"<p>{E(x)}</p>" for x in terms), title="The roof's price", show_fin=show_fin))
-    sched = a.get("schedule") or facts.get("schedule") or []
+    lvl = next((b[0] for b in _plan_boxes(L) if f"{b[0]} {b[1]}" in under), "")
+    sched = a.get("schedule") or ([f"Installed after the deck is built: the roof's posts stand on the new {lvl.lower() if lvl and lvl != 'Deck' else 'deck'}."]
+                                  + list(facts.get("schedule") or []))
     if sched:
         w('<h2 class="kicker" id="g-schedule">Schedule</h2><ol class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in sched) + "</ol>")
     excl = list(a.get("exclusions") or []) + list(facts.get("exclusions") or [])

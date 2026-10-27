@@ -227,8 +227,8 @@
     },
     "DP_base_8x8_custom": {
       "each": 225.0,
-      "source": "EST — fabricated HDG standoff base for an 8x8 on the DP-75 5/8\" bolt; PFI + engineer to approve",
-      "desc": "Custom HDG 8x8 standoff post base, single 5/8\" anchor (Diamond Pier DP-75)"
+      "source": "EST — fabricated base; Pin Foundations + the engineer approve it (no stock Simpson base takes a rough 8x8 on one pier bolt)",
+      "desc": "Custom HDG standoff post base for a rough 8x8, single anchor on the Diamond Pier bolt (1/2\" DP-50 / 5/8\" DP-75)"
     }
   },
   "hardware": {
@@ -805,6 +805,10 @@
       "source": "D&D quote 979610 11 Sep 2026 — ATLOCFAS30LT; English Walnut = ATLOCFAS30B (Brown)",
       "count": 100,
       "desc": "TimberTech TOPLoc fascia screws for Advanced PVC fascia, 30 LF pack (100 screws, 1 bit), color-matched"
+    },
+    "TimberTech|Vintage|12|square": {
+      "each": 92.28,
+      "source": "owner 27 Oct 2026: Vintage 12' square-shoulder boards exist (GSX buys them) — priced at the D&D $7.69/LF (quote 979610 11 Sep 2026)"
     }
   },
   "rail": {

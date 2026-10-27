@@ -290,18 +290,50 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
             + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></div></header>")
 
 
-# The Suncoast Louvered Roof as the homeowner reads it: product facts only, from $S/fillmore/louvered/research.md (the
-# manufacturer's site, brochure, care guide and warranty page). A job overrides any section through render_addon(addon=dict(facts=...)).
+# The Suncoast Louvered Roof as the homeowner reads it: product facts only, from $S/fillmore/louvered/research.md section 1 and
+# 5.1 (Suncoast's louvered-roof page and Oct 2026 brochure [S1, S2], care guide [S5], warranty page [S4], retractable-screens
+# page and brochure [S13, S14]) — the items research.md marks V (read in the source). A job overrides any list through
+# render_addon(addon=dict(facts=...)); what the price includes (engineering, electrical, sensors) is the job's to say (exclusions).
 LOUVER_FACTS = dict(
-    what=[],            # what the product is
-    controls=[],        # motor, remote / app, how far the blades turn
-    gutters=[],         # the integrated gutter, downspouts
-    lights=[],          # the LED light track
-    accessories=[],     # sensors, heaters, other options the maker offers
-    screens=[],         # the retractable screens (product facts; the job's screen sizes come from the engine)
-    warranty=[],        # the maker's warranty terms
-    schedule=[],        # lead time and install sequence
-    exclusions=[],      # what the roof's price does not include
+    what=[              # what the product is
+        "Structural aluminum frame, beams, posts and blades, powder-coated (AAMA 2604)",
+        "8\" blades on 8\" spacing with weather stripping on every blade: closed, they seal against rain and drain into the gutters; "
+        "open, they turn up to 140 degrees",
+        "A motor in one blade of each zone (one motor for up to 150 SF): no arms, levers or pistons outside the frame",
+        "Each roof is made to order by Suncoast",
+    ],
+    controls=[          # motor, remote / app
+        "Gaposa motors; the motors and electrical parts are CSA approved",
+        "A hand-held remote, one channel per zone, each with a programmable preset angle",
+        "Optional: a Wi-Fi module and app (schedules, control from anywhere), voice control through Alexa or Google Assistant, "
+        "and a module for Control4 and other home automation",
+    ],
+    gutters=[           # the integrated gutter, downspouts
+        "A gutter runs around each zone, inside the frame; the blades drain into it and water flows freely from zone to zone",
+        "The downspouts can run hidden inside the posts",
+        "The gutters are cleaned by hand or with a shop vacuum",
+    ],
+    lights=[            # the LED light track
+        "The gutter carries a light track and a wire chase for an LED light strip; pot, rope and track lights can be added",
+    ],
+    accessories=[       # sensors and add-ons the maker offers (not in the price unless the job says so)
+        "Rain and wind sensors can be built into the controls: rain closes the blades, and the screens can retract on their own in high wind",
+        "Heaters (1,600 to 4,000 W), fans and an accessory beam for them can be added",
+    ],
+    screens=[           # the retractable screens: product facts (the job's screen sizes come from the louvered engine)
+        "Gaposa motor with obstacle detection, on the roof's remote and app",
+        "Phifer mesh held in zipper side tracks; a weighted, sealed bottom bar",
+        "Rated for wind up to 65 mph; they can retract automatically in higher winds",
+    ],
+    warranty=[          # Suncoast's warranty page (the brochures still print "limited lifetime"; the page's terms are these)
+        "Aluminum structure and the powder-coat finish: 15 years",
+        "Motors, remotes and electronics: 5 years",
+        "Screen mesh: 10 years; retractable vinyl screen components, welds, stitching and spline: 1 year",
+        "Material defects, for the original purchaser; labor, removal and reinstallation are not covered. Weather beyond the design "
+        "limits, normal fading and electronic accessories (heaters, lights, fans) are excluded",
+    ],
+    schedule=[],        # lead time: ask Suncoast Denver (research.md 7) — the job adds it
+    exclusions=[],      # what the roof's price does not include: the job's (engineering / permit, electrical, sensors — research.md 6)
     structure_rows=[],  # extra (label, text) rows for the structure section
 )
 
