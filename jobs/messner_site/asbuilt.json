@@ -1,0 +1,59 @@
+{
+ "_about": "149 Morning Sun Ave, Mill Valley CA (unincorporated Marin County, APN 051-091-11): the deck AS BUILT, reconciled from the owner's sketches (IMG_5692 elevation, IMG_5693 plan), 27 site photos (26 Oct 2026), the 2018 design (M. Tepperman, A1/A2, 2-21-18) and the house as-built sheets (M. Mijangos, A-1.10/A-1.20, 2026). One-off job (PCG for Adam Messner): nothing here feeds GSX defaults. Every value carries its source; 'verify' marks what the owner must measure or photograph before submittal. Units: inches unless noted. Plan frame: origin = deck corner at the HOUSE line on the north edge; X along the house toward the SOUTH; Y away from the house toward the EAST (the rear lot line).",
+ "site": {"address": "149 Morning Sun Ave, Mill Valley, CA 94941", "apn": "051-091-11", "jurisdiction": "Marin County CDA Building & Safety (unincorporated; Almonte / Tamalpais Area Community Plan)",
+          "owners": "Adam Messner and Allison Rhodes Messner, Trustees of The 2017 Messner Family Trust", "zoning": "R1", "codes": "2025 California codes (eff. 2026-01-01, Marin Ord. 3838); 2025 CWUIC Ch. 5 (Marin UWI area)",
+          "seismic": "SDC D (ASCE 7-22 SDS 1.31 / SD1 1.30, default site class); CRC SDC D2", "flood": "Zone X", "slope": "average 36.7 %, Franciscan melange, few landslides",
+          "fhsz": "LRA non-wildland (not VHFHSZ); inside the county Urban-Wildland Interface layer -> CWUIC Ch. 5 applies", "source": "research/facts.json"},
+ "deck": {
+  "outline_in": [[0, 0], [0, 90], [69, 90], [69, 184], [615, 184], [615, 0]],
+  "along_house_in": 615, "depth_in": 184, "north_strip_in": [69, 90], "area_sf": 741,
+  "edge_definition": "owner's dimensions to the deck edge (fascia face vs. framing not stated) - verify", "source": "sketch IMG_5693 (51'-3\", 45'-6\", 15'-4\" x2, jog 7'-10\", 4'-6\")",
+  "surface_above_grade": "about 10'-1\" at the house to 12'-3\" at the outer edge on the 2018 section; owner post lengths 9' (inner) and 11' (outer) + beam + joist + board give about 10'-9\" / 12'-9\" above the pier tops - verify one height with a tape",
+  "decking": {"field": "TimberTech Advanced PVC, Vintage collection, Weathered Teak, 5.5\" boards, parallel to the house, hidden clips", "border": "a second, darker brown Vintage board (double picture frame on the east edge and south end, mitered corners, plus breaker boards) - color to confirm with the owner",
+              "fascia": "PVC fascia, two boards high, face-fastened", "wui": "SFM 8110-2042:0001 (Class A) and 8170-2042:0504 cover the 5.5\" board only; CCRR-0101: joists 16\" o.c. max", "source": "photos G2/G3, owner"}
+ },
+ "framing": {
+  "joists": {"size": "2x10", "spacing_in": 16, "species": "PT DF (2018 spec: P.T.D.F.; verify grade stamp)", "direction": "perpendicular to the house (E-W)",
+             "evidence": "LUS210Z stamps legible (IMG_5677/5678); measured 15.6-16.1\" o.c.", "source": "photos G1/G2, 2018 design"},
+  "ledger": {"size": "2x12 PT (2018 spec; verify)", "fastening": "1/2\"-5/8\" bolts or lags with ~2-1/2\" square plate washers, about one per joist bay (2018: 1/2\" lags @16\" staggered / (2) 1/2\" MB @16\" / SDWS - conflicting) - verify type, length, spacing",
+             "hangers": "Simpson LUS210Z at every joist, Simpson SD connector screws", "flashing": "not visible - verify (photo); 2025 CWUIC 504.7.3.1 also wants 6\" vertical metal flashing at the deck-to-wall line",
+             "support": "bolted to the band of the MAIN floor, which cantilevers ~2'-9\" past the basement wall below (house sheets A-1.10, soffit visible under the ledger IMG_5671/5677/5678) - CRC R507.9.1.2 -> engineering",
+             "source": "photos G1/G2, drawings"},
+  "beams": [
+    {"name": "B1 inner (intermediate)", "y_cl_in": 87, "size": "6x12 solid (measured 11.25-12\" deep)", "species": "PT DF or redwood (no incising seen) - verify", "detail": "the house-side joists hang from a continuous header sitting on this beam (LUS-type hangers, A35/LTP4-type clips header-to-beam, IMG_5676)",
+     "y_basis": "inferred: the north strip's 90\" depth sits on this line; 2018 design had it at 103.75\" - verify (tape from the house to the beam face)"},
+    {"name": "B2 outer", "y_cl_in": 172, "size": "6x12 solid", "species": "as B1 - verify", "detail": "joists bear on top, Simpson H2.5A at each joist (about 10 seen, IMG_5673/5675), A35-type clips at the blocking (about 9)",
+     "y_basis": "photos: about 1-2 ft inside the fascia; 2018 design 189.75\" from the house face - verify"}
+  ],
+  "beam_splices": "at least one butt splice centered over a 6x6 (IMG_5676, ~2-3/4\" bearing each end) - verify every splice is over a post",
+  "blocking": "solid blocking over both beams + one continuous row at mid-span of the house-side bay (IMG_5670/5676)",
+  "posts": {"count": 14, "size": "6x6 PT", "rows": {"inner (B1)": [1, 4, 6, 8, 10, 12, 14], "outer (B2)": [2, 3, 5, 7, 9, 11, 13]},
+            "lengths_in": {"1": 108, "4": 108, "2": 132, "3": 132, "others": "inner ~108, outer ~132 by pattern - verify"},
+            "stations_x_in": {"note": "NOT dimensioned anywhere: 6 inner/outer pairs share stations along the deck (14/13 ... 4/3, south to north); post 2 (outer) at the jog X~69; post 1 (inner) at the north end under the stair start. Average ~91\" o.c. if even - the owner must measure every post-to-post spacing",
+                              "estimate_outer": [72, 160, 250, 340, 430, 520, 609], "estimate_inner": [6, 160, 250, 340, 430, 520, 609]},
+            "caps": "black-painted plate on the beam face with a galvanized leg on the post (CCQ/ECCQ-type); leg screws look empty in IMG_5676/5678 - verify fasteners",
+            "bases": "black-painted cast-in post bases (CBSQ66-type) on round piers ~12\" dia, 4-12\" above grade (IMG_5670 ff.)",
+            "knee_braces": "about 6x6, 45 deg: outer row single braces at both end posts + 3 Y-braces (both directions); inner row only at the south end post; braces in the plane of the beams. NO bolts, lags or plates visible at either end (all three photo groups) - verify; the 2018 detail: 5/8\" x 10\" lag each end + LTP4 each side + ECCQ cap",
+            "source": "sketch IMG_5692, photos G1/G2/G3"},
+  "footings": {"seen": "round concrete piers ~12-14\" dia, 4-12\" above grade, one possible crack/cold joint (inner north pier); the outer piers sit near the top of a ~3' timber retaining wall",
+               "design_2018": "12\" Quik-Tube pier on a 15\" sq x 12\" spread footing, 36\" min into competent bearing, (4) #4 vert + #3 ties, (2) #4 e.w. in the footing",
+               "unknown": "as-built footing size/depth for the extension - owner to state (or expose one) ; CRC R403.1.7 slope setbacks apply (36.7 % average slope)"},
+  "lateral_ties": {"model": "Simpson DTT2Z", "seen": 1, "where": "side of one joist at the ledger, IMG_5677 (8 SDS-type screws into the joist, ~1/2\" threaded rod through the ledger into the house - anchorage inside not visible)",
+                   "code": "CRC R507.9.2: 2 devices x 1,500 lb within 24\" of each end of the deck (or 4 x 750 lb); 2018 design: DTT2Z @ 4'-0\" o.c. max + each end - owner to count and photograph each one"},
+  "hurricane_ties": "Simpson H2.5A at the outer beam (about 10 seen); the inner line uses hangers on a header instead"
+ },
+ "guards": {
+  "deck": {"type": "black aluminum posts (pyramid caps), flat top rail, bottom rail/channel, CLEAR GLASS infill panels", "height_in": 42, "mount": "fascia-mounted: formed U-cup brackets with side flanges, 2 galvanized hex lags + washers per flange through the PVC fascia into the rim; posts ~5-6' o.c.",
+           "product": "consistent with TimberTech Impression Rail Express (owner) - confirm system + glass part numbers; ESR-4217 recognizes the fascia bracket into CONCRETE only -> engineered connection on wood; glass must be safety glazing (CRC R308.4.4) - confirm etched mark",
+           "notes": "black flat straps from the guard line to the fascia (purpose unknown); NE corner bracket plate with an empty hole (IMG_5690); blocking behind the rim at each post not visible - verify", "source": "photos G1-G3, owner (owner said horizontal cable: the photos show glass)"},
+  "stair": {"type": "black aluminum posts and top rail with VERTICAL stainless cable, both sides of both flights and the landing", "height_in": 38, "handrail": "round black graspable handrail on one side of each flight with looped returns (IMG_5680/5681)", "source": "photos G2, sketch"}
+ },
+ "stair": {"location": "north end: the upper flight runs NORTH from the north strip (Y 54-90), 3' clear; a ~3'x3' landing on 4 posts (6x6 PT per the sketch; may be smaller - IMG_5691), then the lower flight turns 90 deg WEST toward the house line and ends on a pad at about Y 8\"",
+           "risers": {"upper": 11, "lower": 5, "total": 16, "rise_in": 6.625, "total_rise_in": 106}, "treads": {"upper": 10, "lower": 4, "run_in": 11.5},
+           "stringers": "3 per flight: 3x center stringer (notched) + 2 solid outer stringers (unnotched), Simpson LSCZ-type at the deck header, TA-type tread angles on the outer stringers",
+           "base": "lower flight sits on a weathered PT plank at grade - no concrete pad seen (2018 design called for a concrete pad) - verify / add pad",
+           "flags": ["upper flight ~9'-7\" horizontal with no mid support visible - check the notched center stringer", "3' wide and 3'x3' landing are the code minimums - tape them", "riser/tread uniformity (3/8\" max variation)"],
+           "source": "sketch IMG_5693, photos G2"},
+ "other_structures": "a separate cedar stair with hog-wire panels to a lower deck SOUTH of the main deck (IMG_5688/5689) - confirm whether it is in this permit's scope",
+ "history": "2018 deck (~19'-8\" x 16'-5\", north end, drawn by M. Tepperman, no engineer) per the 2004-2026 aerials; extended to 51'-3\" after 2019 (LiDAR 2018-19 shows nothing south of the original)."
+}
