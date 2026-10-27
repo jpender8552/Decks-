@@ -46,7 +46,8 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - TimberTech Vintage English Walnut; every field row one full-length board (no splices), **divider boards**, one picture frame.
 - **12' grooved** is fine in the field under Cortex; **never 12' for the picture frame or dividers** (16/20' square edge).
 - Offcuts become stair treads. Fascia may be spliced. Cortex plugged through the face; TOPLoc on the fascia.
-- IRX black, vertical balusters, drink rail **over the posts**.
+- IRX black, vertical balusters. **No drink rail** (owner 27 Oct: "take off the drink rail"): the posts keep their caps, and
+  Option 1's post lights are LED cap lights.
 
 ## Site, demo and electrical (owner 27 Oct)
 - **Access is good**: no Bad Access line.
