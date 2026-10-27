@@ -183,6 +183,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         timber=(dict(color="#a7adb2", metal=0.6, rough=0.42, label="CEMCO cold-formed steel, G90 galvanized") if spec.framing.system == "steel" else
                 dict(color=wood, grain=True, rough=0.85, label=("Douglas fir #1, dark walnut oil" if oiled else "Douglas fir #1, unfinished") if timber else "#1 SYP pressure-treated")),
         ctimber=dict(color="#b98f62", grain=True, rough=0.85, label="cover framing: 6x6 " + post_words(spec) + " posts, beams, SYP rafters"),
+        dftimber=dict(color="#9c7a52", grain=True, rough=0.9, label="Douglas fir #1" + (" rough" if spec.framing.post_rough else "") + ", unfinished"),
         galv=dict(color="#9aa0a6", metal=0.6, rough=0.45, label="galvanized steel"),
         deck=dict(color=pal[len(pal) // 2], palette=pal, grain=True, rough=0.7, label=f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color}"),
         border=dict(color=bpal[len(bpal) // 2], palette=bpal, grain=True, rough=0.7, label=f"{spec.decking.border_collection or spec.decking.collection} {spec.decking.border_color or spec.decking.color}"),
@@ -352,7 +353,7 @@ def build_scene(L) -> Scene:
         y = ln.y * IN
         top = jbot if ln.kind == "drop" else jtop
         for a, b in ln.pieces:
-            add("beam", a * IN, b * IN, y - bw_ / 2, y + bw_ / 2, top - bd_, top, "timber", 4, tag=ln.label)
+            add("beam", a * IN, b * IN, y - bw_ / 2, y + bw_ / 2, top - bd_, top, _df_mat(spec, ln.species), 4, tag=ln.label)
         for pi, px in enumerate(ln.posts_x):
             x = px * IN
             if ft in ("caisson", "existing"):
@@ -378,7 +379,7 @@ def build_scene(L) -> Scene:
                 add("post", x - 0.125, x + 0.125, y - 0.125, y + 0.125, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1} 3x3 HSS")
             else:
                 add("base", x - pb_ / 2 - 0.02, x + pb_ / 2 + 0.02, y - pb_ / 2 - 0.02, y + pb_ / 2 + 0.02, base_top, base_top + 0.12, "steel", 2)
-                add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, "timber", 2, tag=f"P{pi + 1}")
+                add("post", x - pb_ / 2, x + pb_ / 2, y - pb_ / 2, y + pb_ / 2, base_top + 0.1, top - bd_, _df_mat(spec), 2, tag=f"P{pi + 1}")
             add("cap", x - pb_ / 2 - 0.03, x + pb_ / 2 + 0.03, y - bw_ / 2 - 0.03, y + bw_ / 2 + 0.03, top - bd_ - 0.02, top - bd_ + 0.35, "steel", 4)
             if spec.framing.knee_braces and not spec.framing.existing_posts and spec.framing.system != "steel":
                 lg, th = spec.framing.knee_leg_in / 12.0, 3.5 / 12.0
@@ -1328,25 +1329,25 @@ def build_composite_scene(L) -> Scene:
     x0, x1, y0, y1 = L.bbox
     H_house = zt + 9.5
     hm, sm = getattr(g, "house_model", None), getattr(g, "site_model", None)
+    def _mesh(kind, tri, mat, tag=""):
+        xs_ = [q[0] for q in tri]; ys_ = [q[1] for q in tri]; zs_ = [q[2] for q in tri]
+        B.append(Box(kind, min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), mat, 0, tag=tag, shape="mesh", pts=[[round(v, 3) for v in q] for q in tri]))
+    rb = lambda *a, **k: B.append(rot_box(*a, **k))
+    if sm:                                  # the measured yard owns the ground, with or without the measured house
+        from .landscape import build_site
+        bz = float(sm.get("beyond_z", -0.9))
+        add("ground", x0 - 140, x1 + 140, y0 - 90, y1 + 160, min(-1.6, bz - 0.6), bz, "ground")
+        n0 = len(B)
+        build_site(sm, add, rb, _mesh, zt)
+        for b_ in B[n0:]:
+            b_.layer = "site"
     if hm:
         from .house import build_house
-        def _mesh(kind, tri, mat, tag=""):
-            xs_ = [q[0] for q in tri]; ys_ = [q[1] for q in tri]; zs_ = [q[2] for q in tri]
-            B.append(Box(kind, min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), mat, 0, tag=tag, shape="mesh", pts=[[round(v, 3) for v in q] for q in tri]))
-        rb = lambda *a, **k: B.append(rot_box(*a, **k))
         n_h = len(B)
         build_house(hm, add, rb, _mesh)
         for b_ in B[n_h:]:
             b_.layer = "house"
-        if sm:
-            from .landscape import build_site
-            bz = float(sm.get("beyond_z", -0.9))
-            add("ground", x0 - 140, x1 + 140, y0 - 90, y1 + 160, min(-1.6, bz - 0.6), bz, "ground")
-            n0 = len(B)
-            build_site(sm, add, rb, _mesh, zt)
-            for b_ in B[n0:]:
-                b_.layer = "site"
-        else:
+        if not sm:
             add("ground", x0 - 60, x1 + 60, y0 - 40, y1 + 70, -0.6, 0.0, "ground")
     else:
         hx0 = min([x0] + [h[0] for h in g.house_blocks]); hx1 = max([x1] + [h[1] for h in g.house_blocks])
@@ -1824,6 +1825,14 @@ def front_runs(L):
         else:
             runs.append([xa, xb, y])
     return runs
+
+
+def _df_mat(spec, species: str = "") -> str:
+    """Douglas fir posts / beams on a dimensional (SYP) frame read as Douglas fir, not as the pressure-treated joists."""
+    if spec.is_timber or spec.framing.system == "steel":
+        return "timber"
+    sp = (species or spec.framing.post_species or "").upper()
+    return "dftimber" if (sp.startswith("DF") or (not species and spec.framing.post_rough)) else "timber"
 
 
 def rot_box(kind, x0, y0, x1, y1, z0, z1, mat, phase, thick, tag="", tone=0.0) -> Box:

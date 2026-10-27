@@ -349,7 +349,8 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
                 screen_mask[(nm, s_["side"])] = screen_mask.get((nm, s_["side"]), 0) | 1 << c
     all_mask = sum(1 << c for c in valid)
     if not names:                                                   # one spec: the groups from the engine's option layers
-        found = sorted({_layer_option(b) for b, _m in union.values()} - {""})
+        order = list(OPTION_LABELS.values())
+        found = sorted({_layer_option(b) for b, _m in union.values()} - {""}, key=lambda f: (order.index(f) if f in order else len(order), f))
         names = [next((k for k, v in labels.items() if v == f), f.lower().replace(" ", "_")) for f in found]
         for n, f in zip(names, found):
             labels.setdefault(n, f)
@@ -499,7 +500,9 @@ def configurator_html(data: dict, three_src: Optional[str] = None, standalone: b
     body = (BODY.replace("__TITLE__", title).replace("__ADDR__", _html.escape(str(data.get("address") or "")))
             + f'<script type="application/json" id="cfg-data">{payload}</script>\n'
             + f"<script>{three_src}</script>\n<script>{JS}</script>")
-    desc = _html.escape(f"{data.get('address') or title}: the deck with its options, the sun at the address through the day, the louvered roof and the lights at night.")
+    opts = ", ".join(o["label"].lower() for o in data.get("options") or [])
+    desc = _html.escape(f"{data.get('address') or title}: the deck in 3D" + (f" with its options ({opts})" if opts else "")
+                        + ", the sun at the address through the day.")
     head = (f'<title>{title}</title>\n<meta name="description" content="{desc}">\n<meta name="claude:viewport-fit-sides" content="cover">\n'
             f'<style>{CSS}</style>\n')
     if not standalone:
@@ -611,7 +614,7 @@ input[type=date] { font: 600 13px var(--body); color: var(--ink); background: va
   .grab .bar { width: 34px; height: 4px; border-radius: 2px; background: var(--line); }
   .hint { bottom: 54px; }
   #g-view { display: none; }
-  .vbar { display: flex !important; }
+  .vbar:not([hidden]) { display: flex; }
 }
 .vbar { display: none; position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; gap: 6px; overflow-x: auto; }
 .vbar .btn { background: rgba(14, 16, 20, .78); min-height: 34px; font-size: 12.5px; white-space: nowrap; flex: 0 0 auto; }
@@ -1132,10 +1135,12 @@ function sunAt(date, minutes) {
 }
 var WIND = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 function clock(m) { m = Math.round(m); var h = Math.floor(m / 60) % 24, mi = m % 60, ap = h < 12 ? 'AM' : 'PM', h12 = h % 12 || 12; return h12 + ':' + (mi < 10 ? '0' : '') + mi + ' ' + ap; }
+var RS = {};
 function riseSet(date) {
+  if (RS[date]) return RS[date];
   var rise = null, set = null, prev = sunAt(date, 180).el;
   for (var m = 182; m <= 1380; m += 2) { var e = sunAt(date, m).el; if (prev < -0.833 && e >= -0.833 && rise === null) rise = m; if (prev >= -0.833 && e < -0.833) set = m; prev = e; }
-  return [rise, set];
+  return (RS[date] = [rise, set]);
 }
 
 // ------------------------------------------------------------------ sky, sun and night by the sun's height
@@ -1358,7 +1363,7 @@ var panel = $('panel'), fold = $('fold');
 fold.addEventListener('click', function () { var f = panel.classList.toggle('folded'); fold.setAttribute('aria-expanded', f ? 'false' : 'true');
   fold.setAttribute('aria-label', f ? 'Show the controls' : 'Hide the controls'); $('foldlab').textContent = f ? 'Show controls' : 'Hide controls';
   panel.scrollTop = 0; setTimeout(resize, 30); });
-if (NOUI) { panel.hidden = true; vbar.style.display = 'none'; }
+if (NOUI) { panel.hidden = true; vbar.hidden = true; }
 $('note').textContent = 'Sun position for ' + D.address + ' (' + SITE.lat.toFixed(3) + '°, ' + SITE.lon.toFixed(3) + '°), local clock time. Lights switch on at dusk.';
 function onLabel() { var ks = OPT.filter(function (o) { return S.on[o.key]; }).map(function (o) { return o.short.toLowerCase(); }); return 'Base deck' + (ks.length ? ' + ' + ks.join(' + ') : ''); }
 function dateLabel(d) { var p = d.split('-').map(Number); return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][p[1] - 1] + ' ' + p[2]; }

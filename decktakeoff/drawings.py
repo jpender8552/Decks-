@@ -244,16 +244,16 @@ def sheet_general_notes(L, meta) -> Optional[str]:
     if not notes:
         return None
     o = [T(24, 24, "GENERAL NOTES", 9, 800, fill=GOLD)]
-    wrapped = [textwrap.wrap(str(n), 86) for n in notes]
+    wrapped = [textwrap.wrap(str(n), 80) for n in notes]
     half = sum(len(w) for w in wrapped) / 2
-    x, y, acc = 24, 44, 0
+    x, y, acc = 24, 46, 0
     for i, w in enumerate(wrapped):
-        if x == 24 and acc > half and i > 0:
-            x, y = 512, 44
-        o.append(T(x, y, f"{i + 1}.", 8.4, 800, fill=GOLD))
+        if x == 24 and acc >= half and i > 0:
+            x, y = 506, 46
+        o.append(T(x, y, f"{i + 1}.", 9.2, 800, fill=GOLD))
         for j, ln in enumerate(w):
-            o.append(T(x + 22, y + j * 11.5, ln, 8.2, 400))
-        y += 11.5 * len(w) + 7
+            o.append(T(x + 24, y + j * 13, ln, 9, 400))
+        y += 13 * len(w) + 9
         acc += len(w)
     return sheet("G-002", "General notes", "The jurisdiction's requirements for this work — read with G-001 and the details", o, "No scale", meta)
 
@@ -933,11 +933,8 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
     for e in outs:
         o.append(PG([(X(x), Y(y)) for x, y in e[0]], FILL["deck"], INK, 1.2))
     out = [p for e in outs for p in e[0]]
-    if comp:                                                       # each level named on it, at its label point (the deck label: right column)
-        for e in outs:
-            if len(e) > 1 and e[1]:
-                lx_, ly_ = e[2] if len(e) > 2 and e[2] else (sum(q[0] for q in e[0]) / len(e[0]), sum(q[1] for q in e[0]) / len(e[0]))
-                o.append(T(X(lx_), Y(ly_) + 3, e[1], 6.6, 900, "middle", "#f3ead9"))
+    if comp:
+        pass                                                       # each level is named after the stairs are drawn (the deck label: right column)
     elif sp.get("deck_label") and sp.get("deck_label_inside"):     # inside the deck (a setback line runs under its front)
         cxd, cyd = sum(q[0] for q in out) / len(out), sum(q[1] for q in out) / len(out)
         for k_, ln_ in enumerate(textwrap.wrap(sp["deck_label"], 34)[:3]):
@@ -952,6 +949,20 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
     for b in S.boxes:
         if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
+    treads_ = [(X(b.x0), X(b.x1), Y(b.y0), Y(b.y1)) for b in S.boxes if b.kind == "tread"] if comp else []
+    for e in (outs if comp else []):                               # a composite: each level named on it, at its label point
+        if len(e) > 1 and e[1]:
+            lx_, ly_ = e[2] if len(e) > 2 and e[2] else (sum(q[0] for q in e[0]) / len(e[0]), sum(q[1] for q in e[0]) / len(e[0]))
+            ls_ = str(e[1]).split("\n")
+            cx_, cy_ = X(lx_), Y(ly_)
+            hw_, hh_ = max(len(w) for w in ls_) * 2.1 + 3, len(ls_) * 4.5 + 2
+            for _ in range(40):                                    # clear of a stair drawn on the level (an inset stair)
+                hit = [r for r in treads_ if r[0] < cx_ + hw_ and r[1] > cx_ - hw_ and r[2] < cy_ + hh_ and r[3] > cy_ - hh_]
+                if not hit:
+                    break
+                cx_ += 2 if sum(r[0] + r[1] for r in hit) / (2 * len(hit)) < cx_ else -2
+            for k_, w in enumerate(ls_):
+                o.append(T(cx_, cy_ + 3 + (k_ - (len(ls_) - 1) / 2) * 9, w, 6.8, 900, "middle", "#f3ead9"))
     # other new work drawn dashed (a louvered roof, an option stair), then (a composite) the setback lines over everything
     for rects, lab_, col_, posts_ in marks:
         for x0_, x1_, y0_, y1_ in rects:
@@ -966,7 +977,7 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
             q0, q1 = (p0, p1) if X(p0[0]) < X(p1[0]) else (p1, p0)
             ux, uy = X(q1[0]) - X(q0[0]), Y(q1[1]) - Y(q0[1])
             n_ = math.hypot(ux, uy) or 1.0
-            o.append(TH(X(q0[0]) + ux / n_ * 8, Y(q0[1]) + uy / n_ * 8 - 3, f"{d:g}'", 7.2, 900, "start", col_))
+            o.append(TH(X(q0[0]) + ux / n_ * 16, Y(q0[1]) + uy / n_ * 16 - 3, f"{d:g}'", 7.2, 900, "start", col_))
     # other work on the lot under its own permit (context): a grey outline with its label
     for oth in sp.get("others") or []:
         poly = [tuple(q) for q in oth["poly"]]
@@ -1013,6 +1024,11 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
         # the outline corner nearest the rear line (a shaped deck's front-edge midpoint can sit off the deck)
         best_v = min(out, key=lambda q: (nearest(q[0], q[1], rear_pred) or (9e9, None))[0])
         probes.append((("deck edge", best_v[0], best_v[1]), rear_pred))
+    for rects, lab_, col_, posts_ in marks:                       # each mark's corner nearest the rear lot line
+        pts_ = [(x_, y_) for x0_, x1_, y0_, y1_ in rects for x_ in (x0_, x1_) for y_ in (y0_, y1_)]
+        if pts_:
+            bm = min(pts_, key=lambda q: (nearest(q[0], q[1], rear_pred) or (9e9, None))[0])
+            probes.append(((lab_, bm[0], bm[1]), rear_pred))
     lx_, rx_ = min(p[0] for p in out), max(p[0] for p in out)
     left_pred = lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 < lx_
     right_pred = lambda a, b: side_pred(a, b) and (a[0] + b[0]) / 2 > rx_
@@ -1070,7 +1086,12 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
     yy = 24
     o.append(T(x2, yy, "PARCEL", 9, 800, fill=GOLD)); yy += 16
     for ln in [f"{s.site.address}, {s.site.city} {s.site.state} {s.site.zip}"] + list(sp.get("info") or []):
-        o.append(T(x2, yy, ln, 8.5, 500)); yy += 12
+        for k_, w in enumerate(textwrap.wrap(ln, 84) if comp else [ln]):          # a composite wraps a long line
+            o.append(T(x2 + (8 if k_ else 0), yy, w, 8.5, 500)); yy += 12
+    if comp and sp.get("deck_label"):
+        o.append(T(x2, yy + 10, "NEW DECK", 9, 800, fill=GOLD)); yy += 26
+        for w in textwrap.wrap(re.sub(r"^NEW DECK\s*[—-]\s*", "", sp["deck_label"]), 84):
+            o.append(T(x2, yy, w, 8.5, 500)); yy += 12
     o.append(T(x2, yy + 10, "LOT COVERAGE", 9, 800, fill=GOLD)); yy += 26
     for k, v in sp.get("coverage") or []:
         o.append(T(x2, yy, k, 8, 700)); o.append(T(x2 + 445, yy, textwrap.shorten(v, 54, placeholder="…"), 8, 500, "end")); yy += 12
@@ -1080,13 +1101,31 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
           (ref.get("label") or "")]
     if sp.get("setback_notes"):
         sb = list(sp["setback_notes"])
+    elif comp:                                                     # a composite: the G-001 site lines (no parcel notes) + the reference
+        nl = set(textwrap.wrap(s.site.notes, 70)) if s.site.notes else set()
+        sb = [x for x in _site_lines(s) if x not in nl] + [ref.get("label") or ""]
     sb += [f"Measured (red): to the nearest lot line from the new work — GIS, not survey"]
     for ln in [x for x in sb if x]:
         for w in textwrap.wrap(ln, 80):
             o.append(T(x2, yy, w, 8, 500)); yy += 11.5
+    if comp and (sb_lines or marks):                               # the key to the lines on the plan
+        yy += 4
+        for d, lab_, col_, dash_, segs, best in sb_lines:
+            o.append(LN(x2, yy - 3, x2 + 22, yy - 3, col_, 1.4, dash_))
+            for k_, w in enumerate(textwrap.wrap(lab_, 72)):
+                o.append(T(x2 + 30, yy, w, 8, 700 if k_ == 0 else 500, fill=col_)); yy += 11.5
+        for rects, lab_, col_, posts_ in marks:
+            o.append(R(x2, yy - 8, 22, 7, "none", col_, 1.1, 'stroke-dasharray="4 2"'))
+            for k_, w in enumerate(textwrap.wrap(lab_, 72)):
+                o.append(T(x2 + 30, yy, w, 8, 700 if k_ == 0 else 500, fill=col_)); yy += 11.5
     o.append(T(x2, yy + 10, "SITE WORK", 9, 800, fill=GOLD)); yy += 26
     work = ["Remove the two decks, the two roof covers and the box step; haul off", "Diamond Pier foundations (no excavation spoils), 6-mil poly + 2\" gravel under the decks",
             ("New concrete landing pad at the stair" if any(st_.landing == "concrete pad" for st_ in s.stairs) else "Stair lands on grade (no pad)"), "Roof drainage: covers shed to grade at the low eave, away from the house", "Call 811 before the piers; protect the lawn and the owner's blinds"]
+    if comp:                                                       # a composite's own default list (the job's site_work wins)
+        work = [w for w in ("Remove the existing deck and haul off" if s.extras.demo_existing else "",
+                            "Diamond Pier foundations: each precast head set in a dug hole on undisturbed soil, 4 pins driven through it"
+                            if s.framing.footing_type == "diamond_pier" else "Footings per S-100",
+                            "Call 811 before the footings", "Protect the lawn, beds and hardscape along the work") if w]
     for ln in (sp.get("site_work") or work):
         for j, w in enumerate(textwrap.wrap(ln, 84)):
             o.append(T(x2, yy, ("· " if j == 0 else "  ") + w, 8, 500)); yy += 11.5
@@ -3849,6 +3888,31 @@ def _panel_level_change(o, note, CL, levels, steps):
 
 
 # ------------------------------------------------------------------ the composite set
+def _site_marks(S0) -> list:
+    """C-100 marks for a composite deck (sheet_site `marks`), from the full scene: a louvered roof built into the set (its
+    frame outline and posts) and each option's stair (its treads and landings), drawn dashed."""
+    out = []
+    lv = [b for b in S0.boxes if getattr(b, "layer", "") == "louvered" and b.kind in ("lvbeam", "lvgutter", "lvblade")]
+    if lv:
+        posts = [((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2) for b in S0.boxes
+                 if getattr(b, "layer", "") == "louvered" and b.kind == "lvpost" and "aluminum post" in (b.tag or "")]
+        out.append(([(min(b.x0 for b in lv), max(b.x1 for b in lv), min(b.y0 for b in lv), max(b.y1 for b in lv))],
+                    "Louvered roof over the upper level, on 2 posts at the deck rail (A-403)", "#1c1c1e", posts))
+    opts: Dict[str, Dict[str, list]] = {}
+    for b in S0.boxes:
+        ly = getattr(b, "layer", "") or ""
+        if not ly.startswith("option:"):
+            continue
+        tg = (b.tag or "").split(": ")[-1]
+        m = re.match(r"landing \d+", tg)
+        if b.kind == "tread" or m:
+            opts.setdefault(ly[7:], {}).setdefault(m.group(0) if m else f"t{len(opts.get(ly[7:], {}))}", []).append(b)
+    for name, grp in opts.items():
+        rects = [(min(b.x0 for b in bs), max(b.x1 for b in bs), min(b.y0 for b in bs), max(b.y1 for b in bs)) for bs in grp.values()]
+        out.append((rects, f"Option — {name} (priced separately)", "#7a3e9d", []))
+    return out
+
+
 def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool = False, only=None) -> List[Tuple[str, str, str]]:
     """[(num, title, svg)] for a composite (multi-level) deck: whole-deck sheets in the global frame."""
     import dataclasses as _dc
@@ -3878,7 +3942,9 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
     if gn:
         out.append(("G-002", "General notes", gn))
     if want("C-100") and CL.spec.site.plan and CL.spec.site.plan.get("parcel"):
-        site = sheet_site(CL, S, t, meta, outlines=[(lv.poly, f"{lv.name.upper()} {ftin(lv.h_in)}") for lv in levels])
+        big = lambda lv: max(lv.zones, key=lambda q: (q.x1 - q.x0) * (q.y1 - q.y0))          # the level's label: on its biggest zone
+        site = sheet_site(CL, S, t, meta, outlines=[(lv.poly, f"{lv.name.upper()}\n{ftin(lv.h_in)} above grade", ((big(lv).x0 + big(lv).x1) / 2, big(lv).y0 + (big(lv).y1 - big(lv).y0) * 0.68))
+                                                    for lv in levels], marks=_site_marks(S0))
         if site:
             out.append(("C-100", "Site plan", site))
     if want("A-100"):
