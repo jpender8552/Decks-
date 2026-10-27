@@ -135,6 +135,9 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
     dk = dict(d.get("decking", {}))       # a part may set its own decking keys (breaker lines in its own frame: divider_x_ft)
     dk.update(part.get("decking", {}))
     d["decking"] = dk
+    fr = dict(d.get("framing", {}))       # ... and framing keys (a caisson drilled through a slab: caisson_above_in 0)
+    fr.update(part.get("framing", {}))
+    d["framing"] = fr
     d["job"] = f"{spec.job} — {part['name']}"
     return DeckSpec.from_dict(d)
 
@@ -206,7 +209,7 @@ def _pool_decking(spec: DeckSpec, parts: List[Part], lines: List[Line]) -> None:
         return
     head = f"{dk.brand} {dk.collection} {dk.color} 1x6x"
     field_ = [l for l in lines if l.category == "Decking" and l.item.startswith(head) and l.item.endswith((" Square Edge", " Grooved")) and " — " not in l.item]
-    treads_ = [l for l in lines if l.category == "Stairs" and l.item.startswith(head) and " — treads (" in l.item]
+    treads_ = [l for l in lines if l.category == "Stairs" and l.item.startswith(head) and (" — treads (" in l.item or " decking (" in l.item)]   # treads + stair landings: their pieces pool below
     pieces = [(f"{p.name} {c.member[len('Field boards '):]}", c.length_in + 0.25)
               for p in parts for c in p.takeoff.cut_list if c.member.startswith("Field boards") for _ in range(int(c.qty))]
     tpieces = [(f"tread · {p.name} {st.side}", st.width + 0.25) for p in parts for st in p.layout.stairs for _ in range(int(st.tread_pieces))]

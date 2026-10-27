@@ -820,7 +820,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
     elif ft == "caisson":
         dia, depth = fr0.footing_dia_in, fr0.footing_depth_in
-        above = 6.0
+        above = float(spec.framing.caisson_above_in)        # 0: poured flush with the slab it is drilled through
         tube_len = depth + above
         vol_cf = math.pi * (dia / 24) ** 2 * (tube_len / 12)
         bags_each = int(math.ceil(vol_cf / 0.6))
@@ -828,8 +828,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         tubes = int(math.ceil(n_posts / per_tube))
         tkey = f"sonotube_{int(dia)}" if f"sonotube_{int(dia)}" in PRICEBOOK["footings"] else "sonotube_20"
         d_, uc, src = _item("footings", tkey, f"Sonotube {int(dia)}\" x 12'")
-        lines.append(Line("Footings", f"{d_} — caissons {int(dia)}\" x {ftin(depth)} + {ftin(above)} above grade (frost {ftin(spec.site.frost_depth_in)})", tubes, tubes, "ea",
-                          f"exact  ({n_posts} caissons, {per_tube} per tube)", uc, src, note=f"{worst_load:,.0f} lb per post vs ~{fr0.footing_capacity_lb:,.0f} lb (end bearing + skin friction estimate); engineer sets diameter"))
+        lines.append(Line("Footings", f"{d_} — caissons {int(dia)}\" x {ftin(depth)} (frost {ftin(spec.site.frost_depth_in)})", tubes, tubes, "ea",
+                          f"exact  ({n_posts} caissons, {per_tube} per tube, " + (f"top {ftin(above)} above grade)" if above else "poured flush with the slab)"), uc, src, note=f"{worst_load:,.0f} lb per post vs ~{fr0.footing_capacity_lb:,.0f} lb (end bearing + skin friction estimate); engineer sets diameter"))
         d_, uc, src = _item("footings", "quikrete_80", "Quikrete 80# concrete mix")
         lines.append(Line("Footings", d_, bags_each * n_posts, bags_each * n_posts, "bag", f"exact  ({bags_each} bags per caisson)", uc, src))
         r4 = int(math.ceil(n_posts * 4 * tube_len / 12 / 20))
@@ -900,9 +900,16 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 uc, src = _price("footings", "concrete_pad")
                 lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
             sf_l = lw * ld / 144
-            dk = decking_facts(spec.decking.collection)
-            nb = int(math.ceil(sf_l / (dk["width"] / 12 * 12) * 1.1))
-            lines.append(Line("Stairs", f"{spec.decking.brand} {spec.decking.collection} {spec.decking.color} 1x6x12 — landing {li + 1} decking ({sf_l:.0f} SF)", nb, nb, "ea", "+10% cuts", *_price("decking", f"{spec.decking.brand}|{spec.decking.collection}|12|{spec.decking.profile}")))
+            # the landing is decked in the field board, boards across it (parallel with the treads): rows x the landing's width, cut
+            # from the shortest stock the line's own profile is sold in (Vintage square edge: 16'); a composite pools these pieces with
+            # the field boards ("Field boards ..." cut pieces, composite._pool_decking) and drops this line
+            rows_l = max(1, int(round(ld / (dk0.bw + dk0.gap))))
+            cuts.append(CutPiece(f"Field boards landing {li + 1} ({st_s.side} stair)", f"{coll} {color}", lw, rows_l, "across the landing, parallel with the treads; fascia on its open sides"))
+            tl_ = min(deck_lengths(coll, spec.decking.profile))
+            nb = sum(len(v) for v in pack_boards([("landing", lw + 0.25)] * rows_l, stocks=(tl_,)).values())
+            uc_l, src_l = _price("decking", f"{brand}|{coll}|{tl_}|{spec.decking.profile}")
+            lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{tl_} {'Grooved' if spec.decking.profile == 'grooved' else 'Square Edge'} — landing {li + 1} decking ({sf_l:.0f} SF)",
+                              nb, nb, "ea", f"exact  ({rows_l} rows @ {ftin(lw)}, {int(tl_ * 12 // (lw + 0.375))} per {tl_}' board)", uc_l, src_l))
             if getattr(st_s, "skirts", False) and spec.decking.fascia:
                 # a skirted stair's landing is wrapped in the fascia on all four sides (as the 3D draws it), packed with the deck's fascia
                 lp_ = [(f"landing {li + 1} fascia ({st_s.side} stair)", round(lw + 1.0, 1))] * 2 + [(f"landing {li + 1} fascia ({st_s.side} stair)", round(ld, 1))] * 2

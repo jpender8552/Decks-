@@ -670,6 +670,8 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
     dk = decking_facts(spec.decking.collection)
     drop = any(b.kind == "drop" for b in beams)
     standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(fr.footing_type, CONC_STANDOFF)
+    if fr.footing_type == "caisson":            # the caisson top (framing.caisson_above_in, 6" default) + the 1" standoff base
+        standoff = float(fr.caisson_above_in) + CAISSON_STANDOFF - 6.0
     for bl in beams:
         bl.post_len = max(6.0, g.height_in - dk["thick"] - (jd if bl.kind == "drop" else 0.0) - bl.depth - standoff)
     post_len = max([bl.post_len for bl in beams], default=max(6.0, g.height_in - dk["thick"] - jd - standoff))
@@ -1713,6 +1715,8 @@ def build_edge_posts(spec: DeckSpec, zl: List[ZoneLayout], lines: List[BeamLine]
     g = spec.geometry
     dk_t = decking_facts(spec.decking.collection)["thick"]
     standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(spec.framing.footing_type, CONC_STANDOFF)
+    if spec.framing.footing_type == "caisson":
+        standoff = float(spec.framing.caisson_above_in) + CAISSON_STANDOFF - 6.0
     post_len = max(6.0, g.height_in - dk_t - jd - standoff)
     # the zone frames count them: footings, worst load
     for z in zl:

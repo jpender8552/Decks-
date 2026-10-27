@@ -51,8 +51,8 @@ def sheet(num: str, title: str, sub: str, body: List[str], scale_note: str, meta
            T(110, 39, textwrap.shorten(sub, 110, placeholder="…"), 9.5, 400, fill="#d8cfbf"),
            T(W_ - 18, 20, textwrap.shorten(meta["job_line"], 70, placeholder="…"), 9.5, 700, "end", "#d8cfbf"),
            T(W_ - 18, 36, meta["rev_line"], 8.5, 400, "end", "#b8b0a2")]
-    room, sn = W_ - 60 - len(meta["footer"]) * 8.6 * 0.5, 9.5          # a long scale note never runs into the footer: smaller, then shortened
-    if len(scale_note) * sn * 0.52 > room:
+    room, sn = W_ - 60 - len(meta["footer"]) * 8.6 * 0.5, 9.5          # a long scale note (over 100 characters) never runs into the footer
+    if len(scale_note) > 100 and len(scale_note) * sn * 0.52 > room:
         sn = max(7.0, room / (len(scale_note) * 0.52))
         if len(scale_note) * sn * 0.52 > room:
             scale_note = textwrap.shorten(scale_note, max(20, int(room / (sn * 0.52))), placeholder="…")

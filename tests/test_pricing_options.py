@@ -80,3 +80,56 @@ def test_roof_document(tmp_path):
     assert r["pricing"]["roof"]["sell"] == 14000 and r["pricing"]["screens"]["estimate"] is True
     assert "$14,000" in h and "Size and placement" in h and "<svg" in h and "Motorized screens" in h
     assert not re.search(r"ESTIMATE|estimate|internal", re.sub(r"<(script|style)\b.*?</\1>", "", h, flags=re.S))
+
+
+def _timeline(n_days=3):
+    rows = [dict(key=f"r{i}", option="base", label=f"work {i}", title=f"Work {i}", days=f"Day {i}", first_day=i, last_day=i, gantt_x=[i, i + 1])
+            for i in range(1, n_days + 1)]
+    return dict(title=f"{n_days} working days on site, weather permitting", rows=rows,
+                precon=dict(label="Ordering", weeks=[2, 3], text="Ordering — about 2–3 weeks from signing", gantt_x=[0, 1]),
+                schedule_lines=["Ordering — about 2–3 weeks from signing."] + [f"Day {i} — work {i}." for i in range(1, n_days + 1)])
+
+
+def test_timeline_included_rows_confirm_box_and_brand(tmp_path):
+    from decktakeoff.page import render_page
+    from decktakeoff.report import quote_markdown
+    d = json.load(open(ROOT / "examples/jason_ct.json"))
+    d.setdefault("extras", {}).update(timeline=_timeline(), brand="cde",
+                                      included=[{"title": "Up top", "text": "a row of the job's own"}, {"title": "Site", "text": ""}],
+                                      confirm=["HOA approval. The HOA approves decks in writing.", "One more line"])
+    s = DeckSpec.from_dict(d)
+    t, _, p = run(s)
+    q = quote_markdown(t, p)
+    assert "1. Ordering — about 2–3 weeks from signing." in q and "4. Day 3 — work 3." in q            # the job's own schedule lines
+    inc = q[q.index("## INCLUDED"):q.index("## PLAN")]
+    assert inc.splitlines()[3] == "| Up top | a row of the job's own |" and "| Site |" not in inc
+    opt = copy.deepcopy(d)
+    opt["extras"]["timeline"] = _timeline(4)
+    r = render_page(s, str(tmp_path / "p"), mode="proposal", key="t", render=False, viewer_url="",
+                    options=[dict(key="o", number="Option 1", title="More", price=1000, spec=None, timeline=_timeline(4))])
+    h = Path(r["html"]).read_text()
+    assert 'class="gantt"' in h and "3 working days on site, weather permitting" in h and "4 working days on site, 1 more" in h
+    assert "Still to confirm before we build" in h and "<b>HOA approval.</b>" in h
+    assert "Colorado Deck Experts" in h and "Colorado Deck Experts · a GS Exterior Experts company" in h
+    bad = copy.deepcopy(d)
+    bad["extras"]["timeline"]["rows"][0]["title"] = "City inspection"
+    import pytest
+    with pytest.raises(ValueError):
+        render_page(DeckSpec.from_dict(bad), str(tmp_path / "b"), mode="proposal", key="t", render=False, viewer_url="")
+
+
+def test_footings_and_rail_words_follow_the_spec():
+    import warnings
+    from decktakeoff.report import quote_markdown, rail_words, foundation_words, timeline_of
+    d = json.load(open(ROOT / "examples/eagles_nest.json"))         # a caisson job
+    s = DeckSpec.from_dict(d)
+    t, _, p = run(s)
+    assert foundation_words(t)[1] == "caissons" and "Diamond Pier" not in quote_markdown(t, p)
+    d["extras"] = dict(d.get("extras") or {}, timeline=dict(_timeline(), schedule_lines=["Day 1 — Diamond Pier footings driven."]))
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        assert timeline_of(DeckSpec.from_dict(d)) is None            # a timeline written for Diamond Piers stays out of a caisson job
+    r = copy.deepcopy(d)
+    r["railing"].update(drink_rail=True, drink_rail_mount="over")
+    for sysname in ("IRX Baluster", s.railing.system):
+        assert "modern top rail" not in rail_words(DeckSpec.from_dict(r), sysname)

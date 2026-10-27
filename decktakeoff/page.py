@@ -670,7 +670,7 @@ def _confirm_box(spec) -> str:
     def li(x):
         head, sep, rest = x.partition(". ")
         return f"<li><b>{E(head)}.</b> {E(rest)}</li>" if sep and len(head.split()) <= 8 else f"<li>{E(x)}</li>"
-    return (f'<h2 class="kicker" id="g-confirm">{E(c.get("title") or "Still to confirm before we build")}</h2><div class="confirm">'
+    return (f'<h2 class="kicker pb" id="g-confirm">{E(c.get("title") or "Still to confirm before we build")}</h2><div class="confirm">'
             + (f"<p>{E(c['intro'])}</p>" if c.get("intro") else "") + '<ul class="opt-scope">' + "".join(li(x) for x in items) + "</ul></div>")
 
 

@@ -179,6 +179,7 @@ class Framing:
     lateral_ties: int = 4                # DTT1Z count (IRC R507.9.2 alternative: 4 x 750 lb)
     caisson_dia_in: float = 20.0         # footing_type "caisson": drilled pier diameter
     caisson_depth_in: Optional[float] = None   # None -> frost depth + 2"
+    caisson_above_in: float = 6.0        # caisson top above grade (0 = poured flush with a slab it is drilled through)
     hardware_finish: str = "ZMAX"        # "ZMAX" | "black" (powder-coat, Outdoor Accents)
     finish: str = "none"                 # timbers: "none" (unfinished, weathers gray) | "oil" (dark walnut, 2 coats)
     end_grain_seal: bool = True          # timber frames: seal every cut end
