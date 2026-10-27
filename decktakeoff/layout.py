@@ -1417,9 +1417,10 @@ def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
                 sf.studs.append((round(p, 2), round(zb, 2)))
         if sf.studs:
             # blocking rows: one at the panels' bottom, more between it and the rim so no fastening line is over 12" from the next
-            z_b = -drop + SKIRT_GAP_BOTTOM + 1.75
-            n_mid = max(0, int(math.ceil((rim_bot - 1.0 - z_b) / 12.0 - 1e-9)) - 1)
-            z_rows = [z_b] + [round(z_b + (rim_bot - 1.0 - z_b) * (k + 1) / (n_mid + 1), 2) for k in range(n_mid)]
+            z_b, z_s = -drop + SKIRT_GAP_BOTTOM + 1.75, z_top - 1.0     # the bottom row; the top screws (in the rim)
+            n_g = max(1, int(math.ceil((z_s - z_b) / 12.0 - 1e-9)))
+            z_rows = [round(z_s - (z_s - z_b) * k / n_g, 2) for k in range(1, n_g + 1)]
+            z_rows = [z for z in z_rows if z < rim_bot - 0.5]               # lines inside the rim's depth fasten to the rim
             st_pos = sorted(p for p, _ in sf.studs)
             for zc in z_rows:
                 run_a = None

@@ -42,29 +42,39 @@ HEX = {"black": "#141416", "linen": "#e9e3d3", "grey": "#6b6e70", "gray": "#6b6e
 
 DEFAULTS = dict(
     name="Louvered roof", brand="Suncoast", product="Louvered Roof", color="black",
-    x0=None, x1=None, y0=None, y1=None,     # ft, plan frame: the outside faces of the perimeter beams
-    attach="house",                         # "house" (house-side beam on wall brackets, no posts there) | "freestanding" (posts all round)
-    z_attach=None,                          # ft above grade: top of the house-side beam = the soffit / roof line (None -> deck under the roof + 9')
-    z_top=None,                             # ft above grade: top of the (level) frame (None -> z_attach; freestanding: deck + 9')
-    louver_dir=None,                        # blade long axis "x" (along the house) | "y" (out from the house); None -> across the short side
+    x0=None, x1=None, y0=None, y1=None,     # ft, plan frame: the outside faces of the perimeter frame (the price's area)
+    attach="house",                         # "house" (no posts at the house) | "freestanding" (posts all round); "house_roofline" / "house_wall"
+                                            #   / "house_fascia" also set house_mount
+    house_mount="roof",                     # "roof": the house-side beam bears on flashed stand-off brackets @ 24" on the existing roof over the
+                                            #   wall line, lagged into the rafters (research: the eave over C is too low for a wall ledger) |
+                                            #   "wall": wall brackets under the soffit | "fascia": hung at the fascia line (set y0 there)
+    clear_ft=8.333,                         # the frame's underside above the deck (8'-4"); z_attach / z_top override it
+    z_attach=None,                          # ft above grade: top of the house-side beam (an attached roof's frame top)
+    z_top=None,                             # ft above grade: top of the (level) frame
+    louver_dir=None,                        # blade long axis "x" (parallel to the house) | "y"; None -> "x" attached, the short side freestanding
     blade_in=8.0, spacing_in=8.0,           # blade width and centre-to-centre spacing
-    blade_t_in=1.25, motor_t_in=2.0,        # blade / motor-blade thickness
+    blade_t_in=1.5, motor_t_in=2.25,        # blade / motor-blade thickness
+    pivot_drop_in=3.0,                      # blade pivots this far below the frame top
     angle_deg=45.0,                         # how open to draw them: 0 closed (flat) .. 90 on edge .. 140 (Suncoast max), the +x / +y edge rising
     zones=None,                             # motor zones (one motor blade each); None -> ceil(area / 150 SF)
-    posts=None,                             # [[x, y], ...] post centres (ft); None -> the outer corners (both ends of the front beam), on the
-                                            #   deck's rail-post line when the roof's outer edge is at the deck edge (and all four corners freestanding)
-    post_in=6.0, plate_in=7.0,              # 6x6 aluminum post, square base plate
-    post_inset_in=None,                     # post centre in from the deck's frame face on a rail line (None -> the rail post inset, 2-1/2")
-    snap=True,                              # a default post within 14" of the deck's rail corner post takes the corner (the roof slides to it)
-    beam=None,                              # [w_in, h_in] perimeter frame; None -> by the longest post-to-post span (2x8 15', 2x10 18', 4x8 22')
+    posts=None,                             # [[x, y], ...] post centres (ft); None -> flush under the frame's outer corners (both ends of the front
+                                            #   beam; all four freestanding)
+    post_in=6.0, plate_in=10.0,             # 6x6 aluminum post, square base plate (~10" x 10" x 1/2", Suncoast to specify)
+    edge_clear_in=2.0,                      # a post at the deck edge keeps its outer faces this far inside the edge (the plate on the framing);
+                                            #   the frame's front pulls in to suit and a post near a deck corner slides to it (snap)
+    snap=True,
+    beam=None, front_beam=None, frame_beam=None,   # [w_in, h_in]: all beams / the front beam (None -> by its post-to-post span: 2x8 15',
+                                            #   2x10 18', 4x8 22') / house, side and divider beams (None -> by their spans, 2x8 to 15')
     gutter=True, lights=True,               # integrated gutter; LED light strip in the gutter's light track
-    downspouts="post",                      # "post" (hidden inside the posts, outlet at the base) | "external" (2x3 on the post face) | "none"
+    downspouts="post",                      # "post" (inside the posts, through the deck, a black leader down the post below, piped to the lawn) |
+                                            #   "external" (2x3 on the post face) | "none"
+    house_clear_ft=None,                    # end screens stop at the house gutter line (y); None -> 1.4' attached by the roof line / fascia
     price=None, price_per_sf=None,          # sell (check / ACH): fixed, or $/SF x the roof area
     priced="own",                           # "own" (its own document; the deck's price does not change) | "option" (also an option on the deck's quote)
     build=None,                             # built into the deck's model (3D, rail posts, takeoff)? None -> unless priced "option" (an option leaves the base deck as is)
     option_name=None,                       # the option's name on the deck's quote (None -> "<brand> louvered roof — W x D")
     screens=None,                           # retractable screens (an option): [{side "front" | "left" | "right", drop 0 (up in the cassette) .. 1
-                                            #   (fully down), fabric "mesh" | "vinyl", color, bottom (z the bottom bar stops at), mount, price / price_per_lf}]
+                                            #   (fully down), fabric "mesh" | "vinyl", density, color, bottom, mount, price / price_per_lf}]
     screens_priced=None,                    # None -> as the roof ("own" | "option")
     note="",
 )

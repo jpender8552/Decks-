@@ -86,8 +86,7 @@ PRODUCTS: Dict[str, dict] = {
                        source="EST — ~55¢/ft retail; not on a D&D quote"),
     "AZTDLLEDWIRE": dict(desc="TimberTech 16/2 AWG low-voltage wire, 100'", each=112.13, lf=100,
                          source="EST — Lumbermens list eff. 1 Jun 2026"),
-    "wirenut_silicone_25": dict(desc="Silicone-filled outdoor wire connectors (25 pk) — splices in the post-cap cavity and behind the risers", each=20.0, count=25,
-                                source="EST"),
+    "wirenut_silicone_25": dict(desc="Silicone-filled outdoor wire connectors (25 pk)", each=20.0, count=25, source="EST"),
     "lv_staples_100": dict(desc="Insulated cable staples for the 12/2 along the framing (100 pk)", each=9.0, count=100, source="EST"),
 }
 
@@ -423,15 +422,19 @@ def lines_for(plan: LightPlan) -> list:
         what = " · ".join(f"{nm} {nr} risers" + (f" x {k}" if k > 1 else "") for nm, nr, k, _ in plan.stairs if nr)
         one = all(k == 1 for _, nr, k, _ in plan.stairs if nr)
         out.append(Line(CATEGORY, f"{p['desc']} — {'one in' if one else 'in'} every riser", plan.n_riser, plan.n_riser, "ea", f"exact  ({what})", p["each"], p["source"], p["sku"]))
+    accent = plan.post_kind == "accent"
     if plan.n_cap:
-        p = product(cfg, cfg["cap_sku"])
-        what = f"{plan.deck_posts} deck rail posts" + (f" + {plan.stair_posts} stair / landing posts" if plan.stair_posts else "") + (" — every other post" if cfg.get("every", 1) > 1 else "")
-        out.append(Line(CATEGORY, f"{p['desc']} — on {'every' if cfg.get('every', 1) == 1 else 'every other'} rail post", plan.n_cap, plan.n_cap, "ea", f"exact  ({what})", p["each"], p["source"], p["sku"]))
+        p = product(cfg, cfg["accent_sku"] if accent else cfg["cap_sku"])
+        what = (f"{plan.deck_posts} deck rail posts" + (f" + {plan.stair_posts} stair / landing posts" if plan.stair_posts else "") + (" — every other post" if cfg.get("every", 1) > 1 else "")
+                + ("; the drink rail runs over the posts, so no post caps: a 3/8\" wire hole and two #8 x 3/4\" screws per light" if accent else ""))
+        where = ("on the deck side of every rail post, just below the drink rail" if accent else "on every rail post") if cfg.get("every", 1) == 1 else \
+                ("on the deck side of every other rail post" if accent else "on every other rail post")
+        out.append(Line(CATEGORY, f"{p['desc']} — {where}", plan.n_cap, plan.n_cap, "ea", f"exact  ({what})", p["each"], p["source"], p["sku"]))
     load = plan.load_w
     for sku in dict.fromkeys(plan.transformers):
         p = product(cfg, sku)
         n = plan.transformers.count(sku)
-        sizing = (f"{load:.0f} W connected ({plan.n_cap} caps x {plan.cap_w:g} W + {plan.n_riser} risers x {plan.riser_w:g} W) x {cfg['headroom']:g} = "
+        sizing = (f"{load:.0f} W connected ({plan.n_cap} post lights x {plan.cap_w:g} W + {plan.n_riser} risers x {plan.riser_w:g} W) x {cfg['headroom']:g} = "
                   f"{cfg['headroom'] * load:.0f} W ≤ {sum(product(cfg, s)['watts'] for s in plan.transformers):.0f} W; {len(plan.runs)} run{'s' if len(plan.runs) != 1 else ''} ≤ {cfg['run_max_w']:g} W")
         out.append(Line(CATEGORY, p["desc"], n, n, "ea", f"exact  ({sizing})", p["each"], p["source"], p["sku"]))
     if plan.wire_lf:
@@ -439,7 +442,7 @@ def lines_for(plan: LightPlan) -> list:
         posts = sum(n.wire_ft for r in plan.runs for n in r.nodes if n.what == "post")
         stair = sum(n.wire_ft for r in plan.runs for n in r.nodes if n.what.startswith("stair"))
         along = plan.wire_ft - home - posts - stair
-        why = (f"{plan.wire_lf} LF: {len(plan.runs)} runs — home runs {home:.0f}', along the frame {along:.0f}', up and down the posts {posts:.0f}', "
+        why = (f"{plan.wire_lf} LF: {len(plan.runs)} runs — home runs {home:.0f}', along the frame {along:.0f}', {'down' if accent else 'up and down'} the posts {posts:.0f}', "
                f"down the stairs {stair:.0f}', +10%" if not cfg.get("wire_lf") else f"{plan.wire_lf} LF (job count)")
         mix = _wire_mix(cfg, plan.wire_lf)
         for r, k in mix:
@@ -448,7 +451,9 @@ def lines_for(plan: LightPlan) -> list:
         p = product(cfg, cfg["connector_sku"])
         need = int(math.ceil(2 * plan.splices * 1.1))             # two conductors at every splice, +10% spares
         n = int(math.ceil(need / p.get("count", 25)))
-        out.append(Line(CATEGORY, p["desc"], n, n, "pk", f"{need} needed  ({plan.splices} splices x 2 conductors, +10%)", p["each"], p["source"], p["sku"]))
+        out.append(Line(CATEGORY, p["desc"] + (" — splices on the run under the deck at each post and behind the risers" if accent else
+                                               " — splices in the post-cap cavity and behind the risers"),
+                        n, n, "pk", f"{need} needed  ({plan.splices} splices x 2 conductors, +10%)", p["each"], p["source"], p["sku"]))
         p = product(cfg, cfg["staple_sku"])
         need = int(math.ceil((plan.wire_ft - sum(n.wire_ft for r in plan.runs for n in r.nodes if n.what == "post")) / 1.5))
         n = max(1, int(math.ceil(need / p.get("count", 100))))
@@ -471,8 +476,12 @@ def finish_takeoff(t) -> None:
         t.summary["material_cost"] = round(sum(l.ext for l in t.lines), 2)
     t.notes = [n for n in t.notes if not (n.startswith("lighting") or ": lighting" in n)] + plan.notes     # a composite: the parts' notes go
     if plan.n_cap and getattr(t.spec.railing, "drink_rail", False):
-        t.notes.append("lighting: the post-cap lights need the drink rail BETWEEN the posts (each post keeps its cap) — an over-the-post "
-                       "drink rail covers the post tops and leaves no place for a cap light")
+        t.notes.append("lighting: the drink rail runs over the posts (no post caps), so each post light is a small accent light on the post's "
+                       "deck side just below the drink rail — 3/8\" wire hole behind it, the lead down inside the post to the run under the deck"
+                       if plan.post_kind == "accent" else
+                       "lighting: the post-cap lights need the drink rail BETWEEN the posts (each post keeps its cap) — an over-the-post "
+                       "drink rail covers the post tops and leaves no place for a cap light (railing.drink_rail_mount \"over\" switches the post "
+                       "lights to accent lights)")
 
 
 # ================================================================== labor, the sell allocation, the words
@@ -482,8 +491,10 @@ def labor_lines(t, lr: dict) -> list:
     plan = getattr(t, "lighting", None)
     if plan is None or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
         return []
-    out = [(f"Lighting — install {plan.n_riser} riser + {plan.n_cap} post-cap lights: cut the riser openings, pull the 12/2 through the posts, splice, mount",
-            plan.fixtures, "fixture", float(lr.get("lighting_fixture_each", 50.0)), "ESTIMATE — no lighting rate on the card; confirm")]
+    what = (f"{plan.n_riser} riser + {plan.n_cap} post accent lights: cut the riser openings, drill each post (3/8\" wire hole, 2 screws), "
+            "fish the lead down the post, splice under the deck, mount" if plan.post_kind == "accent" else
+            f"{plan.n_riser} riser + {plan.n_cap} post-cap lights: cut the riser openings, pull the 12/2 through the posts, splice, mount")
+    out = [(f"Lighting — install {what}", plan.fixtures, "fixture", float(lr.get("lighting_fixture_each", 50.0)), "ESTIMATE — no lighting rate on the card; confirm")]
     if plan.transformers:
         out.append((f"Lighting — mount the transformer{'s' if len(plan.transformers) > 1 else ''}, run the home runs, set the photocell and timer, test",
                     len(plan.transformers), "ea", float(lr.get("lighting_transformer_each", 175.0)), "ESTIMATE — no lighting rate on the card; confirm"))

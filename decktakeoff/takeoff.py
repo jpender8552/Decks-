@@ -1128,12 +1128,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             d = PRICEBOOK["decking"]["TOPLoc_PVC_fascia_100"]
             packs = max(1, int(math.ceil(n_ss / d["count"])))
             lines.append(Line("Fasteners", f"TimberTech TOPLoc fascia screws for Advanced PVC fascia, {fcol} (100 ct, 30 LF) — step-face skirt", packs, packs, "pack",
-                              f"{n_ss} screws  (2 at the rim and 2 at each blocking row per panel, pre-drilled) · {packs * d['count']} supplied", d["each"], d["source"]))
+                              f"{n_ss} screws  ({len(hs)} panels: 2 at each board end + 2 every 12\" on the nailers, pre-drilled) · {packs * d['count']} supplied", d["each"], d["source"]))
         else:
             d = PRICEBOOK["decking"]["CapTor_xd_350"]
             packs = max(1, int(math.ceil(n_ss / d["count"])))
             lines.append(Line("Fasteners", f"Starborn Cap-Tor xd 2-3/4\" Epoxy {fcol} 350 ct — step-face skirt", packs, packs, "box", f"{n_ss} screws (2 per nailer per panel)", d["each"], d["source"]))
-        sched["Step skirt"] = (f"vertical fascia panels on 2x4 nailers: 2 color-matched screws into the rim and 2 into each blocking row per panel, pre-drilled; "
+        sched["Step skirt"] = (f"vertical fascia panels on 2x4 nailers, TOPLoc fascia screws (color-matched): 2 at each board end, then 2 every 12\" on the nailers, pre-drilled; "
                                f"panels {skirt.gap:g}\" apart, 1/4\" off the lower deck, tight under the picture-frame board")
 
     # ================= BUILT-INS: benches (4x4 legs wrapped in deck board, 2x4 seat frame) and planters (2x4 box, OSB, deck-board skin)
