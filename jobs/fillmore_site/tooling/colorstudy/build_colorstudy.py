@@ -261,7 +261,8 @@ def main(argv):
       "so the brick would not match the solid siding color. Painted brick needs a masonry paint, and it does not easily go back "
       "to bare brick.</p></div>")
     w("<div><h3>Not painted</h3><ul><li>The roof shingles</li><li>The almond vinyl window and slider frames</li>"
-      "<li>The concrete patio</li><li>The new deck as proposed: TimberTech boards, the black IRX rail, the posts and beams</li></ul></div>")
+      "<li>The concrete patio</li><li>The new deck as proposed: TimberTech boards, the black IRX rail, the posts and beams</li>"
+      "<li>The outdoor furniture in the renders (Outer pieces, the same in every palette)</li></ul></div>")
     w("</div>")
     w('<h3>Reading the chips</h3><ul class="opt-scope">'
       "<li>Every paint is a Sherwin-Williams color, with its color number and the hex value Sherwin-Williams publishes for it</li>"
@@ -270,6 +271,8 @@ def main(argv):
       "<li>The back of the house faces north-northeast: it gets direct sun only on summer mornings (on June 21, until about 10:50 AM). "
       "The photoreal renders are at 10:30 AM on June 21, with the sun raking across the back</li>"
       "<li>The deck chip is the TimberTech board, rendered; its tone is approximate</li>"
+      "<li>The furniture on the deck is Outer outdoor furniture: teak frames with Pacific Fog Gray cushions, and a dining set with "
+      "charcoal frames and teak tops. It is shown for scale and is not part of the deck proposal</li>"
       "<li>Screens and paper do not show paint exactly. Look at painted samples on the house, in sun and in shade, before choosing</li></ul>")
     w('<h3>Before choosing</h3><ul class="opt-scope">'
       "<li>Ask the Tiffany HOA whether a color change needs its approval; if it does, the paint colors can go in with the deck request</li>"

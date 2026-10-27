@@ -16,7 +16,8 @@ Options (every path is a variable below; these override it):
     --keep-stills                reuse the three.js stills already rendered (default: render them fresh)
 
 Steps, in this order (default: all):
-    stills     three.js stills of the base deck: isometrics, exploded, plan, build steps 1-8, sun study (OUT/buildset/renders)
+    stills     three.js stills of the base deck: isometrics, exploded, plan, build steps 1-8, sun study (OUT/buildset/renders); and
+               the permit set's finished views with the styling furniture off (OUT/renders_permit)
     optstills  three.js stand-ins for an option render set the rendering agent has not delivered (stairs, roof, screens)
     combine    the folders the documents read — base (three.js + the photoreal set under the page's still names), the options'
                renders (stairs-*, night-*, roof-*, screens-*), the roof document's — each with a captions.json
@@ -30,13 +31,14 @@ Steps, in this order (default: all):
                link the line is left out)
     supplier   Decks & Docks take-off + build set (the base; no prices)   [supplier_opts: the deck with Options 1 + 2, opt-in]
     cost       cost stack (internal) with the options' basis
-    permit     permit set: whole-deck sheets (both levels in one frame) + 3D views; no prices
+    permit     permit set: whole-deck sheets (both levels in one frame) + 3D views (no furniture: OUT/renders_permit); no prices
     dims       the A-100 dimension plan on one Letter-landscape page
     deliver    every PDF into OUT_ROOT/fillmore_deliver/ under its GSX name; publish/manifest.json (what to publish, the files)
 Anything missing (a spec, a render set, a URL, a copy line marked [TBD]) is skipped and listed in the summary at the end and in
 publish/build_status.json. Publishing order: the 3D page -> URL_3D; `roof` -> URL_ROOF; then `proposal` (it links both) ->
 URL_PROPOSAL; internal / cost / supplier / permit; then hub_merge_fillmore.py and the hub (see publish/manifest.json)."""
 import copy as _copy
+import fnmatch
 import json
 import os
 import re
@@ -128,14 +130,15 @@ PICKS = {
     "roof": [["roof-open-1000-yard", "roof-open-1300-yard", "roof-open-webgl-corner"], ["roof-closed-1000-yard", "roof-closed-1300-yard", "roof-closed-webgl-corner"]],
     "screens": [["screens-down-1600-yard", "screens-down-webgl-corner"], ["screens-up-1600-yard"]],
     "roof_hero": [["roof-open-1000-yard", "roof-partopen-1000-yard", "roof-open-1300-yard", "roof-open-webgl-corner"]],
-    "screens_doc": [["screens-down-1600-yard", "screens-down-webgl-corner"], ["screens-half-1600-yard"], ["screens-up-1600-yard"], ["screens-down-1600-deck"]],
+    # (the view from inside with the screens down is left out: the render shows the black mesh near opaque; from inside it reads see-through)
+    "screens_doc": [["screens-down-1600-yard", "screens-down-webgl-corner"], ["screens-half-1600-yard"], ["screens-up-1600-yard"]],
 }
 # The roof document's gallery (the owner: open and closed at several times of day, the shade moving on the deck): at each time,
-# the yard view open | closed, then the deck view open | closed; then the extras (part open, dusk — add "roof-dusk-2105-yard" once
-# the roof's LED strip is confirmed inside the $35,000).
+# the yard view open | closed, then the deck view open | closed; then the extras: the roof at dusk with its gutter LED strip on
+# (owner 27 Oct: the strip is in the $35,000, "I have that in the bid"). "*" = any render time (the dusk time comes from the render).
 ROOF_DOC_STATES = ["open", "closed"]
 ROOF_DOC_VIEWS = ["yard", "deck"]
-ROOF_DOC_EXTRA = []
+ROOF_DOC_EXTRA = ["roof-dusk-*-yard", "roof-dusk-*-deck"]
 # three.js stand-ins (optstills) for a set with no photoreal stills: set -> (spec key, roof changes, views)
 FALLBACK_SETS = {
     "yardstair": ("yardstair", None, ["corner", "iso"]),
@@ -175,6 +178,11 @@ OWNER_CHECKS = [   # (spec key, what the owner decided, test on the spec dict as
 # notrees switch (its generic camera, trees and fences hidden), as the build steps already are; the sun study too
 NOTREES_STILLS = ["corner", "iso", "iso2", "isolow"]
 NOTREES_SUN = True
+# The permit set never shows the styling furniture (owner 27 Oct: styling only, never in the drawings). Its finished views are
+# three.js stills rendered with the styling layer off (render_stills styling=False -> the viewer's furn=0) into OUT/renders_permit,
+# never the proposal's stills (corner / yard are photoreal there, iso / iso2 furnished); the technical views (exploded, frame,
+# structure) never draw furniture (viewer.py), so they come from the base set as before.
+PERMIT_FINISHED = ["corner", "yard", "iso2", "iso"]
 # The deliverables: (step, out dir attr, delivered file name, hub docs path, url key, artifact icon)
 DELIVER = [
     ("proposal", "OUT_PROPOSAL", f"{ADDRESS} - Proposal + Bid Set.pdf", "docs/fillmore-proposal.pdf", "URL_PROPOSAL", "home"),
@@ -288,6 +296,7 @@ def paths(ctx, opts):
     ctx.RO = ctx.OUT / "renders_options"            # every option's stills (stairs-*, night-*, roof-*, screens-*)
     ctx.RR = ctx.OUT / "renders_roof"               # the roof document's stills
     ctx.ROF = ctx.OUT / "stills_options"            # three.js stand-ins for missing option sets
+    ctx.RP = ctx.OUT / "renders_permit"             # the permit set's finished views, furniture off (PERMIT_FINISHED)
     ctx.OUT_PROPOSAL = o / "fillmore_proposal"
     ctx.OUT_ROOF = o / "fillmore_roof"
     ctx.OUT_DD = o / "fillmore_dd"
@@ -667,7 +676,14 @@ def step_stills(ctx):
     err = ctx.OUT / "buildset" / "renders_error.txt"
     if not n and err.exists():
         raise RuntimeError("three.js stills failed: " + err.read_text()[:300])
-    return f"{n} three.js stills in {ctx.RD3}"
+    # the permit set's finished views: the same cameras as the base set's, the styling furniture off
+    if not ctx.keep_stills:
+        clear_jpgs(ctx.RP)
+    sp = dict(STILLS)
+    render_stills(build_scene(t.layout), str(ctx.RP), which=[], styling=False,
+                  extra=[(n_, dict(sp[n_], **({"notrees": "1"} if n_ in NOTREES_STILLS else {}))) for n_ in PERMIT_FINISHED])
+    n_p = len([n_ for n_ in PERMIT_FINISHED if (ctx.RP / f"{n_}.jpg").exists()])
+    return f"{n} three.js stills in {ctx.RD3}; {n_p} permit views without furniture in {ctx.RP}"
 
 
 def step_optstills(ctx):
@@ -1026,7 +1042,8 @@ def step_roof(ctx):
     n = _names(ctx)
     hero = (pick(ctx, "roof_hero", ctx.RR) or [None])[0]
     have = {q.stem for q in ctx.RR.glob("*.jpg")}
-    rn = [f"roof-{st_}-{tm}-{v}" for tm in ROOF_TIMES for v in ROOF_DOC_VIEWS for st_ in ROOF_DOC_STATES] + ROOF_DOC_EXTRA
+    rn = [f"roof-{st_}-{tm}-{v}" for tm in ROOF_TIMES for v in ROOF_DOC_VIEWS for st_ in ROOF_DOC_STATES] + [
+        m for pat in ROOF_DOC_EXTRA for m in (sorted(fnmatch.filter(have, pat)) if "*" in pat else [pat])]
     rn = [x for x in rn if x in have] or sorted(x for x in have if x.startswith("roof-"))
     sides = ctx.facts.get("screen_sides", "")
     addon = dict(renders=rn or None,
@@ -1109,7 +1126,13 @@ def step_permit(ctx):
     want = [("corner", "From the yard"), ("yard", "From the yard, the upper level"), ("iso2", "From above, the arm end"), ("iso", "From above, the right end"),
             ("exploded", "Exploded — every layer"), ("exploded-corner", "Exploded — from the front corner"), ("frame-iso2", "The frame — decking off"),
             ("structure-underiso", "Posts and beams on the footings")]
-    views = [(caps.get(k, c_), str(ctx.RD / f"{k}.jpg")) for k, c_ in want if (ctx.RD / f"{k}.jpg").exists()]
+    views = []
+    for k, c_ in want:                           # finished views: only the furniture-free stills (never the proposal's)
+        src = (ctx.RP / f"{k}.jpg") if k in PERMIT_FINISHED else (ctx.RD / f"{k}.jpg")
+        if src.exists():
+            views.append((c_ if k in PERMIT_FINISHED else caps.get(k, c_), str(src)))
+        elif k in PERMIT_FINISHED:
+            ctx.miss(f"permit view {k} without furniture ({ctx.RP.name}/{k}.jpg: run the 'stills' step)")
     title = (ctx.copy or {}).get("permit_title", "Two-level deck")
     r = render_permit_set([dict(spec=ctx.specs["base"], title=title)], str(ctx.OUT_PERMIT), key=f"{KEY}k", name=n["permit"],
                           sub=_sub(ctx, "sub_permit"), pdf=ctx.pdf, date_line=ctx.date_line, renders={title: views} if views else None)
@@ -1223,6 +1246,15 @@ def step_deliver(ctx):
         lines.append(f"    {dst.name}  (from {cards[-1]})")
     else:
         ctx.miss(f"color check card ({F / COLOR_CARD_GLOB})")
+    cs_pdf = S / "fillmore" / "colorstudy" / f"{ADDRESS} - Exterior Color Study.pdf"    # its own build: colorstudy/tools/run_photoreal.sh
+    if cs_pdf.exists():
+        dst = D / cs_pdf.name
+        shutil.copy(cs_pdf, dst)
+        docs.append(dict(key="colorstudy", title="Exterior color study", html=None, files={}, hub_doc="docs/fillmore-color-study.pdf", url_key="URL_COLORSTUDY",
+                         url=ctx.urls.get("URL_COLORSTUDY", ""), icon=None, customer=True, pdf=str(dst), mb=round(dst.stat().st_size / 1e6, 2)))
+        lines.append(f"    {dst.name}  (from {cs_pdf.parent})")
+    else:
+        ctx.miss(f"exterior color study PDF ({cs_pdf})")
     threed = ctx.OUT_3D / "fillmore_3d.html"
     docs.insert(0, dict(key="3d", title=_title_of(threed) if threed.exists() else "", html=str(threed) if threed.exists() else None, files={},
                         hub_doc=None, url_key="URL_3D", url=ctx.urls.get("URL_3D", ""), icon="cube", description=DESCRIPTIONS["3d"], customer=True, pdf=None))

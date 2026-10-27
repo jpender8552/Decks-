@@ -1,0 +1,59 @@
+{
+ "existing": {
+  "house": {},
+  "brick_painted": false
+ },
+ "gray": {
+  "house": {
+   "siding": "#585858",
+   "accent": "#2f2f30",
+   "trim": "#2f2f30",
+   "fascia": "#2f2f30",
+   "gutter": "#2f2f30",
+   "soffit": "#2f2f30",
+   "brick": "#585858",
+   "mortar": "#585858",
+   "foundation": "#585858"
+  }
+ },
+ "charcoal": {
+  "house": {
+   "siding": "#434341",
+   "accent": "#2f2f30",
+   "trim": "#2f2f30",
+   "fascia": "#2f2f30",
+   "gutter": "#2f2f30",
+   "soffit": "#2f2f30",
+   "brick": "#434341",
+   "mortar": "#434341",
+   "foundation": "#434341"
+  }
+ },
+ "black": {
+  "house": {
+   "siding": "#2f2f30",
+   "accent": "#2f2f30",
+   "trim": "#2f2f30",
+   "fascia": "#2f2f30",
+   "gutter": "#2f2f30",
+   "soffit": "#2f2f30",
+   "brick": "#2f2f30",
+   "mortar": "#2f2f30",
+   "foundation": "#2f2f30"
+  }
+ },
+ "recommended": {
+  "house": {
+   "siding": "#434341",
+   "accent": "#2f2f30",
+   "trim": "#2f2f30",
+   "fascia": "#2f2f30",
+   "gutter": "#2f2f30",
+   "soffit": "#2f2f30",
+   "brick": "#434341",
+   "mortar": "#434341",
+   "foundation": "#434341"
+  },
+  "deck": "Mahogany"
+ }
+}

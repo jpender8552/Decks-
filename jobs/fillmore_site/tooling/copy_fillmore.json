@@ -8,10 +8,10 @@
  "name_supplier": "7303 S Fillmore Cir · Deck Replacement",
  "name_permit": "7303 S Fillmore Cir · Deck Replacement",
  "permit_title": "Two-level deck",
- "sub_internal": "7303 S Fillmore Cir, Centennial · Andie Jones (buyer) · two-level deck replaced in the same footprint, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape on 6x10 DF #1 drop beams (L1 and A2 under the lower level, U1 under the upper level) and {columns} 8x8 rough DF columns on {column_bases_internal}, in place of the 9 brick columns · TimberTech Vintage English Walnut parallel to the house, one picture frame, breakers at A|B, mid-B, mid-C and C|D, no butt joints, Cortex on every board, TOPLoc on the fascia and the vertical skirt · TimberTech Impression Rail Express, Black, vertical balusters, Vintage English Walnut drink rail over the posts · 5-riser stair set into the upper level at B|C, the step face in vertical English Walnut fascia · demo · options: 1 lighting, 2 / 2B stairs to the yard (two layouts, one or the other), 3 louvered roof (+ 3a screens)",
- "sub_supplier": "7303 S Fillmore Cir, Centennial CO 80122 · two-level deck, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape, 6x10 DF #1 drop beams, {columns} 8x8 rough DF columns on {column_bases_internal} · TimberTech Vintage English Walnut, picture frame, breakers, Cortex on every board, TOPLoc on the fascia and the vertical skirt · Impression Rail Express, Black, vertical balusters, Vintage English Walnut drink rail over the posts · 5-riser stair set into the upper level, vertical English Walnut skirt",
+ "sub_internal": "7303 S Fillmore Cir, Centennial · Andie Jones (buyer) · two-level deck replaced in the same footprint, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape on 6x10 DF #1 drop beams (L1 and A2 under the lower level, U1 under the upper level) and {columns} 8x8 rough DF columns on {column_bases_internal}, in place of the 9 brick columns · TimberTech Vintage English Walnut parallel to the house, one picture frame, breakers at A|B, mid-B, mid-C and C|D, no butt joints, Cortex on every board, TOPLoc on the fascia and the vertical skirt · TimberTech Impression Rail Express, Black, vertical balusters · 5-riser stair set into the upper level at B|C, the step face in vertical English Walnut fascia · demo · options: 1 lighting, 2 / 2B stairs to the yard (two layouts, one or the other), 3 louvered roof (+ 3a screens)",
+ "sub_supplier": "7303 S Fillmore Cir, Centennial CO 80122 · two-level deck, {width} along the house: lower level (arm A + B) and upper level (C + D) {step_in}\" above it · TrueFrame 2x10 @ 12\" with joist tape, 6x10 DF #1 drop beams, {columns} 8x8 rough DF columns on {column_bases_internal} · TimberTech Vintage English Walnut, picture frame, breakers, Cortex on every board, TOPLoc on the fascia and the vertical skirt · Impression Rail Express, Black, vertical balusters · 5-riser stair set into the upper level, vertical English Walnut skirt",
  "sub_permit": "7303 S Fillmore Cir, Centennial CO 80122 · two-level deck replaced in the same footprint, {width} along the house: lower level (A + B) and upper level (C + D), {step_in}\" between them",
- "lede": "Your deck, rebuilt in the same footprint across the back of the house: two levels, {width} along the house, the upper level {step_in}\" above the lower. The old deck and its brick columns come out. The new frame is TrueFrame 2x10 joists at 12\" on center with joist tape, on 6x10 Douglas fir beams and 8x8 rough Douglas fir columns, each column on {footing_one}. TimberTech Vintage decking in English Walnut runs parallel to the house, with a picture frame and breaker boards so every board is one piece. Every deck board and stair tread is screwed through the face with Cortex and plugged in English Walnut. Black Impression Rail Express with vertical balusters, and an English Walnut drink rail over the posts. The stair between the levels is set into the upper level, and the face between the levels is English Walnut boards installed vertically.",
+ "lede": "Your deck, rebuilt in the same footprint across the back of the house: two levels, {width} along the house, the upper level {step_in}\" above the lower. The old deck and its brick columns come out. The new frame is TrueFrame 2x10 joists at 12\" on center with joist tape, on 6x10 Douglas fir beams and 8x8 rough Douglas fir columns, each column on {footing_one}. TimberTech Vintage decking in English Walnut runs parallel to the house, with a picture frame and breaker boards so every board is one piece. Every deck board and stair tread is screwed through the face with Cortex and plugged in English Walnut. Black Impression Rail Express with vertical balusters. The stair between the levels is set into the upper level, and the face between the levels is English Walnut boards installed vertically.",
  "viewer_note": "Your deck and its options in 3D, in a web browser. Turn each option on and off, move the sun through any day at your address, open and close the louvers, raise and lower the screens, and see the lights after dark.",
  "lights": {
   "title": "Lighting",
@@ -48,8 +48,8 @@
    "*": "Motorized screens"
   },
   "note_tail": {
-   "front+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail, so the drink rail stays outside it. The left end stays open, so the stair between the levels stays clear.",
-   "front+left+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail, so the drink rail stays outside it. The left screen comes down across the top of the stair between the levels; raise it to use the stair."
+   "front+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail. The left end stays open, so the stair between the levels stays clear.",
+   "front+left+right": "Black mesh in zipper side tracks, with a weighted bottom bar, on the roof's remote and app. The front screen comes down inside the rail. The left screen comes down across the top of the stair between the levels; raise it to use the stair."
   }
  },
  "roof_doc": {
@@ -61,8 +61,8 @@
    "*": "Motorized screens"
   },
   "screens_blurb": {
-   "front+right": "Screens that come down from the frame on the front and the right end. The front screen comes down inside the rail, so the drink rail stays outside it. The left end stays open, so the stair between the levels stays clear.",
-   "front+left+right": "Screens that come down from the frame on the front and both ends. The front screen comes down inside the rail, so the drink rail stays outside it. The left screen crosses the top of the stair between the levels; raise it to use the stair."
+   "front+right": "Screens that come down from the frame on the front and the right end. The front screen comes down inside the rail. The left end stays open, so the stair between the levels stays clear.",
+   "front+left+right": "Screens that come down from the frame on the front and both ends. The front screen comes down inside the rail. The left screen crosses the top of the stair between the levels; raise it to use the stair."
   },
   "facts": {
    "what": [
@@ -111,7 +111,7 @@
  },
  "stairs2b": {
   "title": "Stairs to the yard — along the deck",
-  "blurb_relay": "A stair from the front of the lower level down to the yard: one step down to a {yard2b_landing_short} landing, then down along the front of the deck to the lawn.",
+  "blurb_relay": "A stair from the front of the lower level down to the yard: one step down to a {yard2b_landing_short} landing, then down along the front of the deck to a new concrete pad, level with the patio.",
   "blurb_horseshoe": "A stair from the front of the lower level down to the yard. A {yard2b_width_short}-wide flight goes down to a {yard2b_landing_short} landing, turns back toward the house, and goes down to the lawn.",
   "blurb_other": "TBD: words for this layout of the stairs along the deck (copy.md 1.11)",
   "addon_label": "With Option 1: lights on these stairs",

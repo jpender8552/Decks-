@@ -14,6 +14,7 @@
 #   yardstair_alt     Option 2B, stairs to the yard along the deck edge, day - the same stations as yardstair
 #   lights            Option 1 (riser lights + post accent lights), dusk
 #   lights_yardstair  Option 1 with Option 2: the yard stair's lights, dusk
+#   lights_yardstair_alt  Option 1 with Option 2B: the stairs along the deck, lit, dusk
 #   roof_open/half/closed   Option 3 louvered roof, louvers open (90) / half open (45) / closed (0), at 10:00, 13:00, 16:00
 #   screens_down/half Option 3a screens (front + right end; the left end stays open over the stair) down / half down,
 #                     louvers closed, 16:00; "screens up" = roof_closed at 16:00
@@ -43,7 +44,7 @@ COMMON=${COMMON:-"--foliage=summer"}
 DAY=${DAY:-"--samples=56 --size=1200x772"}                                                # the Prentice set's quality
 DUSK=${DUSK:-"--samples=160 --size=1200x772 --dusk-exposure=3.2 --dusk-el=-5 --led=1.5"}  # many small lights, more samples
 
-SETS="${*:-base yardstair yardstair_alt lights lights_yardstair roof_open roof_half roof_closed screens_down screens_half roof_dusk}"
+SETS="${*:-base yardstair yardstair_alt lights lights_yardstair lights_yardstair_alt roof_open roof_half roof_closed screens_down screens_half roof_dusk}"
 
 python3 $R/tools/make_variants.py --spec-dir=$SPEC_DIR --out=$VAR --house=$HOUSE || exit 1
 python3 - "$VAR/base.json" <<'EOF'
@@ -74,7 +75,8 @@ for set in $SETS; do
     yardstair|yardstair_alt)
                       run $set $VAR/$set.json stair_yard yard yard_left high34 $DAY ;;
     lights)           run lights $VAR/lights.json dusk dusk_deck upper_deck@dusk $DUSK ;;
-    lights_yardstair) run lights_yardstair $VAR/lights_yardstair.json dusk_stair dusk $DUSK ;;
+    lights_yardstair|lights_yardstair_alt)
+                      run $set $VAR/$set.json dusk_stair dusk $DUSK ;;
     roof_open|roof_half|roof_closed)
                       run $set $VAR/$set.json $(at roof_yard $ROOF_TIMES) $(at roof_deck $ROOF_TIMES) $DAY ;;
     screens_down|screens_half)
