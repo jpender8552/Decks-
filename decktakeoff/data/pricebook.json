@@ -1433,5 +1433,9 @@
     "Reserve": 94.82,
     "Vintage": 109.66,
     "_note": "Pricing Sheet To Fit GS: deck with no railing, sell per SF (40% GM) — a stair landing sells at this rate, its level guard at the rail rule"
+  },
+  "landing_sell_per_sf": {
+    "Vintage": 140.0,
+    "_note": "owner 27 Oct 2026: a stair landing sells at $140/SF (vs the normal $110/SF Vintage deck); its guard at the rail rule ($120/LF IRX); the risers stay at stair_sell_per_riser"
   }
 }

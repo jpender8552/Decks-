@@ -354,7 +354,8 @@ def stair_rule(t: Takeoff, gm: float, tax_rate: float, rate_lf, margin_work: flo
             from .takeoff import build_takeoff
             t0 = build_takeoff(s0)
         _STAIRLESS[key] = price(t0, gm=gm, tax_rate=tax_rate, with_options=False, _stairless=True).margin_work
-    psf = float(PRICEBOOK.get("deck_sell_per_sf_no_rail", {}).get(s.decking.collection, 0.0))
+    psf = float(PRICEBOOK.get("landing_sell_per_sf", {}).get(s.decking.collection)
+                or PRICEBOOK.get("deck_sell_per_sf_no_rail", {}).get(s.decking.collection, 0.0))      # the owner's landing rate, else the deck's
     n_r = sum(st.geo.risers for st in L.stairs)
     land_sf = round(sum(float(w) * float(dd) / 144 for ss in stair_specs(t) for w, dd in (ss.landings or [])), 1)
     guard_lf = round(sum(st.landing_rail_lf for st in L.stairs), 1)
