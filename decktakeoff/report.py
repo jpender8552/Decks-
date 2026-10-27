@@ -439,8 +439,9 @@ def stair_words(ss, st, composite: bool = False) -> str:
         turn = {"switchback": "turn back", "left": "turn left", "right": "turn right", "straight": "continue"}.get(ss.turn, ss.turn)
         txt += f": {g.flights[0].risers} down to the {lands} landing, {turn}, " + " then ".join(f"{fg.risers} down" for fg in g.flights[1:])
     land = getattr(ss, "landing", "") if ss is not None else ""
-    if composite:
-        txt += {"deck": ", down to the lower level", "grade": ", down to the yard", "concrete pad": ", down to a concrete pad in the yard"}.get(land, "")
+    if composite:      # where it lands ("... 6 down to the yard" after the flights; ", down to the lower level" on one flight)
+        to = {"deck": "to the lower level", "grade": "to the yard", "concrete pad": "to a concrete pad in the yard"}.get(land, "")
+        txt += ((" " + to) if (len(g.flights) > 1 and ss is not None) else (", down " + to)) if to else ""
     if ss is not None and getattr(ss, "inset", False):
         txt += ", set into the upper level so the bottom riser is flush with the face between the levels"
     if st.landing_rail_lf:

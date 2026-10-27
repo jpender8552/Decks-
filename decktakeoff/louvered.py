@@ -78,7 +78,7 @@ SCREEN_DEFAULTS = dict(side="front", drop=0.0, fabric="mesh", color="black",
 SCREEN_EST_PER_LF = 275.0       # ESTIMATE until the owner sets it: sell $/LF of screen width, motorized, mesh, installed
 SCREEN_MAT = "lvfabric"
 HEM_H, HEM_T, TRACK_W, TRACK_D = 2.0 * IN, 1.25 * IN, 1.25 * IN, 2.0 * IN
-FABRIC = {"mesh": dict(opacity=0.62, alpha=0.62, rough=0.9), "vinyl": dict(opacity=0.28, alpha=0.22, rough=0.12)}
+FABRIC = {"mesh": dict(rough=0.9), "vinyl": dict(rough=0.12)}   # mesh: Phifer SunTex `density` % (55-99, default 80); vinyl: clear
 
 
 # ================================================================== frames: a roof in the global frame <-> a part's frame
@@ -457,9 +457,12 @@ def materials(spec) -> Dict[str, dict]:
         sc = str(scr[0].get("color") or ("clear" if fab == "vinyl" else "black")).lower()
         hexc = "#dfe6e8" if fab == "vinyl" else {"black": "#1b1c1e", "grey": "#55585a", "gray": "#55585a", "white": "#e6e4de", "linen": "#d8cfbd",
                                                   "tan": "#a99677", "mocha": "#4d3d31"}.get(sc, "#1b1c1e")
-        # opacity: the WebGL viewer's transparency; alpha: the photoreal pass's Principled BSDF alpha (see-through mesh / clear vinyl)
-        out[SCREEN_MAT] = dict(color=hexc, rough=FABRIC[fab]["rough"], opacity=FABRIC[fab]["opacity"], alpha=FABRIC[fab]["alpha"],
-                               label=("Suncoast retractable screen, clear vinyl" if fab == "vinyl" else f"Suncoast retractable screen, Phifer {sc} mesh"))
+        # openness: the open weave the photoreal pass lets sight and sun through (cycles Mats.screen); opacity: the WebGL viewer's
+        dens = float(scr[0].get("density") or 80.0)
+        openness = 0.85 if fab == "vinyl" else max(0.01, min(0.45, 1.0 - dens / 100.0))
+        opacity = 0.28 if fab == "vinyl" else round(0.45 + 0.4 * (min(99.0, max(55.0, dens)) - 55.0) / 45.0, 3)
+        out[SCREEN_MAT] = dict(color=hexc, rough=FABRIC[fab]["rough"], opacity=opacity, openness=round(openness, 3),
+                               label=("Suncoast retractable screen, clear vinyl" if fab == "vinyl" else f"Suncoast retractable screen, Phifer SunTex {dens:g} {sc} mesh"))
     return out
 
 
