@@ -263,8 +263,8 @@ class Stair:
     option: str = ""                     # the option this stair belongs to ("Stairs to the yard"): its 3D boxes carry layer "option:<name>"
     landing_footing: str = ""            # "" -> each landing's 4 posts and footings are their own stair lines | "deck": they stand on the deck's
                                          # footing type (caisson / pier / Diamond Pier, the deck's bases), counted and installed with the deck's posts |
-                                         # "caisson12": the landing AND carrier posts are the deck's posts on their own 12" caissons (the deck's depth, no
-                                         # large-footing add-on) on the deck's base (owner: ABU88RZ on two cast-in anchors, never an ABU66) — the stair's own lines
+                                         # "caisson12": the landing AND carrier posts are 6x6 rough on ABU66RZ (owner) on their own 12" caissons (the deck's
+                                         # depth, no large-footing add-on), one cast-in anchor — the stair's own lines
     landing_grade_in: Optional[float] = None   # the grade under the landings' open edges, inches from the stair's foot (negative: the yard
                                          # falls away from the foot): the landing guard rule (over 30" above grade), the landing posts' length
                                          # and where the 3D sets their footings. None -> the ground is level with the foot

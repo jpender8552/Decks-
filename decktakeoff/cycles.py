@@ -923,10 +923,13 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
     BOARD_KEYS = {k for k, m in D["materials"].items() if m.get("palette")}
     TILE = {"shingle": 8.0, "paver": 8.0, "grass": 4.0, "mulch": 4.0, "gravel": 4.0}
     veg = []
+    plant_tags = _plant_tags(spec) if TREES3D else set()     # the yard model's trees and shrubs: built by build_plants()
     for b in D["boxes"]:
         mk = b["mat"]
         md = D["materials"].get(mk, {})
         shape = b.get("shape") or "box"
+        if b["kind"] == "tree" and (b.get("tag") or "") in plant_tags:
+            continue
         if b["kind"] == "tree" and shape in ("sphere", "cone"):
             veg.append(b)
             continue
@@ -1022,7 +1025,137 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
         cb.inputs["Base Color"].default_value = _hex("#22301a") + (1,)
         cb.inputs["Roughness"].default_value = 0.95
         build_object("crown_core", core, cm, col)
+    if TREES3D and plant_tags:
+        build_plants(spec, D, col, out_dir, foliage, quick)
     return spec, sc, D
+
+
+# ====================================================================== trees and shrubs (decktakeoff.vegetation)
+TREES3D = True       # build the yard model's trees from their entries (vegetation.py) instead of landscape.py's spheres / cones
+PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colours)
+    "maple": ("#4c6827", "#718d38"), "cottonwood": ("#587b2c", "#86a244"), "broadleaf": ("#55702f", "#7c923c"),
+    "spruce": ("#52777a", "#7a9fa5"), "pine": ("#405b2a", "#617d37"), "juniper": ("#4c6450", "#6d846f"),
+    "shrub": ("#526d2d", "#788f3a"), "shrub2": ("#5a7830", "#81973d"), "sumac": ("#4c6829", "#6c8835"),
+}
+PLANT_MATKEY = {"maple": "leaf", "cottonwood": "leaf2", "broadleaf": "leaf", "spruce": "spruce", "pine": "spruce_pine",
+                "juniper": "spruce2", "shrub": "shrub", "shrub2": "leaf2", "sumac": "shrub"}
+
+
+def _plant_tags(spec) -> set:
+    """The scene tags landscape.py gives a tree's or shrub's boxes and meshes (crown blobs, tiers, trunks, stems)."""
+    sm = getattr(spec.geometry, "site_model", None) or {}
+    trees = sm.get("trees") or []
+    if not trees:
+        return set()
+    tags = {"spruce", "spruce trunk", "tree stem", "tree canopy", "tree canopy top", "pine", "pine trunk", "shrub"}
+    for t in trees:
+        if t.get("name"):
+            tags |= {t["name"], f"{t['name']} top"}
+    return tags
+
+
+def _mesh_arrays(name: str, V, Q, UV, COL, mat, collection):
+    """A mesh straight from numpy arrays (plan frame, right-hand outward quads) -> Blender (x, -y, z), winding reversed."""
+    V = np.asarray(V, np.float32).copy(); V[:, 1] *= -1
+    Q = np.asarray(Q, np.int32)[:, ::-1]
+    UV = np.asarray(UV, np.float32).reshape(-1, 4, 2)[:, ::-1].reshape(-1, 2)
+    COL = np.asarray(COL, np.float32).reshape(-1, 4, 4)[:, ::-1].reshape(-1, 4)
+    me = bpy.data.meshes.new(name)
+    me.vertices.add(len(V)); me.vertices.foreach_set("co", V.ravel())
+    me.loops.add(Q.size); me.polygons.add(len(Q))
+    me.polygons.foreach_set("loop_start", np.arange(0, Q.size, 4, dtype=np.int32))
+    me.polygons.foreach_set("vertices", Q.ravel())
+    me.update(calc_edges=True)
+    me.uv_layers.new(name="UVMap").data.foreach_set("uv", UV.ravel())
+    me.color_attributes.new(name="tint", type="FLOAT_COLOR", domain="CORNER").data.foreach_set("color", COL.ravel())
+    me.materials.append(mat)
+    ob = bpy.data.objects.new(name, me)
+    collection.objects.link(ob)
+    return ob
+
+
+def _card_material(name: str, path: str, kind: str):
+    """An alpha cut-out foliage card: the texture x the card's tint, a little translucency (leaves glow backlit); spruce
+    needles carry the glaucous wax's silvery sheen, cottonwood leaves are glossy."""
+    m, nt, bsdf, out = Mats._new(name)
+    img = Mats._img(nt, path)
+    a = nt.nodes.new("ShaderNodeAttribute"); a.attribute_name = "tint"
+    mul = nt.nodes.new("ShaderNodeVectorMath"); mul.operation = "MULTIPLY"
+    nt.links.new(img.outputs["Color"], mul.inputs[0]); nt.links.new(a.outputs["Color"], mul.inputs[1])
+    nt.links.new(mul.outputs["Vector"], bsdf.inputs["Base Color"])
+    rough = {"cottonwood": 0.38, "spruce": 0.42, "juniper": 0.55, "pine": 0.45}.get(kind, 0.5)
+    bsdf.inputs["Roughness"].default_value = rough
+    bsdf.inputs["Specular IOR Level"].default_value = 0.5 if kind in ("spruce", "cottonwood") else 0.4
+    tr = nt.nodes.new("ShaderNodeBsdfTranslucent"); nt.links.new(mul.outputs["Vector"], tr.inputs["Color"])
+    mix = nt.nodes.new("ShaderNodeMixShader"); mix.inputs[0].default_value = 0.12 if kind in ("spruce", "pine", "juniper") else 0.25
+    nt.links.new(bsdf.outputs[0], mix.inputs[1]); nt.links.new(tr.outputs[0], mix.inputs[2])
+    trans = nt.nodes.new("ShaderNodeBsdfTransparent")
+    mix2 = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(img.outputs["Alpha"], mix2.inputs[0]); nt.links.new(trans.outputs[0], mix2.inputs[1]); nt.links.new(mix.outputs[0], mix2.inputs[2])
+    nt.links.new(mix2.outputs[0], out.inputs[0])
+    return m
+
+
+def _bark_material(name: str = "bark3d"):
+    """Bark: a grey-brown with furrows (stretched noise along the stem, UV v runs along it) and the per-part tint."""
+    m, nt, bsdf, out = Mats._new(name)
+    a = nt.nodes.new("ShaderNodeAttribute"); a.attribute_name = "tint"
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (6.0, 0.6, 1.0)
+    nt.links.new(uv.outputs["UV"], mp.inputs["Vector"])
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 3.0; nz.inputs["Detail"].default_value = 6.0
+    nt.links.new(mp.outputs["Vector"], nz.inputs["Vector"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].color = _hex("#2e2722") + (1,)
+    ramp.color_ramp.elements[1].color = _hex("#6e6257") + (1,)
+    nt.links.new(nz.outputs["Fac"], ramp.inputs["Fac"])
+    mul = nt.nodes.new("ShaderNodeVectorMath"); mul.operation = "MULTIPLY"
+    nt.links.new(ramp.outputs["Color"], mul.inputs[0]); nt.links.new(a.outputs["Color"], mul.inputs[1])
+    nt.links.new(mul.outputs["Vector"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 0.92
+    b = nt.nodes.new("ShaderNodeBump"); b.inputs["Strength"].default_value = 0.6; b.inputs["Distance"].default_value = 0.05
+    nt.links.new(nz.outputs["Fac"], b.inputs["Height"]); nt.links.new(b.outputs["Normal"], bsdf.inputs["Normal"])
+    return m
+
+
+def build_plants(spec, D, col, out_dir: str, foliage: str = "", quick: bool = False) -> int:
+    """The yard model's trees and shrubs as real plants (decktakeoff.vegetation): branch skeletons, leaf / needle cards,
+    in the season's colours. Detail falls off with distance from the deck (the backdrop cottonwoods get fewer, larger
+    cards). Returns the number of quads."""
+    from decktakeoff import vegetation as VG
+    from decktakeoff.landscape import grade_at
+    sm = getattr(spec.geometry, "site_model", None) or {}
+    t0 = time.time()
+
+    def colors(kind):
+        if foliage == "summer" or kind in ("spruce", "pine", "juniper"):
+            return PLANT_COLS.get(kind, PLANT_COLS["broadleaf"])
+        mc = (D["materials"].get(PLANT_MATKEY.get(kind, "leaf")) or {}).get("color") or PLANT_COLS["broadleaf"][0]
+        r, g, b = _srgb255(mc)
+        return mc, "#%02x%02x%02x" % tuple(min(255, int(v * 1.2)) for v in (r, g, b))
+    cx = float(np.mean([D.get("x_min", 0.0), D.get("x_min", 0.0) + D.get("W", 40.0)]))
+    detail = lambda x, y: float(np.clip(70.0 / max(1.0, math.hypot(x - cx, y - 12.0)), 0.35, 1.0)) * (0.8 if quick else 1.0)
+    P = VG.Plants(os.path.join(out_dir, "_tex"), colors, seed=int(sm.get("seed", 7)) * 31 + 5, detail_at=detail)
+    for t in sm.get("trees") or []:
+        z0 = float(t["z"]) if t.get("z") is not None else float(grade_at(sm, *t["at"]))
+        P.plant(t, z0)
+    nq = 0
+    bark = _bark_material()
+    core, _, cb, _ = Mats._new("crown_core3d")
+    cb.inputs["Base Color"].default_value = _hex("#1e2a26") + (1,)
+    cb.inputs["Roughness"].default_value = 0.95
+    for key, (V, Q, UV, COL) in P.merged().items():
+        if key == "bark":
+            m = bark
+        elif key == "core":
+            m = core
+        else:
+            kind, tk = key.split(":", 1)
+            m = _card_material(f"plant_{tk}", P.tex[tk], tk)
+        _mesh_arrays(f"plants_{key.replace(':', '_')}", V, Q, UV, COL, m, col)
+        nq += len(Q)
+    print(f"plants: {len(sm.get('trees') or [])} trees and shrubs, {nq} quads in {time.time() - t0:.0f}s", flush=True)
+    return nq
 
 
 def _ellipsoid(g: Geo, b, nu=14, nv=8):
@@ -1845,6 +1978,8 @@ def main(argv):
         globals()["TONEMAP"] = "pbr" if str(opts["--tonemap"]).lower().startswith("pbr") else "grade"
     if opts.get("--clouds") is not None and opts.get("--clouds") is not True:    # --clouds=0: a clear (hazy) sky
         globals()["CLOUDS"] = float(opts["--clouds"])
+    if str(opts.get("--trees", "")).lower() in ("blobs", "landscape", "off"):    # --trees=blobs: landscape.py's crowns as before
+        globals()["TREES3D"] = False
     ev_day = 0.65 if TONEMAP == "grade" else 0.75
     samples = int(opts.get("--samples", 48 if quick else 160))
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))

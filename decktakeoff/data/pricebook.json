@@ -86,6 +86,10 @@
     "2x4": {
       "per_lf": 1.14,
       "source": "D&D quote 979610 11 Sep 2026 (2x4x12 #1 KDAT GC $13.68)"
+    },
+    "6x6_DF_rough": {
+      "per_lf": 10.02,
+      "source": "D&D quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 66DF12RGHB 6x6x12 Douglas fir rough Brite $120.24 ($10.02/LF)"
     }
   },
   "footings": {
@@ -234,6 +238,11 @@
       "each": 18.0,
       "source": "EST — (8) SDS25300 + (1) THD62600H per base",
       "desc": "ABU88 fastener set: (8) Simpson SDS 1/4\" x 3\" into the post + (1) 5/8\" x 6\" Titen HD into the pier head (the second anchor)"
+    },
+    "ABU66RZ": {
+      "each": 49.99,
+      "source": "EST — retail $49.99 (27 Oct 2026); D&D to quote",
+      "desc": "Simpson ABU66RZ adjustable standoff post base, rough 6x6, ZMAX"
     }
   },
   "hardware": {

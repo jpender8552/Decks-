@@ -239,9 +239,8 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     import re as _re
     for ss_, st in zip(stair_specs(t) + [None] * len(L.stairs), L.stairs):       # the stair by its name, else by the side it leaves
         nm_ = (f"Stairs — {ss_.name}" if getattr(ss_, "name", None) else _re.sub(r"\bedge:(\d+)", r"side \1", f"Stairs ({st.side})"))   # "Stairs" leads: the allocation sums by it
-        lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
-        if st.landing_rail_lf:
-            lab.append((f"Landing guard rail ({nm_})", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
+        lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"],
+                    "rate card — railing included (owner: $150 a riser including railing)"))
         if getattr(st, "own_footings", 0):      # its landing + carrier posts on its own 12" caissons: the card's hole, no large-footing add-on
             lab.append((f"{nm_} — 12\" caissons under its landing and carrier posts", st.own_footings, "hole", lr["caisson_each"], "rate card (12\": no large-footing add-on)"))
     for ss in stair_specs(t):
