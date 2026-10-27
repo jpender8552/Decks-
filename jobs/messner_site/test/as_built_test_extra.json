@@ -1,0 +1,20 @@
+{
+  "_note": "Job-local fields for the TEST spec beside it (messner_ext.py reads these; the engine ignores them).",
+  "railing": {"post_kind": "fascia", "fascia_standoff_in": 0.75, "infill": "glass", "stair_infill": "vertical", "stair_handrail": "both"},
+  "framing": {"joist_ties": "H2.5A", "lateral_tie_model": "DTT2Z", "blocking_midspan": true,
+              "knee_brace_size": "4x6", "knee_brace_bolts": "(2) 1/2\" x 8\" HDG through-bolts each end"},
+  "extras": {"as_built": true},
+  "site": {"codes": ["2022 California Residential Code (CRC)", "2022 California Building Code (CBC)", "2022 California Green Building Standards Code (CALGreen)",
+                     "Marin County Code Title 19 (Buildings)"],
+           "design_criteria": {"wind_vult_mph": 95, "wind_exposure": "C", "risk_category": "II", "seismic_sdc": "D2", "sds": 1.2, "sd1": 0.66,
+                               "site_class": "D (default)", "snow_psf": 0, "footing_min_in": 12, "soil_psf": 1500},
+           "wui": true, "wui_listing": "TEST listing string — record the decking's CA SFM / ASTM E2632 listing here"},
+  "photos": [
+    {"img": "photos/test_photo_1.jpg", "caption": "TEST photo — the guard posts on the fascia and the glass infill",
+     "callouts": [{"x": 0.30, "y": 0.42, "label": "Fascia-mount bracket on the rim"}, {"x": 0.55, "y": 0.30, "label": "Glass infill panel"},
+                  {"x": 0.80, "y": 0.18, "label": "Top rail, square post cap"}]},
+    {"img": "photos/test_photo_2.jpg", "caption": "TEST photo — under the deck: posts, beam, knee braces",
+     "callouts": [{"x": 0.22, "y": 0.62, "label": "6x6 post"}, {"x": 0.50, "y": 0.22, "label": "6x12 beam, H2.5A ties"},
+                  {"x": 0.40, "y": 0.40, "label": "Knee brace, 2 bolts each end"}, {"x": 0.86, "y": 0.80, "label": "Concrete pier"}]}
+  ]
+}

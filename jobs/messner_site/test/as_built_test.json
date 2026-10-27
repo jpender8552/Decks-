@@ -1,0 +1,16 @@
+{
+  "job": "TEST — tall as-built deck, IRX glass guard on fascia posts (engine-feature test, not the Messner record)",
+  "client": "Test owner",
+  "site": {"address": "100 Test Way", "city": "Mill Valley", "state": "CA", "zip": "94941", "ground_snow_psf": 0, "wind_speed_mph": 95,
+           "frost_depth_in": 12, "soil_bearing_psf": 1500, "seismic_design_category": "D2", "wui_fire_zone": true},
+  "geometry": {"width": 65, "depth": 14, "height_in": 129, "size_mode": "frame", "attachment": "ledger", "picture_frame": true, "board_direction": "parallel"},
+  "framing": {"system": "dimensional", "joist_size": "2x10", "joist_species": "DF", "joist_grade": "#2", "joist_spacing_in": 16, "rim_plies": 2,
+              "beams": [{"kind": "drop", "size": "6x12", "species": "DF", "position_in": 86.75, "posts_x_ft": [1.0, 11.5, 22.0, 32.5, 43.0, 53.5, 64.0]},
+                        {"kind": "drop", "size": "6x12", "species": "DF", "setback_in": 12, "posts_x_ft": [1.0, 11.5, 22.0, 32.5, 43.0, 53.5, 64.0]}],
+              "post_size": "6x6", "footing_type": "concrete", "knee_braces": true, "ledger_fastener": "1/2 bolt", "joist_tape": false},
+  "decking": {"brand": "TimberTech", "collection": "Vintage", "color": "Weathered Teak", "profile": "grooved"},
+  "railing": {"system": "IRX", "color": "Black", "height_in": 42, "sides": ["left", "right", "front"]},
+  "stairs": [{"side": "front", "width_in": 42, "position_in": 560, "total_rise_in": 129, "landing": "concrete pad", "rails": 2,
+              "flights": [9, 8], "turn": "straight", "landings": [[42, 48]], "name": "Stair to the yard"}],
+  "extras": {"engineered": false}
+}
