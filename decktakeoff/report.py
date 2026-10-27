@@ -603,13 +603,15 @@ def timeline_of(s) -> Optional[dict]:
         tl = d
     if not isinstance(tl, dict):
         return None
-    if hasattr(s, "extras"):                 # a timeline written for other footings than the spec's is out of date: say so, never print it
+    if hasattr(s, "extras"):                 # a timeline written for other footings than the spec's is out of date: warn, never print it
         ft = s.framing.footing_type
         said = " ".join([str((tl.get("precon") or {}).get("text", ""))] + [str(r.get("title") or r.get("label") or "") for r in tl.get("rows") or []]
                         + [str(x) for x in tl.get("schedule_lines") or []])
         if (ft != "diamond_pier" and re.search(r"(?i)diamond pier", said)) or (ft == "diamond_pier" and re.search(r"(?i)\bcaissons?\b", said)):
-            raise ValueError(f"extras.timeline was written for other footings than the spec's ({ft}): re-run the schedule model for this spec, "
-                             "or drop extras.timeline to print the generic day rates")
+            import warnings
+            warnings.warn(f"extras.timeline was written for other footings than the spec's ({ft}) and is left out: the proposal prints no "
+                          "Schedule and the quote the generic day rates until the schedule model is re-run for this spec", stacklevel=2)
+            return None
     return tl
 
 

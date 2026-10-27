@@ -33,12 +33,18 @@ material (a riser light is a spot out of the riser 50 deg down at the tread belo
 light lights down and out; an LED strip lights the deck under it) — no per-light three.js lights, so it stays fast on a
 phone. The house windows glow warm after dark; coach lanterns light their doors.
 
+Views: Yard / Upper deck / Lower deck from the measured site's camera stations when it has them (the ground station that
+sees the most of the deck), else from the layout; Aerial from the layout. The yard's trees can be hidden (Trees), and a
+crown between the camera and what it looks at is cut away so the deck stays in sight.
+
 Speed: boxes merge by material and option mask into a few dozen meshes (vertex-coloured board tones, world-mapped
-textures), the blades are instanced, the shadow map fits the deck and the shadows it throws, and the page renders only
-when something changes.
+textures), the blades are instanced, the shadow map fits the deck and the shadows it throws and re-renders only when the
+sun, an option, the louvers or the screens change, the sky and the far ground draw last, and the page renders only when
+something changes.
 
 URL parameters (also how the QA stills are taken): opts=stairs,lights|all|none, date=YYYY-MM-DD|summer|equinox|winter,
-t=HH:MM (local clock), louver=<deg>, screens=<0-100>|front:100,left:0, view=<key>, ui=0 (no panel), still=1."""
+t=HH:MM (local clock), louver=<deg>, screens=<0-100>|front:100,left:0, view=<key>, cam=x,y,z&at=x,y,z[&fov=] (plan feet),
+trees=0, ui=0 (no panel), still=1, smap=<shadow map px>."""
 from __future__ import annotations
 
 import copy
