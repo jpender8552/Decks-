@@ -516,7 +516,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         else:
             stair_c += rail_c            # a parapet deck: the only rail is on the stair, so it rides with the stairs
         if L.stairs:
-            alloc.append(("Stairs" + (" & stair rail" if s.railing.existing_parapet else ""), stair_c))
+            _snm = [getattr(ss_, "name", "") for ss_ in stair_specs(t)]
+            _slab = " + ".join(dict.fromkeys(_snm)) if (_snm and all(_snm)) else "Stairs"      # named stairs read by name ("Stair between the levels")
+            alloc.append((_slab + (" & stair rail" if s.railing.existing_parapet else ""), stair_c))
         sail_m = mats(lambda l: l.category == "Shade sail")
         if sail_m:
             _np = sum(len(sl.get('posts', [])) for sl in s.geometry.sails)
