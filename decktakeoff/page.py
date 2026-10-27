@@ -323,9 +323,52 @@ def _steps(key, steps, cap, customer):
     return "".join(out)
 
 
+def _reads_levels(t, L, sm):
+    """At a glance for a deck on two or more levels: each level with its size and height, the decking, the rail, every stair by
+    its name (the inset stair, its skirt), the lights, the frame and the columns."""
+    from .report import levels_of, lights_of, stair_words, composite_frame_words
+    from .pricing import stair_specs
+    s = t.spec
+    lv = levels_of(t)
+    reads = [("Deck", f"{L.deck_sf:g} SF on {'two' if len(lv) == 2 else len(lv)} levels, {ftin(L.finished_w)} along the house"
+              + (f", {ftin(abs(lv[1]['height_in'] - lv[0]['height_in']))} between the levels" if len(lv) == 2 else ""))]
+    for v in lv:
+        reads.append((v["name"], f"{v['sf']:g} SF · {ftin(v['height_in'])} above grade · "
+                      + " and ".join(f"{z.name} {ftin(z.W)} x {ftin(z.D)}" for z in v["zones"])))
+    fsys = s.decking.fastener_system or "hidden"
+    brk = any(v["part"].layout.divider_x or (v["part"].layout.plan and v["part"].layout.plan.dividers) for v in lv)
+    decking = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    if s.geometry.picture_frame:
+        decking += (f", picture frame{' and breaker boards' if brk else ''} in "
+                    + (f"{s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "the same color"))
+    decking += f", matching fascia · {fsys} fasteners" + (" with color-matched plugs" if fsys == "Cortex" else "")
+    rl = L.rail
+    rail = (f"{s.decking.brand} {rail_name(rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+            + (f" · {s.railing.drink_rail_collection + ' ' if s.railing.drink_rail_collection else ''}{s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "")) if rl else "None"
+    reads += [("Decking", decking), ("Rail", rail)]
+    for ss, st in zip(stair_specs(t), L.stairs):
+        reads.append((getattr(ss, "name", None) or "Stair", stair_words(ss, st, True)))
+    lt = lights_of(t)
+    if lt["total"]:
+        reads.append(("Lighting", ", ".join(x for x in ((f"{lt['riser']} riser lights" if lt["riser"] else ""), (f"{lt['post_cap']} post-cap lights" if lt["post_cap"] else ""),
+                                                        (f"{lt['other']} more" if lt["other"] else "")) if x) + " · LED, low voltage"))
+    n_p = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or L.n_footings
+    found = f"{n_p} Diamond Pier foundations" if s.framing.footing_type == "diamond_pier" else sm["posts"].split(" on ")[-1]
+    reads += [("Structure", composite_frame_words(t).rstrip(".") + f"; {found}"), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
+    return '<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
+
+
+LEVELS_CSS = """<style>
+.reads.levels { grid-template-columns:160px 1fr; }
+@media (max-width: 640px) { .reads.levels { grid-template-columns:1fr; } }
+</style>"""
+
+
 def _reads_lite(t, L, sm):
     """The homeowner's at-a-glance: what it is, not how it is framed."""
     s = t.spec
+    if hasattr(L, "parts"):
+        return _reads_levels(t, L, sm)
     from .catalog import decking_facts
     fsys = s.decking.fastener_system or "hidden"
     deck = f"{sm['deck_sf']:g} SF · {sm['height']} above grade · {sm['finished_deck']}"
@@ -367,19 +410,24 @@ def _options_table(p, options):
     """Full installed deltas against this proposal: [(label, other pricing)]."""
     if not options:
         return ""
+    from .pricing import option_delta        # the prices' difference; on a deck sold per SF, the engine's cost math at the job margin
     def d(v):
         return ("+" if v >= 0 else "−") + money(abs(v))
-    rows = [[E(lab), d(q.sell - p.sell), d(q.retail - p.retail), d(q.monthly - p.monthly) + "/mo"] for lab, q in options]
+    rows = [[E(lab), d(c), d(f), d(m) + "/mo"] for lab, (c, f, m) in ((lab, option_delta(p, q)) for lab, q in options)]
     return ('<h3>Options</h3><p>Each line is the whole difference, installed, against the price above.</p>'
             + table(["Option", "Check or ACH", "Financed", "Monthly"], rows, "", ["l", "r", "r", "r"]))
 
 
 def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str = "job", name: Optional[str] = None, sub: str = "",
                 lede: str = "", hero: str = "corner", render: bool = True, renders_dir: Optional[str] = None, pdf: bool = False,
-                date_line: Optional[str] = None, options: Optional[list] = None) -> dict:
+                date_line: Optional[str] = None, options: Optional[list] = None, alt_tag: Optional[str] = None, roof: int = 0) -> dict:
     """Build the page. mode = "internal" | "customer" | "proposal" (the customer page without the sheets, schedules and
     step-by-step: cover, at a glance, what it is, renders, isometrics, exploded views, under the deck, investment with
-    options, 3D). options = [(label, DeckSpec)] priced as full installed deltas. Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
+    options, 3D) | "addon" (the louvered roof's own proposal, geometry.louvered_roofs[roof]: see render_addon).
+    options = [(label, DeckSpec)] priced as full installed deltas; the option's renders are the alt-*.jpg stills in renders_dir,
+    shown under "The option, rendered" with alt_tag as its tag. Returns {"html", "files", "pdf"?, "pricing", "takeoff"}."""
+    if mode == "addon":
+        return render_addon(spec, out_dir, key=key, name=name, lede=lede, hero=hero, renders_dir=renders_dir, pdf=pdf, date_line=date_line, roof=roof)
     from . import run
     from .buildset import build_set
     from .viewer import viewer_html
@@ -407,7 +455,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     if (rd / "captions.json").exists():          # a job's own captions (its camera stations, option renders)
         CAP.update(json.load(open(rd / "captions.json")))
     alt_names = sorted(n_ for n_ in have if n_.startswith("alt-"))
-    alt_html = ('<h2 class="kicker pb" id="g-alt">The option, rendered <span class="tag">same deck, the optional rail</span></h2>'
+    alt_html = (f'<h2 class="kicker pb" id="g-alt">The option, rendered <span class="tag">{E(alt_tag or "same deck, the optional rail")}</span></h2>'
                 + _gallery(key, alt_names, have)) if alt_names else ""
     sun_tag = "the covers and the blinds through the day" if (spec.geometry.covers or spec.geometry.cover) else "shade on the deck through the day"
     sun_html = ('<h2 class="kicker pb" id="g-sun">Sun and shade <span class="tag">the real sun at this address · ' + sun_tag + '</span></h2>'
@@ -457,7 +505,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
         frame_lite = (f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams, beam_species_words(spec.framing.beams), len(spec.framing.beams))}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams")
                       + (("; joist tape on every joist, rim and beam" if L.beam_lines else "; joist tape on every joist and rim") if spec.framing.joist_tape else "") + ".")
-        inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
+        if not hasattr(L, "parts"):           # a deck on two levels already reads its frame level by level, in the homeowner's words
+            inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
         w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "isolow", "under"], have))
@@ -569,7 +618,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gp / p.sell, money(p.retail), L.deck_sf))
     if customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
-        head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers)
+        head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=t)
         body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
         title = f"{name} — Proposal"
     elif supplier:
@@ -608,7 +657,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
-            + (PL.FONT + PL.CSS if customer else "") + "</head>" + ('<body class="proposal">' if customer else "<body>")
+            + (PL.FONT + PL.CSS if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "") + "</head>" + ('<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
     page = page.replace(CDN, "", 1)

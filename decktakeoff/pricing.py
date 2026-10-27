@@ -75,6 +75,36 @@ def _factor_rate(s) -> Tuple[float, float]:
     return factor, rate
 
 
+def sell_per_sf_rule(s) -> Optional[Tuple[float, object]]:
+    """extras.sell_per_sf -> (rate, options_gm) or None. A number is the owner's check/ACH price per deck SF; a dict
+    {"rate": 175, "options_gm": 0.45 | "effective"} also says what margin the options price at (default: the job margin)."""
+    v = getattr(s.extras, "sell_per_sf", None)
+    if not v:
+        return None
+    if isinstance(v, dict):
+        r = v.get("rate") or v.get("sell")
+        return (float(r), v.get("options_gm")) if r else None
+    return (float(v), None)
+
+
+def _monthly(retail: float) -> float:
+    r = PRICEBOOK["finance_rate"] / 12
+    n = PRICEBOOK["finance_years"] * 12
+    return retail * r / (1 - (1 + r) ** -n)
+
+
+def option_delta(base: "Pricing", other: "Pricing") -> Tuple[float, float, float]:
+    """An option against a proposal: the whole installed difference (check, financed, monthly) — normally the two prices'
+    difference. Against a deck sold per SF the rate prices only deck area (a stair to the yard would come out at $0), so the
+    option is priced from the engine's cost math instead — work delta / (1 - the job margin), financed / 0.93 — the same
+    way price_options prices extras.options on that deck."""
+    if not getattr(base, "per_sf", 0.0):
+        return other.sell - base.sell, other.retail - base.retail, other.monthly - base.monthly
+    check = round((other.work - base.work) / (1 - base.options_gm))
+    retail = round(check / PRICEBOOK["retail_factor"])
+    return check, retail, _monthly(retail)
+
+
 def builtin_sells(s) -> List[Tuple[str, str, int, float]]:
     """(category, label, sections, sell) for built-ins the owner prices per section (extras.builtin_sell)."""
     from .scene import bench_segments, planter_segments
@@ -87,6 +117,14 @@ def builtin_sells(s) -> List[Tuple[str, str, int, float]]:
         n = len(planter_segments(s))
         out.append(("Planters", f"Built-in planter{'s' if n > 1 else ''} — 17\" x 17\", deck board on all sides, picture-frame cap", n, float(bs["planter"]) * n))
     return out
+
+
+def stair_specs(t) -> list:
+    """The stair specs in the order of t.layout.stairs: a composite deck's stairs live in its parts (the job-level list is empty)."""
+    L = t.layout
+    if hasattr(L, "parts"):
+        return [ss for p in L.parts for ss in p.spec.stairs]
+    return list(t.spec.stairs)
 
 
 def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
@@ -139,12 +177,12 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
         lab.append(("Timber oil — pre-oil the 4x10 joists / rims / ledgers on horses, coat 1 all faces", round(t.joist_lf), "LF", lr["oil_pre_oil_per_lf"], "EST — no rate-card line"))
         lab.append(("Timber oil — posts + beams 2 coats, coat 2 on the whole frame in place, end-grain seal, touch-up", 1, "lot", lr["oil_in_place_lot"] + lr["seal_cut_ends_lot"], "EST"))
     import re as _re
-    for ss_, st in zip(list(s.stairs) + [None] * len(L.stairs), L.stairs):       # the stair by its name, else by the side it leaves
+    for ss_, st in zip(stair_specs(t) + [None] * len(L.stairs), L.stairs):       # the stair by its name, else by the side it leaves
         nm_ = (f"Stairs — {ss_.name}" if getattr(ss_, "name", None) else _re.sub(r"\bedge:(\d+)", r"side \1", f"Stairs ({st.side})"))   # "Stairs" leads: the allocation sums by it
         lab.append((f"{nm_}" + (f" — {len(st.geo.flights)} flights" if len(st.geo.flights) > 1 else ""), st.geo.risers, "riser", lr["stairs_per_riser"], "rate card"))
         if st.landing_rail_lf:
             lab.append((f"Landing guard rail ({nm_})", st.landing_rail_lf, "LF", lr["rail_per_lf"], "base rate"))
-    for ss in s.stairs:
+    for ss in stair_specs(t):
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144
             lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck, 4 footings", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"] + 40.0, "EST — frame + decking rate + footings"))
@@ -295,10 +333,14 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     sell = round((work - rail_work - builtin_work) / (1 - gm) + rail_sell + builtin_sell + gc)
     sell_floor = round((work - rail_work - builtin_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + gc)
     gm_base = gm
-    if (rail_sell or builtin_sell) and not s.extras.sell_override:
+    # an owner-set sell: sell_override (the price), else extras.sell_per_sf (the price per deck SF x the deck's SF); either way the
+    # allocation scales to it and the margin is what that price carries
+    psf = None if s.extras.sell_override else sell_per_sf_rule(s)
+    set_sell = s.extras.sell_override or (round(psf[0] * L.deck_sf) if psf else None)
+    if (rail_sell or builtin_sell) and not set_sell:
         gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
-    if s.extras.sell_override:
-        sell = round(float(s.extras.sell_override))
+    if set_sell:
+        sell = round(float(set_sell))
         gm = 1 - work / max(sell - gc, 1)          # the margin the override actually carries
     retail = round(sell * (1 + s.extras.retail_markup)) if s.extras.retail_markup is not None else round(sell / pb["retail_factor"])
     r = pb["finance_rate"] / 12
@@ -313,7 +355,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if rail_sell and not s.extras.sell_override else gm))
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if rail_sell and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
@@ -327,7 +369,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if s.is_timber and s.framing.finish == "oil":
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
-        parts.append((f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip(), round(comp(drink_m, labsum("Drink rail")))))
+        parts.append(((f"Drink rail — {s.railing.drink_rail_collection or ''} {s.railing.drink_rail_color or ''} board on top of the rail".replace("  ", " ") if hasattr(L, "parts") else   # two-level jobs read the board
+                       f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip()), round(comp(drink_m, labsum("Drink rail")))))
     if covers_of(s):
         cover_m = mats(lambda l: l.category == "Porch cover")
         n_cv = len(covers_of(s))
@@ -368,7 +411,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         alloc.append((label, round(sv)))
     if gc:
         alloc.append((gc_name(gc_lines, "Site & project services"), round(gc)))
-    if s.extras.sell_override:        # scale every component to the set price, then true up the rounding
+    if set_sell:        # scale every component to the set price, then true up the rounding
         tot = sum(a[1] for a in alloc) or 1
         alloc = [(k, round(v * sell / tot)) for k, v in alloc]
     diff = sell - sum(a[1] for a in alloc)
@@ -378,12 +421,20 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     pr = Pricing(round(mat, 2), factor, round(mat_f, 2), rate, round(tax, 2), labor_lines, round(labor, 2), gc_lines, round(gc, 2), round(work, 2), round(cost, 2),
                  gm, sell, sell_floor, retail, round(monthly, 2), round(gp, 2), round(comm, 2), alloc, cats, round(sell / L.deck_sf, 2), engineering,
                  [], pb.get("_dealer_fee_note", ""), gc_base, gc_extras)
-    if builtin_sell and not s.extras.sell_override:
+    pr.per_sf = psf[0] if psf else 0.0      # attributes, not fields: takeoff.json of every existing job stays as it was
+    pr.gm_job = gm_base
+    # the options' margin: on a per-SF deck the per-SF price says nothing about an option (a stair adds no deck SF), so an option
+    # prices from the engine's cost math at the job margin (gm_base) unless sell_per_sf names options_gm ("effective" = the margin
+    # the per-SF price carries); otherwise the margin the price carries, as always
+    pr.options_gm = ((gm if psf[1] == "effective" else float(psf[1])) if psf[1] is not None else gm_base) if psf else gm
+    if psf:
+        pr.rail_note = f"the owner's ${psf[0]:,.2f}/SF x {L.deck_sf:g} SF"
+    if builtin_sell and not set_sell:
         pr.rail_note = " · ".join(f"{n} {('bench section' if c == 'Benches' else 'planter')}{'s' if n > 1 else ''} at ${sv / n:,.0f} (${sv:,.0f})" for c, _l, n, sv in bsell)
-    if rail_sell and not s.extras.sell_override:
+    if rail_sell and not set_sell:
         pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f})" + (" · " + pr.rail_note if getattr(pr, 'rail_note', '') else "") + f", everything else at {gm_base:.1%} GM"
     if with_options and s.extras.options:
-        pr.options = price_options(t, pr, gm)
+        pr.options = price_options(t, pr, pr.options_gm)
     return pr
 
 

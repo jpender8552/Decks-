@@ -251,7 +251,8 @@ def build_scene(L) -> Scene:
     # ---------------- site: ground, rock under the deck, the house behind every zone's wall
     site_m = getattr(spec.geometry, "site_model", None)
     if site_m:                              # the measured yard owns the lot; a flat field beyond the fences fills the horizon
-        add("ground", -140, W + 140, y_min - 90, y_front + 160, -1.6, float(site_m.get("beyond_z", -0.9)), "ground")
+        bz = float(site_m.get("beyond_z", -0.9))     # a far field that sits low (a valley, a creek) keeps the box upright and below the yard
+        add("ground", -140, W + 140, y_min - 90, y_front + 160, min(-1.6, bz - 0.6), bz, "ground")
     else:
         add("ground", -80, W + 80, y_min - 60, y_front + 90, -0.6, 0.0, "ground")
     for z in (L.zones if not getattr(spec.geometry, "house_model", None) else []):   # weed barrier + rock under the deck footprint only (a measured site: the site model owns the ground)
@@ -1199,7 +1200,8 @@ def build_composite_scene(L) -> Scene:
             b_.layer = "house"
         if sm:
             from .landscape import build_site
-            add("ground", x0 - 140, x1 + 140, y0 - 90, y1 + 160, -1.6, float(sm.get("beyond_z", -0.9)), "ground")
+            bz = float(sm.get("beyond_z", -0.9))
+            add("ground", x0 - 140, x1 + 140, y0 - 90, y1 + 160, min(-1.6, bz - 0.6), bz, "ground")
             n0 = len(B)
             build_site(sm, add, rb, _mesh, zt)
             for b_ in B[n0:]:

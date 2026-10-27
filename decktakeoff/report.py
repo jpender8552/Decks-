@@ -8,7 +8,7 @@ from dataclasses import asdict
 from typing import List, Optional
 
 from .flags import Flag, run_flags
-from .pricing import Pricing, gc_name
+from .pricing import Pricing, gc_name, stair_specs
 from .takeoff import Takeoff, CATEGORIES
 from .units import ftin
 from .catalog import rail_name
@@ -192,18 +192,28 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
               f"{s.framing.joist_size} joists at {fr.spacing:g}\"" if s.is_timber else
               f"{s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", " + (f"{' / '.join(sorted({b.size for b in s.framing.beams}))} beam{'s' if len(s.framing.beams) > 1 else ''}, " if s.framing.beams else "")
               + f"{s.framing.post_size} posts")
+    lv = levels_of(t)
+    if lv:          # a deck on two or more levels says so, and every beam line counts
+        _bs = sorted({b.size for b in L.beam_lines})
+        fr_txt = (("Two-level" if len(lv) == 2 else f"{len(lv)}-level") + f" deck — {s.framing.joist_size} {s.framing.joist_species} frame at {fr.spacing:g}\", "
+                  + (f"{' / '.join(_bs)} beam{'s' if len(L.beam_lines) > 1 else ''}, " if _bs else "") + f"{s.framing.post_size} posts")
+    drink_words = (f"{s.railing.drink_rail_collection} {s.railing.drink_rail_color}".strip() if lv and s.railing.drink_rail_collection else s.railing.drink_rail_color)
     n_posts = L.n_footings
     foot = {"caisson": f"{n_posts} caissons", "diamond_pier": f"{n_posts} Diamond Pier footings", "concrete": f"{n_posts} concrete piers",
             "existing": (f"the {n_posts} existing columns and caissons" if s.framing.existing_posts else f"the {n_posts} existing caissons")}[s.framing.footing_type]
     w(f"{fr_txt} — on {foot}{' with stone column bases' if s.extras.stone_bases else ''}. "
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
-      + (f", {rail_name(rl.system)} {'cable ' if rl.system == 'IRX' else ''}rail" + (f" with a {s.railing.drink_rail_color} drink rail" if s.railing.drink_rail else "") if rl else "")
+      + (f", {rail_name(rl.system)} {'cable ' if rl.system == 'IRX' else ''}rail" + (f" with a {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
       + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
-    w(f"**{L.deck_sf} SF** · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''} · **{ftin(s.geometry.height_in)}** above grade"
-      + (", engineered" if s.extras.engineered else "") + f" · **{sm['design_load'].split(':')[0].split(' (')[0]}** design load")
+    if lv:
+        w(f"**{L.deck_sf:g} SF** on {'two' if len(lv) == 2 else len(lv)} levels · " + " and ".join(f"**{ftin(v['height_in'])}** ({v['name'].lower()})" for v in lv) + " above grade"
+          + (", engineered" if s.extras.engineered else "") + f" · **{sm['design_load'].split(':')[0].split(' (')[0]}** design load")
+    else:
+        w(f"**{L.deck_sf} SF** · {len(L.zones)} zone{'s' if len(L.zones) > 1 else ''} · **{ftin(s.geometry.height_in)}** above grade"
+          + (", engineered" if s.extras.engineered else "") + f" · **{sm['design_load'].split(':')[0].split(' (')[0]}** design load")
     if s.client or s.site.address:
         w(("Prepared for " + s.client + (f" · {s.site.address}, {s.site.city}" if s.site.address else "")) if s.client else (f"Prepared for the owner of {s.site.address}, {s.site.city}" if s.site.address else "Prepared for the owner"))
     w("")
@@ -246,8 +256,13 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w("|---|---|")
     from .catalog import decking_facts, RAIL_SYSTEMS
     f = decking_facts(s.decking.collection)
+    if lv:
+        w("| Levels | " + "; ".join(f"{v['name']}: {v['sf']:g} SF, {ftin(v['height_in'])} above grade" for v in lv)
+          + (f"; {ftin(abs(lv[1]['height_in'] - lv[0]['height_in']))} between them" if len(lv) == 2 else "") + ". |")
+    _brk = any(v["part"].layout.divider_x or (v["part"].layout.plan and v["part"].layout.plan.dividers) for v in lv)
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
+      + (f"; picture frame{' and breaker boards' if _brk else ''} in the same {s.decking.color}" if lv and s.geometry.picture_frame and not s.decking.border_color else "")
       + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('a HardieTrim skirt around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('a HardieTrim skirt around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {(f['fire'] + '; ') if (s.site.wui_fire_zone or f.get('wui')) else ''}{f['warranty']}. |")
     if s.railing.existing_parapet and s.railing.parapet_note:
         w(f"| Railing | {s.railing.parapet_note} |")
@@ -256,11 +271,21 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     elif rl:
         rs = RAIL_SYSTEMS.get(rl.system, {})
         w(f"| Railing | {s.decking.brand} {rail_name(rl.system)}{' cable rail' if rs.get('cable') else (' Rail' if rail_name(rl.system) == rl.system else '')}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
-          + (f"; {s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "") + f". {rl.rail_lf} LF. |")
+          + (f"; {drink_words} drink rail on top" if s.railing.drink_rail else "") + f". {rl.rail_lf} LF. |")
+    if lv and L.stairs:
+        w("| Stairs | " + "; ".join(f"{getattr(ss, 'name', None) or 'Stair'}: {stair_words(ss, st, True)}" for ss, st in zip(stair_specs(t), L.stairs)) + ". |")
+    lt = lights_of(t)
+    if lt["total"]:
+        w("| Lighting | " + ", ".join(x for x in ((f"{lt['riser']} LED riser lights, one in every riser" if lt["riser"] else ""),
+                                                   (f"{lt['post_cap']} LED post-cap lights, one on every rail post" if lt["post_cap"] else ""),
+                                                   (f"{lt['other']} more LED lights" if lt["other"] else "")) if x)
+          + ("; low voltage on a transformer" + (" with a photocell / timer" if "photo" in lt["transformer"].lower() or "timer" in lt["transformer"].lower() else "") if lt["transformer"] else "") + ". |")
     if s.is_timber:
         w(f"| Timbers | Douglas fir #1 {s.framing.post_size} posts, {s.framing.beams[0].size if s.framing.beams else ''} beams, {s.framing.joist_size} joists at {fr.spacing:g}\"; "
           + ("unfinished, end grain sealed" if s.framing.finish != "oil" else "dark walnut oil, two coats, end grain sealed") + (". Tub bay doubled" if s.extras.hot_tub else "") + ". |")
         w("| Finish | " + ("Base: unfinished Douglas fir, which weathers gray. Dark walnut oil finish is priced in Options." if s.framing.finish != "oil" else "Dark walnut oil, two coats on every timber.") + " |")
+    elif lv:
+        w(f"| Frame | {composite_frame_words(t)} |")
     else:
         w(f"| Frame | {sm['joists']}; {sm['rims']}; {'; '.join(sm['beams'])}. |")
     if s.extras.stone_bases:
@@ -278,7 +303,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     else:
         w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"
           + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}"
-          + (f" in the field; Cortex color-matched plugs on the picture frame{', benches' if s.geometry.benches else ''}{' and stairs' if s.stairs else ''}"
+          + (f" in the field; Cortex color-matched plugs on the picture frame{', benches' if s.geometry.benches else ''}{' and stairs' if stair_specs(t) else ''}"
              if (s.decking.border_fastener or '') == 'Cortex' and (s.decking.fastener_system or '') != 'Cortex' else "") + ". |")
     from .spec import covers_of
     _cv = covers_of(s)
@@ -297,7 +322,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         site_.append("the existing deck" + (" and roof covers" if s.extras.demo_covers else "") + " removed and hauled off")
     if s.extras.under_deck_gravel:
         site_.append("6-mil poly and 2\" of gravel under the deck")
-    if any(st.landing == "concrete pad" for st in s.stairs):
+    if any(st.landing == "concrete pad" for st in stair_specs(t)):
         site_.append("a concrete landing pad at the stair")
     if site_:
         w(f"| Site | {'; '.join(site_)[0].upper() + '; '.join(site_)[1:]}. |")
@@ -305,7 +330,15 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Not included | {'; '.join(s.extras.exclusions)}. |")
     w("")
     w("## PLAN")
-    if L.multi:
+    if lv:
+        w(f"{'Two' if len(lv) == 2 else len(lv)} levels · {L.deck_sf:g} SF · {ftin(L.finished_w)} along the house" + (f" · {rl.rail_lf} LF {rl.color} rail" if rl else ""))
+        for v in lv:
+            w(f"- **{v['name']}** — {v['sf']:g} SF, {ftin(v['height_in'])} above grade: "
+              + "; ".join(f"{z.name} · {z.label or 'Zone ' + z.name}, {ftin(z.W)} x {ftin(z.D)}" for z in v["zones"]) + ".")
+        w("Zones are named left to right standing in the yard facing the house.")
+        for ss, st in zip(stair_specs(t), L.stairs):
+            w(f"- {getattr(ss, 'name', None) or 'Stair'}: {stair_words(ss, st, True)}.")
+    elif L.multi:
         w(f"{len(L.zones)} zones · {L.deck_sf} SF · {ftin(L.finished_w)} along the house · {ftin(s.geometry.height_in)} above grade"
           + (f" · {rl.rail_lf} LF {rl.color} rail" if rl else ""))
         for z in L.zones:
@@ -314,7 +347,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w("Zones are named left to right standing in the yard facing the house.")
     else:
         w(f"{sm['finished_frame']} · {L.deck_sf} SF · {ftin(s.geometry.height_in)} above grade" + (f" · {rl.rail_lf} LF rail" if rl else ""))
-    for st in sm["stairs"]:
+    for st in ([] if lv else sm["stairs"]):
         w(f"- {st}")
     w("")
     w("## SCHEDULE")
@@ -348,6 +381,87 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     return "\n".join(out)
 
 
+# ================================================================== two-level (composite) decks and lights: how they read to the homeowner
+def levels_of(t) -> list:
+    """A composite deck's levels in the job's part order: [dict(name, sf, height_in, zones, part)]; [] for an ordinary deck."""
+    L = t.layout
+    if not hasattr(L, "parts"):
+        return []
+    return [dict(name=p.name, sf=p.layout.deck_sf, height_in=float(p.spec.geometry.height_in), zones=p.layout.zones, part=p) for p in L.parts]
+
+
+def columns_of(t) -> int:
+    """The posts that carry the deck (beam-line posts and edge posts): the columns the homeowner sees."""
+    L = t.layout
+    return sum(z.frame.n_posts for z in L.zones) + len(getattr(L, "edge_posts", None) or [])
+
+
+def lights_of(t) -> dict:
+    """The deck's lights, counted off the order: {"riser", "post_cap", "other", "total", "transformer"} (all 0 / "" without lights)."""
+    out = dict(riser=0, post_cap=0, other=0, total=0, transformer="")
+    for l in t.lines:
+        it = l.item.lower()
+        if l.category != "Lighting" and "light" not in it:
+            continue
+        if any(k in it for k in ("transformer", "photocell", "timer", "wire", "cable", "connector", "splice", "hub")):
+            if "transformer" in it and not out["transformer"]:
+                out["transformer"] = l.item
+            continue
+        if l.unit.lower() not in ("ea", "each", "pc", "pcs"):
+            continue
+        if "riser" in it or "step" in it:
+            out["riser"] += int(l.order)
+        elif "post" in it and "cap" in it:
+            out["post_cap"] += int(l.order)
+        else:
+            out["other"] += int(l.order)
+    out["total"] = out["riser"] + out["post_cap"] + out["other"]
+    return out
+
+
+def stair_words(ss, st, composite: bool = False) -> str:
+    """One stair as the homeowner reads it: risers, width, flights and landings, where it lands; an inset stair and its skirt."""
+    from .takeoff import inches_frac
+    g = st.geo
+    txt = f"{g.risers} risers at {inches_frac(g.riser_in)}, {ftin(st.width)} wide"
+    if len(g.flights) > 1 and ss is not None:
+        lands = " and ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "a"
+        turn = {"switchback": "turn back", "left": "turn left", "right": "turn right", "straight": "continue"}.get(ss.turn, ss.turn)
+        txt += f": {g.flights[0].risers} down to the {lands} landing, {turn}, " + " then ".join(f"{fg.risers} down" for fg in g.flights[1:])
+    land = getattr(ss, "landing", "") if ss is not None else ""
+    if composite:
+        txt += {"deck": ", down to the lower level", "grade": ", down to the yard", "concrete pad": ", down to a concrete pad in the yard"}.get(land, "")
+    if ss is not None and getattr(ss, "inset", False):
+        txt += ", set into the upper level so the bottom riser is flush with the face between the levels"
+    sk = getattr(ss, "step_skirt", None) or getattr(ss, "skirt", None) if ss is not None else None
+    if isinstance(sk, str) and sk:
+        txt += f"; {sk}"
+    if st.landing_rail_lf:
+        txt += " · guard rail on the landing"
+    return txt
+
+
+def composite_frame_words(t) -> str:
+    """The frame of a deck on two or more levels, the way the homeowner reads it: joists, rims, beams by level, the columns."""
+    s, L = t.spec, t.layout
+    lv = levels_of(t)
+    fr = L.frame
+    wood = "pressure-treated" if not s.is_timber else "Douglas fir"
+    out = f"{s.framing.joist_size} {wood} joists at {fr.spacing:g}\" on center, doubled {s.framing.joist_size} rims"
+    sizes = sorted({b.size for b in L.beam_lines})
+    if sizes:
+        kinds = {b.kind for b in L.beam_lines}
+        per = ", ".join(f"{len(v['part'].layout.beam_lines)} under the {v['name'].lower()}" for v in lv if v["part"].layout.beam_lines)
+        from .catalog import beam_species_words
+        out += (f", {' / '.join(sizes)} {beam_species_words(L.beam_lines)} {'drop ' if kinds == {'drop'} else ('flush ' if kinds == {'flush'} else '')}beams"
+                + (f" ({per})" if len(lv) > 1 and per else ""))
+    from .spec import post_words
+    out += f", {columns_of(t)} {s.framing.post_size} {post_words(s)} columns"
+    if s.framing.joist_tape:
+        out += "; joist tape on every joist, rim" + (" and beam" if L.beam_lines else "")
+    return out + "."
+
+
 def _span(a: int, b: int) -> str:
     return f"Day {a}" if a == b else f"Days {a}–{b}"
 
@@ -378,6 +492,11 @@ def _schedule(t: Takeoff) -> List[str]:
         days.append(f"{_span(d+1, d+rd)} — {rail_name(L.rail.system)} rail" + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
     if L.stairs:
         days.append(f"Day {d+1} — stairs" + (" and the box step" if any(getattr(st, 'build', '') == 'box' for st in L.stairs) and len(L.stairs) > 1 else "") + "."); d += 1
+    lt = lights_of(t)
+    if lt["total"]:
+        days.append(f"Day {d+1} — low-voltage lighting: " + " and ".join(x for x in (("riser lights" if lt["riser"] else ""), ("post-cap lights" if lt["post_cap"] else ""),
+                                                                                     ("deck lights" if lt["other"] else "")) if x)
+                    + (" wired to the transformer" if lt["transformer"] else "") + "."); d += 1
     nb = len(s.geometry.benches or []); npl = len(s.geometry.planters or [])
     if nb or npl:
         bd = max(1, round(nb * 0.75 + npl * 0.5))

@@ -173,7 +173,24 @@ def _title_parts(name: str, address: str):
     return name, ""
 
 
-def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers) -> str:
+def _levels_tele(spec, L, t, n_piers) -> list:
+    """Telemetry for a deck on two or more levels: SF, each level's height, the columns, the rail, the lights."""
+    from .report import levels_of, columns_of, lights_of
+    tele = [(f"{L.deck_sf:,.0f}", "square feet")] + [(ftin(v["height_in"]), f"{v['name'].lower()} above grade") for v in levels_of(t)]
+    tele.append((str(columns_of(t)), f"{spec.framing.post_size} columns"))
+    if L.rail:
+        tele.append((f"{L.rail.rail_lf:g}'", f"{L.rail.color.lower()} rail"))
+    lt = lights_of(t)
+    if lt["total"]:
+        tele.append((str(lt["total"]), "LED lights"))
+    elif L.stairs:
+        tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
+    else:
+        tele.append((str(n_piers), "Diamond Piers"))
+    return tele
+
+
+def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=None) -> str:
     """The launch manifest: hero render, title, the deck's numbers, the materials, the price."""
     title, eyebrow = _title_parts(name, spec.site.address)
     place = ", ".join(x for x in (spec.site.city, spec.site.state) if x)
@@ -183,7 +200,9 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers) -> s
     tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
             (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")), (str(n_piers), "Diamond Piers")]
     rl = L.rail
-    if rl:
+    if hasattr(L, "parts") and t is not None:      # two levels: each level's height, the columns, the rail, the lights
+        tele = _levels_tele(spec, L, t, n_piers)
+    elif rl:
         tele.append((f"{rl.rail_lf:g}'", f"{rl.color.lower()} rail"))
     elif L.stairs:
         tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
@@ -194,6 +213,10 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers) -> s
         chips.append((bp[len(bp) // 2] if bp else "#5a4632", "Picture frame", f"{spec.decking.border_collection or spec.decking.collection} · {spec.decking.border_color}"))
     if rl:
         chips.append((RAIL_HEX.get(rl.color.lower(), "#141414"), "Rail", f"{spec.decking.brand} {rail_name(rl.system)} · {rl.color}"))
+    if rl and spec.railing.drink_rail and hasattr(L, "parts"):
+        dc = spec.railing.drink_rail_collection or spec.decking.collection
+        dp = BOARDS_PALETTE.get((dc, spec.railing.drink_rail_color or spec.decking.color))
+        chips.append((dp[len(dp) // 2] if dp else "#5a4632", "Drink rail", f"{dc} · {spec.railing.drink_rail_color or spec.decking.color}"))
     if spec.extras.show_financing:
         prices = (f'<div class="prices"><div class="lead"><span class="pl">Check or ACH</span><span class="pv">{money(p.sell)}</span><span class="ps">{(1 - p.sell / p.retail) * 100:.0f}% below the financed price</span></div>'
                   f'<div><span class="pl">Financed</span><span class="pv">{money(p.retail)}</span><span class="ps">no money down</span></div>'

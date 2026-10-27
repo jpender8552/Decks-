@@ -310,6 +310,8 @@ class Mats:
         if key in self.cache:
             return self.cache[key]
         md = self.M.get(key, {"color": "#999999"})
+        if _emits(key, md):                     # an LED lens (riser / post-cap light): dark by day, glowing at dusk
+            return self.emitter(key, md)
         m, nt, bsdf, out = self._new(key)
         col = _hex(md.get("color", "#999999"))
         rough = float(md.get("rough", 0.8) if md.get("rough") is not None else 0.8)
@@ -439,6 +441,18 @@ class Mats:
         nt.links.new(img.outputs["Alpha"], mix2.inputs[0]); nt.links.new(trans.outputs[0], mix2.inputs[1]); nt.links.new(mix.outputs[0], mix2.inputs[2])
         nt.links.new(mix2.outputs[0], out.inputs[0])
         self.cache[name] = m
+        return m
+
+    def emitter(self, key: str, md: dict) -> bpy.types.Material:
+        """An LED lens (recessed riser step light, post-cap light): the fixture's housing colour with the light off by day
+        (photocell); set_mode("dusk") turns its emission on in the colour the material dict carries (else 3000 K)."""
+        m, nt, bsdf, out = self._new(key)
+        bsdf.inputs["Base Color"].default_value = _hex(md.get("color") or "#d8d2c4") + (1,)
+        bsdf.inputs["Roughness"].default_value = 0.3
+        bsdf.inputs["Emission Color"].default_value = _hex(_emit_hex(md) or LED_HEX) + (1,)
+        bsdf.inputs["Emission Strength"].default_value = 0.0
+        LIGHTS["emitters"].append(bsdf)
+        self.cache[key] = m
         return m
 
 
@@ -942,10 +956,229 @@ def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065
     ld = bpy.data.lights.new("sun", "SUN")
     ld.energy = sun_strength
     ld.angle = math.radians(0.53)
-    ld.color = (1.0, 0.955, 0.89)                 # late-summer noon sun through ~5,850 ft of clear air
+    ld.color = _sun_rgb(math.degrees(math.asin(max(-1, min(1, v.z)))))   # (1.0, 0.955, 0.89) from 30 deg up: late-summer sun at ~5,850 ft
     ob = bpy.data.objects.new("sun", ld)
     bpy.context.scene.collection.objects.link(ob)
     ob.rotation_euler = v.to_track_quat("Z", "Y").to_euler()
+    LIGHTS["modes"]["day"] = dict(world=w, sun=ob)
+
+
+# ---------------------------------------------------------------------- time of day: the sun at a local time, blue hour, the lights
+LED_HEX = "#ffc78a"           # an LED lens's light when its material dict names none: 3000 K seen at a twilight white balance (sRGB)
+LED_LENS = 4.0                # a lens's emission strength at dusk (x --led): it reads as a bright point, it lights almost nothing itself
+LED_RISER_W = 1.6             # a riser step light's spot (W, Blender, in this 1 unit = 1 ft scene), aimed out and down at the tread
+LED_CAP_W = 0.5               # a post-cap light: four points under the cap, one per post face (W each)
+LANTERN_W = 6.0               # a coach lantern on the house
+ROOM_HEX, ROOM_GLOW = "#ffb06a", 0.06     # the rooms behind the glass at dusk: 2700 K interior light (emission strength, x --glow)
+LIGHTS = dict(emitters=[], fixtures=[], modes={}, mode="day")   # what set_mode() switches between day and dusk
+
+
+def _emit_hex(md: dict) -> str:
+    """The emission colour a material dict carries (the lighting agent's LED lenses), '' when none."""
+    for k in ("emission", "emit", "emissive", "glow"):
+        v = md.get(k)
+        if isinstance(v, str) and v.startswith("#"):
+            return v
+    return ""
+
+
+def _emits(key: str, md: dict) -> bool:
+    return key in ("led_riser", "led_cap") or bool(_emit_hex(md))
+
+
+def _sun_rgb(el_deg: float) -> Tuple[float, float, float]:
+    """The direct sun's colour by its height: the late-summer midday sun above 30 deg, warming toward the horizon (longer air
+    path) — a 15 deg morning sun is ~(1.0, 0.89, 0.74), a 5 deg one ~(1.0, 0.80, 0.58)."""
+    hi, lo = (1.0, 0.955, 0.89), (1.0, 0.78, 0.55)
+    t = max(0.0, min(1.0, (30.0 - el_deg) / 27.0)) ** 1.5
+    return tuple(a + (b - a) * t for a, b in zip(hi, lo))
+
+
+def _mountain_offset(when, base: float) -> float:
+    """The site's UTC offset on that date: Mountain time follows DST (2nd Sunday of March to 1st Sunday of November) when
+    the spec's offset is -6 / -7; any other offset is taken as given."""
+    from datetime import datetime, timedelta
+    if base not in (-6.0, -7.0):
+        return base
+    mar, nov = datetime(when.year, 3, 8), datetime(when.year, 11, 1)
+    start, end = mar + timedelta(days=(6 - mar.weekday()) % 7), nov + timedelta(days=(6 - nov.weekday()) % 7)
+    return -6.0 if start <= when < end else -7.0
+
+
+def sun_at(spec, when: str):
+    """Unit vector toward the sun (plan frame) at a local date-time 'YYYY-MM-DDTHH:MM' for the job's site; None without a
+    site position. The same NOAA approximation the viewer uses (scene.sun_vector), DST-aware for Mountain time."""
+    import dataclasses
+    from datetime import datetime
+    from decktakeoff.scene import sun_vector
+    s = spec.site
+    if s.lat is None or s.lon is None or s.rear_azimuth_deg is None:
+        return None
+    return sun_vector(dataclasses.replace(s, sun_when=when, utc_offset_h=_mountain_offset(datetime.fromisoformat(when), float(s.utc_offset_h))))
+
+
+def dusk_time(spec, date: str, el_deg: float = -5.0) -> str:
+    """The local time (ISO) on that date's evening when the sun has sunk to el_deg: -5 deg is the blue hour, ~25 min after
+    sunset — the sky still deep blue, dark enough that the deck lights carry the picture."""
+    from datetime import datetime, timedelta
+    t = datetime.fromisoformat(f"{date}T15:00")
+    while t.hour < 23:
+        v = sun_at(spec, t.isoformat(timespec="minutes"))
+        if v is None or math.degrees(math.asin(max(-1.0, min(1.0, v[2])))) <= el_deg:
+            break
+        t += timedelta(minutes=1)
+    return t.isoformat(timespec="minutes")
+
+
+def sun_caption(spec, when: str, v) -> str:
+    """'Jun 21, 8:30 AM - sun ENE (70 deg), 37 deg up' for a render's caption / log."""
+    from datetime import datetime
+    if not v:
+        return ""
+    rel = math.degrees(math.atan2(-v[0], v[1]))
+    az = (spec.site.rear_azimuth_deg + rel) % 360
+    el = math.degrees(math.asin(max(-1.0, min(1.0, v[2]))))
+    pts = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    lab = datetime.fromisoformat(when).strftime("%b %-d, %-I:%M %p")
+    hgt = f"{el:.0f}° up" if el >= 0 else f"{-el:.0f}° below the horizon"
+    return f"{lab} — sun {pts[int((az + 11.25) // 22.5) % 16]} ({az:.0f}°), {hgt}"
+
+
+def _box_frame(b):
+    """A box's centre and its local x / y / z unit axes in the plan frame (rot / rot_axis honoured), as numpy vectors."""
+    T = _rot_fn(b)
+    c = np.array(T(0.0, 0.0, 0.0))
+    return c, [np.array(T(*e)) - c for e in ((1.0, 0, 0), (0, 1.0, 0), (0, 0, 1.0))]
+
+
+def add_fixture_lights(D, col) -> int:
+    """Real lights at the LED fixtures so the risers throw light on the treads and the post caps on the posts, rails and
+    deck (an emissive lens alone lights almost nothing): a spot from every riser light aimed out of the riser and 50 deg
+    down; four small points under every post-cap light, one off each face; a point in front of each coach lantern.
+    Hidden until set_mode("dusk")."""
+    treads = [b for b in D["boxes"] if b["kind"] == "tread"]
+
+    def light(kind, p, d, energy, rgb, size=0.04, spot=130.0, blend=0.7):
+        ld = bpy.data.lights.new(f"fx{len(LIGHTS['fixtures'])}", kind)
+        ld.energy = energy
+        ld.color = rgb
+        ld.shadow_soft_size = size
+        if kind == "SPOT":
+            ld.spot_size = math.radians(spot)
+            ld.spot_blend = blend
+        ob = bpy.data.objects.new(ld.name, ld)
+        col.objects.link(ob)
+        ob.location = B(*[float(q) for q in p])
+        if d is not None:
+            ob.rotation_euler = mathutils.Vector(B(*[float(q) for q in d])).to_track_quat("-Z", "Y").to_euler()
+        ob.hide_render = True
+        LIGHTS["fixtures"].append(ob)
+
+    for b in D["boxes"]:
+        mk = b["mat"]
+        md = D["materials"].get(mk, {})
+        tag = (b.get("tag") or "").lower()
+        if "coach lantern" in tag:
+            light("POINT", ((b["x0"] + b["x1"]) / 2, b["y1"] + 0.25, (b["z0"] + b["z1"]) / 2 - 0.1), None, LANTERN_W, _hex(ROOM_HEX), size=0.12)
+            continue
+        if not _emits(mk, md):
+            continue
+        rgb = _hex(_emit_hex(md) or LED_HEX)
+        c, (ux, uy, uz) = _box_frame(b)
+        hx, hy, hz = (b["x1"] - b["x0"]) / 2, (b["y1"] - b["y0"]) / 2, (b["z1"] - b["z0"]) / 2
+        if "cap" in mk or "cap" in b["kind"] or "post" in tag:
+            for u, h in ((ux, hx), (-ux, hx), (uy, hy), (-uy, hy)):
+                light("POINT", c + u * (h + 0.04) - uz * (hz - 0.02), None, LED_CAP_W, rgb, size=0.03)
+            continue
+        # a riser light: out of the riser along the lens's thin horizontal axis, toward the tread it lights (the next tread
+        # down, else away from the tread above)
+        u, h = (ux, hx) if hx <= hy else (uy, hy)
+        zc = c[2]
+        below = [t for t in treads if zc - 1.3 <= t["z1"] <= zc + 0.05]
+        above = [t for t in treads if t["z1"] > zc + 0.05]
+        tc = lambda t: np.array([(t["x0"] + t["x1"]) / 2, (t["y0"] + t["y1"]) / 2, t["z1"]])
+        sgn = 1.0
+        if below:
+            t = min(below, key=lambda t: np.hypot(*(tc(t) - c)[:2]))
+            sgn = 1.0 if float(np.dot(tc(t) - c, u)) >= 0 else -1.0
+        elif above:
+            t = min(above, key=lambda t: np.hypot(*(tc(t) - c)[:2]))
+            sgn = -1.0 if float(np.dot(tc(t) - c, u)) >= 0 else 1.0
+        out = u * sgn
+        aim = out * math.cos(math.radians(50)) - uz * math.sin(math.radians(50))
+        light("SPOT", c + out * (h + 0.03), aim, LED_RISER_W, rgb, size=0.04)
+    n = len(LIGHTS["fixtures"])
+    if n:
+        print(f"fixture lights: {n}", flush=True)
+    return n
+
+
+def setup_dusk(D, spec, sun_vec, sky_strength=1.0, fill_strength=1.0, fill_sat=0.85, sun_strength=5.0):
+    """Twilight: the same physical sky (Blender's multiple-scattering model holds a sun below the horizon: deep blue
+    overhead, the afterglow low on the sunset side), seen by the camera and lighting the scene at full strength (no
+    daylight fill trick); a warm, weak sun lamp only while the sun is still up. set_mode("dusk") switches to it."""
+    scn = bpy.context.scene
+    v = mathutils.Vector(B(*sun_vec)).normalized()
+    el = math.asin(max(-1, min(1, v.z)))
+    w = bpy.data.worlds.new("dusk")
+    try:
+        w.use_nodes = True
+    except Exception:
+        pass
+    nt = w.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    sky = nt.nodes.new("ShaderNodeTexSky")
+    sky.sky_type = "MULTIPLE_SCATTERING"
+    sky.sun_disc = False
+    sky.sun_elevation = el
+    sky.sun_rotation = math.atan2(v.x, v.y)
+    sky.altitude = 1700.0
+    sky.air_density = 1.0
+    sky.aerosol_density = 1.0
+    bg = nt.nodes.new("ShaderNodeBackground"); bg.inputs["Strength"].default_value = sky_strength
+    hs = nt.nodes.new("ShaderNodeHueSaturation"); hs.inputs["Saturation"].default_value = fill_sat
+    fill = nt.nodes.new("ShaderNodeBackground"); fill.inputs["Strength"].default_value = fill_strength
+    lp = nt.nodes.new("ShaderNodeLightPath"); mx = nt.nodes.new("ShaderNodeMixShader")
+    out = nt.nodes.new("ShaderNodeOutputWorld")
+    nt.links.new(sky.outputs[0], bg.inputs[0]); nt.links.new(sky.outputs[0], hs.inputs["Color"]); nt.links.new(hs.outputs[0], fill.inputs[0])
+    nt.links.new(lp.outputs["Is Camera Ray"], mx.inputs[0]); nt.links.new(fill.outputs[0], mx.inputs[1]); nt.links.new(bg.outputs[0], mx.inputs[2])
+    nt.links.new(mx.outputs[0], out.inputs[0])
+    ob = None
+    if el > 0:
+        ld = bpy.data.lights.new("sun_dusk", "SUN")
+        ld.energy = sun_strength * min(1.0, math.sin(el) / math.sin(math.radians(12)))
+        ld.angle = math.radians(0.53)
+        ld.color = _sun_rgb(math.degrees(el))
+        ob = bpy.data.objects.new("sun_dusk", ld)
+        scn.collection.objects.link(ob)
+        ob.rotation_euler = v.to_track_quat("Z", "Y").to_euler()
+        ob.hide_render = True
+    LIGHTS["modes"]["dusk"] = dict(world=w, sun=ob)
+
+
+def set_mode(mode: str, led: float = 1.0, glow: float = 1.0):
+    """Day (sun + daylight fill, LED lenses dark, fixture lights off) or dusk (twilight sky, lenses and fixture lights on,
+    the rooms behind the windows lit)."""
+    m = LIGHTS["modes"].get(mode)
+    if not m:
+        return
+    bpy.context.scene.world = m["world"]
+    for k, mm in LIGHTS["modes"].items():
+        if mm.get("sun") is not None:
+            mm["sun"].hide_render = k != mode
+    dusk = mode == "dusk"
+    for bsdf in LIGHTS["emitters"]:
+        bsdf.inputs["Emission Strength"].default_value = LED_LENS * led if dusk else 0.0
+    for ob in LIGHTS["fixtures"]:
+        ob.hide_render = not dusk
+    room = bpy.data.materials.get("interior")      # the house model's rooms behind the glass (house.py "interior")
+    if room is not None:
+        bsdf = next((n for n in room.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if bsdf is not None:
+            bsdf.inputs["Emission Color"].default_value = _hex(ROOM_HEX) + (1,)
+            bsdf.inputs["Emission Strength"].default_value = ROOM_GLOW * glow if dusk else 0.0
+    LIGHTS["mode"] = mode
 
 
 def camera(name, pos, at, fov_v_deg, size):
@@ -977,7 +1210,9 @@ def generic_views(D) -> Dict[str, dict]:
     }
 
 
-def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.75):
+def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.75, modes=None, default_mode="day"):
+    """Render the named stations. A station may carry its own "mode" ("day" | "dusk"), "exposure" and "samples"; else the
+    mode's settings (modes = {mode: {exposure, samples, led, glow}}), else the arguments."""
     scn = bpy.context.scene
     scn.render.engine = "CYCLES"
     scn.cycles.device = "CPU"
@@ -1013,13 +1248,19 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
         c = cams.get(nm)
         if not c:
             print("no camera", nm); continue
+        mode = c.get("mode") or default_mode
+        ms = (modes or {}).get(mode, {})
+        if mode != LIGHTS["mode"] and mode in LIGHTS["modes"]:
+            set_mode(mode, led=float(ms.get("led", 1.0)), glow=float(ms.get("glow", 1.0)))
+        scn.view_settings.exposure = float(c.get("exposure", ms.get("exposure", exposure)))
+        scn.cycles.samples = int(c.get("samples", ms.get("samples", samples)))
         cam = camera(f"cam_{nm}", c["pos"], c["at"], float(c.get("fov", 40)), size)
         scn.camera = cam
         scn.render.filepath = os.path.join(out_dir, f"{nm}.jpg")
         t = time.time()
         bpy.ops.render.render(write_still=True)
         done[nm] = scn.render.filepath
-        print(f"rendered {nm} in {time.time() - t:.0f}s -> {scn.render.filepath}", flush=True)
+        print(f"rendered {nm} ({LIGHTS['mode']}, {scn.cycles.samples} samples, {scn.view_settings.exposure:+.2f} EV) in {time.time() - t:.0f}s -> {scn.render.filepath}", flush=True)
     return done
 
 
@@ -1034,15 +1275,36 @@ def main(argv):
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()
     spec, sc, D = build(spec_path, out_dir, quick=quick)
+    if opts.get("--cameras"):               # camera stations from a file (the site_model.cameras format), over the job's own
+        cj = json.load(open(opts["--cameras"]))
+        cj = cj.get("cameras", cj)
+        D["meta"]["cameras"] = dict(D["meta"].get("cameras") or {}, **{k: v for k, v in cj.items() if isinstance(v, dict) and "pos" in v})
+    when = opts.get("--when") or spec.site.sun_when       # --when=YYYY-MM-DDTHH:MM: the sun at another local time than spec.site.sun_when
+    if opts.get("--when") and sun_at(spec, when):
+        D["meta"]["sun"] = list(sun_at(spec, when))
+    print("sun:", sun_caption(spec, when, D["meta"].get("sun")) or "no site position (default sun)", flush=True)
     setup_world(D, spec, sky_strength=float(opts.get("--sky", 0.2)), sun_strength=float(opts.get("--sun", 5.0)),
                 fill_strength=float(opts.get("--fill", 0.065)), fill_sat=float(opts.get("--fill-sat", 0.5)))
+    cams = dict(generic_views(D)); cams.update(D["meta"].get("cameras") or {})
+    default_mode = "dusk" if opts.get("--dusk") else "day"
+    if any((cams.get(n) or {}).get("mode", default_mode) == "dusk" for n in names):
+        # the blue hour of the hero date (or --dusk-when): sun --dusk-el (default -5 deg), the LED fixtures and the rooms lit
+        dw = opts.get("--dusk-when") or dusk_time(spec, when.split("T")[0], float(opts.get("--dusk-el", -5.0)))
+        vd = sun_at(spec, dw) or (-0.6, -0.79, -0.087)
+        print("dusk:", sun_caption(spec, dw, vd) or dw, flush=True)
+        setup_dusk(D, spec, vd, sky_strength=float(opts.get("--dusk-sky", 1.0)), fill_strength=float(opts.get("--dusk-fill", 1.0)),
+                   fill_sat=float(opts.get("--dusk-fill-sat", 0.85)), sun_strength=float(opts.get("--sun", 5.0)))
+        add_fixture_lights(D, bpy.context.scene.collection)
     if getattr(spec.geometry, "site_model", None) and not opts.get("--no-grass"):
-        cams = dict(generic_views(D)); cams.update(D["meta"].get("cameras") or {})
         add_grass(spec, D, cams, names, bpy.context.scene.collection, reach=float(opts.get("--grass-reach", 34.0)))
     print(f"scene built in {time.time() - t:.0f}s: {len(bpy.data.objects)} objects", flush=True)
     if opts.get("--blend"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out_dir, "scene.blend"))
-    render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", 0.75)))
+    modes = dict(day=dict(exposure=float(opts.get("--exposure", 0.75)), samples=samples),
+                 dusk=dict(exposure=float(opts.get("--dusk-exposure", 3.0)), samples=int(opts.get("--dusk-samples", samples)),
+                           led=float(opts.get("--led", 1.0)), glow=float(opts.get("--glow", 1.0))))
+    render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", 0.75)),
+                 modes=modes, default_mode=default_mode)
 
 
 if __name__ == "__main__":

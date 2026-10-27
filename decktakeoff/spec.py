@@ -278,6 +278,7 @@ class Extras:
     builtin_sell: Optional[dict] = None               # built-ins sold at a set price per section: {"bench": 3000, "planter": 2500} — their materials + labor cost lands at 60% of it
     rail_sell_per_lf: Optional[float] = None          # rail sold at a fixed installed price per LF (None -> pricebook rail_sell_per_lf for the system, if any)
     sell_override: Optional[float] = None             # owner-set check/ACH price; the allocation scales to it
+    sell_per_sf: Optional[float] = None               # owner-set check/ACH price per deck SF (or {"rate", "options_gm"}): sell = rate x deck SF, scaled like sell_override (pricing.sell_per_sf_rule)
     retail_markup: Optional[float] = None             # financed = sell x (1 + markup) instead of sell / 0.93
     options: List[Option] = field(default_factory=list)
     hardie_skirt: Optional[str] = None   # deck skirt / rim wrap in HardieTrim instead of the decking fascia: "4/4 x 12 Timber Bark"

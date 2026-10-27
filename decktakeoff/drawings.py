@@ -185,26 +185,7 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
     for ln in [x for x in lines if x]:
         o.append(T(24, y, ln, 10, 600)); y += 14
     o.append(T(24, y + 12, "DESIGN CRITERIA", 9, 800, fill=GOLD)); y += 28
-    cover = bool(s.geometry.cover or s.geometry.covers)
-    crit = [("Deck live load", "40 psf uniform (IRC Table R301.5); guards 200 lb concentrated / 50 plf"),
-            ("Ground snow", f"{s.site.ground_snow_psf:g} psf (ground; deck design uses the larger of snow and live)" + (" — snow governs" if s.site.ground_snow_psf > 40 else " — 40 psf live governs") + (f"; {s.site.snow_note}" if s.site.snow_note else "")),
-            ("Dead load", "10 psf deck" + ((" · 15 psf porch cover (standing seam steel on sheathing, Hardie soffit; 12 psf actual, 15 used) carried on the deck posts" if s.extras.cover_roof.lower().startswith("standing") else " · 15 psf porch cover (shingles, sheathing, Hardie soffit) carried on the deck posts") if cover else "")),
-            ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow" + (" (PPRBD minimum 30 psf)" if "colorado springs" in (s.site.city or "").lower() else "") + ", sliding snow off the house roof + drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
-            ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf on the deck" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "") + (" · cover posts add roof snow + dead to the deck frame and footings (engineered)" if cover else "")),
-            ("Wind", s.site.wind_note or f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + (" (Diamond Piers are frost-protected by the pin design; no excavation)" if s.framing.footing_type == "diamond_pier" else " (footings bear below)")),
-            ("Soil bearing", f"{s.site.soil_bearing_psf:,.0f} psf presumptive (IRC R401.4.1) — no soils report"), ("Seismic", s.site.seismic_design_category),
-            ("Wildfire (WUI)", ("Ignition-resistant construction: Class A / WUI-listed decking (TimberTech Advanced PVC), noncombustible rail (steel), fiber-cement skirt, soffit and fascia, "
-                                "26 ga flashing at every wall, " + ("Class A noncombustible standing seam steel roof on the cover with metal eave / rake / headwall trims" if (cover and s.extras.cover_roof.lower().startswith("standing")) else "Class A roof on the cover") + "; under-deck kept clear of combustibles (Colorado Springs WUI Code / IWUIC 504)") if s.site.wui_fire_zone else "not in a WUI zone"),
-            ("Codes", (s.site.code_basis + "; " + ("Tables R507.5 / R507.6 / R507.4 / R507.9" if s.framing.system == "dimensional" else
-                                                    "timber members outside the tables: stamped design" if s.is_timber else "cold-formed steel frame per AISI S240, engineered"))
-                       if s.site.code_basis else
-                       ((("2021 IRC as amended by Pikes Peak Regional Building Dept; IRC R507 decks; ASCE 7-16 loads; IWUIC / Colorado Springs Wildland-Urban Interface Code; "
-                          if "colorado springs" in (s.site.city or "").lower() else
-                          f"2021 IRC as adopted by {s.site.city or 'the jurisdiction'}; IRC R507 decks; ASCE 7-16 loads; " + ("IWUIC where mapped; " if s.site.wui_fire_zone else ""))
-                         + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9")))),
-            ("Engineering", ("Stamped structural set by a Colorado PE required — the stamped set governs" if s.extras.engineered
-                             else ("Stamped structural set by a Colorado PE, provided by GSX and billed at cost with the permit" if s.extras.engineering_note else "Prescriptive; no engineering required by this design")))]
-    crit = [(k, v) for k, v in crit if not (k == "Roof snow (cover)" and v.strip() in ("—", "-", ""))]   # no cover: no roof-snow row
+    crit = _design_criteria(L)
     for k, v in crit:
         for i, ln in enumerate(textwrap.wrap(v, 92)[:3]):
             o.append(T(24, y, k if i == 0 else "", 8.5, 800)); o.append(T(150, y, ln, 8.5, 400)); y += 12
@@ -243,6 +224,44 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
     for num, title in idx:
         o.append(T(x2, yy, num, 8.5, 800, fill=GOLD)); o.append(T(x2 + 52, yy, title, 8.5, 500)); yy += 13
     o.append(T(x2, yy + 12, "SITE", 9, 800, fill=GOLD)); yy += 28
+    site = _site_lines(s)
+    for ln in site:
+        for k_, w_ in enumerate(textwrap.wrap(ln, 74)[:3]):
+            o.append(T(x2 + (8 if k_ else 0), yy, w_, 8, 400)); yy += 12
+    if flags is not None:
+        o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
+        for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
+            o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
+    return sheet("G-001", "General notes · design criteria", "Loads, codes, structure summary, sheet index, site — the permit-set cover", o, "No scale", meta)
+
+
+def _design_criteria(L) -> List[Tuple[str, str]]:
+    """G-001's design-criteria rows (label, text) for the job: loads, wind, frost, soil, seismic, wildfire, codes, engineering."""
+    s = L.spec
+    cover = bool(s.geometry.cover or s.geometry.covers)
+    crit = [("Deck live load", "40 psf uniform (IRC Table R301.5); guards 200 lb concentrated / 50 plf"),
+            ("Ground snow", f"{s.site.ground_snow_psf:g} psf (ground; deck design uses the larger of snow and live)" + (" — snow governs" if s.site.ground_snow_psf > 40 else " — 40 psf live governs") + (f"; {s.site.snow_note}" if s.site.snow_note else "")),
+            ("Dead load", "10 psf deck" + ((" · 15 psf porch cover (standing seam steel on sheathing, Hardie soffit; 12 psf actual, 15 used) carried on the deck posts" if s.extras.cover_roof.lower().startswith("standing") else " · 15 psf porch cover (shingles, sheathing, Hardie soffit) carried on the deck posts") if cover else "")),
+            ("Roof snow (cover)", f"{s.site.ground_snow_psf:g} psf flat-roof design snow" + (" (PPRBD minimum 30 psf)" if "colorado springs" in (s.site.city or "").lower() else "") + ", sliding snow off the house roof + drift at the house wall per ASCE 7 Ch. 7" if cover else "—"),
+            ("Design total", f"{max(z.frame.total_psf for z in L.zones):g} psf on the deck" + (" (hot-tub bay 110 psf)" if s.extras.hot_tub else "") + (" · cover posts add roof snow + dead to the deck frame and footings (engineered)" if cover else "")),
+            ("Wind", s.site.wind_note or f"{s.site.wind_speed_mph:g} mph Vult, Exposure C, Risk Cat. II (ASCE 7-16) — confirm special wind region"), ("Frost depth", ftin(s.site.frost_depth_in) + (" (Diamond Piers are frost-protected by the pin design; no excavation)" if s.framing.footing_type == "diamond_pier" else " (footings bear below)")),
+            ("Soil bearing", f"{s.site.soil_bearing_psf:,.0f} psf presumptive (IRC R401.4.1) — no soils report"), ("Seismic", s.site.seismic_design_category),
+            ("Wildfire (WUI)", ("Ignition-resistant construction: Class A / WUI-listed decking (TimberTech Advanced PVC), noncombustible rail (steel), fiber-cement skirt, soffit and fascia, "
+                                "26 ga flashing at every wall, " + ("Class A noncombustible standing seam steel roof on the cover with metal eave / rake / headwall trims" if (cover and s.extras.cover_roof.lower().startswith("standing")) else "Class A roof on the cover") + "; under-deck kept clear of combustibles (Colorado Springs WUI Code / IWUIC 504)") if s.site.wui_fire_zone else "not in a WUI zone"),
+            ("Codes", (s.site.code_basis + "; " + ("Tables R507.5 / R507.6 / R507.4 / R507.9" if s.framing.system == "dimensional" else
+                                                    "timber members outside the tables: stamped design" if s.is_timber else "cold-formed steel frame per AISI S240, engineered"))
+                       if s.site.code_basis else
+                       ((("2021 IRC as amended by Pikes Peak Regional Building Dept; IRC R507 decks; ASCE 7-16 loads; IWUIC / Colorado Springs Wildland-Urban Interface Code; "
+                          if "colorado springs" in (s.site.city or "").lower() else
+                          f"2021 IRC as adopted by {s.site.city or 'the jurisdiction'}; IRC R507 decks; ASCE 7-16 loads; " + ("IWUIC where mapped; " if s.site.wui_fire_zone else ""))
+                         + ("timber members outside the tables: stamped design" if s.is_timber else "Tables R507.5 / R507.6 / R507.4 / R507.9")))),
+            ("Engineering", ("Stamped structural set by a Colorado PE required — the stamped set governs" if s.extras.engineered
+                             else ("Stamped structural set by a Colorado PE, provided by GSX and billed at cost with the permit" if s.extras.engineering_note else "Prescriptive; no engineering required by this design")))]
+    return [(k, v) for k, v in crit if not (k == "Roof snow (cover)" and v.strip() in ("—", "-", ""))]   # no cover: no roof-snow row
+
+
+def _site_lines(s) -> List[str]:
+    """G-001's site lines: setbacks and the deck's distances to the lot lines, easements, the site notes."""
     site = []
     if s.site.rear_setback_required_ft is not None or s.site.deck_to_rear_line_ft is not None:
         site.append(f"Rear / front lot line: deck edge {s.site.deck_to_rear_line_ft if s.site.deck_to_rear_line_ft is not None else '?'}' from the line, " + (f"{s.site.rear_setback_required_ft:g}' required" if s.site.rear_setback_required_ft is not None else "setback per the PUD — Planning to confirm (C-100)"))
@@ -253,14 +272,7 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
         site += textwrap.wrap(s.site.notes, 70)
     if not site:
         site = ["Setbacks not on file — verify the plat / ILC before layout"]
-    for ln in site:
-        for k_, w_ in enumerate(textwrap.wrap(ln, 74)[:3]):
-            o.append(T(x2 + (8 if k_ else 0), yy, w_, 8, 400)); yy += 12
-    if flags is not None:
-        o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
-        for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
-            o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
-    return sheet("G-001", "General notes · design criteria", "Loads, codes, structure summary, sheet index, site — the permit-set cover", o, "No scale", meta)
+    return site
 
 
 def sheet_foundation(L: Layout, S: Scene, meta) -> str:
