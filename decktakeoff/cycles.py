@@ -67,8 +67,13 @@ class Tex:
             import render as TT   # the timbertech-boards renderer
         finally:
             sys.path.pop(0)
+        from decktakeoff.catalog import BOARDS_PALETTE
+        pal = BOARDS_PALETTE.get((collection, color))
+        if pal:   # the engine catalog's palette wins over the skill's synced copy: a skill re-sync cannot revert the boards' colour
+            TT.C.BOARDS = [(b[0], b[1], b[2], list(pal)) + tuple(b[4:]) if (b[0], b[1]) == (collection, color) else b for b in TT.C.BOARDS]
+        tag = hashlib.md5(json.dumps(pal or []).encode()).hexdigest()[:6]   # in the cache name: a cached texture never outlives its palette
         for k in range(n):
-            nm = f"board_{collection}_{color}_{k}.png".replace(" ", "_").replace("+", "plus")
+            nm = f"board_{collection}_{color}_{tag}_{k}.png".replace(" ", "_").replace("+", "plus")
             p = self.path(nm)
             if not p:
                 im = TT.render_board(collection, color, length_in=length_in, ppi=ppi, seed_offset=100 + k)
@@ -407,6 +412,8 @@ class Mats:
             return self.emitter(key, md)
         m, nt, bsdf, out = self._new(key)
         col = _hex(md.get("color", "#999999"))
+        if BLACK_PC and "powder" in (md.get("label") or "").lower() and _lum(col) < _lum(_hex(BLACK_PC)):
+            col = _hex(BLACK_PC)    # black powder coat at TimberTech's colour chip (~3.7 % reflectance, not 0.7 %): it shows its form
         rough = float(md.get("rough", 0.8) if md.get("rough") is not None else 0.8)
         metal = float(md.get("metal", 0.0) or 0.0)
         bsdf.inputs["Roughness"].default_value = rough
@@ -1175,6 +1182,14 @@ ROOM_HEX, ROOM_GLOW = "#ffb06a", 0.06     # the rooms behind the glass at dusk: 
 LIGHTS = dict(emitters=[], fixtures=[], modes={}, mode="day")   # what set_mode() switches between day and dusk
 
 
+BLACK_PC = "#363535"          # the floor for black powder coat (IRX rail, the louvered roof's frame, light housings): TimberTech's
+                              # black chip; the engine's #141416 reflects 0.7 % and renders as a flat silhouette. --black=none turns it off
+
+
+def _lum(c) -> float:
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
 def _emit_hex(md: dict) -> str:
     """The emission colour a material dict carries (the lighting agent's LED lenses), '' when none."""
     for k in ("emission", "emit", "emissive", "glow"):
@@ -1548,6 +1563,8 @@ def main(argv):
     names = args[2:] or ["yard", "corner", "ondeck"]
     os.makedirs(out_dir, exist_ok=True)
     quick = bool(opts.get("--quick"))
+    if opts.get("--black"):                 # --black=#hex sets the black powder-coat floor, --black=none renders the spec's colour as is
+        globals()["BLACK_PC"] = "" if str(opts["--black"]).lower() in ("none", "off", "0") else str(opts["--black"])
     samples = int(opts.get("--samples", 48 if quick else 160))
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()

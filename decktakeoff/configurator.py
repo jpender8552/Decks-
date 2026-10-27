@@ -54,9 +54,13 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-OPTION_LABELS = {"stairs": "Stairs to the yard", "lights": "Lighting", "roof": "Louvered roof", "screens": "Roof screens"}
-OPTION_SHORT = {"stairs": "Yard stairs", "lights": "Lighting", "roof": "Louvered roof", "screens": "Screens"}
+OPTION_LABELS = {"stairs": "Stairs to the yard", "stairs_alt": "Stairs to the yard — along the deck", "lights": "Lighting",
+                 "roof": "Louvered roof", "screens": "Roof screens"}
+OPTION_SHORT = {"stairs": "Yard stairs", "stairs_alt": "Yard stairs along the deck", "lights": "Lighting", "roof": "Louvered roof",
+                "screens": "Screens"}
 REQUIRES = {"screens": ["roof"]}
+EXCLUSIVE = [["stairs", "stairs_alt"]]                    # two layouts of one option: turning one on turns the other off
+MAX_COMBOS = 32                                         # a box's mask is one 32-bit word on the page
 LED_KEYS = ("led_riser", "led_cap")
 LIVE_KINDS = {"lvblade", "lvscreen"}                     # drawn live by the page (the blades turn, the screens run)
 NO_CAST_KINDS = {"ground", "gravel", "concrete_slab", "concrete_joint", "water", "lawn", "mulch", "soil", "groundcover"}
@@ -381,16 +385,32 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, oc
 
 
 # ================================================================== the page's data
+def _valid_combos(names: List[str], req: Dict[str, List[str]], excl: List[List[str]]) -> List[int]:
+    """Every combination code (bit i = option names[i] on) whose options have their prerequisites and no two options of
+    one exclusive group."""
+    bits = {n: i for i, n in enumerate(names)}
+    out = []
+    for c in range(1 << len(names)):
+        on = [n for n in names if c >> bits[n] & 1]
+        if all(all(r in on for r in req.get(n, [])) for n in on) and all(sum(1 for n in g if n in on) <= 1 for g in excl):
+            out.append(c)
+    if len(out) > MAX_COMBOS:
+        raise ValueError(f"{len(out)} option combinations: the page holds at most {MAX_COMBOS} (fewer options, or make some exclusive)")
+    return out
+
+
 def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *, labels: Optional[Dict[str, str]] = None,
-                      requires: Optional[Dict[str, Sequence[str]]] = None, combos: Optional[Dict[str, object]] = None,
-                      site: Optional[dict] = None, title: Optional[str] = None, default_on: Sequence[str] = (),
-                      views: Optional[List[dict]] = None) -> Tuple[dict, dict]:
+                      requires: Optional[Dict[str, Sequence[str]]] = None, exclusive: Optional[Sequence[Sequence[str]]] = None,
+                      combos: Optional[Dict[str, object]] = None, site: Optional[dict] = None, title: Optional[str] = None,
+                      default_on: Sequence[str] = (), views: Optional[List[dict]] = None) -> Tuple[dict, dict]:
     """(data for the page, stats). See build_configurator."""
     base = _load(spec_base)
     options = dict(options or {})
     names = list(options)
     labels = dict(OPTION_LABELS, **(labels or {}))
     req = {k: [r for r in v if r in names] for k, v in dict(REQUIRES, **(requires or {})).items() if k in names}
+    excl_src = EXCLUSIVE if exclusive is None else exclusive
+    excl = [g for g in ([n for n in grp if n in names] for grp in excl_src) if len(g) > 1]
     stats: dict = dict(warnings=[], deltas={}, groups={}, mode="specs" if names else "layers")
     # ---- each option's patch, against the base plus its prerequisites
     opt_dicts = {n: _load(options[n]) for n in names}
@@ -405,13 +425,10 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
         stats["deltas"][n] = [_path_str(p) for p, _v in ops]
         if not ops:
             stats["warnings"].append(f"option {n}: its spec is the same as the base")
-    # ---- every valid combination of options
+    # ---- every valid combination of options; a box's mask has bit i for the i-th valid combination it appears in
     bits = {n: i for i, n in enumerate(names)}
-    valid = []
-    for c in range(1 << len(names)):
-        on = [n for n in names if c >> bits[n] & 1]
-        if all(all(r in on for r in req.get(n, [])) for n in on):
-            valid.append(c)
+    valid = _valid_combos(names, req, excl)
+    ci = {c: i for i, c in enumerate(valid)}
     explicit = {}
     for k, v in (combos or {}).items():
         on = [s.strip() for s in k.replace(",", "+").split("+") if s.strip()]
@@ -441,17 +458,17 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
                 continue
             k = _key(b)
             if k in union:
-                union[k][1] |= 1 << c
+                union[k][1] |= 1 << ci[c]
             else:
-                union[k] = [b, 1 << c]
+                union[k] = [b, 1 << ci[c]]
         for r in sc.meta.get("louvered_roofs") or []:
             nm = r.get("name", "roof")
             if nm not in roofs or len(r.get("screens") or []) > len(roofs[nm].get("screens") or []):
                 roofs[nm] = r
-            roof_mask[nm] = roof_mask.get(nm, 0) | 1 << c
+            roof_mask[nm] = roof_mask.get(nm, 0) | 1 << ci[c]
             for s_ in r.get("screens") or []:
-                screen_mask[(nm, s_["side"])] = screen_mask.get((nm, s_["side"]), 0) | 1 << c
-    all_mask = sum(1 << c for c in valid)
+                screen_mask[(nm, s_["side"])] = screen_mask.get((nm, s_["side"]), 0) | 1 << ci[c]
+    all_mask = (1 << len(valid)) - 1
     if not names:                                                   # one spec: the groups from the engine's option layers
         order = list(OPTION_LABELS.values())
         found = sorted({_layer_option(b) for b, _m in union.values()} - {""}, key=lambda f: (order.index(f) if f in order else len(order), f))
@@ -460,21 +477,22 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
             labels.setdefault(n, f)
         bits = {n: i for i, n in enumerate(names)}
         req = {n: [r for r in REQUIRES.get(n, []) if r in names] for n in names}
-        valid = [c for c in range(1 << len(names)) if all(all(c >> bits[r] & 1 for r in req.get(n, [])) for n in names if c >> bits[n] & 1)]
-        all_mask = sum(1 << c for c in valid)
+        excl = [g for g in ([n for n in grp if n in names] for grp in excl_src) if len(g) > 1]
+        valid = _valid_combos(names, req, excl)
+        ci = {c: i for i, c in enumerate(valid)}
+        all_mask = (1 << len(valid)) - 1
         lab2n = {labels[n]: n for n in names}
+        on_mask = lambda n: sum(1 << ci[c] for c in valid if n is None or c >> bits[n] & 1)
         for e in union.values():
             o = _layer_option(e[0])
-            e[1] = sum(1 << c for c in valid if c >> bits[lab2n[o]] & 1) if o in lab2n else all_mask
+            e[1] = on_mask(lab2n[o]) if o in lab2n else all_mask
         for nm in list(roof_mask):
-            rn = lab2n.get(labels.get("roof", "Louvered roof"))
-            roof_mask[nm] = sum(1 << c for c in valid if rn is None or c >> bits[rn] & 1)
+            roof_mask[nm] = on_mask(lab2n.get(labels.get("roof", "Louvered roof")))
         for key in list(screen_mask):
-            sn = lab2n.get(labels.get("screens", "Roof screens"))
-            screen_mask[key] = sum(1 << c for c in valid if sn is None or c >> bits[sn] & 1)
+            screen_mask[key] = on_mask(lab2n.get(labels.get("screens", "Roof screens")))
     # ---- what each mask means, in words; cross-check the engine's option layers
     def with_(n):
-        return sum(1 << c for c in valid if c >> bits[n] & 1)
+        return sum(1 << ci[c] for c in valid if c >> bits[n] & 1)
 
     def describe(m):
         """The simplest 'shows with A (+ B), not with C (or D)' that gives exactly this mask."""
@@ -499,13 +517,16 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
     groups: Dict[str, int] = {}
     mask_labels: Dict[int, str] = {}
     mism = []
-    lab2key = {labels.get(n, n): n for n in names}
     for b, m in union.values():
         g = mask_labels.setdefault(m, describe(m))
         groups[g] = groups.get(g, 0) + 1
-        n_lo = lab2key.get(_layer_option(b))      # a box the engine marks as an option's must show only with that option on
-        if n_lo is not None and m & ~with_(n_lo) and len(mism) < 12:
-            mism.append(f"{b.kind} {b.tag[:60]!r}: layer says {labels.get(n_lo, n_lo)}, the specs say {g}")
+        lo = _layer_option(b)                      # a box the engine marks as an option's must show only with that option on
+        cands = [n for n in names if lo and (labels.get(n, n) == lo or labels.get(n, n).startswith(lo + " "))]   # (or one of its layouts)
+        allowed = 0
+        for n in cands:
+            allowed |= with_(n)
+        if cands and m & ~allowed and len(mism) < 12:
+            mism.append(f"{b.kind} {b.tag[:60]!r}: layer says {lo}, the specs say {g}")
     stats["groups"] = dict(sorted(groups.items(), key=lambda kv: -kv[1]))
     if mism:
         stats["warnings"].append("engine option layers vs spec diffs: " + "; ".join(mism))
@@ -577,8 +598,8 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
     fixtures = _fixtures([(b, m) for b, m in union.values()], mats)
     gboxes = [b for b, _m in union.values() if b.kind == "ground" and b.shape == "box"]
     gbig = max(gboxes, key=lambda b: (b.x1 - b.x0) * (b.y1 - b.y0)) if gboxes else None
-    opts = [dict(key=n, label=labels.get(n, n.title()), short=OPTION_SHORT.get(n, labels.get(n, n.title())), bit=bits[n], requires=req.get(n, []))
-            for n in names]
+    opts = [dict(key=n, label=labels.get(n, n.title()), short=OPTION_SHORT.get(n, labels.get(n, n.title())), bit=bits[n], requires=req.get(n, []),
+                 excludes=[x for g in excl if n in g for x in g if x != n]) for n in names]
     addr = f"{spec0.site.address}, {spec0.site.city}".strip(", ") if spec0.site.address else spec0.job
     data = dict(title=title or (spec0.site.address or spec0.job or "Deck"), address=addr, options=opts, combos=valid, all_mask=all_mask,
                 mask_labels={str(k): v for k, v in sorted(mask_labels.items())},
@@ -618,26 +639,29 @@ def configurator_html(data: dict, three_src: Optional[str] = None, standalone: b
 
 def build_configurator(spec_base, options: Optional[Dict[str, object]] = None, out_html: Union[str, Path] = "configurator.html", *,
                        title: Optional[str] = None, site: Optional[dict] = None, labels: Optional[Dict[str, str]] = None,
-                       requires: Optional[Dict[str, Sequence[str]]] = None, combos: Optional[Dict[str, object]] = None,
-                       default_on: Sequence[str] = (), views: Optional[List[dict]] = None, three_src: Optional[str] = None,
-                       standalone: bool = True) -> dict:
+                       requires: Optional[Dict[str, Sequence[str]]] = None, exclusive: Optional[Sequence[Sequence[str]]] = None,
+                       combos: Optional[Dict[str, object]] = None, default_on: Sequence[str] = (), views: Optional[List[dict]] = None,
+                       three_src: Optional[str] = None, standalone: bool = True) -> dict:
     """Write the interactive options page; returns stats (path, bytes, boxes, combos, the groups each box landed in, each
     option's patch paths, warnings).
 
     spec_base   the base bid: a DeckSpec, a spec dict or a path to the job JSON.
     options     {key: spec} — each option's whole spec (the base plus that option), in the order the toggles show. Keys with
-                built-in labels: "stairs" (Stairs to the yard), "lights" (Lighting), "roof" (Louvered roof), "screens" (Roof
-                screens — needs the roof; its spec carries the roof too). None: `spec_base` is one spec with every option on
-                and the groups come from the engine's "option:<label>" layers (see the module doc).
+                built-in labels: "stairs" (Stairs to the yard), "stairs_alt" (Stairs to the yard — along the deck), "lights"
+                (Lighting), "roof" (Louvered roof), "screens" (Roof screens — needs the roof; its spec carries the roof too).
+                None: `spec_base` is one spec with every option on and the groups come from the engine's "option:<label>"
+                layers (see the module doc).
     combos      {"stairs+lights": spec}: a whole spec for a combination whose patches do not simply add up (used as given).
     requires    {"screens": ["roof"]} (the default): an option offered only with its prerequisites.
+    exclusive   [["stairs", "stairs_alt"]] (the default): groups of which at most one option is on — two layouts of one
+                option; turning one on turns the others off. At most 32 valid combinations in all.
     site        overrides of the sun's site: {"lat", "lon", "rear_az" (deg, the plan's +y), "utc" (h), "when" ("YYYY-MM-DDTHH:MM")}.
     default_on  the options the page opens with (default: the base alone); the URL's ?opts= overrides.
     views       camera presets [{key, label, pos: [x, y, z], at: [x, y, z], fov, fit}] in plan feet (default: yard / upper
                 deck (under the roof) / lower deck / aerial from the layout and the roof).
     standalone  False: the body only (title, style, markup, scripts) for a host that wraps its own document."""
-    data, stats = configurator_data(spec_base, options, labels=labels, requires=requires, combos=combos, site=site, title=title,
-                                    default_on=default_on, views=views)
+    data, stats = configurator_data(spec_base, options, labels=labels, requires=requires, exclusive=exclusive, combos=combos, site=site,
+                                    title=title, default_on=default_on, views=views)
     page = configurator_html(data, three_src=three_src, standalone=standalone)
     out = Path(out_html)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -784,15 +808,26 @@ var $ = function (id) { return document.getElementById(id); };
 var OPT = D.options, VALID = {}, SITE = D.site, ROOFS = D.roofs || [];
 D.combos.forEach(function (c) { VALID[c] = 1; });
 var OBYKEY = {}; OPT.forEach(function (o) { OBYKEY[o.key] = o; });
+var CI = {}; D.combos.forEach(function (c, i) { CI[c] = i; });          // combination code -> its bit in the masks
 function comboOf(on) { var c = 0; OPT.forEach(function (o) { if (on[o.key]) c |= 1 << o.bit; }); return c; }
-function shows(mask, c) { return ((mask >>> c) & 1) === 1; }
+function shows(mask, c) { var i = CI[c]; return i != null && ((mask >>> i) & 1) === 1; }
 
 // ------------------------------------------------------------------ state (+ URL)
 var S = { on: {}, date: SITE.date, min: SITE.minutes, view: D.views[0].key, louver: 0, louverGoal: null, scr: {}, scrGoal: {}, sel: {}, playing: false, trees: Q.get('trees') !== '0' };
 (D.default_on || []).forEach(function (k) { S.on[k] = true; });
 var qo = Q.get('opts');
-if (qo !== null) { S.on = {}; if (qo === 'all') OPT.forEach(function (o) { S.on[o.key] = true; }); else qo.split(',').forEach(function (k) { if (OBYKEY[k]) S.on[k] = true; }); }
-function fixRequires() { OPT.forEach(function (o) { if (S.on[o.key]) o.requires.forEach(function (r) { if (!S.on[r]) S.on[o.key] = false; }); }); }
+if (qo !== null) { S.on = {}; if (qo === 'all') OPT.forEach(function (o) { if (!(o.excludes || []).some(function (x) { return S.on[x]; })) S.on[o.key] = true; });
+  else qo.split(',').forEach(function (k) { if (OBYKEY[k]) S.on[k] = true; }); }
+function fixRequires() {      // an option without its prerequisites goes off; of two exclusive options (two layouts) the first listed stays
+  OPT.forEach(function (o) { if (S.on[o.key]) (o.excludes || []).forEach(function (x) { if (S.on[x] && OBYKEY[x].bit > o.bit) S.on[x] = false; }); });
+  OPT.forEach(function (o) { if (S.on[o.key]) o.requires.forEach(function (r) { if (!S.on[r]) S.on[o.key] = false; }); });
+}
+function toggleOpt(key) {     // a chip: on brings its prerequisites and turns its exclusive partners off; off takes what needs it along
+  var o = OBYKEY[key]; S.on[key] = !S.on[key];
+  var off = function (k) { S.on[k] = false; OPT.forEach(function (p) { if (S.on[p.key] && p.requires.indexOf(k) >= 0) off(p.key); }); };
+  if (S.on[key]) [key].concat(o.requires).forEach(function (k) { S.on[k] = true; (OBYKEY[k].excludes || []).forEach(off); });
+  else off(key);
+}
 fixRequires();
 var YEAR = +SITE.date.slice(0, 4);
 var SEASONS = [['summer', 'Summer', YEAR + '-06-21'], ['equinox', 'Equinox', YEAR + '-09-22'], ['winter', 'Winter', YEAR + '-12-21']];
@@ -1436,12 +1471,7 @@ var chips = $('chips');
 chips.appendChild(el('span', { class: 'chip base' }, '<span class="tick"></span>Base deck'));
 OPT.forEach(function (o) {
   var b = el('button', { type: 'button', class: 'chip', 'data-opt': o.key, 'aria-pressed': 'false', id: 'opt-' + o.key }, '<span class="tick"></span>' + o.label);
-  b.addEventListener('click', function () {
-    S.on[o.key] = !S.on[o.key];
-    if (S.on[o.key]) o.requires.forEach(function (r) { S.on[r] = true; });
-    else OPT.forEach(function (p) { if (p.requires.indexOf(o.key) >= 0) S.on[p.key] = false; });
-    applyOptions(); writeURL();
-  });
+  b.addEventListener('click', function () { toggleOpt(o.key); applyOptions(); writeURL(); });
   chips.appendChild(b);
 });
 var seasons = $('seasons');

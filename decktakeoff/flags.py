@@ -72,7 +72,9 @@ def run_flags(L: Layout) -> List[Flag]:
             add("ENGINEER", "engineering", f"joist: {chk.note}")
     for b in fr.beams:
         c = b.check
-        if not c.ok:
+        if not c.ok and ex.engineered and c.size.replace(" ", "") in eng.BEAM_ALIAS:     # a member outside R507.5 on an engineered job: the proxy row is not the limit
+            add("ENGINEER", "engineering", f"{b.label} post spacing {ftin(c.actual_in)} is past the {eng.BEAM_ALIAS[c.size.replace(' ', '')]} table row ({ftin(c.allowable_in)}) the engine uses for a {c.size} — the engineer's NDS check governs (calc package)", "IRC Table R507.5 / NDS")
+        elif not c.ok:
             add("STOP", "engineering", f"{b.label} post spacing {ftin(c.actual_in)} exceeds allowable {ftin(c.allowable_in)} — add a post or upsize the beam", "IRC Table R507.5")
         if c.note:
             add("ENGINEER", "engineering", f"{b.label}: {c.note}", "IRC Table R507.5")
