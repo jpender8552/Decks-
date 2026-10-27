@@ -16,7 +16,7 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - Labor: the GSX card only (`GSX_Subcontractor_Labor_Rates` rev 14 Jul 2026). No day rates, hours or per-diem.
   Demo $2/SF (no column-demo line, no skirting line). Caisson $150/hole + large-footing (20"+) $150. Stairs $150 a riser,
   railing included.
-- Slab openings for the upper caissons: **$200 each** (`extras.labor_extras`).
+- Slab openings for the upper caissons: **$200 each** (`extras.labor_extras`: 3 in the base, 4 in the roof version).
 - Lighting install: **$25 a fixture**, the transformer and runs included (pricebook `lighting_fixture_each`).
 - A stair is stringers, treads, risers, fascia, railing and some blocking with joist tape — no mid-run carrier, no pad.
   A landing is its own scope (frame, decking, posts, caissons, guard).
@@ -24,11 +24,22 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 
 ## Structure
 - **Ledgered** on all three walls (B/C ledger at the 2-ft cantilevered floor = engineer's detail), not free-standing.
-- **20" x 42" concrete caissons** (no Diamond Piers). Upper row through saw-cut openings in the patio slab, poured flush;
-  lower row 7" above the beds.
-- Deck columns: 8x8 Douglas fir rough on **Simpson ABU88RZ** (two cast-in 5/8" anchors).
-- **Stair landing posts: 6x6 rough on ABU66RZ** (one cast-in anchor) on their own 12" x 42" caissons.
-- 6x10 DF #1 drop beams; 2x10 TrueFrame @ 12" with joist tape. Measured heights: upper 8'-6¾", lower 5'-5¾" above the slab.
+- **Max spans, fewest columns, larger caissons** (owner 27 Oct: "You have way too many post", "I'd rather make the caissons
+  larger for fewer post. Max spans"). 6x10 DF #1 drop beams on 8x8 DF rough columns, 2x10 TrueFrame @ 12" with joist tape.
+- **The base is designed WITHOUT the roof; the roof has its own structure and its own document** (owner: "Do beams with and
+  without roof cover... don't do the caissons or spans based on the roof for the base. I made that clear").
+  - BASE, 8 columns on **24" x 42" caissons** (end bearing alone carries every column: max 4,179 lb vs 4,712):
+    L1 x 2.6 / 15.0 / 26.85, A2 x 1.0 / 5.5, U1 x 32.77 / 46.17 / 59.52 (13'-4" spans, overhangs at L/4 — 3 columns is the
+    6x10's deflection limit on U1; L1 and A2 are at their minimum).
+  - ROOF VERSION (_roof / _roof_screens / _all), 9 columns: U1 x 29.80 / 39.87 / 49.94 / 62.60 with a column under each roof
+    post, **30" x 42" caissons** under the upper level. Its deck structure is priced into Option 3 at the 40% margin.
+- **Caissons flush with the patio slab** where they go through it (upper row); lower row 7" above the beds.
+- **Never wet-set** (owner 27 Oct: "We don't wet set. ABU is meant to be placed once cured"): ABU88RZ / ABU66RZ go on after
+  the cure on 5/8" Titen HD screw anchors drilled into the concrete (2 per ABU88, 1 per ABU66).
+- **No knee braces** (owner 27 Oct): the lateral system is the house attachment (R507.9.2) + the deck diaphragm — PE confirms.
+- Deck columns: 8x8 Douglas fir rough on **Simpson ABU88RZ**. **Stair landing posts: 6x6 rough on ABU66RZ** on their own
+  12" x 42" caissons.
+- Measured heights: upper 8'-6¾", lower 5'-5¾" above the slab.
 
 ## Decking and rail
 - TimberTech Vintage English Walnut; every field row one full-length board (no splices), **divider boards**, one picture frame.
@@ -40,12 +51,14 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - **The base has only the stair between the levels (upper to lower) — never a stair to the ground.** Both yard stairs
   (2 and 2B) are EXTRA, one or the other (owner 27 Oct, repeated: "Get it right"). The base price line reads
   "Stair between the levels".
-- Option 1 lighting (riser + post accent lights), priced at the 40% margin like the rest — no per-light sell price in any
-  client text; $25 a fixture is the install labor.
+- **Lights are à la carte extras — never in the base** (owner 27 Oct: "No the lights are not in base price, they're extras. I
+  never said that. I said to charge. They're a La carte"). Option 1 = riser + post accent lights; the yard stairs' lights are
+  the add-on under each stair option. 40% margin; no per-light sell price in client text; $25 a fixture is the install labor.
 - Option 2 stairs to the yard: **show both** — 2 = the owner's horseshoe (7 + 3 risers, 9' x 4' landing), 2B = along the deck
   (1 + 9 risers, rail on the yard side only — the flight runs along the deck face). One or the other. **No mid-run
   carrier** (stair `mid_support` false); the stair foot is on grade (no pad).
-- Option 3 louvered roof (own document), roof-line mount, 8'-11" clear; Option 3a screens $15,000.
+- Option 3 louvered roof (own document), roof-line mount, 8'-11" clear; **the gutter LED strip is in the $35,000** (owner:
+  "I have that in the bid"); plus its own deck structure (above). Option 3a screens $15,000.
 
 ## Renders
 - Photoreal: the TimberTech skill's wire-brushed Vintage texture + greyscale relief maps; English Walnut from TimberTech's swatch;

@@ -59,7 +59,7 @@ def test_timber_frame_and_caissons(result):
     assert any(l.startswith("FLUSH") and l.endswith(" C") for l in labels)
     assert line(t, "Sonotube 20\"").net == 3 and line(t, "Quikrete").net == 120
     assert line(t, "Stone veneer column base").net == 8
-    assert line(t, "APB88").net == 8 and line(t, "anchor bolt").net == 8
+    assert line(t, "APB88").net == 8 and line(t, "Titen HD").net == 8      # set after the cure on a drilled anchor (GSX never wet-sets)
     assert line(t, "CCQ68").net == 4 and line(t, "ECCQ68").net == 4
     assert line(t, "LUS410Z").net >= 80 and line(t, "H2.5AZ").net >= 60
     assert line(t, "LedgerLOK 6\"").net == 3 and "107 needed" in line(t, "LedgerLOK 6\"").why

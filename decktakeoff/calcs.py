@@ -1016,13 +1016,14 @@ class Calc:
                     if not (a - 0.6 <= x <= b + 0.6):
                         continue
                     xx = min(b, max(a, x))
+                    sh = 1.0 / max(1, sum(1 for a2, b2 in ln.pieces if a2 - 0.6 <= x <= b2 + 0.6))   # a load over a splice: shared by both ends, counted once
                     if comp.get("D"):
-                        dl.append(("p", xx, comp["D"]))
+                        dl.append(("p", xx, comp["D"] * sh))
                     if comp.get("L"):
-                        lv.append(("p", xx, comp["L"]))
+                        lv.append(("p", xx, comp["L"] * sh))
                     for k in ("S", "Wd", "Wu"):
                         if comp.get(k):
-                            other.setdefault(k, []).append(("p", xx, comp[k]))
+                            other.setdefault(k, []).append(("p", xx, comp[k] * sh))
                 return dl, lv, other
 
             cks: List[Check] = []
@@ -1248,12 +1249,12 @@ class Calc:
                 two = sku.startswith(("ABU88", "APB88", "CPT88"))
                 on_dp = ftype == "diamond_pier"
                 anchors = "two 5/8\" anchors" if two else "the 5/8\" anchor"
-                where_ = (f" · {anchors} cast in each {b['model']}, 1\" standoff" if own
-                          else f" · anchors cast in the {ftype} (standard catalog condition), 1\" standoff" if not on_dp else "")
+                where_ = (f" · {anchors} (Titen HD) drilled into each cured {b['model']}, 1\" standoff" if own
+                          else f" · 5/8\" Titen HD anchors drilled into the cured {ftype} (set after the cure, never wet-set), 1\" standoff" if not on_dp else "")
                 note = ("the second anchor in the 5-5/8\" pier plinth (edge distance, the head's concrete limit) is not a catalog condition: "
                         "Pin Foundations and the engineer confirm; the pier's own uplift (chart) governs uplift" if two and on_dp else "")
                 if own and two and not on_dp:
-                    note = f"two cast-in anchors in a {b['dia'] or STAIR_CAISSON_DIA:g}\" shaft: the engineer confirms their embedment and edge distance (ACI 318-14 Ch. 17)"
+                    note = f"two 5/8\" Titen HD anchors drilled into a {b['dia'] or STAIR_CAISSON_DIA:g}\" shaft: the engineer confirms their embedment and edge distance (ESR-2713; ACI 318-14 Ch. 17)"
                 self.add(Check(cid, "Caps & bases", lab, f"Post base {sku}", b["down"] if r_u <= r_d else b["up"],
                                pr["down"] if r_u <= r_d else pr["up"], "lb", pr["src"],
                                f"down {b['down']:,.0f} / {pr['down']:,} lb · uplift {b['up']:,.0f} / {pr['up']:,} lb · lateral {b['lat']:,.0f} lb"
@@ -1501,6 +1502,13 @@ class Calc:
         if Lp <= a + 12:
             return
         in_spec = bool(getattr(spec.framing, "knee_braces", False))
+        if not in_spec and getattr(spec.framing, "knee_braces_waived", False):
+            ltag = self.line_tag(P, li)
+            self.add(Check(f"LT-{ltag}.5", "Lateral system", f"Beam {ltag}: no knee braces (owner)", "Lateral path without braces", 0.0, 1.0, "-",
+                           "IRC R507.9.2; AWC DCA6", f"the columns are pinned top and bottom (bases and caps are not moment connections); the line's share, "
+                           f"{H:,.0f} lb, goes through the joist ties and the deck diaphragm to the ledgers and the R507.9.2 hold-downs (LT rows above)",
+                           status="INFO", note="the engineer confirms the house attachment as the lateral system"))
+            return
         brace = section("4x6" if spec.framing.post_size == "8x8" else "4x4", "DF", "No.1")
         Vb = H / 2.0
         Fh = Vb * Lp / a
@@ -2174,6 +2182,21 @@ class _CalcMore(Calc):
                            f"and pier rows include them)", tags=tags))
             self.roof_uplift_chain(P, tag, mem, R, tags)
             return
+        # over a beam line between (or past) its columns: blocking over the beam takes it, and the beam carries it as a point load
+        on_beam = None
+        for li, ln in enumerate(P.L.beam_lines):
+            if abs(ln.y - yl) <= 12.0 and any(a - 0.5 <= xl <= b + 0.5 for a, b in ln.pieces):
+                if on_beam is None or abs(ln.y - yl) < abs(on_beam[1].y - yl):
+                    on_beam = (li, ln)
+        if on_beam is not None:
+            li, ln = on_beam
+            near = min(ln.posts_x, key=lambda q: abs(q - xl))
+            self.beam_pts.setdefault((P.idx, li), []).append((xl, dict(D=R["D"], S=R["S"], Wd=R["Wd"], Wu=R["Wu"]), "roof post on the beam"))
+            self.add(Check(f"{tag}.a", grp, mem, "Load path: the roof post stands over the beam", abs(ln.y - yl), 12.0, "in", "load path",
+                           f"roof post {abs(xl - near) / 12.0:.2f}' from the nearest column on beam {P.tag}{li + 1}, over the beam line: blocking over the beam "
+                           f"takes the base plate and the beam carries the post as a point load (its rows include it)", tags=tags))
+            self.roof_uplift_chain(P, tag, mem, R, tags)
+            return
         # otherwise it stands on the joists: a doubled joist + blocking takes it on its cantilever
         z = self.zone_at(P, xl, yl)
         if z is None:
@@ -2397,7 +2420,7 @@ def _footing_review(k) -> List[str]:
                    "Get PFI's written OK for a job over 600 SF.")
     if kinds & {"caisson", "existing", "concrete"}:
         out.append(f"Caissons: capacity = end bearing at the presumptive {k.c.soil_psf:,.0f} psf + the engine's ≈{CAISSON_SKIN_PSF:g} psf skin-friction estimate — confirm the soil "
-                   "(Buick loam, CL/ML; a soils report if Centennial's R401.2 amendment applies), size the shafts and their reinforcing, and the cast-in anchors. "
+                   "(Buick loam, CL/ML; a soils report if Centennial's R401.2 amendment applies), size the shafts and their reinforcing, and the post bases' drilled anchors (5/8\" Titen HD, after the cure). "
                    "Centennial R109.1.1: the footing inspection is by a Colorado PE.")
     return out
 
@@ -2443,8 +2466,8 @@ def _base_review(k) -> str:
         return (f"{ck.what.replace('Post base ', '')} on the Diamond Pier: the base's second 5/8\" anchor is drilled into the pier head beside the cast-in bolt (owner's choice) — "
                 "not a catalog condition (5-5/8\" plinth edge distance, the head's concrete limit): Pin Foundations and the engineer confirm, or detail a single-bolt HDG standoff base.")
     if not on_dp:
-        return (f"{ck.what.replace('Post base ', '')} bases with their 5/8\" anchors cast in the footing (catalog condition, 1\" standoff keeps the Douglas fir off the concrete): "
-                "the engineer confirms the anchor embedment and edge distance in the shaft.")
+        return (f"{ck.what.replace('Post base ', '')} bases set on the cured footing with 5/8\" Titen HD screw anchors (post-installed — GSX never wet-sets; the 1\" standoff keeps the Douglas fir off the concrete): "
+                "the engineer confirms the anchors' embedment, edge distance and the base's uplift on them (ESR-2713).")
     return f"{ck.what}: confirm it on the pier for the down / uplift / lateral values on the Caps & bases sheet."
 
 
@@ -2781,7 +2804,7 @@ def calc_sheets(pkg_or_spec, meta: Optional[dict] = None, standalone: bool = Fal
                "Footings": ("Caissons: bearing (end + skin friction), uplift, lateral embedment, frost — IRC R403 / R507.3, IBC 1807.3"
                             if not any(r.get("ftype") == "diamond_pier" for r in pkg.columns) else
                             "Diamond Piers: bearing by soil, uplift, lateral, frost, spacing — ESR-1895, Pin Foundations chart"),
-               "Lateral system": "House attachment (R507.9.2 hold-downs, ledger), deck diaphragm, knee braces at the end columns",
+               "Lateral system": "House attachment (R507.9.2 hold-downs, ledger), deck diaphragm" + ("" if any("no knee braces (owner)" in c_.member for c_ in pkg.checks) else ", knee braces at the end columns"),
                "Inset stair & notch": "Stringers, notch headers and trimmer, the stair base ledger and the lower rim",
                "Stairs to the yard": "Option: stringers, landing joists and rims, the stair on the deck rim (its posts: Columns, Caps & bases, Footings)",
                "Louvered roof load path": "Option: roof post reactions to the deck — gravity, uplift chain, base moment",

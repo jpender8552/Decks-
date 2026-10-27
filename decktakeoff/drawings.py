@@ -251,7 +251,7 @@ def sheet_general_notes(L, meta) -> Optional[str]:
     fr = s.framing
     if fr.footing_type != "diamond_pier":                   # a note written for Diamond Piers on a job that drills caissons: the job's footing
         ft_note = (f"Footings: {int(L.frame.footing_dia_in)}\" drilled caissons x {ftin(L.frame.footing_depth_in)} per the footing schedule (S-100), (4) #4 verticals "
-                   f"+ #3 ties, 5/8\" cast-in anchor, bottoms below the {ftin(s.site.frost_depth_in)} frost line on undisturbed soil; post bases per the engineer. "
+                   f"+ #3 ties, post bases set after the cure on 5/8\" Titen HD anchors, bottoms below the {ftin(s.site.frost_depth_in)} frost line on undisturbed soil; post bases per the engineer. "
                    "Call 811 before drilling." if fr.footing_type == "caisson" else "Footings per the footing schedule (S-100); post bases per the engineer. Call 811 first.")
         notes = [ft_note if _dp_text(n) else n for n in notes]
         if not any(str(n).lower().startswith(("footings", "footing:")) or "caisson" in str(n).lower() for n in notes):   # no footing note: the job's own
@@ -418,9 +418,9 @@ def sheet_foundation(L: Layout, S: Scene, meta) -> str:
     sx = 710
     o.append(T(sx, 24, "FOOTING SCHEDULE", 9, 800, fill=GOLD))
     ft = L.frame
-    desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, 5/8\" x 8\" cast-in anchor",
+    desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, base on 5/8\" Titen HD anchors after the cure",
             "diamond_pier": f"Diamond Pier {ft.footing_model} (head + 4 x 50\" pins), 3,300 lb allowable",
-            "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base",
+            "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, standoff base set after the cure",
             "existing": ("Existing caissons and columns stay — verify plumb, bearing and condition; new column caps (engineered)" if L.spec.framing.existing_posts
                          else "Existing caissons stay — tops chipped level, standoff bases on epoxy-set 5/8\" rods (engineer confirms capacity)")}[L.spec.framing.footing_type]
     yy = 40
@@ -748,7 +748,7 @@ def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Call
             o.append(LN(xx, 195, xx, 295, "#3f5d8a", 1.0))
     if ft == "caisson":
         o.append(LN(680, 200 + L.spec.site.frost_depth_in / 12 * 25, 960, 200 + L.spec.site.frost_depth_in / 12 * 25, "#3f5d8a", 0.8, "4 3")); o.append(T(690, 196 + L.spec.site.frost_depth_in / 12 * 25, f"frost {ftin(L.spec.site.frost_depth_in)}", 6.5, 600, fill="#3f5d8a"))
-        o.append(R(796, 180, 48, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{base} on the 5/8\" cast-in anchor" if base else "post base, 5/8\" cast-in anchor", 6.5, 600))
+        o.append(R(796, 180, 48, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{base} on 5/8\" Titen HD (after the cure)" if base else "post base, 5/8\" Titen HD (after the cure)", 6.5, 600))
         if s.extras.stone_bases:
             o.append(R(770, 110, 100, 80, "none", "#7a7267", 1.0, 'stroke-dasharray="4 3"')); o.append(T(880, 150, "stone veneer 2'x2' x 3' + cap", 6.5, 600))
     elif ft == "diamond_pier":
@@ -3247,9 +3247,9 @@ def _footing_words(s, CL, t=None, short: bool = False) -> str:
     if fr.footing_type == "caisson":
         return (f"{int(ft.footing_dia_in)}\" x {ftin(ft.footing_depth_in)} drilled caisson" if short else
                 f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}) + 6\" above grade, (4) #4 verticals + #3 ties, "
-                f"5/8\" cast-in anchor; {base} base on the anchor")
+                f"{base} base set after the cure on 5/8\" Titen HD anchors")
     if fr.footing_type == "concrete":
-        return f"{int(ft.footing_dia_in)}\" concrete pier" if short else f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set {base} base"
+        return f"{int(ft.footing_dia_in)}\" concrete pier" if short else f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, {base} base set after the cure"
     return "existing caisson" if short else "Existing caissons stay — verify plumb, bearing and condition (engineer)"
 
 
@@ -3931,7 +3931,7 @@ def _composite_key(CL, S, t) -> list:
         lab = lab.replace(" rail rail,", " rail,")
         out.append((lab, pred, where, pick))
     if s.framing.footing_type != "diamond_pier":                  # the footing the spec names (member_key keys only a Diamond Pier)
-        out.insert(0, (_footing_words(s, CL, t, short=True).capitalize() + (", (4) #4 + #3 ties, 5/8\" cast-in anchor" if s.framing.footing_type == "caisson" else ""),
+        out.insert(0, (_footing_words(s, CL, t, short=True).capitalize() + (", (4) #4 + #3 ties; the base on 5/8\" Titen HD after the cure" if s.framing.footing_type == "caisson" else ""),
                        lambda b: b.kind == "footing" and "Diamond" not in (b.tag or ""), (0.5, 0.5, 1.0), "first"))
     if s.railing.drink_rail:
         out.append((f"Drink rail — {getattr(s.railing, 'drink_rail_collection', '') or s.decking.collection} {getattr(s.railing, 'drink_rail_color', '') or s.decking.color} board"
@@ -4170,21 +4170,24 @@ def sheet_details_frame_composite(CL, S, t, levels, steps, meta) -> str:
         yy = top + 16
         while yy < bot - 8:
             o.append(LN(cx - cw / 2 + 4, yy, cx + cw / 2 - 4, yy, "#3f5d8a", 0.6, "3 2")); yy += 12 * sc_
-        for ax_ in (cx - 4.6, cx + 4.6):                                       # the two cast-in anchors
+        for ax_ in (cx - 4.6, cx + 4.6):                                       # the two anchors, drilled in after the cure
             o.append(LN(ax_, top - 4, ax_, top + 8 * sc_, "#5b6166", 1.6))
         o.append(R(cx - 11, top - 4, 22, 4, "#5b6166", INK, 0.6))              # the standoff base: plate + side flanges
         o.append(R(cx - 12, top - 26, 2.2, 22, "#5b6166", INK, 0.5)); o.append(R(cx + 9.8, top - 26, 2.2, 22, "#5b6166", INK, 0.5))
         _wood(o, cx - 9.6, y + 24, 19.2, top - 5 - (y + 24))
         o.append(T(cx, y + 60, f"{psz}", 6.2, 800, "middle", INK, rot=-90))
         dim_v(o, lambda v: v, cx + cw / 2 + 10, gy, bot, ftin(fr.footing_depth_in), 6.4, left=False)
-        anc = _ord(t, "anchor bolt", "cast-in"); sds = _ord(t, "post screws") or _ord(t, "SDS")
+        anc = _ord(t, "Titen HD") or _ord(t, "anchor bolt"); sds = _ord(t, "post screws") or _ord(t, "SDS")
         n_b = max(1, int(_ord_n(t, base))) if base else 1
         per_ = int(round(anc.net / n_b)) if anc else 2
         _lead(o, cx + 11, top - 6, x + 172, y + 30, f"Simpson {base} standoff base" + (f", {sds.item.split(': ')[-1]}" if sds and ':' in sds.item else ", SDS screws into the post"))
-        anc_txt = anc.item.split(" w/")[0] if anc else "5/8\" anchor bolts"
-        _lead(o, cx + 4.6, top + 10, x + 172, y + 66, f"({per_}) {anc_txt}, cast in on the base template")
+        anc_txt = anc.item.split(" (")[0].split(" w/")[0] if anc else "5/8\" Titen HD screw anchors"
+        _lead(o, cx + 4.6, top + 10, x + 172, y + 66, f"({per_}) {anc_txt}, drilled through the base into the cured caisson — never wet-set")
         reb4 = _ord(t, "#4 rebar"); reb3 = _ord(t, "#3 rebar")
-        _lead(o, cx + cw / 2 - 6, (top + bot) / 2, x + 172, y + 132, f"{int(fr.footing_dia_in)}\" caisson x {ftin(fr.footing_depth_in)}, top 6\" above grade"
+        tops_ = sorted({float(((p_ if isinstance(p_, dict) else {}).get("framing") or {}).get("caisson_above_in", s.framing.caisson_above_in))
+                        for p_ in (getattr(s.geometry, "parts", None) or [])} or {float(s.framing.caisson_above_in)})
+        _lead(o, cx + cw / 2 - 6, (top + bot) / 2, x + 172, y + 132, f"{int(fr.footing_dia_in)}\" caisson x {ftin(fr.footing_depth_in)}, top "
+              + " / ".join("flush with the slab" if a_ == 0 else f"{ftin(a_)} above grade" for a_ in reversed(tops_))
               + (", (4) #4 verticals + #3 ties" if (reb4 and reb3) else "") + " — the engineer sizes them")
         rows_ = _post_rows(levels, S.boxes)
         sl_ids, sl_name = _slab_posts(s, rows_)
@@ -4364,7 +4367,7 @@ def sheet_details_edge_composite(CL, S, t, levels, steps, meta) -> str:
     if bls:
         rows += [("Joist to beam", "H2.5AZ each joist + rim, 10d x 1-1/2\"" if all(b.kind == "drop" for b in bls) else f"{hs} at flush beams; H2.5AZ at drop beams"),
                  ("Beam to column", f"{cap} cap, SDS screws (incl.)" if cap else "column cap per the engineer")]
-    rows += [("Column to footing", f"{base}, (2) 5/8\" cast-in anchors" + (", (8) SDS 1/4\" x 3\"" if sds else "") if s.framing.footing_type == "caisson" else f"{base} on the footing"),
+    rows += [("Column to footing", f"{base}, (2) 5/8\" Titen HD after the cure" + (", (8) SDS 1/4\" x 3\"" if sds else "") if s.framing.footing_type == "caisson" else f"{base} on the footing"),
              ("Field boards", "Cortex + plugs, 2 per board per joist" if (s.decking.fastener_system or "").lower().startswith("cortex") else (s.decking.fastener_system or "per maker")),
              ("Borders / fascia", ("Cortex + plugs · fascia: TOPLoc" if cortex_b else "face screws · fascia: TOPLoc") if _ord(t, "TOPLoc") else "per maker"),
              ("Rail posts", "(4) HeadLOK 6\" into the blocking" if hl else "per the rail maker")]

@@ -130,8 +130,9 @@
     },
     "sonotube_24": {
       "per_lf": 11.0,
-      "source": "est.",
-      "desc": "24\" form tube"
+      "source": "EST — 12' x $11/LF; D&D to quote",
+      "desc": "Sonotube 24\" x 12' (cut to length)",
+      "each": 132.0
     },
     "ABA66Z": {
       "each": 27.85,
@@ -243,6 +244,17 @@
       "each": 49.99,
       "source": "EST — retail $49.99 (27 Oct 2026); D&D to quote",
       "desc": "Simpson ABU66RZ adjustable standoff post base, rough 6x6, ZMAX"
+    },
+    "titen_hd_58x6": {
+      "each": 6.25,
+      "source": "EST — Simpson THD62600H, box of 25 ~$156; D&D to quote",
+      "desc": "Simpson Titen HD 5/8\" x 6\" screw anchor (THD62600H), drilled into the cured footing through the post base"
+    },
+    "sonotube_30": {
+      "each": 180.0,
+      "per_lf": 15.0,
+      "source": "EST — 12' x $15/LF; D&D to quote",
+      "desc": "Sonotube 30\" x 12' (cut to length)"
     }
   },
   "hardware": {

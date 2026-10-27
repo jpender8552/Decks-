@@ -357,8 +357,8 @@ def build_scene(L) -> Scene:
         for pi, px in enumerate(ln.posts_x):
             x = px * IN
             if ft in ("caisson", "existing"):
-                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, 0.5, "concrete", 1, tag=f"caisson P{li}-{pi + 1}" + (" (existing)" if ft == "existing" else ""), shape="cyl")
-                base_top = 0.5
+                base_top = max(0.01, float(getattr(spec.framing, "caisson_above_in", 6.0)) / 12.0) if ft == "caisson" else 0.5   # 0 = poured flush with a slab (1/8" proud: no z-fight with it)
+                add("footing", x - 10 / 12, x + 10 / 12, y - 10 / 12, y + 10 / 12, -1.0, base_top, "concrete", 1, tag=f"caisson P{li}-{pi + 1}" + (" (existing)" if ft == "existing" else ""), shape="cyl")
             elif ft == "diamond_pier":
                 add("footing", x - 0.45, x + 0.45, y - 0.45, y + 0.45, -0.2, 0.3, "concrete", 1, tag="Diamond Pier")
                 base_top = 0.3
@@ -739,18 +739,62 @@ def build_scene(L) -> Scene:
             bx("riser", (k - 1) * run_, (k - 1) * run_ + r_t, va, vb, -k * r_, -(k - 1) * r_ - bt_in, "fascia", 6, tag=f"riser {k} {st.side}", tone_=tone())
             if k <= T:
                 bx("tread", (k - 1) * run_ + r_t, k * run_ + r_t + NOSE, va, vb, -k * r_ - bt_in, -k * r_, "deck", 6, tag=f"tread {k} {st.side}", tone_=tone())
-        # stringers: their top edge under the back of every tread, hung on the trimmer, the heels cut level onto the base ledger
+        # stringers: cut 2x12s, drawn as their true cut outline (a prism mesh) - a tread seat and a riser cut per step (the
+        # treads and risers sit in them), the uncut throat under the notch line, the top plumb-cut against the notch header,
+        # and the foot cut level onto the base ledger (top flush with the lower level's rim) from the bottom riser cut back to
+        # the bottom edge: full length, bearing at both ends, nothing hanging below the stair
         th = math.atan2(r_, run_)
         dep = 11.25
         l_top = nt["ledger_top"]
-        z_edge = lambda u: -r_ - bt_in - 0.25 - (u - r_t) * math.tan(th)
-        u_end = min(T * run_, r_t + (-r_ - bt_in - 0.25 - (l_top - 5.5) - dep / math.cos(th)) / math.tan(th))
-        Ls, uc = u_end / math.cos(th), u_end / 2
-        zc = z_edge(uc) - (dep / 2) / math.cos(th)
+        throat = max(3.5, dep - r_ * run_ / math.hypot(r_, run_))               # the board left under the notch line
+        z_seat = lambda k: -k * r_ - bt_in                                        # the seat under tread k
+        z_bot = lambda u: z_seat(1) - u * math.tan(th) - throat / math.cos(th)   # the stringer's bottom edge
+        u_ft = T * run_                                                           # the bottom riser cut
+        u_s = (z_seat(1) - throat / math.cos(th) - l_top) / math.tan(th)          # the level foot cut meets the bottom edge
+        prof = [(0.0, z_seat(1))]
+        for k in range(1, T + 1):
+            prof += [(k * run_, z_seat(k)), (k * run_, z_seat(k + 1) if k < T else max(l_top, z_bot(u_ft)))]
+        if u_s < u_ft:
+            prof.append((u_s, l_top))
+        prof.append((0.0, z_bot(0.0)))
+
+        def _tris(poly):
+            """Ear-clip a simple polygon [(u, z), ...] -> index triples."""
+            idx = list(range(len(poly)))
+            area = sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in idx)
+            if area < 0:
+                idx.reverse()
+            cross = lambda a, b, c: (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            out, guard = [], 0
+            while len(idx) > 3 and guard < 500:
+                guard += 1
+                for j in range(len(idx)):
+                    a, b, c = idx[j - 1], idx[j], idx[(j + 1) % len(idx)]
+                    if cross(poly[a], poly[b], poly[c]) <= 1e-9:
+                        continue
+                    if any(cross(poly[a], poly[b], poly[p]) > 0 and cross(poly[b], poly[c], poly[p]) > 0 and cross(poly[c], poly[a], poly[p]) > 0
+                           for p in idx if p not in (a, b, c)):
+                        continue
+                    out.append((a, b, c)); idx.pop(j)
+                    break
+            return out + [tuple(idx)]
+        tri_ix = _tris(prof)
         n_s = max(2, st.stringers)
         for i in range(n_s):
             v = va + 0.75 + (vb - va - 1.5) * i / (n_s - 1)
-            bx("stringer", uc - Ls / 2, uc + Ls / 2, v - 0.75, v + 0.75, zc - dep / 2, zc + dep / 2, "timber", 5, tag=f"stringer {st.side}", rot=th)
+            def P(u, z, w, v=v):
+                a_ = face - sgn * u
+                xy = (a_, v + w) if ax == "x" else (v + w, a_)
+                return [round(xy[0] * IN, 4), round(xy[1] * IN, 4), round(zt + z * IN, 4)]
+            tri = []
+            for a, b, c in tri_ix:                                                # the two faces
+                tri += [P(*prof[a], -0.75), P(*prof[b], -0.75), P(*prof[c], -0.75), P(*prof[a], 0.75), P(*prof[c], 0.75), P(*prof[b], 0.75)]
+            for j in range(len(prof)):                                            # the edges (cuts, throat, ends)
+                p0, p1 = prof[j], prof[(j + 1) % len(prof)]
+                tri += [P(*p0, -0.75), P(*p1, -0.75), P(*p1, 0.75), P(*p0, -0.75), P(*p1, 0.75), P(*p0, 0.75)]
+            xs_, ys_, zs_ = [q[0] for q in tri], [q[1] for q in tri], [q[2] for q in tri]
+            add("stringer", min(xs_), max(xs_), min(ys_), max(ys_), min(zs_), max(zs_), "timber", 5, tag=f"stringer {st.side}",
+                shape="mesh", pts=tri)
         # the stair base ledger (2-ply PT 2x6 bolted to the lower level's rim face, top flush with it) and the two short PT posts
         # on it under the header / rim corners (structure.md §5.2)
         u_f = nt["depth"]                                                # the face the notch is cut in

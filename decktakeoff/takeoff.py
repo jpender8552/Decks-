@@ -868,10 +868,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if bkey == "ABU88Z" and spec.framing.post_rough:
             bkey = "ABU88RZ"                # a rough 8x8 (a full 8") takes the R-series ABU88
         n_anc = n_posts * (2 if bkey.startswith("ABU88") else 1)       # an ABU88 bolts down with two 5/8" anchors
-        d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_anc, n_anc, "ea", "exact" + (f"  (2 per {bkey})" if n_anc > n_posts else ""), uc, src))
+        # GSX never wet-sets (owner 27 Oct): the base goes on once the caisson has cured, on anchors drilled through it into the concrete
+        d_, uc, src = _item("footings", "titen_hd_58x6"); lines.append(Line("Footings", d_, n_anc, n_anc, "ea", "exact" + (f"  (2 per {bkey})" if n_anc > n_posts else "  (1 per base)"), uc, src))
         d_, uc, src = _item("footings", bkey)
-        lines.append(Line("Footings", d_ + (" on the cast-in anchor" if bkey.startswith("ABU88") else ""), n_posts, n_posts, "ea", "exact", uc, src, bkey))
-        if bkey.startswith("ABU88"):           # both anchors are cast in: the set is only the post screws
+        lines.append(Line("Footings", d_ + " — set on the cured caisson", n_posts, n_posts, "ea", "exact", uc, src, bkey))
+        if bkey.startswith("ABU88"):           # both anchors are drilled in after the cure (their own line): the set is only the post screws
             lines.append(Line("Footings", "ABU88 post screws: (8) Simpson SDS 1/4\" x 3\" per base", n_posts, n_posts, "set", "exact  (one set per ABU88 base)", 10.0, "EST — (8) SDS25300 per base"))
         base_screws = 0
     else:
@@ -886,7 +887,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Footings", "Concrete mix 80 lb", bags, bags + 2, "bag", f"+2  ({vol_cf:.1f} cf per pier)", uc, src))
         base = POST_BASE.get(spec.framing.post_size, {}).get("concrete", "ABU66Z")
         uc, src = _price("footings", base)
-        lines.append(Line("Footings", _desc("footings", base, base) + " wet-set 1/2\" anchor", n_posts, n_posts, "ea", "exact", uc, src, base))
+        lines.append(Line("Footings", _desc("footings", base, base) + " — set on the cured pier", n_posts, n_posts, "ea", "exact", uc, src, base))
+        d_, uc_a, src_a = _item("footings", "titen_hd_58x6")            # never wet-set (owner 27 Oct): one 5/8" anchor drilled in after the cure
+        lines.append(Line("Footings", d_, n_posts, n_posts, "ea", "exact  (1 per base)", uc_a, src_a))
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
     if spec.extras.stone_bases:
         d_, uc, src = _item("footings", "stone_base_kit")
@@ -899,7 +902,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if n_own:
             # the stair's own footings (Stair.landing_footing "caisson12", footings agent 27 Oct): 12" caissons to the deck's caisson depth
             # (frost + 2" without one), the deck's top above grade, (4) #4 + #3 ties like the deck's (engineer governs), and an ABU66
-            # an ABU66RZ on one cast-in 5/8" anchor under each 6x6 rough landing / carrier post (owner); labor at the card's $150 a hole (pricing)
+            # an ABU66RZ on one 5/8" Titen HD drilled in after the cure under each 6x6 rough landing / carrier post (owner); labor at the card's $150 a hole (pricing)
             dep_s = float(spec.framing.caisson_depth_in or (spec.site.frost_depth_in + 2))
             abv_s = float(spec.framing.caisson_above_in) if spec.framing.footing_type == "caisson" else 6.0
             tl_s = dep_s + abv_s
@@ -913,10 +916,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             r4_s = int(math.ceil(n_own * 4 * tl_s / 12 / 20)); r3_s = int(math.ceil(n_own * (math.pi * 8 / 12 * 4) / 20))
             d_, uc, src = _item("footings", "rebar4_20"); lines.append(Line("Footings", d_, r4_s, r4_s, "ea", "exact — engineer governs (12\" stair caissons)", uc, src))
             d_, uc, src = _item("footings", "rebar3_20"); lines.append(Line("Footings", d_, r3_s, r3_s, "ea", "exact — engineer governs (12\" stair caissons)", uc, src))
-            bk_ = "ABU66RZ" if spec.framing.post_rough else "ABU66Z"     # owner: a stair landing is 6x6 rough on an ABU66RZ (one cast-in anchor)
-            d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_own, n_own, "ea", f"exact  (1 per {bk_} base, stair caissons)", uc, src))
+            bk_ = "ABU66RZ" if spec.framing.post_rough else "ABU66Z"     # owner: a stair landing is 6x6 rough on an ABU66RZ (one anchor, after the cure)
+            d_, uc, src = _item("footings", "titen_hd_58x6"); lines.append(Line("Footings", d_, n_own, n_own, "ea", f"exact  (1 per {bk_} base, stair caissons)", uc, src))
             d_, uc, src = _item("footings", bk_)
-            lines.append(Line("Footings", f"{d_} — stair landing / carrier posts, on the cast-in anchor", n_own, n_own, "ea", "exact", uc, src, bk_))
+            lines.append(Line("Footings", f"{d_} — stair landing / carrier posts, set on the cured caissons", n_own, n_own, "ea", "exact", uc, src, bk_))
             base_screws += n_own * POST_BASE_SCREWS.get(bk_, 12)
     # intermediate stair landings: a framed platform (joist-size rims + joists at the deck spacing) on four posts, decked in the field board
     for st_s in spec.stairs:
@@ -948,7 +951,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                     lines.append(Line("Stairs", f"{d_} — landing {li + 1}", 4, 4, "set", "exact  (one set per ABU88 base)", uc_ or 18.0, src_ or "EST — SDS25300 x 8 + THD62600H x 1"))
             else:
                 uc, src = _price("footings", "concrete_pad")
-                lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, wet-set bases", 4, 4, "ea", "exact", uc * 0.6, src))
+                lines.append(Line("Stairs", f"Landing {li + 1} footings — 4 concrete piers 12\" x frost, bases set after the cure", 4, 4, "ea", "exact", uc * 0.6, src))
             sf_l = lw * ld / 144
             # the landing is decked in the field board, boards across it (parallel with the treads): rows x the landing's width, cut
             # from the shortest stock the line's own profile is sold in (Vintage square edge: 16'); a composite pools these pieces with

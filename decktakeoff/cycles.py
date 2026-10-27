@@ -1032,6 +1032,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
 
 # ====================================================================== trees and shrubs (decktakeoff.vegetation)
 TREES3D = True       # build the yard model's trees from their entries (vegetation.py) instead of landscape.py's spheres / cones
+PLANT_KEEPOUT: List[Tuple[float, float, float]] = []   # extra camera stations (--cameras) the plants keep 3 ft clear of
 PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colours)
     "maple": ("#4c6827", "#718d38"), "cottonwood": ("#587b2c", "#86a244"), "broadleaf": ("#55702f", "#7c923c"),
     "spruce": ("#52777a", "#7a9fa5"), "pine": ("#405b2a", "#617d37"), "juniper": ("#4c6450", "#6d846f"),
@@ -1135,7 +1136,9 @@ def build_plants(spec, D, col, out_dir: str, foliage: str = "", quick: bool = Fa
         return mc, "#%02x%02x%02x" % tuple(min(255, int(v * 1.2)) for v in (r, g, b))
     cx = float(np.mean([D.get("x_min", 0.0), D.get("x_min", 0.0) + D.get("W", 40.0)]))
     detail = lambda x, y: float(np.clip(70.0 / max(1.0, math.hypot(x - cx, y - 12.0)), 0.35, 1.0)) * (0.8 if quick else 1.0)
-    P = VG.Plants(os.path.join(out_dir, "_tex"), colors, seed=int(sm.get("seed", 7)) * 31 + 5, detail_at=detail)
+    lens = [tuple(c["pos"][:3]) for c in list((sm.get("cameras") or {}).values()) if isinstance(c, dict) and c.get("pos")]
+    P = VG.Plants(os.path.join(out_dir, "_tex"), colors, seed=int(sm.get("seed", 7)) * 31 + 5, detail_at=detail,
+                  keepout=lens + list(PLANT_KEEPOUT), keepout_r=3.0)
     for t in sm.get("trees") or []:
         z0 = float(t["z"]) if t.get("z") is not None else float(grade_at(sm, *t["at"]))
         P.plant(t, z0)
@@ -1842,17 +1845,24 @@ def generic_views(D) -> Dict[str, dict]:
 
 GLARE = 0.012        # a real lens's veiling glare: a neutral lift of 1.2 % of the frame's mean luminance
 TONEMAP = "grade"    # "grade": linear EXR -> grade() (default); "pbr": Blender's Khronos PBR Neutral straight to JPEG (--tonemap=pbr)
+LIFT = {"day": (0.8, 0.05), "dusk": (0.25, 0.03)}   # the shadow lift (amount, luminance scale) by light mode
+EV_DAY = -0.35       # day exposure for grade(): a sunlit 18 % card reads ~#8f8f8f, the sunlit English Walnut ~#6c5545
 
 
-def grade(lin: np.ndarray, exposure: float) -> np.ndarray:
-    """Scene-linear RGB -> display sRGB 0..1: exposure, the lens's veiling glare, then the Khronos PBR Neutral highlight
-    shoulder WITHOUT its toe. PBR Neutral subtracts up to 0.04 from every channel (x - 6.25 x^2 below 0.08): right for a
-    product shot, but it crushes the smallest channel of every shadow - the shaded siding came out #391e03 (saturation
-    0.96) where the owner's photos hold 0.07-0.20 in the same tones. Mid-tones pass unchanged (the sunlit deck keeps the
-    colour test's value); highlights roll off to white as in PBR Neutral."""
+def grade(lin: np.ndarray, exposure: float, lift=(0.0, 0.05)) -> np.ndarray:
+    """Scene-linear RGB -> display sRGB 0..1: exposure, the lens's veiling glare, a phone camera's shadow lift, then the
+    Khronos PBR Neutral highlight shoulder WITHOUT its toe. PBR Neutral subtracts up to 0.04 from every channel
+    (x - 6.25 x^2 below 0.08): right for a product shot, but it crushes the smallest channel of every shadow - the shaded
+    siding came out #391e03 (saturation 0.96) where the owner's photos hold 0.07-0.20 in the same tones. The exposure is a
+    photograph's (EV_DAY: the sunlit deck reads the swatch's deep brown, not a light, salmon brown) and the lift
+    (luminance x (1 + a e^(-L/b)), hue kept) holds the shade under the deck readable, as the owner's phone photos do."""
     x = lin[..., :3].astype(np.float32) * np.float32(2.0 ** exposure)
     lum = x @ np.array([0.2126, 0.7152, 0.0722], np.float32)
     x = x + np.float32(GLARE * float(np.mean(np.clip(lum, 0.0, 4.0))))
+    a, b = lift
+    if a:
+        L = np.maximum(x @ np.array([0.2126, 0.7152, 0.0722], np.float32), 0.0)
+        x = x * (1.0 + np.float32(a) * np.exp(-L / np.float32(b)))[..., None]
     peak = np.maximum(x.max(axis=-1, keepdims=True), 1e-6)
     s, d = 0.8, 0.2
     new = 1.0 - d * d / (np.maximum(peak, s) + d - s)
@@ -1863,18 +1873,18 @@ def grade(lin: np.ndarray, exposure: float) -> np.ndarray:
     return np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(y, 1 / 2.4) - 0.055)
 
 
-def grade_exr(exr_path: str, jpg_path: str, exposure: float, quality: int = 90) -> None:
+def grade_exr(exr_path: str, jpg_path: str, exposure: float, quality: int = 90, lift=(0.0, 0.05)) -> None:
     """The rendered linear EXR (kept in OUT/_exr for re-grading) -> the graded JPEG."""
     img = bpy.data.images.load(exr_path, check_existing=False)
     w, h = img.size
     px = np.empty(w * h * 4, np.float32)
     img.pixels.foreach_get(px)
     bpy.data.images.remove(img)
-    out = grade(px.reshape(h, w, 4)[::-1], exposure)
+    out = grade(px.reshape(h, w, 4)[::-1], exposure, lift)
     Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGB").save(jpg_path, quality=quality, subsampling=0)
 
 
-def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=0.65, modes=None, default_mode="day",
+def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, exposure=EV_DAY, modes=None, default_mode="day",
                  spec=None, date=None):
     """Render the named stations. A name may carry a time: "station@16:00" (that clock time on `date`, or a full
     "@YYYY-MM-DDTHH:MM") renders it with the sun moved there -> station_1600.jpg; "station@dusk" renders it at dusk ->
@@ -1904,7 +1914,7 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
     scn.render.resolution_percentage = 100
     if TONEMAP == "grade":
         # linear half-float EXR, then grade(): PBR Neutral's hue-true mid-tones and highlight roll-off without its toe;
-        # +0.65 EV puts the sunlit English Walnut on the colour test's #91715c
+        # EV_DAY puts the sunlit English Walnut near the swatch's deep brown (#6c5545 in sun vs the swatch's #614b3c)
         scn.render.image_settings.file_format = "OPEN_EXR"
         scn.render.image_settings.color_depth = "16"
         scn.render.image_settings.exr_codec = "ZIP"
@@ -1957,7 +1967,7 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
         t = time.time()
         bpy.ops.render.render(write_still=True)
         if TONEMAP == "grade":
-            grade_exr(scn.render.filepath, jpg, scn.view_settings.exposure)
+            grade_exr(scn.render.filepath, jpg, scn.view_settings.exposure, lift=LIFT.get(mode, LIFT["day"]))
             scn.render.filepath = jpg
         done[out_nm] = jpg
         sv = LIGHTS.get("dusk_sun") if mode == "dusk" else (LIGHTS.get("sun_now") or base_sun)
@@ -1987,7 +1997,14 @@ def main(argv):
         globals()["CLOUDS"] = float(opts["--clouds"])
     if str(opts.get("--trees", "")).lower() in ("blobs", "landscape", "off"):    # --trees=blobs: landscape.py's crowns as before
         globals()["TREES3D"] = False
-    ev_day = 0.65 if TONEMAP == "grade" else 0.75
+    if opts.get("--cameras"):               # the stations, before the build: no branch within 3 ft of a lens
+        try:
+            cj0 = json.load(open(opts["--cameras"]))
+            cj0 = cj0.get("cameras", cj0)
+            PLANT_KEEPOUT[:] = [tuple(v["pos"][:3]) for v in cj0.values() if isinstance(v, dict) and v.get("pos")]
+        except Exception:
+            pass
+    ev_day = EV_DAY if TONEMAP == "grade" else 0.75
     samples = int(opts.get("--samples", 48 if quick else 160))
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()

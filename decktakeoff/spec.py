@@ -168,6 +168,8 @@ class Framing:
     footing_model_lock: bool = False     # the owner's pier model stays (Fillmore: "We need DP-50"): posts are added instead of upgrading the pier
     knee_braces: bool = False                # 4x4 knee braces at 45 deg, both directions at every beam post (tall posts / lateral)
     knee_leg_in: float = 30.0                # brace leg (each way) from the post / beam intersection
+    knee_braces_waived: bool = False         # the owner's call: no knee braces anywhere — the columns are pinned top and bottom and the
+                                             #   house attachment (R507.9.2 hold-downs, ledgers) + the deck diaphragm carry the lateral load
     post_species: str = ""                   # deck posts: "" -> #2 GC treated; "DF#1" -> Douglas fir #1 (owner-specified)
     post_rough: bool = False                 # 6x6 posts are rough-sawn full dimension (Douglas fir rough): R-series bases and caps
     steel_deck_post: str = "hss"             # steel frame: what stands on a deck-only pier — "hss" (3x3 stub) | "wood" (6x6 post, steel saddle to the beam)
@@ -264,7 +266,7 @@ class Stair:
     landing_footing: str = ""            # "" -> each landing's 4 posts and footings are their own stair lines | "deck": they stand on the deck's
                                          # footing type (caisson / pier / Diamond Pier, the deck's bases), counted and installed with the deck's posts |
                                          # "caisson12": the landing AND carrier posts are 6x6 rough on ABU66RZ (owner) on their own 12" caissons (the deck's
-                                         # depth, no large-footing add-on), one cast-in anchor — the stair's own lines
+                                         # depth, no large-footing add-on), one 5/8" Titen HD after the cure — the stair's own lines
     landing_grade_in: Optional[float] = None   # the grade under the landings' open edges, inches from the stair's foot (negative: the yard
                                          # falls away from the foot): the landing guard rule (over 30" above grade), the landing posts' length
                                          # and where the 3D sets their footings. None -> the ground is level with the foot

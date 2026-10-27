@@ -142,7 +142,7 @@ def spray_tex(path: str, c1: str, c2: str, seed: int = 3, W: int = 512, H: int =
     return path
 
 
-def tuft_tex(path: str, c1: str, c2: str, seed: int = 5, S: int = 512) -> str:
+def tuft_tex(path: str, c1: str, c2: str, seed: int = 5, S: int = 1024) -> str:
     """A pine needle tuft seen from the side (S x S, transparent): long needles fanning forward from a short twig end
     at the left-centre, darker toward the twig."""
     if os.path.exists(path):
@@ -152,8 +152,8 @@ def tuft_tex(path: str, c1: str, c2: str, seed: int = 5, S: int = 512) -> str:
     d = ImageDraw.Draw(im)
     a, b = _rgb(c1), _rgb(c2)
     ox, oy = S * 0.12, S * 0.5
-    d.line([(0, oy + 6), (ox + S * 0.25, oy)], fill=(96, 70, 48, 255), width=7)
-    for _ in range(420):
+    d.line([(0, oy + 6), (ox + S * 0.25, oy)], fill=(96, 70, 48, 255), width=max(4, S // 70))
+    for _ in range(int(0.9 * S)):
         t = rng.uniform(0.0, 0.32)
         px, py = ox + t * S, oy + rng.uniform(-3, 3)
         ang = rng.normal(0, 0.55)
@@ -162,7 +162,7 @@ def tuft_tex(path: str, c1: str, c2: str, seed: int = 5, S: int = 512) -> str:
         m = rng.random()
         col = np.clip((a * (1 - m) + b * m) * rng.uniform(0.7, 1.15), 0, 255)
         d.line([(px, py), ((px + qx) / 2 + rng.uniform(-4, 4), (py + qy) / 2 + rng.uniform(-4, 4)), (qx, qy)],
-               fill=tuple(int(v) for v in col) + (255,), width=2)
+               fill=tuple(int(v) for v in col) + (255,), width=max(2, S // 400))
     im.save(path)
     return path
 
@@ -333,17 +333,33 @@ def smooth_nodes(P, par, fixed, passes=2):
 class Plants:
     """Collects the parts of every plant by material key. colors(kind) -> (c1, c2) sRGB for a foliage kind."""
 
-    def __init__(self, tex_dir: str, colors: Callable[[str], Tuple[str, str]], seed: int = 17, detail_at=None):
+    def __init__(self, tex_dir: str, colors: Callable[[str], Tuple[str, str]], seed: int = 17, detail_at=None,
+                 keepout=(), keepout_r: float = 3.0):
         self.parts: Dict[str, List[Part]] = {}
         self.tex: Dict[str, str] = {}
         self.dir = tex_dir
         self.colors = colors
         self.rng = np.random.default_rng(seed)
         self.detail_at = detail_at or (lambda x, y: 1.0)
+        # camera stations (plan x, y, z): no branch or leaf within keepout_r of a lens - the photographer's elbow room
+        self.ko = np.asarray(keepout, float).reshape(-1, 3)
+        self.ko_r = float(keepout_r)
         os.makedirs(tex_dir, exist_ok=True)
 
+    def _near_lens(self, pts: np.ndarray, extra: float = 0.0) -> np.ndarray:
+        if not len(self.ko):
+            return np.zeros(len(pts), bool)
+        d = np.linalg.norm(pts[:, None, :] - self.ko[None, :, :], axis=2)
+        return (d < self.ko_r + extra).any(axis=1)
+
     def add(self, key: str, part: Part):
-        if len(part[1]):
+        V, Q, UV, C = part
+        if len(Q) and len(self.ko):
+            keep = ~self._near_lens(V[Q].mean(axis=1))
+            if not keep.all():
+                Q, UV, C = Q[keep], UV.reshape(-1, 4, 2)[keep].reshape(-1, 2), C.reshape(-1, 4, 4)[keep].reshape(-1, 4)
+                part = (V, Q, UV, C)
+        if len(Q):
             self.parts.setdefault(key, []).append(part)
 
     def merged(self) -> Dict[str, Part]:
@@ -357,7 +373,7 @@ class Plants:
 
     def _texture(self, kind: str, maker, *args) -> str:
         c1, c2 = self.colors(kind)
-        h = hashlib.md5(f"{kind}|{c1}|{c2}|v1".encode()).hexdigest()[:8]
+        h = hashlib.md5(f"{kind}|{c1}|{c2}|v2".encode()).hexdigest()[:8]
         key = f"{kind}"
         if key not in self.tex:
             self.tex[key] = maker(os.path.join(self.dir, f"veg_{kind}_{h}.png"), *args, c1, c2) if args else \
@@ -493,6 +509,13 @@ class Plants:
                     e = el[j]
                     pts.append(pts[-1] + stepL * np.array([math.cos(e) * ca, math.cos(e) * sa, math.sin(e)]))
                 pts = np.array(pts)
+                near = self._near_lens(pts, extra=1.2)          # a branch toward a camera station stops short of the lens
+                if near.any():
+                    k_ = int(np.argmax(near))
+                    if k_ < 2:
+                        continue
+                    pts = pts[:k_]; tt = tt[:k_]; L = L * (k_ - 1) / ns
+                    tt = tt / tt[-1]; ns = len(pts) - 1
                 br = 0.025 + 0.06 * L / max(R, 1)
                 seg0 += list(pts[:-1]); seg1 += list(pts[1:]); rr0 += list(np.linspace(br, 0.012, ns + 1)[:-1]); rr1 += list(np.linspace(br, 0.012, ns + 1)[1:])
                 # sprays along the branch, both sides, alternating, from 15% out; and a terminal one

@@ -538,6 +538,11 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             ap = price_louvered(rs, roof)
             c, f, m = ap.sell, ap.retail, ap.monthly
             basis = f"owner-set: {ap.basis}, sold on its own (outside the deck's cost and margin)"
+            dw = o.get("deck_work") or {}
+            if dw.get("price"):                  # the deck structure the roof needs (its columns / caissons), at the deck's margin, rides in its price
+                dc, df_, dm = fixed_terms(spec, dw["price"])
+                c, f, m = c + dc, f + df_, m + dm
+                basis += f" + {dw.get('label') or 'the deck structure for it'} ${dc:,.0f} at the deck's margin"
             if o.get("facts") is None:
                 from .pricing import roof_size_ft
                 _w, _d = roof_size_ft(roof)
@@ -1194,6 +1199,12 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
         sc_c = sc_f = sc_m = 0
         sc_est = False
     has_screens = bool(sc_c)
+    # the deck structure the roof needs (its own beams / columns / caissons, owner 27 Oct: the base is designed without the roof):
+    # addon["deck_work"] = dict(label, price, note) — priced at the deck's margin, required with the roof, so it rides in the roof's price
+    dw = a.get("deck_work") or {}
+    dw_c, dw_f, dw_m = fixed_terms(spec, dw["price"]) if dw.get("price") else (0.0, 0.0, 0.0)
+    if dw_c:
+        c, f, m = c + dw_c, f + dw_f, m + dw_m
     # ---- cover
     title, eyebrow = PL._title_parts(name, spec.site.address)
     eyebrow = " · ".join(x for x in (eyebrow, ", ".join(x for x in (spec.site.city, spec.site.state) if x)) if x)
@@ -1275,7 +1286,10 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if facts.get("warranty"):
         w('<h2 class="kicker" id="g-warranty">Warranty</h2><ul class="opt-scope">' + "".join(f"<li>{E(x)}</li>" for x in facts["warranty"]) + "</ul>")
     # ---- investment, schedule, terms
-    rows = [(f"{q['brand']} {q['product']} — {ftin(Wp * 12)} x {ftin(Dp * 12)}", c, f, m, "item")]
+    rows = [(f"{q['brand']} {q['product']} — {ftin(Wp * 12)} x {ftin(Dp * 12)}", c - dw_c, f - dw_f, m - dw_m, "item")]
+    if dw_c:
+        rows.append((dw.get("label") or "The deck structure for the roof", dw_c, dw_f, dw_m, "item"))
+        rows.append(("The roof, with its deck structure", c, f, m, "total"))
     if has_screens:
         rows.append((sa.get("label") or "Motorized screens", sc_c, sc_f, sc_m, "addon"))
         tf = f + sc_f
