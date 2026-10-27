@@ -287,11 +287,12 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     per = " + ".join(f"{sum(len(b.posts) for b in lv.beams) + len(lv.eps)} {lw(lv)}" for lv in levels)
     steps = []
     # 1 footings
+    to_posts = lambda l: (not l.item.startswith("Diamond Pier") and ("post base" in l.item.lower() or "post screws" in l.item.lower() or "fastener set" in l.item.lower() or ("anchor" in l.item.lower() and "cast-in" not in l.item.lower()) or "to the edge posts" in l.item))   # the bases and their fasteners go in with the posts
     from .drawings import _post_rows, _slab_posts, _id_run
     sl_ids, sl_name = _slab_posts(s, _post_rows(levels, []))           # footings in a slab: saw-cut openings (S-100's IDs)
     lay = "; ".join(f"{lv.name} {bm.short} {ftin(bm.a[1] * 12)} out, posts at x " + " / ".join(ftin(p.x * 12) for p in bm.posts) for lv in levels for bm in lv.beams)
     steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
-        goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),
+        goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and not to_posts(l)),
         how=["Call 811 and locate before any " + ("hole or pin." if ft == "diamond_pier" else "digging.") + (" Strip the existing deck first." if s.extras.demo_existing else ""),
              "Lay out in the deck's frame — x from its left end, y out from the main rear wall (the S-100 schedule): " + lay + ".",
              {"caisson": f"Auger {n_posts} holes ({per}) {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
@@ -309,7 +310,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     plen = " · ".join(f"{lw(lv)} " + ", ".join(b.short for b in lv.beams) + " " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)
     steps.append(dict(n=2, code="T-401", title="Posts", still="step2",
         goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item)
-                + items(lambda l: not l.item.startswith("Diamond Pier") and ("post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item)),
+                + items(to_posts),
         how=[f"{s.framing.post_size} {post_words(s)} posts on the {_post_base_name(s, t)} bases, cut so the beam top lands at {seat}: {plen} — field-measure each"
              + (f"; the {lw(hi)}'s posts stand {inch(rise)} taller than the {lw(lo)}'s." if faces else "."),
              "Plumb both ways, brace, then the caps go on with the beams."]
