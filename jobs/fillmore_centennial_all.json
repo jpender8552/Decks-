@@ -13685,6 +13685,152 @@
     ],
     "screens_price": 15000
    }
+  ],
+  "furniture": [
+   {
+    "type": "sectional",
+    "model": "Teak Outdoor L Sectional - 4 Seat",
+    "level": "lower",
+    "x": 12.975,
+    "y": 2.942,
+    "rot_deg": 0,
+    "ret": "+x",
+    "frame": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "coffee_table",
+    "model": "Teak Outdoor Coffee Table - Square Leg",
+    "size": "Medium",
+    "level": "lower",
+    "x": 10.95,
+    "y": 5.42,
+    "rot_deg": 0,
+    "frame": "teak"
+   },
+   {
+    "type": "lounge_chair",
+    "model": "Teak Outdoor Armchair",
+    "level": "lower",
+    "x": 6.3,
+    "y": 1.95,
+    "rot_deg": -58,
+    "frame": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "lounge_chair",
+    "model": "Teak Outdoor Armchair",
+    "level": "lower",
+    "x": 6.18,
+    "y": 5.25,
+    "rot_deg": -92,
+    "frame": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_table",
+    "model": "Teak + Aluminum Extendable Dining Table",
+    "level": "upper",
+    "x": 44.15,
+    "y": 3.32,
+    "rot_deg": 0,
+    "frame": "charcoal",
+    "top": "teak"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armless Chair",
+    "level": "upper",
+    "x": 42.45,
+    "y": 1.167,
+    "rot_deg": 0,
+    "frame": "charcoal",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armless Chair",
+    "level": "upper",
+    "x": 45.85,
+    "y": 1.167,
+    "rot_deg": 0,
+    "frame": "charcoal",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armless Chair",
+    "level": "upper",
+    "x": 42.45,
+    "y": 5.474,
+    "rot_deg": 180,
+    "frame": "charcoal",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armless Chair",
+    "level": "upper",
+    "x": 45.85,
+    "y": 5.474,
+    "rot_deg": 180,
+    "frame": "charcoal",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armchair",
+    "arms": true,
+    "level": "upper",
+    "x": 40.033,
+    "y": 3.32,
+    "rot_deg": -90,
+    "frame": "charcoal",
+    "arm_top": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "dining_chair",
+    "model": "595 Dining Armchair",
+    "arms": true,
+    "level": "upper",
+    "x": 48.267,
+    "y": 3.32,
+    "rot_deg": 90,
+    "frame": "charcoal",
+    "arm_top": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "lounge_chair",
+    "model": "Teak Outdoor Armchair",
+    "level": "upper",
+    "x": 54.25,
+    "y": 2.4,
+    "rot_deg": -10,
+    "frame": "teak",
+    "cushion": "Pacific Fog Gray"
+   },
+   {
+    "type": "side_table",
+    "model": "Teak Outdoor Side Table",
+    "level": "upper",
+    "x": 56.6,
+    "y": 2.05,
+    "rot_deg": 90,
+    "frame": "teak"
+   },
+   {
+    "type": "lounge_chair",
+    "model": "Teak Outdoor Armchair",
+    "level": "upper",
+    "x": 58.95,
+    "y": 2.4,
+    "rot_deg": 10,
+    "frame": "teak",
+    "cushion": "Pacific Fog Gray"
+   }
   ]
  },
  "framing": {

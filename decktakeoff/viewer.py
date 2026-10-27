@@ -18,6 +18,10 @@ const VIEW0 = q.get('view') || 'yard';
 const PHASE0 = parseInt(q.get('phase') || '8', 10);
 const EXPLODE0 = q.get('explode') === '1';
 const TECH = EXPLODE0 || PHASE0 < 8 || q.get('notrees') === '1' || ['plan', 'under', 'underiso'].includes(VIEW0);   // technical stills: generic cameras, no trees
+// styling furniture (layer "styling"): the finished views only — never a build step (an explicit ?phase=), an exploded view, the
+// plan or a view from under the deck; ?furn=0 leaves it out everywhere (notrees alone is not technical: the tree-blocked
+// presentation stills use it)
+const FURN0 = q.get('furn') !== '0' && !EXPLODE0 && q.get('phase') === null && !['plan', 'under', 'underiso'].includes(VIEW0);
 const root = document.getElementById('__UID__');
 const W = root.clientWidth || window.innerWidth, H = root.clientHeight || window.innerHeight;
 const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
@@ -158,7 +162,7 @@ function material(b) {
 const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser', 'wblock']);
 const edgeMat = new THREE.LineBasicMaterial({color: 0x1a1612, transparent: true, opacity: 0.22});
 // meshes
-const phased = [], ctx = [];
+const phased = [], ctx = [], FURN = [];
 for (const b of D.boxes) {
   const w = b.x1 - b.x0, d = b.y1 - b.y0, h = b.z1 - b.z0;
   let geo;
@@ -190,17 +194,22 @@ for (const b of D.boxes) {
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
   mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }
-  scene.add(mesh); if (b.phase > 0) phased.push(mesh);
+  scene.add(mesh);
+  if (b.layer === 'styling') FURN.push(mesh); else if (b.phase > 0) phased.push(mesh);
   if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree' || b.kind === 'fence') ctx.push(mesh);
 }
 const HIDE_TECH = new Set(['tree', 'fence']);          // trees and lot fences never stand in front of a technical still
 function ctxShown(o, on) { const k = o.userData.kind; if (HIDE_TECH.has(k)) return !on && !TECH; return k === 'roof' ? !on : true; }
 if (TECH) for (const o of ctx) if (HIDE_TECH.has(o.userData.kind)) o.visible = false;
 const GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23};
-function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; }
+function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; applyFurn(); }
+// styling furniture: never in a technical still (build steps, exploded, plan, under), only on the finished deck
+function applyFurn() { const on = FURN0 && !(typeof exploded !== 'undefined' && exploded) && (typeof phase === 'undefined' || phase >= 8)
+  && !(typeof curView !== 'undefined' && ((VIEWS[curView] || {}).ortho || ['under', 'underiso'].includes(curView)));
+  for (const o of FURN) o.visible = on; }
 function explode(on) {
   for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) + o.userData.xg : 0);
-  explodeCtx(on);
+  explodeCtx(on); applyFurn();
 }
 function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof' || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
 function explodedTop() { let t = 0; for (const o of phased) if (o.visible) { o.geometry.computeBoundingBox(); t = Math.max(t, o.position.y + o.geometry.boundingBox.max.y); } return t; }
@@ -254,7 +263,7 @@ function setView(name) {
   const v = (TECH && GVIEWS[name]) ? GVIEWS[name] : (VIEWS[name] || VIEWS.yard); cam = v.ortho ? ortho : persp; planMode(!!v.ortho);
   if (!v.ortho) { const f_ = q.get('fov') ? parseFloat(q.get('fov')) : (v.fov || 40); if (persp.fov !== f_) { persp.fov = f_; persp.updateProjectionMatrix(); } }
   cam.up.set(...(v.up || [0, 1, 0]));
-  cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target));
+  cam.position.set(...v.pos); target.set(...v.at); sph.setFromVector3(cam.position.clone().sub(target)); applyFurn();
   if (typeof exploded !== 'undefined' && exploded && !v.ortho) {      // frame the whole lifted stack, the roof covers included; the house goes see-through
     explodeCtx(true);
     const lift = Math.max(0, explodedTop() - zt);

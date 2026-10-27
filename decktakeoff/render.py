@@ -35,9 +35,11 @@ def three_source() -> Optional[str]:
 
 
 def render_stills(scene: Scene, out_dir: str, which: Optional[List[str]] = None, size: Tuple[int, int] = (1400, 900), quality: int = 82,
-                  extra: Optional[List[Tuple[str, dict]]] = None) -> Dict[str, str]:
+                  extra: Optional[List[Tuple[str, dict]]] = None, styling: bool = True) -> Dict[str, str]:
     """Returns {name: path}. Skips stills that already exist. Needs playwright + three.min.js on disk (data/ or $THREE_MIN_JS).
-    extra: more (name, params) stills, e.g. a sun study [("sun-0900", {"view": "corner", "sun": "dx,dy,dz"}), ...]."""
+    extra: more (name, params) stills, e.g. a sun study [("sun-0900", {"view": "corner", "sun": "dx,dy,dz"}), ...].
+    styling=False leaves the styling furniture (geometry.furniture) out of every still; the technical stills (build steps,
+    exploded, plan, under) never show it."""
     from playwright.sync_api import sync_playwright
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     src = three_source()
@@ -56,7 +58,7 @@ def render_stills(scene: Scene, out_dir: str, which: Optional[List[str]] = None,
             target = out / f"{name}.jpg"
             if target.exists():
                 done[name] = str(target); continue
-            qs = "&".join(f"{k}={v}" for k, v in dict(params, still="1").items())
+            qs = "&".join(f"{k}={v}" for k, v in dict(params, still="1", **({} if styling else {"furn": "0"})).items())
             pg.goto(f"file://{page_path}?{qs}")
             pg.wait_for_function("window.__ready === true", timeout=60000)
             pg.wait_for_timeout(150)

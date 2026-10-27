@@ -20,7 +20,7 @@ IN = 1 / 12.0
 
 @dataclass
 class Box:
-    kind: str          # house | wall | privacy | ground | gravel | footing | base | post | stone | cap | beam | ledger | joist | rim | block | doubler | board | border | fascia | railpost | toprail | cable | baluster | botrail | drink | tub | stringer | tread | brace
+    kind: str          # house | wall | privacy | ground | gravel | footing | base | post | stone | cap | beam | ledger | joist | rim | block | doubler | board | border | fascia | railpost | toprail | cable | baluster | botrail | drink | tub | stringer | tread | brace | furn (styling furniture, layer "styling")
     x0: float; x1: float; y0: float; y1: float; z0: float; z1: float
     mat: str
     phase: int = 0
@@ -2020,7 +2020,7 @@ FURNITURE = {   # type -> the defaults (inches) the model is built from; a piece
                  arm_top_in=24.5, arms=["left", "right"], frame="teak", cushion="Pacific Fog Gray"),
     "lounge_chair": dict(model="Teak Outdoor Armchair", w_in=28.0, d_in=34.4, height_in=29.0, seat_in=16.0, leg_in=9.2, arm_in=3.0,
                          arm_top_in=24.5, frame="teak", cushion="Pacific Fog Gray"),
-    "coffee_table": dict(model="Teak Outdoor Coffee Table - Square Leg", l_in=50.0, w_in=26.0, h_in=14.0, slats=5, frame="teak"),
+    "coffee_table": dict(model="Teak Outdoor Coffee Table - Square Leg", l_in=50.0, w_in=26.0, h_in=14.0, slats=5, frame="teak"),   # Medium; Large 58"
     "side_table": dict(model="Teak Outdoor Side Table", l_in=25.5, w_in=18.5, h_in=22.5, slats=4, frame="teak"),
     "dining_table": dict(model="Teak + Aluminum Extendable Dining Table", l_in=87.6, w_in=41.7, h_in=30.0, slats=8, frame="charcoal", top="teak"),
     "dining_chair": dict(model="595 Dining Armless Chair", w_in=21.7, d_in=22.0, height_in=34.4, seat_in=17.8, arms=False,

@@ -67,6 +67,14 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - Option 3 louvered roof (own document), roof-line mount, 8'-11" clear; **the gutter LED strip is in the $35,000** (owner:
   "I have that in the bid"); plus its own deck structure (above). Option 3a screens $15,000.
 
+## Styling
+- **Outer outdoor furniture** (owner 27 Oct: "style with furniture and make it all outer.com outdoor furniture"), styling only — never
+  priced, never in the drawings: teak frames with Pacific Fog Gray cushions. Lower level B: Teak L Sectional 4-Seat, Teak Coffee
+  Table, 2 Teak Armchairs. Upper C: Teak + Aluminum Extendable Dining Table with 595 dining chairs (4 armless + 2 arm). Upper D:
+  2 Teak Armchairs + Teak Side Table.
+- **Exterior color study** is a separate document (not the main proposal): dark gray / charcoal / black; recommended charcoal
+  (SW Iron Ore body + brick, Tricorn Black trim) with a TimberTech Vintage Mahogany deck.
+
 ## Renders
 - Photoreal: the TimberTech skill's wire-brushed Vintage texture + greyscale relief maps; English Walnut from TimberTech's swatch;
   June 21 10:30 hero, summer foliage.

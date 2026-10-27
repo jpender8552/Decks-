@@ -7,6 +7,7 @@ Run with a Python that has bpy (Blender as a module):
     python -m decktakeoff.cycles JOB.json OUT_DIR [view ...] [--samples 160] [--size 1400x900] [--quick]
         [--cameras=STATIONS.json] [--when=YYYY-MM-DDTHH:MM] [--dusk] [--dusk-when=...] [--dusk-exposure=3] [--led=1] [--glow=1]
         [--foliage=summer]   (the deciduous canopy and shrubs in summer greens when the yard model carries autumn colours)
+        [--styling=0]        (leave out the styling furniture, geometry.furniture: it is drawn by default, never priced)
 --when puts the sun at another local time than spec.site.sun_when; --dusk renders the blue hour of that date (sun -5 deg, or
 --dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" colour), real
 fixture lights and the rooms behind the windows lit. A station with "mode": "dusk" renders at dusk without the flag.
@@ -574,6 +575,34 @@ class Mats:
                 bsdf.inputs["Roughness"].default_value = 0.95
             elif key == "dftimber" or md.get("rough_sawn"):
                 self._rough_sawn(nt, bsdf, col)
+            elif key.startswith("furn_teak"):
+                # styling furniture, new teak: a fine straight grain at furniture scale (the boxes' UVs are 1 ft tiles), a satin oil
+                wv = nt.nodes.new("ShaderNodeTexWave"); wv.wave_type = "BANDS"; wv.inputs["Scale"].default_value = 9.0
+                wv.inputs["Distortion"].default_value = 4.0; wv.inputs["Detail"].default_value = 4.0
+                mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (0.2, 3.0, 1.0)
+                tc = nt.nodes.new("ShaderNodeTexCoord"); nt.links.new(tc.outputs["UV"], mp.inputs[0]); nt.links.new(mp.outputs[0], wv.inputs["Vector"])
+                ramp = nt.nodes.new("ShaderNodeValToRGB")
+                ramp.color_ramp.elements[0].color = tuple(c * 0.78 for c in col) + (1,)
+                ramp.color_ramp.elements[1].color = tuple(min(1, c * 1.12) for c in col) + (1,)
+                nt.links.new(wv.outputs["Fac"], ramp.inputs[0])
+                self._tint(nt, ramp.outputs[0], bsdf)
+                self._bump(nt, bsdf, wv.outputs["Fac"], 0.05, 0.002)
+                bsdf.inputs["Roughness"].default_value = 0.5
+                bsdf.inputs["Coat Weight"].default_value = 0.08
+            elif key.startswith(("furn_cushion", "furn_canopy")):
+                # styling furniture: solution-dyed olefin / acrylic: a matte weave with a soft sheen at grazing light
+                self._tint(nt, rgb.outputs[0], bsdf)
+                tc = nt.nodes.new("ShaderNodeTexCoord")          # object space (feet): the weave the same size on every piece
+                nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 40.0; nz.inputs["Detail"].default_value = 2.0
+                nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+                self._bump(nt, bsdf, nz.outputs["Fac"], 0.12, 0.002)
+                bsdf.inputs["Roughness"].default_value = 0.92
+                bsdf.inputs["Specular IOR Level"].default_value = 0.3
+                try:
+                    bsdf.inputs["Sheen Weight"].default_value = 0.45
+                    bsdf.inputs["Sheen Roughness"].default_value = 0.5
+                except KeyError:
+                    pass
             elif md.get("grain"):
                 # wood without a TimberTech texture (framing lumber, cedar fence): a wave-grain procedural
                 wv = nt.nodes.new("ShaderNodeTexWave"); wv.wave_type = "BANDS"; wv.inputs["Scale"].default_value = 2.5
@@ -909,6 +938,8 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
     else:
         sc = build_scene(build_layout(spec))
     D = sc.to_dict()
+    if not STYLING:                         # --styling=0: the deck without the styling furniture
+        D["boxes"] = [b for b in D["boxes"] if (b.get("layer") or "") != "styling"]
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scn = bpy.context.scene
     col = scn.collection
@@ -947,7 +978,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
                 add_box(G(f"{mk}#{k}"), b, "board", u_off=u_off, tint=(t, t, t, 1))
             continue
         pat = md.get("pattern")
-        tile = TILE.get(pat, 8.0)
+        tile = 1.0 if mk.startswith("furn_") else TILE.get(pat, 8.0)      # styling furniture: its grain / weave at furniture scale
         tint = (1, 1, 1, 1)
         if mk.startswith("wblock") or mk == "cedar":
             v = float(rng.uniform(0.93, 1.06)); tint = (v, v * float(rng.uniform(0.98, 1.02)), v * float(rng.uniform(0.97, 1.01)), 1)
@@ -1032,6 +1063,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
 
 # ====================================================================== trees and shrubs (decktakeoff.vegetation)
 TREES3D = True       # build the yard model's trees from their entries (vegetation.py) instead of landscape.py's spheres / cones
+STYLING = True       # the styling furniture (geometry.furniture, scene layer "styling"); --styling=0 renders the deck without it
 PLANT_KEEPOUT: List[Tuple[float, float, float]] = []   # extra camera stations (--cameras) the plants keep 3 ft clear of
 PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colours)
     "maple": ("#4c6827", "#718d38"), "cottonwood": ("#587b2c", "#86a244"), "broadleaf": ("#55702f", "#7c923c"),
@@ -1997,6 +2029,8 @@ def main(argv):
         globals()["CLOUDS"] = float(opts["--clouds"])
     if str(opts.get("--trees", "")).lower() in ("blobs", "landscape", "off"):    # --trees=blobs: landscape.py's crowns as before
         globals()["TREES3D"] = False
+    if str(opts.get("--styling", "1")).lower() in ("0", "off", "no", "false"):  # --styling=0: no styling furniture (a permit view)
+        globals()["STYLING"] = False
     if opts.get("--cameras"):               # the stations, before the build: no branch within 3 ft of a lens
         try:
             cj0 = json.load(open(opts["--cameras"]))

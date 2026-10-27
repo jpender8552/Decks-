@@ -47,7 +47,10 @@ something changes.
 
 URL parameters (also how the QA stills are taken): opts=stairs,lights|all|none, date=YYYY-MM-DD|summer|equinox|winter,
 t=HH:MM (local clock), louver=<deg>, screens=<0-100>|front:100,left:0, view=<key>, cam=x,y,z&at=x,y,z[&fov=] (plan feet),
-trees=0, ui=0 (no panel), still=1, smap=<shadow map px>."""
+trees=0, furn=0 (no styling furniture), ui=0 (no panel), still=1, smap=<shadow map px>.
+
+Styling furniture (geometry.furniture, scene layer "styling"): drawn like any box, in every combination; the Furniture
+chip (beside Trees) hides it. It is never priced: the page shows it, the takeoff and the price never read it."""
 from __future__ import annotations
 
 import copy
@@ -67,7 +70,7 @@ MAX_COMBOS = 32                                         # a box's mask is one 32
 LED_KEYS = ("led_riser", "led_cap")
 LIVE_KINDS = {"lvblade", "lvscreen"}                     # drawn live by the page (the blades turn, the screens run)
 NO_CAST_KINDS = {"ground", "gravel", "concrete_slab", "concrete_joint", "water", "lawn", "mulch", "soil", "groundcover"}
-ROLE_NOCAST, ROLE_GLASS, ROLE_LED, ROLE_LANTERN, ROLE_DOUBLE, ROLE_TREE = 1, 2, 4, 8, 16, 32
+ROLE_NOCAST, ROLE_GLASS, ROLE_LED, ROLE_LANTERN, ROLE_DOUBLE, ROLE_TREE, ROLE_FURN = 1, 2, 4, 8, 16, 32, 64
 SHAPES = {"box": 0, "cyl": 1, "sphere": 2, "cone": 3, "mesh": 4}
 AXES = {"y": 0, "x": 1, "z": 2}
 GLASS_MATS = {"hglass", "glass", "nglass"}
@@ -167,6 +170,8 @@ def _role(b, mats: dict) -> int:
         r |= ROLE_DOUBLE
     if b.kind == "tree":                 # the yard's trees: the page can hide them (the Trees chip) and fades them near the camera
         r |= ROLE_TREE
+    if (getattr(b, "layer", "") or "") == "styling":     # styling furniture (geometry.furniture): the Furniture chip hides it
+        r |= ROLE_FURN
     return r
 
 
@@ -845,7 +850,7 @@ function comboOf(on) { var c = 0; OPT.forEach(function (o) { if (on[o.key]) c |=
 function shows(mask, c) { var i = CI[c]; return i != null && ((mask >>> i) & 1) === 1; }
 
 // ------------------------------------------------------------------ state (+ URL)
-var S = { on: {}, date: SITE.date, min: SITE.minutes, view: D.views[0].key, louver: 0, louverGoal: null, scr: {}, scrGoal: {}, sel: {}, playing: false, trees: Q.get('trees') !== '0' };
+var S = { on: {}, date: SITE.date, min: SITE.minutes, view: D.views[0].key, louver: 0, louverGoal: null, scr: {}, scrGoal: {}, sel: {}, playing: false, trees: Q.get('trees') !== '0', furn: Q.get('furn') !== '0' };
 (D.default_on || []).forEach(function (k) { S.on[k] = true; });
 var qo = Q.get('opts');
 if (qo !== null) { S.on = {}; if (qo === 'all') OPT.forEach(function (o) { if (!(o.excludes || []).some(function (x) { return S.on[x]; })) S.on[o.key] = true; });
@@ -1077,10 +1082,10 @@ function matFor(key, side, opts2) {
 // ------------------------------------------------------------------ geometry: boxes merged by material x option mask
 var GROUPS = {};
 function grp(matKey, mask, role) {
-  var dbl = (role & 16) ? 'd' : 'f', variant = (role & 2) ? 'glass' : ((role & 32) ? 'tree' : ''), cast = (role & 1) ? 0 : 1;
-  var k = matKey + '|' + mask + '|' + dbl + '|' + variant + '|' + cast;
+  var dbl = (role & 16) ? 'd' : 'f', variant = (role & 2) ? 'glass' : ((role & 32) ? 'tree' : ''), cast = (role & 1) ? 0 : 1, furn = (role & 64) ? 1 : 0;
+  var k = matKey + '|' + mask + '|' + dbl + '|' + variant + '|' + cast + '|' + furn;
   var g = GROUPS[k];
-  if (!g) g = GROUPS[k] = { mat: matKey, mask: mask, side: dbl, variant: variant, cast: cast, P: [], N: [], U: [], C: [] };
+  if (!g) g = GROUPS[k] = { mat: matKey, mask: mask, side: dbl, variant: variant, cast: cast, furn: furn, P: [], N: [], U: [], C: [] };
   return g;
 }
 var _v = new THREE.Vector3(), _n = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _m3 = new THREE.Matrix3();
@@ -1167,6 +1172,7 @@ Object.keys(GROUPS).forEach(function (k) {
   geo.computeBoundingSphere();
   var mesh = new THREE.Mesh(geo, matFor(g.mat, g.side, g.variant));
   mesh.castShadow = !!g.cast && !mesh.material.transparent; mesh.receiveShadow = true; mesh.userData.mask = g.mask; mesh.userData.tree = g.variant === 'tree';
+  mesh.userData.furn = !!g.furn;
   if (mesh.material.transparent) mesh.renderOrder = 2;
   scene.add(mesh); GMESH.push(mesh);
   g.P = g.N = g.U = g.C = null;
@@ -1394,7 +1400,7 @@ function applyGlow() {
 function applyOptions() {
   fixRequires();
   var c = comboOf(S.on);
-  GMESH.forEach(function (m) { m.visible = shows(m.userData.mask, c) && (S.trees || !m.userData.tree); });
+  GMESH.forEach(function (m) { m.visible = shows(m.userData.mask, c) && (S.trees || !m.userData.tree) && (S.furn || !m.userData.furn); });
   BLADES.forEach(function (B) { B.mesh.visible = shows(B.roof.mask, c); });
   SCR.forEach(function (o) { o.vis = shows(o.s.mask, c); placeScreen(o, S.scr[o.s.id]); });
   for (var i = 0; i < FXN; i++) {
@@ -1549,6 +1555,11 @@ var HAS_TREES = GMESH.some(function (m) { return m.userData.tree; });
 if (HAS_TREES) [vwrap, vbar].forEach(function (host, hi) {
   var b = el('button', { type: 'button', class: 'btn trees', id: hi ? 'vb-trees' : 'trees', 'aria-pressed': 'true' }, 'Trees');
   b.addEventListener('click', function () { S.trees = !S.trees; applyOptions(); writeURL(); }); host.appendChild(b); });
+var HAS_FURN = GMESH.some(function (m) { return m.userData.furn; });     // styling furniture: shown by default, never priced
+if (HAS_FURN) [vwrap, vbar].forEach(function (host, hi) {
+  var b = el('button', { type: 'button', class: 'btn furn', id: hi ? 'vb-furn' : 'furn', 'aria-pressed': 'true',
+    title: 'Styling only: the outdoor furniture is shown for scale and is not part of the price' }, 'Furniture');
+  b.addEventListener('click', function () { S.furn = !S.furn; applyOptions(); writeURL(); }); host.appendChild(b); });
 var panel = $('panel'), fold = $('fold');
 fold.addEventListener('click', function () { var f = panel.classList.toggle('folded'); fold.setAttribute('aria-expanded', f ? 'false' : 'true');
   fold.setAttribute('aria-label', f ? 'Show the controls' : 'Hide the controls'); $('foldlab').textContent = f ? 'Show controls' : 'Hide controls';
@@ -1579,6 +1590,7 @@ function syncUI() {
   SIDES.forEach(function (sd) { var b = $('side-' + sd); if (b) b.setAttribute('aria-pressed', S.sel[sd] ? 'true' : 'false'); });
   document.querySelectorAll('[data-view]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-view') === S.view); });
   document.querySelectorAll('.btn.trees').forEach(function (b) { b.setAttribute('aria-pressed', S.trees ? 'true' : 'false'); b.classList.toggle('on', S.trees); });
+  document.querySelectorAll('.btn.furn').forEach(function (b) { b.setAttribute('aria-pressed', S.furn ? 'true' : 'false'); b.classList.toggle('on', S.furn); });
   $('state').textContent = onLabel() + ' · ' + dateLabel(S.date) + ', ' + clock(S.min) + ' · ' + sunWords(s);
 }
 var urlTimer = null;
@@ -1592,6 +1604,7 @@ function writeURL() {
     p.set('date', S.date); p.set('t', Math.floor(S.min / 60) + ':' + ('0' + Math.round(S.min % 60)).slice(-2));
     if (ROOF) p.set('louver', Math.round(S.louver)); p.set('view', S.view);
     if (!S.trees) p.set('trees', '0'); else p.delete('trees');
+    if (!S.furn) p.set('furn', '0'); else p.delete('furn');
     history.replaceState(null, '', location.pathname + '?' + p.toString() + location.hash);
   } catch (e) { /* a sandboxed frame: the state stays in the page */ }
 }
