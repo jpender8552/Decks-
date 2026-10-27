@@ -425,7 +425,9 @@ def _added_facts(t0, t1) -> list:
     if l1["riser"] > l0["riser"]:
         rows.append(("Riser lights", f"{l1['riser'] - l0['riser']} LED lights, one in every riser"))
     if l1["post_cap"] > l0["post_cap"]:
-        rows.append(("Post-cap lights", f"{l1['post_cap'] - l0['post_cap']} LED post-cap lights, one on every rail post"))
+        from .report import post_light_terms
+        _pl, _pw = post_light_terms(t1)          # cap lights, or accent lights below an over-the-post drink rail
+        rows.append((_pl[0].upper() + _pl[1:], f"{l1['post_cap'] - l0['post_cap']} LED {_pl}, {_pw}"))
     if l1["other"] > l0["other"]:
         rows.append(("Lights", f"{l1['other'] - l0['other']} more LED lights"))
     plan = getattr(t1, "lighting", None)
@@ -539,8 +541,10 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
                 if not note and t2 is not None:
                     la, lb, lo, l0 = lights_of(ta), lights_of(tb), lights_of(t2), lights_of(t)
                     xr, xp = (la["riser"] - lb["riser"]) - (lo["riser"] - l0["riser"]), (la["post_cap"] - lb["post_cap"]) - (lo["post_cap"] - l0["post_cap"])
+                    from .report import post_light_terms
+                    _pl = post_light_terms(ta)[0]
                     note = " and ".join(x for x in ((f"{xr} more riser light{'s' if xr != 1 else ''}" if xr > 0 else ""),
-                                                     (f"{xp} more post-cap light{'s' if xp != 1 else ''}" if xp > 0 else "")) if x)
+                                                     (f"{xp} more {_pl if xp != 1 else _pl[:-1]}" if xp > 0 else "")) if x)
             elif a.get("price") is not None:     # a set price
                 ca, fa, ma = fixed_terms(spec, a["price"])
             elif a.get("screens") and o.get("roof") is not None:     # the roof's screens: the louvered engine's price for them

@@ -328,8 +328,7 @@ class Layout:
 
     @property
     def stair_support_posts(self) -> int:
-        return (sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support)
-                + sum(getattr(st, "notch_posts", 0) for st in self.stairs))     # an inset stair's notch posts stand on footings too
+        return sum(2 * max(1, len(st.carrier_flights)) * max(1, len(st.carrier_fracs)) for st in self.stairs if st.mid_support)
 
     @property
     def n_footings(self) -> int:
@@ -1417,9 +1416,11 @@ def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
         for i in range(n_iv + 1):
             p = 1.75 + (L_ - 3.5) * i / n_iv
             px, py = e.x0 + ux * p - nx * 0.75, e.y0 + uy * p - ny * 0.75
-            if any(abs(px - qx) < pb / 2 + 2.5 and abs(py - qy) < pb / 2 + 2.5 for qx, qy in posts):
-                continue
-            zb = floor_z(p) + (0.5 if cheek is not None else SKIRT_GAP_BOTTOM + 0.25)
+            if any(abs(px - qx) < actual(NOTCH_POST)[1] / 2 + 2.0 and abs(py - qy) < actual(NOTCH_POST)[1] / 2 + 2.0 for qx, qy in posts):
+                continue                    # the notch post backs the panels there
+            # on the step face a stud runs down past the lower level's surface and laps its rim (2 structural screws); on a
+            # cheek it hangs from the header and stops 1/2" over the tread
+            zb = floor_z(p) + 0.5 if cheek is not None else -(drop + bt + jd)
             if rim_bot - zb >= 4.0:
                 sf.studs.append((round(p, 2), round(zb, 2)))
         if sf.studs:
