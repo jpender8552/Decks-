@@ -9,16 +9,16 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - Proposal meeting: **Thu 29 Oct 2026, 4–5 pm Mountain** (Google Meet). Client documents final Wed 28 Oct evening.
 
 ## Pricing (the owner's own numbers — never estimate around them)
+- **Margin: 40% on everything except the louvered roof and screens** (owner 27 Oct, latest). The rail, the stairs, the landings
+  and the lights all price at their real cost / 0.6 — the fixed-rate rules (IRX $120/LF, $682/riser, landing $140/SF, $200 a
+  light) are NOT used on this job (`extras.rail_sell_per_lf` 0, `extras.stair_rule` false, no `lights.sell_each`).
+- **At cost, outside the 40%:** dumpster + portable toilet **$800**; **engineering** and **permit / plan review** billed at cost.
 - Labor: the GSX card only (`GSX_Subcontractor_Labor_Rates` rev 14 Jul 2026). No day rates, hours or per-diem.
-  Demo $2/SF (no column-demo line, no skirting line). Caisson $150/hole + large-footing (20"+) $150.
-- Slab openings for the upper caissons: **$200 each** (`extras.labor_extras`, marked up like the card).
-- General conditions: **Dumpster + portable toilet $800**. Permit + plan review: **always billed at cost**, outside the price.
-- Rail: IRX $120/LF (pricebook rule).
-- Stairs: **$682 per riser (Vintage), railing included** (Pricing Sheet To Fit GS). A stair is stringers, treads, risers,
-  fascia, railing and some blocking with joist tape — no mid-run carrier, no pad. A **landing is priced on its own: $140/SF**
-  (the deck is $110/SF), its level guard $120/LF (`extras.stair_rule`). Labor **$150 a riser, railing included** (no
-  separate guard / stair-rail labor).
-- Lights: $200 each installed, margin included.
+  Demo $2/SF (no column-demo line, no skirting line). Caisson $150/hole + large-footing (20"+) $150. Stairs $150 a riser,
+  railing included.
+- Slab openings for the upper caissons: **$200 each** (`extras.labor_extras`).
+- A stair is stringers, treads, risers, fascia, railing and some blocking with joist tape — no mid-run carrier, no pad.
+  A landing is its own scope (frame, decking, posts, caissons, guard).
 - Louvered roof: **$175/SF → $35,000** (Suncoast, black, 20' x 10'). **Screens are not in the $175/SF: $15,000** (front + right end).
 
 ## Structure
