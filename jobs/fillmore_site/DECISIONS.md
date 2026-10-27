@@ -64,7 +64,8 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
   the add-on under each stair option. 40% margin; no per-light sell price in client text; $25 a fixture is the install labor.
 - Option 2 stairs to the yard: **show both** — 2 = the owner's horseshoe (7 + 3 risers, 9' x 4' landing), 2B = along the deck
   (1 + 9 risers, rail on the yard side only — the flight runs along the deck face). One or the other. **No mid-run
-  carrier** (stair `mid_support` false); the stair foot is on grade (no pad).
+  carrier** (stair `mid_support` false); the horseshoe's foot is on grade (no pad); 2B's foot is on a pad flush with the patio (below).
+  - 2B's foot (27 Oct, lead): since the flight turned the other way (owner) it comes down at the patio's front edge, the back 9" of its width over the slab. It lands on a 4" concrete pad poured flush with the slab (rise 65.8" to the slab top, 10 risers @ 6.58") — never half on the slab, half on the lawn (a 4.8" uneven bottom riser).
 - Option 3 louvered roof (own document), roof-line mount, 8'-11" clear; **the gutter LED strip is in the $35,000** (owner:
   "I have that in the bid"); plus its own deck structure (above). Option 3a screens $15,000.
 
