@@ -1,5 +1,5 @@
 {
-  "_source": "Pender Consulting Group (PCG) identity, harvested read-only from Jade Pender's Gmail and Drive, 27 Oct 2026. Legal name and city: the 'Prepared by' block of a PCG-prepared deck takeoff (.docx, May 2026, sent from jpender8552@gmail.com; Rev. 1 reads 'Pender Consulting Group LLC, Greenwood Village, CO'; the file's author property is also 'Pender Consulting Group LLC'). Phone and email: Jade's contact line on the title block of his July 2026 build sets ('Jade Pender · 303-550-9558 · jpender8552@gmail.com', sets marked PCG/GSX). No street address, website, contractor or professional license number, logo or brand palette was found, so none is given here. logo.svg / logo-ink.svg are a PLACEHOLDER typographic mark (PCG over PENDER CONSULTING GROUP, Inter outlined to paths), not an approved logo: swap both files when PCG has a real one. colors: the two blues on that PCG takeoff (table header fill #1F4E79, headings #2E75B6), Word's default blues rather than a designed palette.",
+  "_source": "Pender Consulting Group (PCG) identity, harvested read-only from Jade Pender's Gmail and Drive, 27 Oct 2026. Legal name and city: the 'Prepared by' block of a PCG-prepared deck takeoff (.docx, May 2026, sent from Jade's personal address; Rev. 1 reads 'Pender Consulting Group LLC, Greenwood Village, CO'; the file's author property is also 'Pender Consulting Group LLC'). Phone and email: Jade's contact line on the title block of his July 2026 build sets ('Jade Pender · 303-550-9558 · <email>', sets marked PCG/GSX). No street address, website, contractor or professional license number, logo or brand palette was found, so none is given here. logo.svg / logo-ink.svg are a PLACEHOLDER typographic mark (PCG over PENDER CONSULTING GROUP, Inter outlined to paths), not an approved logo: swap both files when PCG has a real one. colors: the two blues on that PCG takeoff (table header fill #1F4E79, headings #2E75B6), Word's default blues rather than a designed palette.",
   "name": "Pender Consulting Group",
   "legal_name": "Pender Consulting Group LLC",
   "short": "PCG",
@@ -10,11 +10,14 @@
   "logo_ink": "logo-ink.svg",
   "logo_placeholder": true,
   "logo_px": 72,
-  "colors": {"accent_a": "#1F4E79", "accent_b": "#2E75B6"},
+  "colors": {
+    "accent_a": "#1F4E79",
+    "accent_b": "#2E75B6"
+  },
   "lines": [
     "Pender Consulting Group LLC",
     "Greenwood Village, CO",
-    "Jade Pender · 303-550-9558",
-    "jpender8552@gmail.com"
-  ]
+    "Jade Pender · 303-550-9558"
+  ],
+  "private_lines_file": "the build adds the contact email from a private override kept out of this public repo (scratchpad messner/brand/private.json)"
 }
