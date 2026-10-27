@@ -14033,6 +14033,12 @@
     "topic": "post bases",
     "text": "8x8 DF rough on Simpson ABU88RZ, set after the caisson cures (owner 27 Oct: \"We don't wet set. ABU is meant to be placed once cured\"): (2) ⅝\" x 6\" Titen HD (THD62600H) drilled through the base into the cured concrete, projection < 1\"; the engineer confirms the anchors' embedment and edge distance.",
     "ref": "footings.md §10 (caissons, 27 Oct)"
+   },
+   {
+    "severity": "CHECK",
+    "topic": "footings",
+    "text": "Options 2B and 3 both sold (owner 27 Oct: \"pour the two together\"): the roof version's U1-1 30\" caisson sits under the back corner of 2B's foot. Pour 2B's landing pad and that caisson together, one placement, the pad's top flush with the caisson top and the slab; the 2B stringers bear on it.",
+    "ref": "owner 27 Oct"
    }
   ],
   "timeline": "jobs/fillmore_site/schedule.json#Base",
