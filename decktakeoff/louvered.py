@@ -964,7 +964,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
         o.append(LN(X(ax_), Y(ay_), X(bx_), Y(by_), "#5b6e8c", 2.0, "2 2"))
         side_ = sc["plane"] == "x"
         right_ = side_ and ax_ > (x0 + x1) / 2
-        o.append(TH(X((ax_ + bx_) / 2) + ((-4 if right_ else 4) if side_ else 0), (Y(ay_ + (by_ - ay_) * 0.22) if side_ else Y(ay_) - 4),
+        o.append(TH((X((ax_ + bx_) / 2) + (-4 if right_ else 4)) if side_ else X(ax_ + (bx_ - ax_) * 0.78), (Y(ay_ + (by_ - ay_) * 0.22) if side_ else Y(ay_) - 4),
                     f"{sc['side']} screen (option)", 6.0, 800, ("end" if right_ else "start") if side_ else "middle", "#3d4f6b", halo="#fff"))
     for zi, c in enumerate(q["zones"]):
         cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
@@ -973,7 +973,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     o.append(TH(X(x0) + 8, Y(y0 + w) + 11, ((f"house-side {q['frame_label']} beam on stand-offs on the roof @ {BRACKET_OC_FT * 12:g}\" OC (roof-line mount) — no posts at the house"
                                               if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house")
                                              if q["attach"] == "house" else f"rear {q['frame_label']} beam"), 6.6, 700, halo="#fff"))
-    o.append(TH(X(x0) + 8, Y(y1 - wf) - 6, f"front {q['beam_label']} beam on the 2 posts · {q['frame_label']} sides" + (" and divider" if q["xs"] else "") + " · gutter + LED strip all round", 6.6, 700, halo="#fff"))
+    o.append(TH(X(x0) + 8, Y(y1 - wf) - 6, f"front {q['beam_label']} beam · {q['frame_label']} sides" + (" + divider" if q["xs"] else "") + " · gutter + LED all round", 6.6, 700, halo="#fff"))
     # dimensions: zones in the house band, the frame and post spans below, the depth at the right
     if len(q["zones"]) > 1 and q["louver_dir"] == "y":
         edges_ = [x0] + list(q["xs"]) + [x1]
@@ -1055,18 +1055,18 @@ def sheet(L, S, t, meta) -> Optional[str]:
     dim_v(o, Zs, xr, zd, zb, f"{ftin((zb - zd) * 12)} clear", 7, left=False)
     dim_v(o, Zs, xr, zb, zt, f"{h * 12:g}\"", 6.2, left=False)
     dim_v(o, Zs, xr + 22, zd, zt, f"{ftin((zt - zd) * 12)} deck to top", 7, left=False)
-    dim_h(o, Xs, Zs(zt + 1.75), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
+    dim_h(o, Xs, Zs(zt + 1.05), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
     o.append(T(Xs(y1) + 8, Zs(zt) + 9, f"TOP OF FRAME {ftin(zt * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) - 4, f"DECK {ftin(zd * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) + 6, "above the patio" if zd > 3 else "above grade", 6.0, 600, "start", MUTE))
-    _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.4), Zs(zt + 3.0), "existing eave, gutter and soffit (~7'-3\" above the deck) — field verify", 6.2)
+    _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.6), Zs(zt + 3.15), "existing eave + gutter, soffit ~7'-3\" over the deck: field verify", 6.2)
     if q["attach"] == "house":
         _lead(o, Xs(y0 + wb / 2), Zs(zbb - 0.12), Xs(y0 + 1.2), Zs(zb - 1.1),
               (f"house-side {q['frame_label']} beam on flashed stand-offs @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters over solid blocking (roof-line mount)"
                if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing"), 6.2)
     _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.9), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
-    _lead(o, Xs(py), Zs(zd + 2.6), Xs(y0 + 3.4), Zs(zd + 2.2), f"{p * 12:g}x{p * 12:g} aluminum post, {q['edge_clear'] * 12:g}\" inside the deck edge: the rail post, downspout inside", 6.2)
-    _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.0), "rail (cut) ends into the post on wall-mount brackets", 6.2)
+    _lead(o, Xs(py), Zs(zd + 3.6), Xs(y0 + 3.4), Zs(zd + 3.5), f"{p * 12:g}x{p * 12:g} aluminum post, {q['edge_clear'] * 12:g}\" inside the deck edge: the rail post, downspout inside", 6.2)
+    _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.3), "rail (cut) ends into the post on wall-mount brackets", 6.2)
     _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck post + pier directly under the roof post (framing plan)", 6.2)
 
     # ---------------------------------------------------------------- detail 1: the post on the deck edge
@@ -1124,12 +1124,12 @@ def sheet(L, S, t, meta) -> Optional[str]:
     o.append(R(SX(-pc_in - p_in / 2), SZ(zbase + 28.0), p_in * k_, 27.5 * k_, BLACK, INK, 0.6))
     o.append(LN(SX(-rp_in), SZ(zbase + 30.0), SX(-rp_in), SZ(zbase + 1.0), GOLD, 1.2, "4 2"))
     o.append(T(SX(-18), SZ(jd_in / 2) + 2, "solid blocking", 5.8, 800, "middle"))
-    for d_, lab_, z_ in ((q["edge_clear"] * 12, f"{q['edge_clear'] * 12:g}\"", -2.4), (rp_in, f"{ftin(rp_in)} rail line", -6.0)):
+    for d_, lab_, z_ in ((q["edge_clear"] * 12, f"{q['edge_clear'] * 12:g}\" post face", zbase + 31.0), (rp_in, f"{ftin(rp_in)} rail line", zbase + 34.5)):
         o.append(LN(SX(0), SZ(z_), SX(-d_), SZ(z_), INK, 0.6)); o.append(LN(SX(0), SZ(z_ + 1.0), SX(0), SZ(z_ - 1.0), INK, 0.6))
         o.append(LN(SX(-d_), SZ(z_ + 1.0), SX(-d_), SZ(z_ - 1.0), INK, 0.6))
         o.append(T(SX(-d_) - 3, SZ(z_) + 3, lab_, 5.8, 800, "end"))
-    _lead(o, SX(-rp_in), SZ(zbase + 24), SX(-29), SZ(zbase + 36), "the rail line (gold) runs into the post: the panels end on its faces", 5.8)
-    _lead(o, SX(-pc_in + pl_in / 2 - 0.9), SZ(zbase - 3.0), SX(-29), SZ(zbase + 25), "through-bolts into the blocking; tie-down to the post below", 5.8)
+    _lead(o, SX(-rp_in), SZ(zbase + 20), SX(-29), SZ(zbase + 25), "the rail line (gold) runs into the post: the panels end on its faces", 5.8)
+    _lead(o, SX(-pc_in + pl_in / 2 - 0.9), SZ(zbase - 3.0), SX(-29), SZ(zbase + 13), "through-bolts into the blocking; tie-down to the post below", 5.8)
 
     # ---------------------------------------------------------------- what it is
     _panel(o, 14, 346, 560, 260, "", "WHAT IT IS")
