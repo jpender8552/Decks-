@@ -105,6 +105,54 @@ def option_delta(base: "Pricing", other: "Pricing") -> Tuple[float, float, float
     return check, retail, _monthly(retail)
 
 
+def fixed_terms(spec, check: float) -> Tuple[float, float, float]:
+    """(check, financed, monthly) for a price the owner set outright — financed and monthly the way the deck's price gets them."""
+    check = round(float(check))
+    retail = round(check * (1 + spec.extras.retail_markup)) if spec.extras.retail_markup is not None else round(check / PRICEBOOK["retail_factor"])
+    return check, retail, _monthly(retail)
+
+
+@dataclass
+class AddonPrice:
+    """A separately sold item with its own document (the louvered roof): the owner's price per SF x its area, or a set price."""
+    name: str
+    sf: float
+    rate: float                  # $/SF of the item's area (0 when the price is set outright)
+    sell: float                  # check or ACH
+    retail: float                # financed
+    monthly: float
+    basis: str = ""              # how the price was set, for the internal pages ("200 SF x $175/SF")
+
+
+def roof_size_ft(roof: dict) -> Tuple[float, float]:
+    """(along the house, out from the house) in feet for a louvered roof dict — its x/y extents, else its width / depth keys."""
+    if all(k in roof for k in ("x0", "x1", "y0", "y1")):
+        return abs(float(roof["x1"]) - float(roof["x0"])), abs(float(roof["y1"]) - float(roof["y0"]))
+    w = roof.get("width_ft", roof.get("width", roof.get("length_ft")))
+    d = roof.get("depth_ft", roof.get("depth", roof.get("projection_ft")))
+    if w is None and roof.get("width_in"):
+        w = float(roof["width_in"]) / 12
+    if d is None and roof.get("depth_in"):
+        d = float(roof["depth_in"]) / 12
+    return float(w or 0), float(d or 0)
+
+
+def price_louvered(spec, roof: dict, name: str = "Louvered roof") -> AddonPrice:
+    """The louvered roof's own price: roof["price"] when the owner set it, else roof["price_per_sf"] x its area (roof["sf"], else
+    along x out). Sold on its own, outside the deck's price and margin; financed and monthly the way the deck's price gets them."""
+    w, d = roof_size_ft(roof)
+    sf = float(roof.get("sf") or round(w * d, 1))
+    rate = float(roof.get("price_per_sf") or 0.0)
+    if roof.get("price"):
+        sell, basis = float(roof["price"]), "owner-set price"
+    elif rate:
+        sell, basis = rate * sf, f"{sf:g} SF x ${rate:,.2f}/SF"
+    else:
+        raise ValueError("louvered roof has neither price nor price_per_sf")
+    c, f, m = fixed_terms(spec, sell)
+    return AddonPrice(roof.get("name") or name, sf, rate, c, f, m, basis)
+
+
 def builtin_sells(s) -> List[Tuple[str, str, int, float]]:
     """(category, label, sections, sell) for built-ins the owner prices per section (extras.builtin_sell)."""
     from .scene import bench_segments, planter_segments
@@ -369,7 +417,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if s.is_timber and s.framing.finish == "oil":
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
-        parts.append(((f"Drink rail — {s.railing.drink_rail_collection or ''} {s.railing.drink_rail_color or ''} board on top of the rail".replace("  ", " ") if hasattr(L, "parts") else   # two-level jobs read the board
+        parts.append(((f"Drink rail — {s.railing.drink_rail_collection or ''} {s.railing.drink_rail_color or ''}".replace("  ", " ").strip() if hasattr(L, "parts") else   # two-level jobs read the board
                        f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip()), round(comp(drink_m, labsum("Drink rail")))))
     if covers_of(s):
         cover_m = mats(lambda l: l.category == "Porch cover")

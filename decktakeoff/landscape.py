@@ -3,6 +3,12 @@ interpolated from spot grades), raised beds behind a segmental retaining wall, s
 borders, flagstones, trees, shrubs, cedar privacy fences on the lot lines and the neighbours' houses as massing. Box and
 mesh geometry only, so the WebGL viewer and the photoreal renderer draw the same yard.
 
+Opt-in pieces (a model without the key draws exactly as before): ground areas of their own material inside the graded
+extent (native grass on a creek bank, the creek) and polygon holes (the house); a bed drawn as a concrete slab (a level
+top, its exposed edge down to the lawn, sawcut joints) or as ground cover (low leafy mounds over the soil); split-rail
+fences with welded-wire mesh and spaced-picket fences, any fence in its own wood; pines; a deciduous crown in its own
+leaf materials; a neighbour house turned to its own axis, with a brick base.
+
 Frame: the deck's plan frame in feet (x along the rear wall from the deck's left end, y out into the yard, z up from the
 reference grade at the main stair; the deck top is the spec height)."""
 from __future__ import annotations
@@ -16,12 +22,64 @@ IN = 1 / 12.0
 DEFAULT_COLORS = dict(lawn="#6d8a3c", mulch="#4b3326", soil="#5d4a36", groundcover="#3f5a2c", block="#c99d86", block2="#d3b499",
                       block3="#ad9483", block4="#bea291", brick="#9b4b3b", brick2="#b0624c", flag="#c8a184", flag2="#b38f76",
                       cedar="#9b7a5c", bark="#5a4637", leaf="#93a03c", leaf2="#c2b043", spruce="#5d7f7b", spruce2="#6f9089",
-                      shrub="#8c3b2a", shrub2="#5f7537", rock="#a39b8f", well="#9ea3a6")
+                      shrub="#8c3b2a", shrub2="#5f7537", rock="#a39b8f", well="#9ea3a6",
+                      concrete="#b5b0a6", joint="#6f6a62", ivy="#35502a", ivy2="#4a6a34", pine="#4b6a33", pine2="#637f3c",
+                      rail="#7a6b5b", wire="#3c3d3a", picket="#4e3f33", cedar_old="#6e5a4b", meadow="#8b8a50", water="#4e5d55")
+
+# materials only a model that uses them gets (a model without them keeps exactly the material set it had)
+_EXTRA = dict(concrete_slab=("concrete", dict(rough=0.92, label="concrete patio slab")),
+              concrete_joint=("joint", dict(rough=0.95)),
+              ivy=("ivy", dict(rough=0.85, label="ground cover (vinca / ivy)")), ivy2=("ivy2", dict(rough=0.85)),
+              spruce_pine=("pine", dict(rough=0.9, label="pine")), spruce_pine2=("pine2", dict(rough=0.9)),
+              rail=("rail", dict(grain=True, rough=0.95, label="split-rail fence")),
+              wire=("wire", dict(metal=0.5, rough=0.55, label="welded-wire mesh")),
+              picket=("picket", dict(grain=True, rough=0.9, label="stained picket fence")),
+              cedar_old=("cedar_old", dict(grain=True, rough=0.95, label="weathered cedar privacy fence")),
+              meadow=("meadow", dict(pattern="grass", rough=1.0, label="native grass")),
+              water=("water", dict(rough=0.12, label="creek")))
+
+
+def _used_keys(model: dict) -> set:
+    """Every material key the model names, and the ones its pieces draw with by default."""
+    keys = set()
+    def walk(v):
+        if isinstance(v, str):
+            keys.add(v)
+        elif isinstance(v, dict):
+            for w in v.values():
+                walk(w)
+        elif isinstance(v, (list, tuple)):
+            for w in v:
+                walk(w)
+    walk({k: v for k, v in model.items() if k not in ("cameras", "colors")})
+    for b in model.get("beds", []):
+        if b.get("joints"):
+            keys.add("concrete_joint")
+        if b.get("edge") is not None and "mat" not in b:
+            keys.add("concrete_slab")
+        if b.get("mounds") is not None:
+            keys.update((b.get("mounds") or {}).get("mats", ["ivy", "ivy2"]))
+    for f in model.get("fences", []):
+        st = f.get("style", "privacy")
+        if st == "split_rail":
+            keys.add(f.get("mat", "rail"))
+            if f.get("mesh"):
+                keys.add((f.get("mesh") or {}).get("mat", "wire") if isinstance(f.get("mesh"), dict) else "wire")
+        elif st == "picket":
+            keys.add(f.get("mat", "picket"))
+    for t in model.get("trees", []):
+        if t.get("type") == "pine":
+            keys.update(t.get("mats", ["spruce_pine", "spruce_pine2"]))
+    for a in model.get("grade", {}).get("areas", []):
+        keys.add(a.get("mat", "meadow"))
+    return keys
 
 
 def materials(model: dict) -> Dict[str, dict]:
     c = dict(DEFAULT_COLORS, **(model.get("colors") or {}))
-    return dict(
+    used = _used_keys(model)
+    extra = {k: dict(color=c[ck], **o) for k, (ck, o) in _EXTRA.items() if k in used}
+    return dict(extra, **dict(
         lawn=dict(color=c["lawn"], pattern="grass", rough=1.0, label="lawn"),
         mulch=dict(color=c["mulch"], pattern="gravel", rough=1.0, label="shredded bark mulch"),
         groundcover=dict(color=c["groundcover"], pattern="grass", rough=1.0, label="ground cover"),

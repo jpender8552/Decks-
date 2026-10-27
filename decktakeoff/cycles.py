@@ -5,9 +5,13 @@ the light is a physical sky with the sun where it really is for the site, date a
 
 Run with a Python that has bpy (Blender as a module):
     python -m decktakeoff.cycles JOB.json OUT_DIR [view ...] [--samples 160] [--size 1400x900] [--quick]
+        [--cameras=STATIONS.json] [--when=YYYY-MM-DDTHH:MM] [--dusk] [--dusk-when=...] [--dusk-exposure=3] [--led=1] [--glow=1]
+--when puts the sun at another local time than spec.site.sun_when; --dusk renders the blue hour of that date (sun -5 deg, or
+--dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" colour), real
+fixture lights and the rooms behind the windows lit. A station with "mode": "dusk" renders at dusk without the flag.
 
 Frames: the scene's plan feet (x along the wall, y into the yard, z up) map to Blender (x, -y, z); 1 Blender unit = 1 ft.
-Views are the job's camera stations (geometry.site_model.cameras) or the viewer's generic ones."""
+Views are the job's camera stations (geometry.site_model.cameras, then --cameras) or the viewer's generic ones."""
 from __future__ import annotations
 
 import hashlib
@@ -1054,8 +1058,8 @@ def _box_frame(b):
 def add_fixture_lights(D, col) -> int:
     """Real lights at the LED fixtures so the risers throw light on the treads and the post caps on the posts, rails and
     deck (an emissive lens alone lights almost nothing): a spot from every riser light aimed out of the riser and 50 deg
-    down; four small points under every post-cap light, one off each face; a point in front of each coach lantern.
-    Hidden until set_mode("dusk")."""
+    down; four small points under every post-cap light, one off each face; a downward area light under any other emitter
+    (e.g. a roof's LED strip); a point in front of each coach lantern. Hidden until set_mode("dusk")."""
     treads = [b for b in D["boxes"] if b["kind"] == "tread"]
 
     def light(kind, p, d, energy, rgb, size=0.04, spot=130.0, blend=0.7):
@@ -1086,9 +1090,23 @@ def add_fixture_lights(D, col) -> int:
         rgb = _hex(_emit_hex(md) or LED_HEX)
         c, (ux, uy, uz) = _box_frame(b)
         hx, hy, hz = (b["x1"] - b["x0"]) / 2, (b["y1"] - b["y0"]) / 2, (b["z1"] - b["z0"]) / 2
-        if "cap" in mk or "cap" in b["kind"] or "post" in tag:
+        what = f"{mk} {b['kind']} {tag}"
+        if "cap" in what or "post" in what:
             for u, h in ((ux, hx), (-ux, hx), (uy, hy), (-uy, hy)):
                 light("POINT", c + u * (h + 0.04) - uz * (hz - 0.02), None, LED_CAP_W, rgb, size=0.03)
+            continue
+        if "riser" not in what and "step" not in what:
+            # any other emitter (a downlight strip in a roof beam, a puck): an area light on its underside, facing down,
+            # its power by its area (LED_RISER_W per ~6 in x 3 in lens)
+            ld = bpy.data.lights.new(f"fx{len(LIGHTS['fixtures'])}", "AREA")
+            ld.shape = "RECTANGLE"; ld.size = max(0.05, 2 * hx); ld.size_y = max(0.05, 2 * hy)
+            ld.energy = LED_RISER_W * max(1.0, (4 * hx * hy) / (0.5 * 0.25)); ld.color = rgb
+            ob = bpy.data.objects.new(ld.name, ld)
+            col.objects.link(ob)
+            ob.location = B(*[float(q) for q in c - uz * (hz + 0.01)])
+            ob.rotation_euler = mathutils.Vector(B(*[float(q) for q in -uz])).to_track_quat("-Z", "Y").to_euler()
+            ob.hide_render = True
+            LIGHTS["fixtures"].append(ob)
             continue
         # a riser light: out of the riser along the lens's thin horizontal axis, toward the tread it lights (the next tread
         # down, else away from the tread above)
