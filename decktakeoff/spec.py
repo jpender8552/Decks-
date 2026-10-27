@@ -117,6 +117,7 @@ class Geometry:
                                                        #  slope "+y", clear_high_in / clear_low_in (bottom of the ledger at the house /
                                                        #  bottom of the beam at the posts, above the deck), posts_x_ft, footing
                                                        #  "deck" | "diamond_pier", overhang_ft, blinds [{"from_ft","to_ft","lowered"}]}
+    louvered_roofs: List[dict] = field(default_factory=list)  # motorized aluminum louvered roofs (Suncoast) over the deck — keys and defaults in louvered.py (DEFAULTS)
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
                                                                         # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)

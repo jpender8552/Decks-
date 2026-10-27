@@ -121,6 +121,9 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
               "house_model", "site_model", "house_walls", "outline"):
         g.pop(k, None)
     g.update(part.get("geometry", {}))
+    if d["geometry"].get("louvered_roofs"):     # a job-level roof (global frame): the part sees it in its own frame, marked so it neither draws nor prices it
+        from .louvered import part_roofs
+        g["louvered_roofs"] = part_roofs(d["geometry"]["louvered_roofs"], part)
     d["geometry"] = g
     r = dict(d.get("railing", {}))
     for k in ("edges", "sides", "openings"):
