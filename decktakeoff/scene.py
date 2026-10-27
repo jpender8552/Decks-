@@ -933,8 +933,8 @@ def build_scene(L) -> Scene:
                 z_under = z_top - rise - bt - math.tan(theta) * um - depth / math.cos(theta)
                 zc_top = z_under - 0.02
                 sb_("beam", um - 1.5 * IN, um + 1.5 * IN, va_ - 0.25, vb_ + 0.25, zc_top - 5.5 * IN, zc_top, "timber", 4, tag=f"stair carrier {st.side}")
-                own_ = getattr(st, "own_footings", 0)             # on the stair's own 12" caissons: a 6x6, its footing at the stair's foot level
-                pc_ = actual("6x6")[0] * IN if own_ else pb_
+                own_ = getattr(st, "own_footings", 0)             # on the stair's own 12" caissons: the deck's post, its footing at the stair's foot level
+                pc_ = pb_
                 fc_, z0_ = (0.5, zt - g.total_rise_in * IN) if own_ else (0.55, 0.0)
                 for vp in (va_ + 0.25, vb_ - 0.25):
                     sb_("post", um - pc_ / 2, um + pc_ / 2, vp - pc_ / 2, vp + pc_ / 2, z0_ + 0.55, zc_top - 5.5 * IN, "timber", 2, tag="stair carrier post")
@@ -969,7 +969,7 @@ def build_scene(L) -> Scene:
             lg_ = getattr(ss, "landing_grade_in", None)
             zg_ = (zt - g.total_rise_in * IN + lg_ * IN) if lg_ is not None else 0.0     # the ground under the landing (Stair.landing_grade_in), else z 0
             own_ = getattr(st, "own_footings", 0)
-            pl_ = actual("6x6")[0] * IN if own_ else pb_            # its own 12" caissons carry 6x6 posts
+            pl_ = pb_                                               # its own 12" caissons carry the deck's posts (owner: ABU88RZ, no ABU66)
             fh_ = 0.5 if own_ else 0.55
             for px in (x0_ + ins, x1_ - ins):
                 for py in (y0_ + ins, y1_ - ins):

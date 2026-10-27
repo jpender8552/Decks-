@@ -92,6 +92,7 @@ PRODUCTS = {
     "ABU88Z": dict(down=22405, up=4120, v=True, src="Simpson C-C-2026 (2 x 5/8\" anchors — not on a Diamond Pier)"),
     "ABU88RZ": dict(down=19870, up=4045, v=True, src="Simpson C-C-2026, rough 8x8 (2 x 5/8\" anchors)"),
     "ABU66Z": dict(down=18205, up=2475, v=True, src="Simpson C-C-2026 (1 x 5/8\" anchor)"),
+    "ABU66RZ": dict(down=18205, up=1905, v=False, src="Simpson C-C-2026, rough 6x6 (1 x 5/8\" anchor; structure.md 1,905-2,475 lb uplift) — verify"),
     "ABW66RZ": dict(down=12935, up=1190, v=True, src="Simpson C-C-2026 (1 x 1/2\" anchor)"),
     "LUS210Z": dict(down=1000, up=500, v=False, src="Simpson C-C LUS210 (DF/SP) — conservative reading, verify"),
     "HUCQ210-2-SDS": dict(down=2500, up=1000, v=False, src="Simpson C-C HUCQ210-2-SDS — conservative reading, verify"),
@@ -1212,7 +1213,7 @@ class Calc:
                                    f"P = {down:,.0f} lb (governing ASD combination) vs {pr['down']:,} lb" + (f"; uplift {col['up']:,.0f} lb vs {pr['up']:,} lb" if col["up"] > 0 else "; no net uplift"))
                     self.add(ck)
             if col.get("on_footing"):
-                key = (col["size"], self.spec.framing.footing_type)
+                key = (col["size"], self.footing_info(col)["type"])
                 b = base_req.setdefault(key, dict(down=0.0, up=0.0, lat=0.0, ids=[]))
                 b["down"] = max(b["down"], down); b["up"] = max(b["up"], col["up"]); b["lat"] = max(b["lat"], col.get("Vb", 0.0))
                 b["ids"].append(col["id"])
@@ -1245,6 +1246,8 @@ class Calc:
 
     def footing_info(self, col: dict) -> dict:
         """The footing under a column, from the layout: type, model / diameter, depth, capacity (the engine's numbers)."""
+        if col.get("footing"):
+            return dict(col["footing"])
         P_ = self.parts[col["part"]]
         zm = {z.name: z for z in P_.L.zones}
         z = zm.get(col.get("zone"))
@@ -1537,6 +1540,7 @@ def pole_embedment(P: float, h: float, b: float, s_lat: float = 100.0, iso: floa
 
 
 CONCRETE_PCF = 150.0
+STAIR_CAISSON_DIA = 12.0      # Stair.landing_footing "caisson12": the stair's own landing / carrier posts (footings agent, 27 Oct)
 CAISSON_SKIN_PSF = 400.0      # the engine's skin-friction estimate (layout.frame_layout) — the engineer sizes the shaft
 
 
@@ -1607,6 +1611,8 @@ class _CalcMore(Calc):
         th = _throat(sec.d, g.riser_in, g.tread_in)
         worst = (0.0, 0.0, 0.0)
         for fi, fg in enumerate(g.flights):
+            if fg.run_in < 6.0:          # a single riser onto a landing: no stringers to check
+                continue
             n_car = 0
             if st.mid_support and fi in (st.carrier_flights or []):
                 n_car = len(st.carrier_fracs or [0.5])
@@ -1883,6 +1889,7 @@ class _CalcMore(Calc):
         self.stair_on_rim(P, st, (RsD, RsL), name, tags)
         lands = [l for l in (getattr(sd, "landings", None) or []) if l]
         if not lands:
+            self.stair_carriers(P, k, st, sd, name, tags)
             return
         g = st.geo
         for li, (la, lb) in enumerate(lands):
@@ -1914,18 +1921,90 @@ class _CalcMore(Calc):
             mem = f"{name}: landing {li + 1} rim {rim.label}, {_ftin(span)} between corner posts (half the landing + the flights)"
             for ck in flexure_checks(rr, f"{tag}L{li + 1}R", grp, mem, self.scope, tags=tags):
                 self.add(ck)
-            # corner posts and footings
+            # corner posts and footings: the layout's landing_post_h (frame bottom above the grade under the landing, the yard's fall
+            # included) less the footing's top and the base; the stair's own 12" caissons and 6x6 posts when own_footings > 0
             Rd = max(rr.dead.R); Rl = max(sum(max(0.0, l.R[q]) for l in rr.lives) for q in range(2))
-            hland = g.total_rise_in - sum(f.rise_in for f in g.flights[:li + 1])
-            from .layout import DP_STANDOFF
-            dk_t = 1.0
-            hp = max(6.0, hland - dk_t - LUMBER_ACTUAL[P.spec.framing.joist_size][1] - (DP_STANDOFF if P.spec.framing.footing_type == "diamond_pier" else 2.0))
-            model = next((ln_.item.split("—")[0].replace("Diamond Pier", "").strip() for ln_ in P.t.lines if "landing" in (ln_.item or "") and "Diamond Pier" in (ln_.item or "")), None)
-            model = model if model in PIER else P.spec.framing.footing_model
+            own = int(getattr(st, "own_footings", 0) or 0)
+            lph = list(getattr(st, "landing_post_h", None) or [])
+            if li < len(lph):
+                hp = max(6.0, float(lph[li]) - self.stair_standoff(P, own))
+                hsrc = f"landing_post_h {lph[li]:.1f}\" less {self.stair_standoff(P, own):g}\" (footing top + base)"
+            else:
+                from .layout import DP_STANDOFF
+                hland = g.total_rise_in - sum(f.rise_in for f in g.flights[:li + 1]) - float(getattr(sd, "landing_grade_in", None) or 0.0)
+                hp = max(6.0, hland - 1.0 - LUMBER_ACTUAL[P.spec.framing.joist_size][1] - (DP_STANDOFF if P.spec.framing.footing_type == "diamond_pier" else self.stair_standoff(P, 0)))
+                hsrc = "from the flights' rise"
+            size = "6x6" if own else P.spec.framing.post_size
+            foot = self.stair_caisson(P) if own else None
+            model = None
+            if not own and P.spec.framing.footing_type == "diamond_pier":
+                model = next((ln_.item.split("—")[0].replace("Diamond Pier", "").strip() for ln_ in P.t.lines if "landing" in (ln_.item or "") and "Diamond Pier" in (ln_.item or "")), None)
+                model = model if model in PIER else P.spec.framing.footing_model
             for q in range(4):
                 self.cols.append(dict(id=f"{P.tag}S{k + 1}L{li + 1}-{q + 1}", part=P.idx, part_name=P.name, line=-1, j=q, kind="landing", x=0.0, y=0.0, gx=float("nan"), gy=float("nan"),
-                                      zone=None, height=hp, comp={"D": [Rd, Rd], "L": [Rl, 0.0]}, pieces=[1, 1], label=f"{name} landing {li + 1} post", line_label="landing",
-                                      end_post=True, cap_mid="", cap_end="", Vb=0.0, braced=False, on_footing=True, size=P.spec.framing.post_size, model=model, tags=tags))
+                                      zone=None, height=hp, comp={"D": [Rd, Rd], "L": [Rl, 0.0]}, pieces=[1, 1], label=f"{name} landing {li + 1} post ({hsrc})", line_label="landing",
+                                      end_post=True, cap_mid="", cap_end="", Vb=0.0, braced=False, on_footing=True, size=size, model=model, footing=foot, tags=tags))
+        self.stair_carriers(P, k, st, sd, name, tags)
+
+    def stair_standoff(self, P: _Part, own: int) -> float:
+        """Footing top above grade + the 1" standoff base: a caisson's caisson_above_in (6" default), the stair's own 12" caissons
+        the same (6" when the deck is on another footing type), a Diamond Pier's head, a concrete pier's 2"."""
+        from .layout import DP_STANDOFF, CONC_STANDOFF
+        fsp = P.spec.framing
+        if own or fsp.footing_type == "caisson":
+            above = float(fsp.caisson_above_in) if (fsp.footing_type == "caisson" and fsp.caisson_above_in is not None) else 6.0
+            return above + 1.0
+        return {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF}.get(fsp.footing_type, CONC_STANDOFF)
+
+    def stair_caisson(self, P: _Part) -> dict:
+        """Stair.landing_footing "caisson12": 12" caissons to the deck's caisson depth (frost + 2" without one)."""
+        fsp = P.spec.framing
+        dia = STAIR_CAISSON_DIA
+        depth = float(fsp.caisson_depth_in or (self.c.frost_in + 2.0))
+        end_b = math.pi * (dia / 24.0) ** 2 * self.c.soil_psf
+        cap = end_b + math.pi * dia / 12.0 * depth / 12.0 * CAISSON_SKIN_PSF
+        return dict(type="caisson", model=f"{dia:g}\" x {depth:g}\" caisson", dia=dia, depth=depth, cap=cap, end=end_b,
+                    weight=math.pi * (dia / 24.0) ** 2 * depth / 12.0 * CONCRETE_PCF, own=True)
+
+    def stair_carriers(self, P: _Part, k: int, st, sd, name: str, tags: List[str]):
+        """A flight longer than DCA6's 6' cut-stringer span sits on carriers: a 2-ply 2x6 under the stringers on two posts
+        (the stair's own 12" caissons when own_footings, else the deck's footings)."""
+        if not getattr(st, "mid_support", False):
+            return
+        c = self.c
+        grp = "Stairs to the yard"
+        tag = f"ST-{P.tag}{k + 1}"
+        g = st.geo
+        n = max(2, int(st.stringers or 2))
+        trib = float(st.width) / (n - 1)
+        w = (c.stair_dead_psf + c.stair_live_psf) * trib / 144.0
+        wD = c.stair_dead_psf * trib / 144.0
+        fracs = list(st.carrier_fracs or [0.5])
+        own = int(getattr(st, "own_footings", 0) or 0)
+        car = section("(2)2x6", P.spec.framing.joist_species, P.spec.framing.joist_grade)
+        size = "6x6" if own else P.spec.framing.post_size
+        pb = LUMBER_ACTUAL.get(size, (5.5, 5.5))[0]
+        for fi in (st.carrier_flights or []):
+            fg = g.flights[fi]
+            span = fg.run_in / (len(fracs) + 1)
+            R1 = 1.25 * w * span if len(fracs) == 1 else 1.1 * w * span        # a stringer continuous over the carrier(s)
+            R1d = R1 * wD / w
+            L_c = float(st.width) + 6.0 - pb
+            ys = [L_c * (j + 0.5) / n for j in range(n)]
+            r = run_member(car, 0.0, L_c, [0.0, L_c], [("p", y, R1d) for y in ys] + [("u", 0.0, L_c, car.weight_plf / 12.0)],
+                           [("p", y, R1 - R1d) for y in ys])
+            mem = f"{name}: carrier {car.label} under flight {fi + 1} ({len(fracs)} per flight), {_ftin(L_c)} between its posts, {n} stringers at {R1:,.0f} lb"
+            for ck in flexure_checks(r, f"{tag}C{fi + 1}", grp, mem, self.scope, tags=tags):
+                self.add(ck)
+            below = sum(f_.rise_in for f_ in g.flights[fi + 1:])
+            for ci, fr_ in enumerate(fracs):
+                h_c = max(6.0, below + fg.rise_in * (1.0 - fr_) - self.stair_standoff(P, own))
+                Rd = r.dead.R[0]; Rl = sum(max(0.0, l.R[0]) for l in r.lives)
+                for q in range(2):
+                    self.cols.append(dict(id=f"{P.tag}S{k + 1}C{fi + 1}{chr(97 + ci)}-{q + 1}", part=P.idx, part_name=P.name, line=-1, j=q, kind="landing", x=0.0, y=0.0,
+                                          gx=float("nan"), gy=float("nan"), zone=None, height=h_c, comp={"D": [Rd, Rd], "L": [Rl, 0.0]}, pieces=[1, 1],
+                                          label=f"{name} carrier post (flight {fi + 1})", line_label="carrier", end_post=True, cap_mid="", cap_end="", Vb=0.0,
+                                          braced=False, on_footing=True, size=size, model=None, footing=self.stair_caisson(P) if own else None, tags=tags))
 
     def stair_on_rim(self, P: _Part, st, Rs, name, tags):
         """The top flight's stringers hang on the deck rim (LSCZ): the joists at the opening carry one stringer reaction each

@@ -139,3 +139,24 @@ def test_sheets_and_html(tmp_path):
 def test_steel_frame_is_outside_this_calc():
     pkg = calcs.run_calcs(DeckSpec.from_dict(json.load(open("jobs/jefferson_louisville.json"))))
     assert [c.result for c in pkg.checks] == ["REVIEW"]
+
+
+def test_yard_stair_on_its_own_12in_caissons():
+    """Stair.landing_footing "caisson12": the landing posts are 6x6 on 12" caissons, as long as the layout's landing_post_h
+    (the yard's fall included) less the footing top and base."""
+    d = json.loads(json.dumps(TWO_LEVELS))
+    d["geometry"]["parts"][0]["stairs"] = [{"side": "front:B", "width_in": 48, "position_in": 60, "total_rise_in": 66, "landing": "grade", "rails": 2,
+                                            "flights": [6, 3], "turn": "switchback", "landings": [[108, 48]], "landing_footing": "caisson12",
+                                            "landing_grade_in": -12.0, "name": "Stairs to the yard"}]
+    spec = DeckSpec.from_dict(d)
+    k = calcs._analyze(spec)
+    st = next(s for P in k.parts for s in P.L.stairs if not s.inset)
+    if not getattr(st, "own_footings", 0):
+        pytest.skip("this engine has no stair-owned footings")
+    posts = [c for c in k.cols if c["kind"] == "landing"]
+    assert len(posts) == st.own_footings and all(c["size"] == "6x6" for c in posts)
+    P = k.parts[0]
+    assert posts[0]["height"] == pytest.approx(st.landing_post_h[0] - k.stair_standoff(P, st.own_footings))
+    f = [c for c in k.checks if c.id.startswith("F-") and c.what.startswith("Caisson bearing") and "S1" in c.id]
+    assert f and all(c.capacity == pytest.approx(math.pi * 0.25 * 1500 + math.pi * 1.0 * 42 / 12 * 400, rel=1e-3) for c in f)
+    assert any(c.id == "K-BASE-6x6" for c in k.checks)

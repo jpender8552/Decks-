@@ -205,6 +205,13 @@ def field_profile(spec: DeckSpec, stock: int) -> str:
     return spec.decking.profile if stock in deck_lengths(spec.decking.collection, spec.decking.profile) else "grooved"
 
 
+def _deck_base(spec: DeckSpec, black: bool = False) -> str:
+    """The deck's post base on a caisson: TIMBER_BASE by post size, the R-series ABU88 for a rough 8x8."""
+    bkeys = TIMBER_BASE.get(spec.framing.post_size, ("ABU66Z_black", "ABU66Z"))
+    bkey = bkeys[0] if black else bkeys[1]
+    return "ABU88RZ" if (bkey == "ABU88Z" and spec.framing.post_rough) else bkey
+
+
 def site_lines(spec: DeckSpec, deck_sf: float) -> List[Line]:
     """The job's site lines (demo, site extras) — once per job: a composite adds them once, not once per part."""
     out = []
@@ -739,7 +746,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         uc, src = _lumber_price(nom, st, timber or df1_beam)
         desc = f"{nom}x{st} {SPECIES_NAMES['DF#1'] if timber else 'Douglas Fir #1' if df1_beam else SPECIES_NAMES.get(sp, sp)}"
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  ({_summarize_labels(labels)}: " + " · ".join(bl.label for bl in L.beam_lines) + ")", uc, src))
-    stair_posts_own = []          # posts on a stair's own 12" caissons (Stair.landing_footing "caisson12"): 6x6, their own line below
+    stair_posts_own = []          # posts on a stair's own 12" caissons (Stair.landing_footing "caisson12"): the deck's post size, their own line below
     for st_ in L.stairs:
         if st_.mid_support:
             fl_ = st_.geo.flights or []
@@ -752,9 +759,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                     h_c = below + f_rise * (1 - fr_)
                     tagf = f"{st_.side}" + (f", flight {fi + 1}" if len(fl_) > 1 else "") + (f", carrier {fracs.index(fr_) + 1} of {len(fracs)}" if len(fracs) > 1 else "")
                     own_ = getattr(st_, "own_footings", 0)
-                    ps_ = "6x6" if own_ else spec.framing.post_size
+                    ps_ = spec.framing.post_size          # the owner: the deck's posts and bases under the stairs too (8x8 rough on ABU88RZ)
                     (stair_posts_own if own_ else post_pieces).extend([(ps_, h_c + 6.0, "stair carrier post")] * 2)
-                    cuts.append(CutPiece(f"Stair carrier posts ({tagf})", ps_, h_c, 2, "under the stringers" + (", on 12\" caissons, ABU66 bases" if own_ else "") + " — field-measure"))
+                    cuts.append(CutPiece(f"Stair carrier posts ({tagf})", ps_, h_c, 2, "under the stringers" + (f", on 12\" caissons, {_deck_base(spec, black)} bases" if own_ else "") + " — field-measure"))
                     cuts.append(CutPiece(f"Stair carrier ({tagf})", "2x6" if not timber else "4x6", st_.width + 6, 2, "2 ply, notched stringers bear on it; hurricane tie each stringer"))
             car = "2x6" if not timber else "4x6"
             n_car = len(idx) * len(fracs)
@@ -763,9 +770,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                               3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
         for li_, h_l in enumerate(getattr(st_, "landing_post_h", None) or []):     # landing posts on the deck's own footings (cut with the deck's posts) or on the stair's own 12" caissons
             own_ = getattr(st_, "own_footings", 0)
-            ps_ = "6x6" if own_ else spec.framing.post_size
+            ps_ = spec.framing.post_size
             (stair_posts_own if own_ else post_pieces).extend([(ps_, h_l + 6.0, "stair landing post")] * 4)
-            cuts.append(CutPiece(f"Stair landing posts ({st_.side}, landing {li_ + 1})", ps_, h_l, 4, ("on 12\" caissons, ABU66 bases" if own_ else "on the deck's footings and post bases") + " — field-measure"))
+            cuts.append(CutPiece(f"Stair landing posts ({st_.side}, landing {li_ + 1})", ps_, h_l, 4, (f"on 12\" caissons, {_deck_base(spec, black)} bases" if own_ else "on the deck's footings and post bases") + " — field-measure"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
@@ -776,8 +783,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lens = sorted(set([ftin(bl.post_len) for bl in L.beam_lines] + ([ftin(L.edge_post_len)] if eps_ else [])))
         lines.append(Line("Lumber", desc, n, n, "ea", f"exact  (yields {n_posts} posts at ~{' / '.join(lens)})", uc, src))
     for (nom, st), (n, labels) in pack_lumber(stair_posts_own, short_stock_ft=8).items():
-        # a stair's own landing / carrier posts (6x6 on 12" caissons): Douglas fir rough like the deck's columns where the deck's are,
-        # priced per BF at the rate the pricebook's DF #1 8x8 is built from when there is no DF 6x6 price of its own
+        # a stair's own landing / carrier posts on 12" caissons: the deck's post (Douglas fir rough like the deck's columns where the deck's are),
+        # priced per BF at the rate the pricebook's DF #1 8x8 is built from when a size has no DF price of its own
         df_ = spec.framing.post_rough or spec.framing.post_species.upper().startswith("DF")
         if not df_ or f"{nom}_DF#1" in PRICEBOOK["lumber"]:
             uc, src = _lumber_price(nom, st, df_)
@@ -889,7 +896,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if n_own:
             # the stair's own footings (Stair.landing_footing "caisson12", footings agent 27 Oct): 12" caissons to the deck's caisson depth
             # (frost + 2" without one), the deck's top above grade, (4) #4 + #3 ties like the deck's (engineer governs), and an ABU66
-            # standoff base on ONE cast-in 5/8" anchor under each 6x6 landing / carrier post; labor at the card's $150 a hole (pricing)
+            # the deck's own post base (ABU88RZ on two cast-in 5/8" anchors) under each landing / carrier post; labor at the card's $150 a hole (pricing)
             dep_s = float(spec.framing.caisson_depth_in or (spec.site.frost_depth_in + 2))
             abv_s = float(spec.framing.caisson_above_in) if spec.framing.footing_type == "caisson" else 6.0
             tl_s = dep_s + abv_s
@@ -903,13 +910,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             r4_s = int(math.ceil(n_own * 4 * tl_s / 12 / 20)); r3_s = int(math.ceil(n_own * (math.pi * 8 / 12 * 4) / 20))
             d_, uc, src = _item("footings", "rebar4_20"); lines.append(Line("Footings", d_, r4_s, r4_s, "ea", "exact — engineer governs (12\" stair caissons)", uc, src))
             d_, uc, src = _item("footings", "rebar3_20"); lines.append(Line("Footings", d_, r3_s, r3_s, "ea", "exact — engineer governs (12\" stair caissons)", uc, src))
-            d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_own, n_own, "ea", "exact  (1 per ABU66 base, stair caissons)", uc, src))
-            rough_ = spec.framing.post_rough
-            bk_ = "ABU66RZ" if rough_ and "ABU66RZ" in PRICEBOOK["footings"] else "ABU66Z"
+            bk_ = _deck_base(spec, black)                 # the owner: the deck's base under every stair post too (ABU88RZ on a rough 8x8), never an ABU66
+            n_a = n_own * (2 if bk_.startswith("ABU88") else 1)
+            d_, uc, src = _item("footings", "anchor_5/8x8"); lines.append(Line("Footings", d_, n_a, n_a, "ea", f"exact  ({n_a // n_own} per {bk_} base, stair caissons)", uc, src))
             d_, uc, src = _item("footings", bk_)
-            lines.append(Line("Footings", f"{d_} — stair landing / carrier posts, on the cast-in anchor", n_own, n_own, "ea", "exact", uc, src, bk_,
-                              "a rough 6x6 (a full 6\") takes the ABU66RZ — not in the pricebook: priced as the ABU66Z, confirm the SKU and price" if (rough_ and bk_ == "ABU66Z") else ""))
-            base_screws += n_own * POST_BASE_SCREWS.get(bk_, 12)
+            lines.append(Line("Footings", f"{d_} — stair landing / carrier posts, on the cast-in anchors", n_own, n_own, "ea", "exact", uc, src, bk_))
+            if bk_.startswith("ABU88"):
+                lines.append(Line("Footings", "ABU88 post screws: (8) Simpson SDS 1/4\" x 3\" per base — stair posts", n_own, n_own, "set", "exact  (one set per ABU88 base)", 10.0, "EST — (8) SDS25300 per base"))
+            else:
+                base_screws += n_own * POST_BASE_SCREWS.get(bk_, 12)
     # intermediate stair landings: a framed platform (joist-size rims + joists at the deck spacing) on four posts, decked in the field board
     for st_s in spec.stairs:
         for li, (lw, ld) in enumerate(st_s.landings or []):
