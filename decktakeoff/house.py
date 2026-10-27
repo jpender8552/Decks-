@@ -37,7 +37,9 @@ def _shade(hexc: str, k: float) -> str:
 
 
 def materials(model: dict) -> Dict[str, dict]:
-    c = dict(DEFAULT_COLORS, **EXTRA_COLORS, **(model.get("colors") or {}))
+    c = dict(DEFAULT_COLORS)
+    c.update(EXTRA_COLORS)
+    c.update(model.get("colors") or {})
     out = dict(
         siding=dict(color=c["siding"], rough=0.82, label="lap siding"),
         sidinglap=dict(color=c["siding"], rough=0.82),
@@ -610,7 +612,7 @@ class _Builder:
                 self.add(kind, xs[0], xs[1], y0, y1, za, zb, mat, 0, tag=tg)
         band(-0.07, 0.0, z - fh, z + th, "trim", fascia_mat, f"{tag}: fascia")
         if gutter:
-            gt = z + th - 0.06
+            gt = z + th - 0.04                      # the gutter's top lip just under the roof edge
             band(0.0, 0.40, gt - 0.40, gt - 0.34, "gutter", gutter_mat, f"{tag}: K gutter bottom")
             band(0.33, 0.40, gt - 0.40, gt, "gutter", gutter_mat, f"{tag}: K gutter face")
             band(0.36, 0.43, gt - 0.07, gt + 0.01, "gutter", gutter_mat, f"{tag}: K gutter lip")

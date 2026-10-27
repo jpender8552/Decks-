@@ -84,6 +84,7 @@ DEFAULTS = dict(
     screens=None,                           # retractable screens (an option): [{side "front" | "left" | "right", drop 0 (up in the cassette) .. 1
                                             #   (fully down), fabric "mesh" | "vinyl", density, color, bottom, mount, price / price_per_lf}]
     screens_priced=None,                    # None -> as the roof ("own" | "option")
+    screens_price=None,                     # the owner's price for all the screens together (sell) — split across the screens by width
     nominal=None,                           # [W, D] ft: the size it is sold as (customer wording, $/SF) when the built frame differs
     note="",
 )
@@ -492,6 +493,12 @@ def _screens(q: dict, screens: List[dict], surfaces: List[dict]) -> List[dict]:
                         fixed_panel=(list(fp) if fp else None), fixed_top=(q["eave"]["soffit_z"] if q.get("eave") else q["z_deck"] + max(6.5, q["clear_ft"] - 1.0)),
                         fabric=fab, density=float(sd.get("density") or 90), color=str(sd["color"]),
                         name=sd.get("name") or f"{side} screen", sell=round(sell, 2), estimate=not price_known, rate=rate))
+    if q.get("screens_price") is not None and out:       # the owner's price for the screens together: split by width, exact in total
+        tot, wsum, acc = float(q["screens_price"]), sum(x["width"] for x in out) or 1.0, 0.0
+        for i, x in enumerate(out):
+            x["sell"] = round(tot - acc, 2) if i == len(out) - 1 else round(tot * x["width"] / wsum, 2)
+            acc += x["sell"]
+            x["estimate"], x["rate"] = False, None
     return out
 
 

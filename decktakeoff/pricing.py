@@ -192,6 +192,8 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     lab = []
     if s.extras.demo_existing:
         lab.append(("Demolition — existing deck", s.extras.demo_sf or sf, "SF", lr["demo_per_sf"], "base rate; field verify the existing deck"))
+    for x in s.extras.labor_extras:          # the owner's own price for work the card has no line for
+        lab.append((str(x.get("item", "labor")), float(x.get("qty", 1)), str(x.get("unit", "ea")), float(x.get("rate", 0)), "owner-set"))
     for c in s.extras.demo_columns:          # masonry columns out: the card's stone / stucco column demo, per LF of column
         lab.append((f"Demolition — {c.get('what', 'existing columns')} (stone / stucco column demo)", float(c.get("lf", 0)), "LF", lr.get("column_demo_per_lf", 50.0), "rate card add-on"))
     ft = s.framing.footing_type

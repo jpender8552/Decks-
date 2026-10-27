@@ -3633,7 +3633,15 @@ def sheet_elevations_composite(CL, S, t, levels, steps, meta) -> str:
         o.append(T(fr[0], fr[1] + 8, ttl, 9, 800, fill=GOLD))
         o.append(f'<g clip-path="url(#{cid})">' + "".join(polys) + "</g>")
         gy = to_sheet((0, 0, 0))[1]
-        o.append(LN(fr[0], gy, fr[0] + fr[2], gy, INK, 1.2)); o.append(T(fr[0] + 4, gy + 10, "GRADE", 6.5, 800, fill=MUTE))
+        o.append(LN(fr[0], gy, fr[0] + fr[2], gy, INK, 1.2))
+        fx_ = [(min(q), max(q)) for q in ([to_sheet((x_, y_, 0.0))[0] for x_ in (b.x0, b.x1) for y_ in (b.y0, b.y1)] for b in bx if b.kind == "footing")]
+        free = lambda a_, b_: not any(lo < b_ and hi > a_ for lo, hi in fx_)       # the GRADE word where no footing shows below grade
+        if free(fr[0] + 2, fr[0] + 40):
+            o.append(T(fr[0] + 4, gy + 10, "GRADE", 6.5, 800, fill=MUTE))
+        elif free(fr[0] + fr[2] - 40, fr[0] + fr[2] - 2):
+            o.append(T(fr[0] + fr[2] - 4, gy + 10, "GRADE", 6.5, 800, "end", MUTE))
+        else:
+            o.append(TH(fr[0] + 4, gy - 4, "GRADE", 6.5, 800, fill=MUTE))
         if az == 0:
             for lv in levels:               # each level's surface, tagged over its own deck
                 xs_ = [p[0] for p in lv.poly]
@@ -3952,14 +3960,14 @@ def sheet_iso_assembled_composite(CL, S, t, meta) -> str:
     fit = [b for b in bx if not _house(b)]
     hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "stepbase", "sheath", "underlay")
     key = [k for k in _composite_key(CL, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
-    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Both levels, everything you see: piers, columns, decking, picture frame, step skirt, stair, rail", CL, S, t, meta, bx,
+    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Both levels, everything you see: footings, columns, decking, picture frame, step skirt, stair, rail", CL, S, t, meta, bx,
                       fit=fit, key=key, note=("House shown for context only (the deck work only). " if any(_house(b) for b in bx) else "")
                       + "The frame under the decking is called out on S-102 and A-003.")
 
 
 def sheet_iso_exploded_composite(CL, S, t, meta) -> str:
     bx = [b for b in S.boxes if b.kind not in ("ground", "glass") and not _house(b)]
-    sub = ("Both levels, each build layer lifted in order: piers · posts · beams · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "")
+    sub = ("Both levels, each build layer lifted in order: footings · posts · beams · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "")
            + (" · rail" if CL.rail else ""))
     return _axo_sheet("A-003", "Isometric — exploded, labeled", sub, CL, S, t, meta, bx, explode=True, az=35, el=24, key=_composite_key(CL, S, t),
                       note="Layers lifted in build order. Lifts are for clarity only; every member returns straight down to its place.")
@@ -3973,7 +3981,7 @@ def sheet_iso_structure_composite(CL, S, t, meta) -> str:
     note = ("Decking, rail and house removed to show the frame of both levels, each on its own posts and beams. Joists hang from the ledgers in face-mount hangers"
             + ("; they bear on the drop beams with H2.5AZ ties" if "drop" in kinds else "") + ("; joists hang on both faces of the flush beams" if "flush" in kinds else "")
             + ("; double rims in concealed-flange hangers" if "concealed" in items else "") + ".")
-    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Both levels: piers, post bases, columns, beams, joists, rims, ledgers, blocking, the stair stringers",
+    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Both levels: footings, post bases, columns, beams, joists, rims, ledgers, blocking, the stair stringers",
                       CL, S, t, meta, bx, az=-32, el=32, key=key, note=note)
 
 

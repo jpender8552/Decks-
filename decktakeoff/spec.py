@@ -269,6 +269,7 @@ class Stair:
 class Extras:
     demo_existing: bool = False
     demo_sf: Optional[float] = None
+    labor_extras: List[dict] = field(default_factory=list)   # owner-set labor lines [{"item", "qty", "unit", "rate"}] (e.g. slab openings 6 x $200), marked up like the card
     demo_columns: List[dict] = field(default_factory=list)   # masonry columns out [{"what": "brick columns (9)", "lf": 55}] -> the card's stone / stucco column demo per LF
     hot_tub: bool = False
     roof_over: bool = False
