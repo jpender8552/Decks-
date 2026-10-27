@@ -37,7 +37,11 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
 - IRX black, vertical balusters, drink rail **over the posts**.
 
 ## Options
-- Option 1 lighting (riser + post accent lights).
+- **The base has only the stair between the levels (upper to lower) — never a stair to the ground.** Both yard stairs
+  (2 and 2B) are EXTRA, one or the other (owner 27 Oct, repeated: "Get it right"). The base price line reads
+  "Stair between the levels".
+- Option 1 lighting (riser + post accent lights), priced at the 40% margin like the rest — no per-light sell price in any
+  client text; $25 a fixture is the install labor.
 - Option 2 stairs to the yard: **show both** — 2 = the owner's horseshoe (7 + 3 risers, 9' x 4' landing), 2B = along the deck
   (1 + 9 risers, rail on the yard side only — the flight runs along the deck face). One or the other. **No mid-run
   carrier** (stair `mid_support` false); the stair foot is on grade (no pad).
