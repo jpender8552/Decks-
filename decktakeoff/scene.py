@@ -222,6 +222,7 @@ def materials_for(spec: DeckSpec) -> Dict[str, dict]:
         **(_site_materials(spec.geometry.site_model) if getattr(spec.geometry, "site_model", None) else {}),
         **__import__("decktakeoff.lighting", fromlist=["materials"]).materials(spec),     # led_riser / led_cap / led_housing when extras.lights is on
         **__import__("decktakeoff.louvered", fromlist=["materials"]).materials(spec),     # lvmetal / lvled / lvfabric when the job has a louvered roof
+        **furniture_materials(spec),                                                     # furn_* when the job is styled with furniture
     )
 
 
@@ -1253,6 +1254,8 @@ def build_scene(L) -> Scene:
         for wseg in spec.geometry.house_walls:
             fixed.append(angled_wall(*wseg, z0=0.0, z1=H_house))
     fixed += __import__("decktakeoff.lighting", fromlist=["scene_lights"]).scene_lights(fixed, spec)    # extras.lights: a light on every riser + rail-post box (a composite gets them per part)
+    if getattr(spec.geometry, "furniture", None):           # styling only: layer "styling", never on a sheet (a composite draws it once, globally)
+        fixed += furniture_boxes(spec, furniture_levels(L))
     meta = dict(job=spec.job, address=f"{spec.site.address}, {spec.site.city}".strip(", "), sf=L.deck_sf, height=spec.geometry.height_in,
                 zones=[dict(name=z.name, label=z.label, x0=z.x0 * IN, W=z.W * IN, wall_y=z.wall_y * IN, D=z.D * IN, front=(z.wall_y + z.D) * IN, ledger=bool(z.frame.ledger)) for z in L.zones],
                 edge=edge, timber=timber, oiled=spec.framing.finish == "oil",
@@ -1264,6 +1267,8 @@ def build_scene(L) -> Scene:
         meta["cameras"] = spec.geometry.site_model["cameras"]       # measured-site camera stations (inside the lot), plan feet
     if getattr(spec.geometry, "louvered_roofs", None):              # blades / screens a live viewer can turn and run (louvered.descriptors)
         meta["louvered_roofs"] = __import__("decktakeoff.louvered", fromlist=["descriptors"]).descriptors(L)
+    if getattr(spec.geometry, "furniture", None):
+        meta["styling"] = furniture_meta(spec)
     return Scene(fixed, zt, W, y_min, y_front, materials_for(spec), meta)
 
 
@@ -1390,6 +1395,8 @@ def build_composite_scene(L) -> Scene:
                 continue
             B.append(_place_box(b, p.placement, p.name))
     __import__("decktakeoff.louvered", fromlist=["draw"]).draw(add, L)     # the job-level louvered roofs, once, in the global frame
+    if getattr(g, "furniture", None):      # styling only (layer "styling"): the 3D views draw it, the sheets, takeoff and price never see it
+        B.extend(furniture_boxes(spec, furniture_levels(L)))
     x0, x1, y0, y1 = L.bbox
     H_house = zt + 9.5
     hm, sm = getattr(g, "house_model", None), getattr(g, "site_model", None)
@@ -1436,6 +1443,8 @@ def build_composite_scene(L) -> Scene:
         meta["cameras"] = sm["cameras"]
     if __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(spec):    # blades / screens a live viewer can turn and run
         meta["louvered_roofs"] = __import__("decktakeoff.louvered", fromlist=["descriptors"]).descriptors(L)
+    if getattr(g, "furniture", None):
+        meta["styling"] = furniture_meta(spec)
     S = Scene(B, zt, W, y0, y1, materials_for(spec), meta)
     S.x_min = x0
     return S
@@ -1982,3 +1991,322 @@ def draw_cover(add, spec, c: dict, zt: float) -> None:
             z_bot = zr - low * (zr - zt)
             add("blind", a + 0.05, b - 0.05, yb - 0.02, yb + 0.02, z_bot, zr, "shade", 8, tag="roll-down blind, lowered")
             add("trim", a + 0.05, b - 0.05, yb - 0.04, yb + 0.04, z_bot - 0.05, z_bot, "steel", 8, tag="blind bottom bar")
+
+
+# ====================================================================== styling furniture (geometry.furniture)
+# Simple low-poly models of real outdoor furniture placed on the deck to style the 3D views. STYLING ONLY: never priced,
+# never ordered (the takeoff and pricing never read geometry.furniture), never on a drawing sheet (every box is on layer
+# "styling", which drawings.py / axo.py leave out and the viewer hides in its technical stills). Every box is tagged
+# "Styling: <maker> <model> (not included)". Our own geometry from the maker's published dimensions: no photos, no marks.
+#
+# A piece: {"type", "model", "x", "y" (plan feet: the centre of the piece's footprint before it turns), "rot_deg",
+# "level": "lower" | "upper" (a composite's lowest / highest part; or "z_ft": the floor it stands on), colours, sizes}.
+# rot_deg follows the scene's rot_axis "z" convention (+x turns toward +y): 0 = the piece faces +y (out toward the yard),
+# -90 faces +x, 90 faces -x, 180 faces the house. Colours: "frame" (teak | charcoal | white | anodized | any #hex),
+# "top" (a table top), "cushion" (Outer's names: Pacific Fog Gray, Palisades Cream, Deep Sea Navy, Dark Pebble Gray, or
+# #hex; null = none), "canopy" (an umbrella). Sizes default to the maker's numbers for the model (FURNITURE below), in inches.
+FURN_LAYER = "styling"
+FURN_KIND = "furn"
+FURN_PHASE = 8                                   # "Furnishings": the finished deck only
+FURN_HEX = {"teak": "#b07a4c", "charcoal": "#3b3c3e", "black": "#1f2022", "white": "#e9e8e3", "anodized": "#a4a6a7",
+            "gray": "#8e908c", "grey": "#8e908c",
+            # Outer's cushion / canopy colours (our approximations of their swatches)
+            "pacific fog gray": "#b7b8b2", "palisades cream": "#e3dccb", "deep sea navy": "#2b3651", "dark pebble gray": "#5d5e5a"}
+FURN_DEFAULT_COLOR = {"frame": "charcoal", "cushion": "Pacific Fog Gray", "canopy": "gray"}
+FURNITURE = {   # type -> the defaults (inches) the model is built from; a piece's own keys win
+    "sectional": dict(model="Teak Outdoor L Sectional - 4 Seat", legs_in=[97.8, 63.4], depth_in=34.4, height_in=29.0, seat_in=16.0,
+                      leg_in=9.2, arm_in=5.4, arm_top_in=24.5, ret="+x", arms=["free"], frame="teak", cushion="Pacific Fog Gray"),
+    "sofa": dict(model="Teak Outdoor Sofa - 3 Seat", legs_in=[97.8], depth_in=34.4, height_in=29.0, seat_in=16.0, leg_in=9.2, arm_in=5.4,
+                 arm_top_in=24.5, arms=["left", "right"], frame="teak", cushion="Pacific Fog Gray"),
+    "lounge_chair": dict(model="Teak Outdoor Armchair", w_in=28.0, d_in=34.4, height_in=29.0, seat_in=16.0, leg_in=9.2, arm_in=3.0,
+                         arm_top_in=24.5, frame="teak", cushion="Pacific Fog Gray"),
+    "coffee_table": dict(model="Teak Outdoor Coffee Table - Square Leg", l_in=50.0, w_in=26.0, h_in=14.0, slats=5, frame="teak"),
+    "side_table": dict(model="Teak Outdoor Side Table", l_in=25.5, w_in=18.5, h_in=22.5, slats=4, frame="teak"),
+    "dining_table": dict(model="Teak + Aluminum Extendable Dining Table", l_in=87.6, w_in=41.7, h_in=30.0, slats=8, frame="charcoal", top="teak"),
+    "dining_chair": dict(model="595 Dining Armless Chair", w_in=21.7, d_in=22.0, height_in=34.4, seat_in=17.8, arms=False,
+                         arm_h_in=25.8, frame="charcoal", arm_top="teak", cushion="Pacific Fog Gray"),
+    "umbrella": dict(model="Marine-Grade Aluminum Outdoor Umbrella", dia_in=138.0, h_in=102.0, rim_in=78.0, pole_in=1.9, base_in=24.0,
+                     frame="anodized", base="charcoal", canopy="gray"),
+}
+
+
+def _furn_slug(name) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(name).lower()).strip("_")
+
+
+def _furn_hex(color) -> str:
+    c = str(color or "").strip()
+    return c if c.startswith("#") else FURN_HEX.get(c.lower(), "#8e908c")
+
+
+def _furn_mat(role: str, color) -> str:
+    """The material key of a part: teak -> furn_teak; an aluminium colour -> furn_frame[_<colour>]; a cushion / canopy colour ->
+    furn_cushion[_<colour>] / furn_canopy[_<colour>] (the default colour keeps the plain key)."""
+    if str(color or "").strip().lower() == "teak":
+        return "furn_teak"
+    role = "frame" if role in ("frame", "top", "base", "arm_top") else role
+    return f"furn_{role}" if _furn_slug(color) == _furn_slug(FURN_DEFAULT_COLOR.get(role, "")) else f"furn_{role}_{_furn_slug(color)}"
+
+
+def furniture_materials(spec) -> Dict[str, dict]:
+    """The material keys the job's styling pieces use ({} without furniture: the other jobs' scenes stay exactly as they were)."""
+    out: Dict[str, dict] = {}
+    for it in getattr(spec.geometry, "furniture", None) or []:
+        d = dict(FURNITURE.get(it.get("type"), {}), **it)
+        for role in ("frame", "top", "base", "arm_top", "cushion", "canopy"):
+            c = d.get(role)
+            if not c or (role == "arm_top" and not d.get("arms")):
+                continue
+            k = _furn_mat(role, c)
+            if k == "furn_teak":
+                out[k] = dict(color=FURN_HEX["teak"], grain=True, rough=0.6, label="FSC teak (styling only, not included)")
+            elif k.startswith("furn_frame"):
+                out[k] = dict(color=_furn_hex(c), metal=0.3, rough=0.5, label=f"{c} powder-coated aluminum (styling only, not included)")
+            elif k.startswith("furn_cushion"):
+                out[k] = dict(color=_furn_hex(c), rough=0.96, label=f"{c} cushion (styling only, not included)")
+            else:
+                out[k] = dict(color=_furn_hex(c), rough=0.9, label=f"{c} umbrella canopy (styling only, not included)")
+    return out
+
+
+class _Furn:
+    """One piece's boxes in its own frame — inches; x across it, y from its back (0) to its front (d), z up from its floor —
+    placed with the centre of its w x d footprint at (cx, cy) on the floor zf (feet), turned rot_deg in plan."""
+
+    def __init__(self, out: List[Box], cx: float, cy: float, zf: float, rot_deg: float, w: float, d: float, tag: str):
+        self.out, self.cx, self.cy, self.zf, self.w, self.d, self.tag = out, cx, cy, zf, w, d, tag
+        r = float(rot_deg or 0.0) % 360.0
+        self.quarter = int(round(r / 90.0)) % 4 if abs(r / 90.0 - round(r / 90.0)) < 1e-9 else None   # a quarter turn: kept axis-aligned
+        self.th = math.radians(r)
+        self.c, self.s = math.cos(self.th), math.sin(self.th)
+        if self.quarter is not None:
+            self.c, self.s = [(1, 0), (0, 1), (-1, 0), (0, -1)][self.quarter]
+
+    def pt(self, x: float, y: float) -> Tuple[float, float]:
+        lx, ly = (x - self.w / 2) * IN, (y - self.d / 2) * IN
+        return self.cx + lx * self.c - ly * self.s, self.cy + lx * self.s + ly * self.c
+
+    def box(self, x0, x1, y0, y1, z0, z1, mat, shape="box"):
+        if x1 - x0 <= 1e-6 or y1 - y0 <= 1e-6 or z1 - z0 <= 1e-6:
+            return
+        gx, gy = self.pt((x0 + x1) / 2, (y0 + y1) / 2)
+        hw, hd = (x1 - x0) / 2 * IN, (y1 - y0) / 2 * IN
+        rot, axis = 0.0, "y"
+        if self.quarter in (1, 3):
+            hw, hd = hd, hw
+        elif self.quarter is None:
+            rot, axis = self.th, "z"
+        r4 = lambda v: round(v, 4)
+        b = Box(FURN_KIND, r4(gx - hw), r4(gx + hw), r4(gy - hd), r4(gy + hd), r4(self.zf + z0 * IN), r4(self.zf + z1 * IN), mat, FURN_PHASE,
+                tag=self.tag, shape=shape, rot=rot, rot_axis=axis)
+        b.layer = FURN_LAYER
+        self.out.append(b)
+
+    def tris(self, tri_pts, mat):
+        """Triangles from local points (x, y, z inches) as one mesh box (the umbrella canopy)."""
+        pts = []
+        for x, y, z in tri_pts:
+            gx, gy = self.pt(x, y)
+            pts.append([round(gx, 3), round(gy, 3), round(self.zf + z * IN, 3)])
+        xs, ys, zs = [p[0] for p in pts], [p[1] for p in pts], [p[2] for p in pts]
+        b = Box(FURN_KIND, min(xs), max(xs), min(ys), max(ys), min(zs), max(zs), mat, FURN_PHASE, tag=self.tag, shape="mesh", pts=pts)
+        b.layer = FURN_LAYER
+        self.out.append(b)
+
+
+def _legs(P: _Furn, xs, ys, z1, mat, s=1.75):
+    for x in xs:
+        for y in ys:
+            x0 = min(max(x - s / 2, 0.0), P.w - s); y0 = min(max(y - s / 2, 0.0), P.d - s)
+            P.box(x0, x0 + s, y0, y0 + s, 0.0, z1, mat)
+
+
+def _cushions(P: _Furn, a: float, b: float, n: int, along_x: bool, lo: float, hi: float, z0: float, z1: float, mat, gap=0.35):
+    """n cushions side by side from a to b (along x, or along y), each lo..hi on the other axis."""
+    if n < 1 or b - a <= 0:
+        return
+    w = (b - a - gap * (n - 1)) / n
+    for i in range(n):
+        u0 = a + i * (w + gap)
+        if along_x:
+            P.box(u0, u0 + w, lo, hi, z0, z1, mat)
+        else:
+            P.box(lo, hi, u0, u0 + w, z0, z1, mat)
+
+
+def _m_seating(P: _Furn, d: dict, frame: str, cush: Optional[str]):
+    """Sectional / sofa / lounge chair, Outer's modular teak build: legs, a teak seat frame, a teak back panel, arms, a seat
+    cushion per seat on the frame, a back cushion per seat against the panel. A sectional's return (its short leg) is at the
+    +x or -x end ("ret") and runs toward the front."""
+    lounge = d["type"] == "lounge_chair"
+    legs = [P.w] if lounge else list(d.get("legs_in") or [97.8])
+    L1, L2 = legs[0], (legs[1] if len(legs) > 1 and d["type"] == "sectional" else None)
+    D = d.get("d_in", 34.4) if lounge else float(d.get("depth_in", 34.4))
+    H, seat, lh = float(d.get("height_in", 29.0)), float(d.get("seat_in", 16.0)), float(d.get("leg_in", 9.2))
+    arm, atop = float(d.get("arm_in", 5.4)), float(d.get("arm_top_in", 24.5))
+    fz, bk, bc = lh + 2.3, 2.0, 6.0                       # the frame's top (cushions sit on it), back panel, back cushion
+    arms = ["left", "right"] if lounge else list(d.get("arms") or [])
+    mir = (d.get("ret") or d.get("return") or "+x") == "-x" and L2 is not None
+    X = (lambda x0, x1: (L1 - x1, L1 - x0)) if mir else (lambda x0, x1: (x0, x1))
+    bx = lambda x0, x1, y0, y1, z0, z1, m: P.box(*X(x0, x1), y0, y1, z0, z1, m)
+    left = arm if ("left" in arms or (L2 is not None and "free" in arms)) else 0.0
+    right = (arm if "right" in arms else 0.0) if L2 is None else bk       # a sectional's corner: the return's back panel
+    # the long leg (the whole piece for a sofa / chair)
+    bx(0, L1, 0, D, lh, fz, frame)
+    bx(0, L1, 0, bk, lh, H, frame)
+    if left:
+        bx(0, left, 0, D, lh, atop, frame)
+    if right and L2 is None:
+        bx(L1 - right, L1, 0, D, lh, atop, frame)
+    n = max(1, int(round((L1 - left - right) / 29.0)))
+    if cush:
+        for i, (a, b) in enumerate([(left + (L1 - left - right) * k / n, left + (L1 - left - right) * (k + 1) / n) for k in range(n)]):
+            bx(a + (0.15 if i else 0.0), b - (0.15 if i < n - 1 else 0.0), bk, D - 0.4, fz, seat, cush)
+            bx(a + (0.15 if i else 0.0), b - (0.15 if i < n - 1 else 0.0), bk, bk + bc, seat, H - 1.0, cush)
+    lx = [0.0, L1] + [left + (L1 - left - right) * k / n for k in range(1, n)]
+    for x in lx:
+        x0, x1 = X(min(max(x - 0.875, 0.0), L1 - 1.75), min(max(x - 0.875, 0.0), L1 - 1.75) + 1.75)
+        for y in (0.0, D - 1.75):
+            P.box(x0, x1, y, y + 1.75, 0.0, lh, frame)
+    if L2 is None:
+        return
+    # the return: L1 - D .. L1 across, D .. L2 toward the front; its back panel runs the whole depth of the piece
+    bx(L1 - D, L1, D, L2, lh, fz, frame)
+    bx(L1 - bk, L1, 0, L2, lh, H, frame)
+    end = arm if "return" in arms else 0.0
+    if end:
+        bx(L1 - D, L1, L2 - end, L2, lh, atop, frame)
+    m = max(1, int(round((L2 - D - end) / 29.0)))
+    if cush:
+        for k in range(m):
+            a, b = D + (L2 - end - D) * k / m, D + (L2 - end - D) * (k + 1) / m
+            b_ = b - (0.15 if k < m - 1 else (0.0 if end else 0.4))
+            bx(L1 - D + 0.4, L1 - bk, a + 0.15, b_, fz, seat, cush)
+            bx(L1 - bk - bc, L1 - bk, (bk + bc if k == 0 else a + 0.15), b_, seat, H - 1.0, cush)
+    for y in [L2 - 1.75] + [D + (L2 - end - D) * k / m for k in range(1, m)]:
+        for x in (L1 - D, L1 - 1.75):
+            x0, x1 = X(x, x + 1.75)
+            P.box(x0, x1, y, y + 1.75, 0.0, lh, frame)
+
+
+def _m_table(P: _Furn, d: dict, frame: str, top: str, legs_inset: float, leg: float, apron_h: float, top_t: float, n: int, shelf=False):
+    """A slatted table: square legs, an apron under the top, the top's slats along its length (x)."""
+    Lt, Wt, Ht = P.w, P.d, float(d.get("h_in", 30.0))
+    zt0 = Ht - top_t
+    ins = legs_inset
+    for x0 in (ins, Lt - ins - leg):
+        for y0 in (ins, Wt - ins - leg):
+            P.box(x0, x0 + leg, y0, y0 + leg, 0.0, zt0, frame)
+    at = 1.0
+    P.box(ins, Lt - ins, ins, ins + at, zt0 - apron_h, zt0, frame)
+    P.box(ins, Lt - ins, Wt - ins - at, Wt - ins, zt0 - apron_h, zt0, frame)
+    P.box(ins, ins + at, ins, Wt - ins, zt0 - apron_h, zt0, frame)
+    P.box(Lt - ins - at, Lt - ins, ins, Wt - ins, zt0 - apron_h, zt0, frame)
+    _cushions(P, 0.0, Wt, n, False, 0.0, Lt, zt0, Ht, top, gap=0.375)
+    if shelf:
+        _cushions(P, ins + leg, Wt - ins - leg, 3, False, ins + leg, Lt - ins - leg, 5.0, 6.0, top, gap=0.5)
+
+
+def _m_dining_chair(P: _Furn, d: dict, frame: str, cush: Optional[str], arm_top: str):
+    """Outer's 595 chair: aluminium legs running up into the back posts, a seat frame with slats, three back slats and a top
+    rail; the armchair adds arm posts and teak armrests; an optional seat cushion."""
+    W, D, H, seat = P.w, P.d, float(d.get("height_in", 34.4)), float(d.get("seat_in", 17.8))
+    s, e = 1.25, 0.4
+    arms = bool(d.get("arms"))
+    ai = 1.45 if arms else 0.0                 # the armchair is wider: its seat frame sits inside the arm posts
+    for x0 in (e + ai, W - e - ai - s):
+        P.box(x0, x0 + s, D - e - s, D - e, 0.0, seat - 1.5, frame)        # front legs
+        P.box(x0, x0 + s, e, e + s, 0.0, H, frame)                          # back legs -> back posts
+    xa, xb = e + ai, W - e - ai
+    P.box(xa, xb, D - e - s, D - e, seat - 1.5, seat, frame)
+    P.box(xa, xb, e, e + s, seat - 1.5, seat, frame)
+    P.box(xa, xa + s, e, D - e, seat - 1.5, seat, frame)
+    P.box(xb - s, xb, e, D - e, seat - 1.5, seat, frame)
+    _cushions(P, e + s, D - e - s, 4, False, xa + s, xb - s, seat - 0.8, seat - 0.05, frame, gap=0.45)    # seat slats
+    for z0 in (seat + 4.5, seat + 8.5, seat + 12.5):
+        P.box(xa + s, xb - s, e + 0.2, e + 1.0, z0, min(z0 + 2.6, H - 1.6), frame)                    # back slats
+    P.box(xa, xb, e, e + s, H - 1.5, H, frame)                                                       # top rail
+    if arms:
+        for x0 in (0.0, W - 2.2):
+            P.box(x0 + 0.5, x0 + 1.7, D - 4.5, D - 3.25, seat - 1.5, float(d.get("arm_h_in", 25.8)) - 1.0, frame)   # arm posts
+            P.box(x0 + 0.5, x0 + 1.7, e + s, e + s + 1.0, seat, float(d.get("arm_h_in", 25.8)) - 1.0, frame)
+            P.box(x0, x0 + 2.2, e, D - 2.5, float(d.get("arm_h_in", 25.8)) - 1.0, float(d.get("arm_h_in", 25.8)), arm_top)  # armrest
+    if cush:
+        P.box(xa + 0.6, xb - 0.6, e + s + 0.3, D - e - 0.3, seat, seat + 1.75, cush)
+
+
+def _m_umbrella(P: _Furn, d: dict, frame: str, base: str, canopy: str):
+    """A market umbrella on its base: a square steel base, the pole, a 16-gore canopy (a shallow pyramid) and its vent cap."""
+    c = P.w / 2
+    bs, pd, H, rim = float(d.get("base_in", 24.0)), float(d.get("pole_in", 1.9)), float(d.get("h_in", 102.0)), float(d.get("rim_in", 78.0))
+    P.box(c - bs / 2, c + bs / 2, c - bs / 2, c + bs / 2, 0.0, 3.0, base)
+    P.box(c - pd / 2, c + pd / 2, c - pd / 2, c + pd / 2, 3.0, H, frame, shape="cyl")
+    R, apex, n = P.w / 2, H - 4.0, 16
+    tri = []
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        tri += [(c, c, apex), (c + R * math.cos(a0), c + R * math.sin(a0), rim), (c + R * math.cos(a1), c + R * math.sin(a1), rim)]
+    P.tris(tri, canopy)
+    P.box(c - 7.0, c + 7.0, c - 7.0, c + 7.0, apex - 1.0, apex + 3.0, canopy, shape="cyl")              # the vent cap
+    P.box(c - 1.2, c + 1.2, c - 1.2, c + 1.2, apex + 3.0, H + 1.5, frame, shape="cyl")                    # the finial
+
+
+def furniture_levels(L) -> Dict[str, float]:
+    """The floors a piece can stand on (feet above the scene's z = 0): a composite's lowest / highest part, or the deck."""
+    if hasattr(L, "parts"):
+        tops = sorted(p.spec.geometry.height_in * IN for p in L.parts)
+        lv = {"lower": tops[0], "upper": tops[-1]}
+        lv.update({p.name.lower(): p.spec.geometry.height_in * IN for p in L.parts})
+        return lv
+    zt = L.spec.geometry.height_in * IN
+    return {"deck": zt, "lower": zt, "upper": zt}
+
+
+def furniture_boxes(spec, levels: Dict[str, float]) -> List[Box]:
+    """Every styling piece of geometry.furniture as boxes in the global plan frame (see the notes above FURN_LAYER)."""
+    out: List[Box] = []
+    for it in getattr(spec.geometry, "furniture", None) or []:
+        ty = it.get("type")
+        if ty not in FURNITURE:
+            continue
+        d = dict(FURNITURE[ty], **it)
+        d["type"] = ty
+        zf = float(d["z_ft"]) if d.get("z_ft") is not None else levels.get(str(d.get("level", "lower")).lower(), min(levels.values()))
+        tag = f"Styling: {d.get('maker', 'Outer')} {d['model']} (not included)"
+        frame = _furn_mat("frame", d.get("frame"))
+        cush = _furn_mat("cushion", d["cushion"]) if d.get("cushion") else None
+        if ty in ("sectional", "sofa"):
+            legs = list(d.get("legs_in") or [97.8])
+            w, dd = legs[0], (legs[1] if ty == "sectional" and len(legs) > 1 else float(d.get("depth_in", 34.4)))
+        elif ty == "lounge_chair":
+            w, dd = float(d["w_in"]), float(d["d_in"])
+        elif ty == "dining_chair":                  # Outer's 595: 21.7" armless, 24.6" with arms
+            w, dd = float(it.get("w_in", 24.6 if d.get("arms") else 21.7)), float(d["d_in"])
+        elif ty == "umbrella":
+            w = dd = float(d.get("dia_in", 138.0))
+        else:
+            w, dd = float(d["l_in"]), float(d["w_in"])
+        P = _Furn(out, float(d["x"]), float(d["y"]), zf, float(d.get("rot_deg", 0.0)), w, dd, tag)
+        if ty in ("sectional", "sofa", "lounge_chair"):
+            _m_seating(P, d, frame, cush)
+        elif ty == "coffee_table":
+            _m_table(P, d, frame, _furn_mat("top", d.get("top", d.get("frame"))), 0.0, 2.25, 2.5, 1.0, int(d.get("slats", 5)))
+        elif ty == "side_table":
+            _m_table(P, d, frame, _furn_mat("top", d.get("top", d.get("frame"))), 0.0, 1.75, 2.0, 1.0, int(d.get("slats", 4)), shelf=True)
+        elif ty == "dining_table":
+            _m_table(P, d, frame, _furn_mat("top", d.get("top", "teak")), 2.0, 2.75, 3.0, 1.1, int(d.get("slats", 8)))
+        elif ty == "dining_chair":
+            _m_dining_chair(P, d, frame, cush, _furn_mat("arm_top", d.get("arm_top", "teak")))
+        elif ty == "umbrella":
+            _m_umbrella(P, d, frame, _furn_mat("base", d.get("base", "charcoal")), _furn_mat("canopy", d.get("canopy", "gray")))
+    return out
+
+
+def furniture_meta(spec) -> List[dict]:
+    """What the styling shows, for a page's caption: maker, model, type, level, colours."""
+    out = []
+    for it in getattr(spec.geometry, "furniture", None) or []:
+        d = dict(FURNITURE.get(it.get("type"), {}), **it)
+        out.append({k: d.get(k) for k in ("type", "model", "level", "x", "y", "rot_deg", "frame", "top", "cushion", "canopy") if d.get(k) is not None}
+                   | {"maker": d.get("maker", "Outer")})
+    return out

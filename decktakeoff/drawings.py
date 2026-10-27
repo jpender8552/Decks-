@@ -1515,6 +1515,9 @@ def _poly_area_in(P) -> float:
     return 0.5 * sum(P[i][0] * P[(i + 1) % len(P)][1] - P[(i + 1) % len(P)][0] * P[i][1] for i in range(len(P)))
 
 
+NOT_ON_SHEETS = ("site", "louvered", "styling")     # scene layers the drawing sheets leave out: the yard, a louvered roof (A-403 draws it), styling furniture
+
+
 def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: bool = False) -> List[Tuple[str, str, str]]:
     """[(num, title, svg)] — everything except A-001 (renders) and T-400 (build steps), which the build set adds.
     customer=True leaves the internal flags block off G-001. A composite deck (two levels, a wrap) gets whole-deck sheets
@@ -1525,9 +1528,9 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
         flags = None
     S = scene or build_scene(L)
     S_roof = S                          # a louvered roof has its own sheet (A-403, louvered.sheet); the deck sheets leave it out
-    if any(getattr(b, "layer", "") in ("site", "louvered") for b in S.boxes):      # the yard model is for the 3D views, not the drawing sheets
+    if any(getattr(b, "layer", "") in NOT_ON_SHEETS for b in S.boxes):      # the yard model and the styling furniture are for the 3D views, not the drawing sheets
         import dataclasses as _dc
-        S = _dc.replace(S, boxes=[b for b in S.boxes if getattr(b, "layer", "") not in ("site", "louvered")])
+        S = _dc.replace(S, boxes=[b for b in S.boxes if getattr(b, "layer", "") not in NOT_ON_SHEETS])
     _MAT_COLORS.clear()
     for k in ("deck", "border", "drink", "fascia"):
         if k in S.materials:
@@ -4423,9 +4426,9 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
         flags = None
     S0 = scene or build_scene(CL)
     x_min = getattr(S0, "x_min", 0.0)
-    # the drawing sheets: no yard, no louvered roof (its own sheet), no option (A-100 / S-100 show it dashed), no stand-in
-    # landing board on the level a stair lands on (the level is there)
-    allb = [b for b in S0.boxes if getattr(b, "layer", "") not in ("site", "louvered") and not (b.tag or "").split(": ")[-1].startswith("lower deck at the")]
+    # the drawing sheets: no yard, no louvered roof (its own sheet), no styling furniture, no option (A-100 / S-100 show it
+    # dashed), no stand-in landing board on the level a stair lands on (the level is there)
+    allb = [b for b in S0.boxes if getattr(b, "layer", "") not in NOT_ON_SHEETS and not (b.tag or "").split(": ")[-1].startswith("lower deck at the")]
     optb_ = [q for q in allb if (getattr(q, "layer", "") or "").startswith("option:") and q.kind in ("riser", "railpost", "post", "tread", "stringer", "fascia")]
     on_opt = lambda b: any(b.x0 < q.x1 + 0.06 and b.x1 > q.x0 - 0.06 and b.y0 < q.y1 + 0.06 and b.y1 > q.y0 - 0.06 and b.z0 < q.z1 + 0.06 and b.z1 > q.z0 - 0.06
                            for q in optb_)                         # a light set on an option's stair or post goes with the option

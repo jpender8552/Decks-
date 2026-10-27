@@ -129,6 +129,9 @@ class Geometry:
     through_columns: List[List[float]] = field(default_factory=list)    # existing columns that pass through the deck to the structure above: [x_ft, y_ft, size_ft]
     house_finish: str = "lap"            # how the house is drawn: "lap" siding | "stucco" | "brick"
     house_color: Optional[str] = None    # the siding color to draw (hex), from the photos — the finish's default otherwise
+    furniture: List[dict] = field(default_factory=list)  # STYLING ONLY (the 3D views): never priced, ordered or drawn on a sheet. Pieces in
+                                         # the global plan frame (feet): {type, model, x, y (the piece's centre), rot_deg, level "lower" | "upper"
+                                         # (or z_ft: the floor it stands on), frame / top / cushion / canopy colours} — types and keys in scene.FURNITURE
 
 
 @dataclass

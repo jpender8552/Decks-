@@ -119,7 +119,7 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
     # the job-wide pieces are drawn once, in the global frame, by the composite scene: the measured house and yard, the
     # house blocks, angled walls; a job-level outline is global too (a part brings its own, in its own frame)
     for k in ("parts", "zones", "width", "depth", "width_in", "depth_in", "house_blocks", "house_openings", "cover",
-              "house_model", "site_model", "house_walls", "outline"):
+              "house_model", "site_model", "house_walls", "outline", "furniture"):
         g.pop(k, None)
     g.update(part.get("geometry", {}))
     if d["geometry"].get("louvered_roofs"):     # a job-level roof (global frame): the part sees it in its own frame, marked so it neither draws nor prices it

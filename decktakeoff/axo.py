@@ -104,6 +104,8 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
     """Paint the boxes into frame (x, y, w, h) on the sheet. Returns (svg strings, to_sheet(point3d) -> (sx, sy), scale)."""
     polys = []
     pts_all = []
+    boxes = [b for b in boxes if (getattr(b, "layer", "") or "") != "styling"]            # styling furniture is never on a sheet
+    fit_boxes = None if fit_boxes is None else [b for b in fit_boxes if (getattr(b, "layer", "") or "") != "styling"]
     for b in boxes:
         lf = lift_of(b, explode, gaps)
         if b.shape == "mesh" and b.pts:          # shade sail: its own triangles, shaded by how much each faces the light
