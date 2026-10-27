@@ -77,4 +77,6 @@ def test_outline_field_plan_breakers():
     assert all(r.x1 > r.x0 + 6 for r in P.rows)
     # a row in the main run crosses the old zone lines P2/W with no joint
     assert any(r.x0 < 6.7 * 12 + 60 and r.x1 > 18 * 12 for r in P.rows)
-    assert sum(1 for l in t.lines if l.category == "Decking" and "Square Edge" in l.item and "border" not in l.item) == 3
+    field_ = [l.item for l in t.lines if l.category == "Decking" and ("Square Edge" in l.item or "Grooved" in l.item) and " — " not in l.item]
+    assert len(field_) == 3                                  # 12 / 16 / 20' field stock (owner: "12' boards do exist")
+    assert any("1x6x12 Grooved" in i for i in field_)        # every 12' Vintage is grooved — fine under Cortex in the field

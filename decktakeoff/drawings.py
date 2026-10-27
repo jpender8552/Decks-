@@ -248,6 +248,15 @@ def sheet_general_notes(L, meta) -> Optional[str]:
     notes = getattr(s.site, "general_notes", None) or (s.site.plan or {}).get("general_notes") or []
     if not notes:
         return None
+    fr = s.framing
+    if fr.footing_type != "diamond_pier":                   # a note written for Diamond Piers on a job that drills caissons: the job's footing
+        ft_note = (f"Footings: {int(L.frame.footing_dia_in)}\" drilled caissons x {ftin(L.frame.footing_depth_in)} per the footing schedule (S-100), (4) #4 verticals "
+                   f"+ #3 ties, 5/8\" cast-in anchor, bottoms below the {ftin(s.site.frost_depth_in)} frost line on undisturbed soil; post bases per the engineer. "
+                   "Call 811 before drilling." if fr.footing_type == "caisson" else "Footings per the footing schedule (S-100); post bases per the engineer. Call 811 first.")
+        notes = [ft_note if _dp_text(n) else n for n in notes]
+        if not any(str(n).lower().startswith(("footings", "footing:")) or "caisson" in str(n).lower() for n in notes):   # no footing note: the job's own
+            at_ = next((i for i, n in enumerate(notes) if str(n).lower().startswith("posts")), len(notes))
+            notes = notes[:at_] + [ft_note] + notes[at_:]
     o = [T(24, 24, "GENERAL NOTES", 9, 800, fill=GOLD)]
     wrapped = [textwrap.wrap(str(n), 80) for n in notes]
     half = sum(len(w) for w in wrapped) / 2
@@ -263,6 +272,11 @@ def sheet_general_notes(L, meta) -> Optional[str]:
     return sheet("G-002", "General notes", "The jurisdiction's requirements for this work — read with G-001 and the details", o, "No scale", meta)
 
 
+def _dp_text(txt) -> bool:
+    """Words written for a Diamond Pier footing (the model, the evaluation report, 'no excavation')."""
+    return bool(re.search(r"diamond pier|ESR-1895|no excavation|driven pins?", str(txt), re.I))
+
+
 def _design_criteria(L) -> List[Tuple[str, str]]:
     """G-001's design-criteria rows (label, text) for the job: loads, wind, frost, soil, seismic, wildfire, codes, engineering.
     A louvered roof built into the set adds its roof-snow / dead-load / post-reaction wording; the job's own rows
@@ -275,7 +289,12 @@ def _design_criteria(L) -> List[Tuple[str, str]]:
     if hasattr(L, "parts") and s.framing.footing_type == "diamond_pier":          # the head sits in a dug hole (ESR-1895 4.2)
         rows = [(k, ftin(s.site.frost_depth_in) + " (Diamond Piers: frost protection by the pin design per ICC-ES ESR-1895; the head sits in a dug hole on "
                  "undisturbed soil)") if k == "Frost depth" else (k, v) for k, v in rows]
+    elif hasattr(L, "parts") and s.framing.footing_type == "caisson":
+        rows = [(k, ftin(s.site.frost_depth_in) + f" (the {int(L.frame.footing_dia_in)}\" drilled caissons go {ftin(L.frame.footing_depth_in)} deep, their bottoms "
+                 "below the frost line on undisturbed soil)") if k == "Frost depth" else (k, v) for k, v in rows]
     for lab, txt in (getattr(s.site, "design_criteria", None) or (s.site.plan or {}).get("design_criteria") or []):
+        if s.framing.footing_type != "diamond_pier" and _dp_text(txt):
+            continue                                                  # a Diamond Pier row on a job that is not on Diamond Piers: the engine's row
         if key(lab) == "roof snow" and not (roof or s.geometry.cover or s.geometry.covers):
             continue                                                  # a roof-snow row prints only when the set has a roof
         hit = next((i for i, (k, _) in enumerate(rows) if key(k) == key(lab)), None)
@@ -716,12 +735,20 @@ def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Call
     frame_(660, 20, 320, 290, "3", "FOOTING · POST BASE")
     ft = s.framing.footing_type
     o.append(LN(680, 200, 960, 200, INK, 1.0)); o.append(T(950, 196, "grade", 6.5, 600, "end", MUTE))
-    if ft == "caisson":
+    if ft == "caisson" and base:            # the order's base given (a composite deck): the caisson to the panel's scale, its depth dimensioned
+        bot = min(302.0, 200 + L.frame.footing_depth_in / 12 * 25)
+        o.append(R(790, 187.5, 60, bot - 187.5, FILL["concrete"], INK, 0.9)); o.append(T(820, (200 + bot) / 2 + 12, f"{int(L.frame.footing_dia_in)}\" caisson", 7, 700, "middle", INK, rot=-90))
+        for xx in (800, 812, 828, 840):
+            o.append(LN(xx, 195, xx, bot - 5, "#3f5d8a", 1.0))
+        dim_v(o, lambda v: v, 862, 200, bot, ftin(L.frame.footing_depth_in), 6.6, left=False)
+        o.append(T(884, bot - 4, "(4) #4 + #3 ties", 6.5, 600, fill="#3f5d8a"))
+    elif ft == "caisson":
         o.append(R(790, 190, 60, 110, FILL["concrete"], INK, 0.9)); o.append(T(820, 250, f"{int(L.frame.footing_dia_in)}\" caisson", 7, 700, "middle", INK, rot=-90))
         for xx in (800, 812, 828, 840):
             o.append(LN(xx, 195, xx, 295, "#3f5d8a", 1.0))
+    if ft == "caisson":
         o.append(LN(680, 200 + L.spec.site.frost_depth_in / 12 * 25, 960, 200 + L.spec.site.frost_depth_in / 12 * 25, "#3f5d8a", 0.8, "4 3")); o.append(T(690, 196 + L.spec.site.frost_depth_in / 12 * 25, f"frost {ftin(L.spec.site.frost_depth_in)}", 6.5, 600, fill="#3f5d8a"))
-        o.append(R(796, 180, 48, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, "post base, 5/8\" cast-in anchor", 6.5, 600))
+        o.append(R(796, 180, 48, 10, FILL["steel"], INK, 0.6)); o.append(T(852, 188, f"{base} on the 5/8\" cast-in anchor" if base else "post base, 5/8\" cast-in anchor", 6.5, 600))
         if s.extras.stone_bases:
             o.append(R(770, 110, 100, 80, "none", "#7a7267", 1.0, 'stroke-dasharray="4 3"')); o.append(T(880, 150, "stone veneer 2'x2' x 3' + cap", 6.5, 600))
     elif ft == "diamond_pier":
@@ -1127,11 +1154,14 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
     work = ["Remove the two decks, the two roof covers and the box step; haul off", "Diamond Pier foundations (no excavation spoils), 6-mil poly + 2\" gravel under the decks",
             ("New concrete landing pad at the stair" if any(st_.landing == "concrete pad" for st_ in s.stairs) else "Stair lands on grade (no pad)"), "Roof drainage: covers shed to grade at the low eave, away from the house", "Call 811 before the piers; protect the lawn and the owner's blinds"]
     if comp:                                                       # a composite's own default list (the job's site_work wins)
-        work = [w for w in ("Remove the existing deck and haul off" if s.extras.demo_existing else "",
-                            "Diamond Pier foundations: each precast head set in a dug hole on undisturbed soil, 4 pins driven through it"
-                            if s.framing.footing_type == "diamond_pier" else "Footings per S-100",
+        ftw = {"diamond_pier": "Diamond Pier foundations: each precast head set in a dug hole on undisturbed soil, 4 pins driven through it",
+               "caisson": f"{int(L.frame.footing_dia_in)}\" drilled caissons x {ftin(L.frame.footing_depth_in)} (S-100); spoils hauled off"}.get(s.framing.footing_type, "Footings per S-100")
+        work = [w for w in ("Remove the existing deck and haul off" if s.extras.demo_existing else "", ftw,
                             "Call 811 before the footings", "Protect the lawn, beds and hardscape along the work") if w]
-    for ln in (sp.get("site_work") or work):
+    sw = sp.get("site_work") or work
+    if comp and s.framing.footing_type != "diamond_pier":          # a Diamond Pier line on a job that drills caissons: the job's footing
+        sw = [ftw if _dp_text(ln) else ln for ln in sw]
+    for ln in sw:
         for j, w in enumerate(textwrap.wrap(ln, 84)):
             o.append(T(x2, yy, ("· " if j == 0 else "  ") + w, 8, 500)); yy += 11.5
     if sp.get("source"):
@@ -2894,8 +2924,9 @@ def sheet_notes_composite(CL, S, t, flags, meta, levels, steps, index) -> str:
     worst = max((p.load for b in bls for p in b.posts), default=0)
     ms = _merged_schedule(t, levels)
     groups = [g for g in _stair_groups(S, levels) if not g.option]
-    struct = [("Footings", f"{n_ft} " + (f"Diamond Pier {CL.frame.footing_model}" if fr.footing_type == "diamond_pier" else fr.footing_type.replace("_", " ") + " footings")
-                           + " — " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)),
+    sl_ids, sl_name = _slab_posts(s, _post_rows(levels, S.boxes))
+    struct = [("Footings", f"{n_ft} x " + _footing_words(s, CL, t) + " — " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)
+                           + (f"; {_id_run(sl_ids)} through saw-cut openings in the {sl_name.lower()}" if sl_ids else "") + " (S-100)"),
               ("Posts", f"{fr.post_size} {post_words(s)} on {_post_base_name(s, t)} bases: " + " · ".join(f"{_lv_word(lv)} " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)),
               ("Beams", f"{len(bls)} {' / '.join(sorted({b.kind for b in bls}))} beam lines, {' / '.join(sorted({b.size + ' ' + b.species for b in bls}))}, {n_ft} posts"
                         + (f" (worst {worst:,.0f} lb)" if worst else "") + " — " + "; ".join(f"{_lv_word(lv)} " + ", ".join(b.short for b in lv.beams) for lv in levels if lv.beams) + " (S-100 / S-101)"),
@@ -3618,15 +3649,16 @@ def sheet_elevations_composite(CL, S, t, levels, steps, meta) -> str:
                 p_ = sorted(posts, key=lambda b: b.x0)[len(posts) // 2]
                 ax_, ay_ = to_sheet(((p_.x0 + p_.x1) / 2, p_.y1, p_.z0 + (p_.z1 - p_.z0) * 0.3))
                 o.append(LN(ax_, ay_, ax_ + 18, gy + 14, INK, 0.5)); o.append(C(ax_, ay_, 1.4, INK, "none", 0))
-                o.append(TH(ax_ + 20, gy + 17, f"{n_} {s.framing.post_size} {post_words(s)} columns on {_post_base_name(s, t)} bases + Diamond Piers"
-                            if s.framing.footing_type == "diamond_pier" else f"{n_} {s.framing.post_size} {post_words(s)} columns", 6.6, 700))
+                o.append(TH(ax_ + 20, gy + 17, f"{n_} {s.framing.post_size} {post_words(s)} columns on {_post_base_name(s, t)} bases, "
+                            + {"diamond_pier": "Diamond Piers", "caisson": f"{int(CL.frame.footing_dia_in)}\" drilled caissons", "concrete": "concrete piers"}.get(
+                                s.framing.footing_type, "existing caissons"), 6.6, 700))
     if steps:
         lo, hi = steps[0][0], steps[0][1]
         o.append(T(20, 334, f"STEP FACE — seen from the {lo.name.lower()} ({inch(hi.h_in - lo.h_in)} up)", 9, 800, fill=GOLD))
         groups = [g for g in _stair_groups(S, levels) if not g.option]
         _step_face_view(o, (20, 336, 600, 196), levels, steps, groups, bx, cols, s, t)
     notes = [" · ".join(f"{lv.name}: surface {ftin(lv.h_in)} above grade" for lv in levels),
-             "Heights AFG = above finished grade at the beam line; field-verify grade before setting the piers",
+             "Heights AFG = above finished grade at the beam line; field-verify grade before setting the footings",
              f"Deck frame: {s.framing.joist_size} {s.framing.joist_grade} @ {CL.frame.spacing:g}\" OC on {sum(len(lv.beams) for lv in levels)} "
              f"{' / '.join(sorted({b.kind for lv in levels for b in lv.beams}))} beam lines, {sum(len(b.posts) for lv in levels for b in lv.beams)} "
              f"{s.framing.post_size} columns (S-100 / S-101)"]
@@ -3771,7 +3803,7 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
         items.append((*at(q[0], 0.5, 0.45), f"{s.framing.post_size} {post_words(s)} column"))
     q = [b for b in cutA if b.kind == "footing"] or [b for d, b in beyA if b.kind == "footing"]
     if q:
-        items.append((*at(q[0], 0.5, 1.0), f"Diamond Pier {CL.frame.footing_model} + {_post_base_name(s, t)} base" if s.framing.footing_type == "diamond_pier" else "Footing"))
+        items.append((*at(q[0], 0.5, 1.0), f"{_footing_words(s, CL, t, short=True)} + {_post_base_name(s, t)} base"))
     q = [b for b in cutA if b.kind in ("toprail", "drink") and b.z0 < hi.top]
     if q:
         items.append((*at(q[0], 0.5, 1.0), f"{rail_name(s.railing.system)} {s.railing.height_in:g}\"" + (" + drink rail" if s.railing.drink_rail else "")))
@@ -3890,6 +3922,9 @@ def _composite_key(CL, S, t) -> list:
         lab = lab.replace("head + 4 driven pins (frost-protected, no excavation)", "precast head in a dug hole + 4 driven pins (frost-protected)")
         lab = lab.replace(" rail rail,", " rail,")
         out.append((lab, pred, where, pick))
+    if s.framing.footing_type != "diamond_pier":                  # the footing the spec names (member_key keys only a Diamond Pier)
+        out.insert(0, (_footing_words(s, CL, t, short=True).capitalize() + (", (4) #4 + #3 ties, 5/8\" cast-in anchor" if s.framing.footing_type == "caisson" else ""),
+                       lambda b: b.kind == "footing" and "Diamond" not in (b.tag or ""), (0.5, 0.5, 1.0), "first"))
     if s.railing.drink_rail:
         out.append((f"Drink rail — {getattr(s.railing, 'drink_rail_collection', '') or s.decking.collection} {getattr(s.railing, 'drink_rail_color', '') or s.decking.color} board"
                      + (" over the posts" if str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over" else ""), lambda b: b.kind == "drink", (0.5, 0.5, 1.0), "mid"))

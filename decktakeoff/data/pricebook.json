@@ -130,8 +130,8 @@
       "desc": "24\" form tube"
     },
     "ABA66Z": {
-      "each": 16.0,
-      "source": "est.",
+      "each": 27.85,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — ABA66Z",
       "desc": "Simpson ABA66Z adjustable post base 6x6"
     },
     "ABA66RZ": {
@@ -253,8 +253,8 @@
       "desc": "Simpson LUS210Z face-mount hanger 2x10/2x12"
     },
     "HUCQ210-2-SDS": {
-      "each": 18.0,
-      "source": "est.",
+      "each": 94.28,
+      "source": "D&D quote 978707 (GSEXT1) 9 Sep 2026 — HUCQ2102SDS",
       "desc": "Simpson HUCQ210-2-SDS concealed-flange double 2x10 hanger (SDS screws included)"
     },
     "HUCQ210-3-SDS": {
@@ -278,8 +278,8 @@
       "desc": "Simpson H2.5AZ hurricane tie (joists to the drop beam, hidden)"
     },
     "BC46Z": {
-      "each": 14.0,
-      "source": "est.",
+      "each": 17.68,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — BC46Z",
       "desc": "Simpson BC46Z post cap 6x post / 4x beam"
     },
     "BC6Z": {
@@ -298,8 +298,8 @@
       "desc": "Simpson BCS2-2/4Z post cap 4x post / (2)2x beam"
     },
     "LSCZ": {
-      "each": 2.93,
-      "source": "D&D quote 979610 11 Sep 2026",
+      "each": 3.8,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — LSCZ",
       "desc": "Simpson LSCZ adjustable stair-stringer connector"
     },
     "DTT1Z": {
@@ -313,20 +313,20 @@
       "desc": "Simpson DTT2Z deck tension tie"
     },
     "nail_3in_5lb": {
-      "each": 24.34,
-      "source": "D&D Aug-26",
+      "each": 18.73,
+      "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — Camo 0096175",
       "desc": "Camo 9ga HDG hanger nail 3\" 5 lb (~350)",
       "count": 350
     },
     "nail_1.5in_5lb": {
-      "each": 22.74,
-      "source": "D&D Aug-26",
+      "each": 17.5,
+      "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — Camo 0096095",
       "desc": "Camo 9ga HDG hanger nail 1-1/2\" 5 lb (~650)",
       "count": 650
     },
     "LedgerLOK_50": {
-      "each": 62.0,
-      "source": "est.",
+      "each": 56.14,
+      "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — FMLL358-50",
       "desc": "FastenMaster LedgerLOK 3-5/8\" 50 ct",
       "count": 50
     },
@@ -378,8 +378,8 @@
       "desc": "Ledger end dam"
     },
     "gtape_2": {
-      "each": 18.6,
-      "source": "D&D quote 979610 11 Sep 2026 — GT265DFT",
+      "each": 18.45,
+      "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — GT265DFT",
       "desc": "Nichigo G-Tape 3035 2\" x 65' black",
       "lf": 65
     },
@@ -390,8 +390,8 @@
       "lf": 65
     },
     "gtape_6": {
-      "each": 62.0,
-      "source": "est.",
+      "each": 55.72,
+      "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — GT665DFT",
       "desc": "Nichigo G-Tape 3035 6\" x 65' black",
       "lf": 65
     },
@@ -549,8 +549,8 @@
       "count": 50
     },
     "LedgerLOK5_50": {
-      "each": 75.0,
-      "source": "EST",
+      "each": 58.68,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — FMLLF005-50",
       "desc": "FastenMaster LedgerLOK 5\" (50 ct)",
       "count": 50
     },
@@ -730,8 +730,8 @@
       "source": "est. — get D&D quote"
     },
     "TimberTech|Vintage|per_lf": {
-      "each": 7.69,
-      "source": "D&D quote 979610 11 Sep 2026 ($123.04 / 16', $153.80 / 20')"
+      "each": 7.25,
+      "source": "D&D quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct ($145.00 / 20' square)"
     },
     "TimberTech|Landmark|per_lf": {
       "each": 7.2,
@@ -766,32 +766,32 @@
       "count": 224
     },
     "TimberTech|Vintage|16|square": {
-      "each": 123.04,
-      "source": "D&D quote 979610 (GSEXT1, H. Frederick) 11 Sep 2026 — AZV1616WT; one price for all Vintage colors (English Walnut = ADB15516EW)"
+      "each": 130.58,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZV1616EW"
     },
     "TimberTech|Vintage|20|square": {
-      "each": 153.8,
-      "source": "D&D quote 979610 11 Sep 2026 — AZV1620WT (English Walnut = ADB15520EW)"
+      "each": 145.0,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZV1620EW"
     },
     "TimberTech|Vintage|12|grooved": {
-      "each": 92.28,
-      "source": "EST — 12' x $7.69/LF (D&D 979610); AGB15512EW not quoted"
+      "each": 87.0,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZV1612EWG (every 12' Vintage on D&D's quotes is grooved; owner: '12' grooved even with cortex')"
     },
     "TimberTech|Vintage|16|grooved": {
-      "each": 123.04,
-      "source": "EST — D&D prices grooved = square (Landmark 1x6x20 sq/grv both $138.60 SO 6622045; Reserve 1x6x20 sq/grv both $112.15 SO 6645370); AGB15516EW"
+      "each": 116.0,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZV1616EWG"
     },
     "TimberTech|Vintage|20|grooved": {
-      "each": 153.8,
-      "source": "EST — grooved = square at D&D; AGB15520EW"
+      "each": 145.0,
+      "source": "EST — = the 20' square (no GSEXT1 price; D&D ALPIN1 order 9 Oct prices 20' grooved = 20' square)"
     },
     "TimberTech|Vintage|fascia": {
-      "each": 171.38,
-      "source": "D&D quote 979610 11 Sep 2026 — AZVFASCIA12WT 1/2 x 11-3/4 x 12' (English Walnut = ADR5117512EW)"
+      "each": 163.17,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZVFASCIA12EW 1/2 x 11-3/4 x 12'"
     },
     "TimberTech|Vintage|riser": {
-      "each": 121.69,
-      "source": "D&D quote 979610 11 Sep 2026 — AZVRISER12WT 3/4 x 7-1/4 x 12' (English Walnut = ARISER72512EW)"
+      "each": 115.46,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZVRISER12EW 3/4 x 7-1/4 x 12'"
     },
     "Cortex_TimberTech_100lf": {
       "each": 52.0,
@@ -813,7 +813,7 @@
     },
     "TimberTech|Vintage|12|square": {
       "each": 92.28,
-      "source": "owner 27 Oct 2026: Vintage 12' square-shoulder boards exist (GSX buys them) — priced at the D&D $7.69/LF (quote 979610 11 Sep 2026)"
+      "source": "owner 27 Oct 2026 '12' boards do exist' — on D&D's quotes the 12' Vintage is GROOVED (AZV1612EWG, see 12|grooved); a 12' field row orders the grooved board"
     }
   },
   "rail": {
@@ -989,13 +989,13 @@
       "desc": "Cinch HD 2\" post (welded base, cap, skirt, screws), Satin Black"
     },
     "IRX Baluster|panel|8|level": {
-      "each": 293.91,
-      "source": "D&D SO 6622045 (GSEXT1) 9 Jul 2026 — AZTIX36UNLP8B (CASH50 quote 959545 7 Jul 2026: $275.52)",
+      "each": 278.14,
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP8B",
       "desc": "TimberTech Impression Rail Express 36\" 8' level universal panel kit, 20 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}"
     },
     "IRX Baluster|panel|6|level": {
-      "each": 211.35,
-      "source": "D&D SO 6622045 9 Jul 2026 — AZTIX36UNLP6B",
+      "each": 199.5,
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP6B",
       "desc": "TimberTech Impression Rail Express 36\" 6' level universal panel kit, 15 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}"
     },
     "IRX Baluster|panel|8|stair": {
@@ -1030,18 +1030,18 @@
       "desc": "TimberTech Impression Rail Express 3\" x 3\" x 38\" post kit (post, cap, skirt) for a 36\" rail, {color}"
     },
     "IRX Baluster|handrail_kit": {
-      "each": 180.63,
-      "source": "D&D quote 979610 11 Sep 2026 — AZTIXADAPR90DRKB ADA pipe rail + 90-degree return kit (extension AZTIXADAPREKB $193.48)",
+      "each": 188.72,
+      "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZTIXADAPR90DRKB ADA pipe rail + 90° return kit",
       "desc": "TimberTech Impression aluminum ADA graspable handrail, pipe rail + 90-degree return kit, {color}"
     },
     "IRX Baluster|top_rail|8": {
-      "each": 91.7,
-      "source": "D&D quote 979610 11 Sep 2026 — Classic AZTIXCSTR8B (Modern AZTIXMDTR8B not quoted)",
+      "each": 85.58,
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — Classic AZTIXCSTR8B",
       "desc": "TimberTech Impression Rail Express top rail 8' (Classic; Modern priced alike — confirm), {color}"
     },
     "IRX Baluster|top_rail|6": {
-      "each": 76.94,
-      "source": "D&D quote 979610 11 Sep 2026 — Classic AZTIXCSTR6B (Modern AZTIXMDTR6B not quoted)",
+      "each": 77.52,
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — Classic AZTIXCSTR6B",
       "desc": "TimberTech Impression Rail Express top rail 6' (Classic; Modern priced alike — confirm), {color}"
     },
     "IRX Baluster|post_kit|48": {

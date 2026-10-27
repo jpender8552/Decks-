@@ -13,7 +13,7 @@ from .flags import Flag, run_flags
 from .layout import Layout, RailPost
 from .spec import DeckSpec
 from .catalog import deck_lengths
-from .takeoff import CutPiece, Line, Takeoff, _price, build_takeoff, pack_boards, site_lines
+from .takeoff import CutPiece, Line, Takeoff, _price, build_takeoff, field_lengths, pack_boards, site_lines
 
 
 @dataclass
@@ -198,30 +198,53 @@ def _stair_landings(parts: List["Part"]) -> None:
 
 def _pool_decking(spec: DeckSpec, parts: List[Part], lines: List[Line]) -> None:
     """One cut plan for the field boards of every part and the spares once per job (the standard: field +2, 1 spare border):
-    the merge alone packs each level on its own — no offcut crosses a level — and carries every part's spares."""
+    the merge alone packs each level on its own — no offcut crosses a level — and carries every part's spares. The stair treads
+    come out of the same boards (owner: "If you have cut offs they can be used as stair treads"); a board that carries a tread is
+    square edge (the nosing shows), and a row may sit on a 12' grooved board when the field is face-screwed (field_lengths)."""
     dk = spec.decking
     if any((p.spec.decking.collection, p.spec.decking.color, p.spec.decking.profile) != (dk.collection, dk.color, dk.profile) for p in parts):
         return
-    prof = "Grooved" if dk.profile == "grooved" else "Square Edge"
     head = f"{dk.brand} {dk.collection} {dk.color} 1x6x"
-    field_ = [l for l in lines if l.category == "Decking" and l.item.startswith(head) and l.item.endswith(f" {prof}")]
+    field_ = [l for l in lines if l.category == "Decking" and l.item.startswith(head) and l.item.endswith((" Square Edge", " Grooved")) and " — " not in l.item]
+    treads_ = [l for l in lines if l.category == "Stairs" and l.item.startswith(head) and " — treads (" in l.item]
     pieces = [(f"{p.name} {c.member[len('Field boards '):]}", c.length_in + 0.25)
               for p in parts for c in p.takeoff.cut_list if c.member.startswith("Field boards") for _ in range(int(c.qty))]
-    if field_ and pieces:
-        packed = pack_boards(pieces, stocks=deck_lengths(dk.collection, dk.profile))
-        top = max(packed)
-        price = {int(l.item[len(head):].split()[0]): (l.unit_cost, l.source) for l in field_}
-        at = lines.index(field_[0])
-        for l in field_:
-            lines.remove(l)
-        new = []
-        for stock, boards in sorted(packed.items()):
-            uc, src = price.get(stock) or _price("decking", f"{dk.brand}|{dk.collection}|{stock}|{dk.profile}")
-            n, multi = len(boards), sum(1 for b in boards if len(b) > 1)
-            new.append(Line("Decking", f"{head}{stock} {prof}", n, n + (2 if stock == top else 0), "ea",
-                            ("+2  (" if stock == top else "exact  (") + f"one cut plan for {' + '.join(p.name for p in parts)}: {n} x {stock}'"
-                            + (f", {multi} cut into 2-3 rows" if multi else "") + " · every row one piece)", uc, src))
-        lines[at:at] = new
+    tpieces = [(f"tread · {p.name} {st.side}", st.width + 0.25) for p in parts for st in p.layout.stairs for _ in range(int(st.tread_pieces))]
+    if not (field_ and pieces):
+        return
+    stocks = field_lengths(spec)
+    square = deck_lengths(dk.collection, dk.profile)
+    packed = pack_boards(pieces + tpieces, stocks=stocks)
+    boards: "OrderedDict[Tuple[int, str], list]" = OrderedDict()
+    for stock, bins in sorted(packed.items()):
+        for b in bins:
+            st_ = stock
+            if any(lab.startswith("tread") for lab, _ in b) and st_ not in square:       # a tread board is square edge: the next square stock
+                used = sum(x + 0.125 for _, x in b)
+                st_ = next((q for q in sorted(square) if used <= q * 12 - 2.0 + 1e-6), max(square))
+            boards.setdefault((st_, dk.profile if st_ in square else "grooved"), []).append(b)
+    top = max(k[0] for k in boards if k[1] == dk.profile) if any(k[1] == dk.profile for k in boards) else max(k[0] for k in boards)
+    price = {}
+    for l in field_ + treads_:
+        st_ = int(l.item[len(head):].split()[0])
+        price.setdefault((st_, "grooved" if " Grooved" in l.item else dk.profile), (l.unit_cost, l.source))
+    at = lines.index(field_[0])
+    for l in field_ + treads_:
+        lines.remove(l)
+    new = []
+    for (stock, prof), bins in sorted(boards.items()):
+        uc, src = price.get((stock, prof)) or _price("decking", f"{dk.brand}|{dk.collection}|{stock}|{prof}")
+        if not uc:
+            lf, src = _price("decking", f"{dk.brand}|{dk.collection}|per_lf"); uc = round(lf * stock, 2)
+        n, multi = len(bins), sum(1 for b in bins if len(b) > 1)
+        nt = sum(1 for b in bins for lab, _ in b if lab.startswith("tread"))
+        spare = 2 if (stock == top and prof == dk.profile) else 0
+        new.append(Line("Decking", f"{head}{stock} {'Grooved' if prof == 'grooved' else 'Square Edge'}", n, n + spare, "ea",
+                        (f"+{spare}  (" if spare else "exact  (") + f"one cut plan for {' + '.join(p.name for p in parts)}: {n} x {stock}'"
+                        + (f", {multi} cut into 2-3 pieces" if multi else "") + (f", {nt} stair-tread pieces from the offcuts" if nt else "")
+                        + " · every row one piece"
+                        + (f" · {stock}' is sold grooved: field rows only, Cortex through the face" if prof != dk.profile else "") + ")", uc, src))
+    lines[at:at] = new
     fas = [l for l in lines if l.category == "Fascia" and " — " not in l.item]
     fpieces = [(c.member, c.length_in) for p in parts for c in p.takeoff.cut_list if c.nominal == "fascia" for _ in range(int(c.qty))]
     if len(parts) > 1 and len(fas) == 1 and fpieces:
@@ -248,6 +271,7 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
     _stair_landings(parts)          # a stair from one level onto another: no stand-in boards under its foot
     # ---- merge the orders: same category + item -> one line, quantities summed, reasons joined
     merged: "OrderedDict[Tuple[str, str], Line]" = OrderedDict()
+    whys: "OrderedDict[Tuple[str, str], OrderedDict[str, List[str]]]" = OrderedDict()
     for p in parts:
         for ln in p.takeoff.lines:
             if ln.category == "Site":           # every part carries the job's extras: its site lines are added once, below
@@ -256,12 +280,16 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
             if key in merged:
                 m = merged[key]
                 m.net = round(m.net + ln.net, 3); m.order = round(m.order + ln.order, 3)
-                if ln.why and ln.why not in m.why:
-                    m.why = f"{m.why} + {p.name}: {ln.why}"
             else:
-                c = copy.copy(ln)
-                c.why = f"{p.name}: {ln.why}" if ln.why else p.name
-                merged[key] = c
+                merged[key] = copy.copy(ln)
+            whys.setdefault(key, OrderedDict()).setdefault(ln.why or "", []).append(p.name)
+    for key, m in merged.items():               # each reason once, with the parts it is true of ("each" when it repeats)
+        culls = [w for w, nm in whys[key].items() for _ in nm]
+        if key[0] == "Lumber" and len(culls) > 1 and all(w.startswith("+1 cull") for w in culls):
+            m.order = round(m.net + 1, 3)          # the standard: 1 cull per length per job, not per part
+        m.why = " + ".join(f"{' + '.join(nm)}{' (each)' if len(nm) > 1 and w else ''}" + (f": {w}" if w else "") for w, nm in whys[key].items())
+        if m.order == m.net + 1 and len(culls) > 1 and key[0] == "Lumber":
+            m.why = "+1 cull (one per length per job) · " + m.why
     lines = list(merged.values())
     _pool_decking(spec, parts, lines)
     lines += site_lines(spec, sum(p.layout.deck_sf for p in parts))

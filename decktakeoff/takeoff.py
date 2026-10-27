@@ -190,6 +190,21 @@ def pack_boards(pieces: List[Tuple[str, float]], stocks=(16, 20), kerf: float = 
     return out
 
 
+def field_lengths(spec: DeckSpec) -> tuple:
+    """The stocks a field row may be cut from: the line's own profile, plus the lengths it is sold in grooved only when the field is
+    face-screwed with Cortex (owner: "you can use 12' grooved even with cortex" — the groove never shows between field boards)."""
+    c, p = spec.decking.collection, spec.decking.profile
+    own = deck_lengths(c, p)
+    if p == "square" and (spec.decking.fastener_system or default_fastener_system(c, p)) == "Cortex":
+        return tuple(sorted(set(own) | set(deck_lengths(c, "grooved"))))
+    return own
+
+
+def field_profile(spec: DeckSpec, stock: int) -> str:
+    """The profile a field board of this stock is ordered in: the line's own, else grooved (a length sold grooved only)."""
+    return spec.decking.profile if stock in deck_lengths(spec.decking.collection, spec.decking.profile) else "grooved"
+
+
 def site_lines(spec: DeckSpec, deck_sf: float) -> List[Line]:
     """The job's site lines (demo, site extras) — once per job: a composite adds them once, not once per part."""
     out = []
@@ -305,7 +320,7 @@ def _accumulate_field_plan(Q_: Q, spec: DeckSpec, L: Layout) -> None:
         Q_.clips += crossings * (2 if cortex else 1)
         Q_.bearing_points += crossings
     # cut the rows from stock: the short rows beside the steps and the bay come two or three to a board
-    packed = pack_boards([(f"panel {r.panel + 1}", r.length + 0.25) for r in P.rows], stocks=deck_lengths(spec.decking.collection, spec.decking.profile))
+    packed = pack_boards([(f"panel {r.panel + 1}", r.length + 0.25) for r in P.rows], stocks=field_lengths(spec))
     for stock, boards in sorted(packed.items()):
         Q_.field_boards[stock] += len(boards)
         multi = sum(1 for b in boards if len(b) > 1)
@@ -404,7 +419,7 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
         Q_.timber_ends += 2 * pieces_here
     # ---- decking: field boards per run, rips, cortex per run (an outline-laid plan is counted once, after the zones)
     runs = ([] if L.plan is not None else (_field_runs(spec, L, z, zi) if L.multi else [(dk.rows, dk.field_len, z.name)]))
-    _dl = deck_lengths(spec.decking.collection, spec.decking.profile)
+    _dl = field_lengths(spec)
     for n_rows, run_len, lab in runs:
         k = max(1, int(math.ceil(run_len / 240.0)))
         piece = run_len / k
@@ -743,6 +758,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             uc, src = _lumber_price(car, 12, timber)
             lines.append(Line("Lumber", f"{car}x12 {'#1 KDAT' if not timber else 'DF #1'} — stair carrier (2 ply) + blocking between stringers at each carrier ({st_.side}" + (f", {n_car} carriers" if n_car > 1 else "") + ")",
                               3 * n_car, 3 * n_car, "ea", f"exact  (2 ply x {ftin(st_.width + 6)} carrier + {st_.stringers - 1} blocks, 1 spare — per carrier)", uc, src))
+        for li_, h_l in enumerate(getattr(st_, "landing_post_h", None) or []):     # landing posts on the deck's own footings: cut with the deck's posts
+            post_pieces += [(spec.framing.post_size, h_l + 6.0, "stair landing post")] * 4
+            cuts.append(CutPiece(f"Stair landing posts ({st_.side}, landing {li_ + 1})", spec.framing.post_size, h_l, 4, "on the deck's footings and post bases — field-measure"))
     for (nom, st), (n, labels) in pack_lumber(post_pieces, short_stock_ft=8).items():
         df1_post = spec.framing.post_species.upper().startswith("DF") and not timber
         uc, src = _lumber_price(nom, st, timber or df1_post)
@@ -858,9 +876,13 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             pcs = int(math.ceil((2 * (lw + ld) / 12 + n_j * ld / 12) / 12)) + 1
             uc, src = _lumber_price(jsize, 12, timber)
             lines.append(Line("Stairs", f"{jsize}x12 {SPECIES_NAMES.get(jsp, jsp)} — landing {li + 1} frame ({ftin(lw)} x {ftin(ld)}, {st_s.side} stair)", pcs, pcs, "ea", f"+1  (rims + {n_j} joists @ {spec.joist_spacing:g}\")", uc, src))
-            uc, src = _lumber_price(spec.framing.post_size, 8, timber or spec.framing.post_size.startswith("8x"))
-            lines.append(Line("Stairs", f"{spec.framing.post_size}x8 — landing {li + 1} posts (4)", 4, 4, "ea", "exact", uc, src))
-            if spec.framing.footing_type == "diamond_pier":     # the landing sits on the same footing the deck does
+            deck_ft = getattr(st_s, "landing_footing", "") == "deck"      # its posts, footings and bases are counted with the deck's (post lumber, footing lines)
+            if not deck_ft:
+                uc, src = _lumber_price(spec.framing.post_size, 8, timber or spec.framing.post_size.startswith("8x"))
+                lines.append(Line("Stairs", f"{spec.framing.post_size}x8 — landing {li + 1} posts (4)", 4, 4, "ea", "exact", uc, src))
+            if deck_ft:
+                pass
+            elif spec.framing.footing_type == "diamond_pier":     # the landing sits on the same footing the deck does
                 lm_ = spec.framing.footing_model if spec.framing.footing_model in PRICEBOOK["footings"] else fr0.footing_model   # an unpriced spec model: the pier the frame resolved to
                 ucp, srcp = _price("footings", lm_)
                 lines.append(Line("Stairs", f"Diamond Pier {lm_} — landing {li + 1} footings", 4, 4, "ea", "exact  (one under each landing post)", ucp, srcp))
@@ -1101,12 +1123,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     # ================= DECKING
     prof = "Grooved" if spec.decking.profile == "grooved" else "Square Edge"
     for stock, n_rows in sorted(Qz.field_boards.items()):
-        key = f"{brand}|{coll}|{stock}|{spec.decking.profile}"
+        fp = field_profile(spec, stock)          # a length sold grooved only (Vintage 12'): the grooved board, Cortex through the face
+        key = f"{brand}|{coll}|{stock}|{fp}"
         uc, src = _price("decking", key)
         if uc == 0.0:
             lf, src = _price("decking", f"{brand}|{coll}|per_lf"); uc = round(lf * stock, 2)
-        lines.append(Line("Decking", f"{brand} {coll} {color} 1x6x{stock} {prof}", n_rows, n_rows + 2, "ea",
-                          "+2  (" + " · ".join(n for n in Qz.field_piece_note if n.split(":")[0] and True) + ")", uc, src))
+        lines.append(Line("Decking", f"{brand} {coll} {color} 1x6x{stock} {'Grooved' if fp == 'grooved' else 'Square Edge'}", n_rows, n_rows + 2, "ea",
+                          "+2  (" + " · ".join(n for n in Qz.field_piece_note if n.split(":")[0] and True) + ")"
+                          + (f" · {stock}' is sold grooved: field rows only, Cortex through the face" if fp != spec.decking.profile else ""), uc, src))
     if Qz.rip_strips:
         n_rip = len(pack_boards([("rip", s) for s in Qz.rip_strips], stocks=(16,), kerf=0.125)[16]) if False else int(math.ceil(sum(s + 0.125 for s in Qz.rip_strips) / dk0.bw))
         stock = 16 if timber else min(deck_lengths(coll, "square"))

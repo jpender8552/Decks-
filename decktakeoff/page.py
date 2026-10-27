@@ -343,7 +343,8 @@ def _reads_levels(t, L, sm):
                     + (f"{s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "the same color"))
     decking += f", matching fascia · {fsys} fasteners" + (" with color-matched plugs" if fsys == "Cortex" else "")
     rl = L.rail
-    rail = (f"{s.decking.brand} {rail_name(rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+    from .report import rail_words
+    rail = (f"{s.decking.brand} {rail_words(s, rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
             + (f" · {s.railing.drink_rail_collection + ' ' if s.railing.drink_rail_collection else ''}{s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "")) if rl else "None"
     reads += [("Decking", decking), ("Rail", rail)]
     for ss, st in zip(stair_specs(t), L.stairs):
@@ -356,8 +357,8 @@ def _reads_levels(t, L, sm):
         from .report import post_light_terms
         reads.append(("Lighting", ", ".join(x for x in ((f"{lt['riser']} riser lights" if lt["riser"] else ""), (f"{lt['post_cap']} {post_light_terms(t)[0]}" if lt["post_cap"] else ""),
                                                         (f"{lt['other']} more" if lt["other"] else "")) if x) + " · LED, low voltage"))
-    n_p = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or L.n_footings
-    found = f"{n_p} Diamond Pier foundations" if s.framing.footing_type == "diamond_pier" else sm["posts"].split(" on ")[-1]
+    from .report import foundation_words
+    found = foundation_words(t)[2]           # by the spec's footing type: Diamond Piers, caissons (size), concrete piers
     reads += [("Structure", composite_frame_words(t).rstrip(".") + f"; {found}"), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
     return '<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
@@ -388,7 +389,8 @@ def _reads_lite(t, L, sm):
     elif s.railing.existing_parapet:
         rail = "The existing stucco parapet stays" + (f"; {rl.system} {rl.color} {rl.height:g}\" rail on the new stair and landings" if rl and L.stairs else "")
     elif rl:
-        rail = f"{s.decking.brand} {rail_name(rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+        from .report import rail_words
+        rail = f"{s.decking.brand} {rail_words(s, rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
     else:
         rail = "None"
     stairs = []
@@ -448,11 +450,11 @@ def _added_facts(t0, t1) -> list:
     drl = round(r1.rail_lf - (r0.rail_lf if r0 else 0.0), 1) if r1 else 0.0
     if drl >= 1:
         rows.append(("Rail", f"{drl:g} LF more of the same rail"))
-    def piers(t):
-        return int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or t.layout.n_footings
-    dp = piers(t1) - piers(t0)
-    if dp > 0:
-        rows.append(("Foundation", f"{dp} more Diamond Pier foundation{'s' if dp != 1 else ''}"))
+    from .report import foundation_words
+    dp = foundation_words(t1)[0] - foundation_words(t0)[0]
+    if dp > 0:                               # by the spec's footing type
+        noun = {"diamond_pier": "Diamond Pier foundation", "caisson": "concrete caisson", "concrete": "concrete pier"}.get(t1.spec.framing.footing_type, "footing")
+        rows.append(("Foundation", f"{dp} more {noun}{'s' if dp != 1 else ''}"))
     return rows
 
 
@@ -651,6 +653,25 @@ def _viewer_link(url: str, note: Optional[str] = None) -> str:
     return ('<h2 class="kicker" id="g-3d">Interactive 3D <span class="tag">opens in a web browser</span></h2>'
             f'<div class="v3d-link"><p>{E(note or "The deck and its options in 3D, in a web browser.")}</p>'
             f'<a class="v3d-btn" href="{E(url)}">Open the interactive 3D model</a><span class="v3d-url">{E(url)}</span></div>')
+
+
+def _confirm_box(spec) -> str:
+    """The proposal's "Still to confirm" box (extras.confirm: [lines] or {"title", "intro", "items"}): what the client and we
+    settle before the build. It prints on an engineered quote too, where proposal_note does not. A line that opens on a short
+    sentence ("HOA approval. ...") sets that sentence in bold."""
+    c = getattr(spec.extras, "confirm", None)
+    if not c:
+        return ""
+    c = dict(items=list(c)) if isinstance(c, (list, tuple)) else dict(c)
+    items = [str(x).strip() for x in c.get("items") or [] if str(x).strip()]
+    if not items:
+        return ""
+
+    def li(x):
+        head, sep, rest = x.partition(". ")
+        return f"<li><b>{E(head)}.</b> {E(rest)}</li>" if sep and len(head.split()) <= 8 else f"<li>{E(x)}</li>"
+    return (f'<h2 class="kicker" id="g-confirm">{E(c.get("title") or "Still to confirm before we build")}</h2><div class="confirm">'
+            + (f"<p>{E(c['intro'])}</p>" if c.get("intro") else "") + '<ul class="opt-scope">' + "".join(li(x) for x in items) + "</ul></div>")
 
 
 # words a homeowner's timeline never carries (the schedule model scrubs its customer rows; this keeps it that way)
@@ -873,6 +894,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
             q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
             w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + opt_html + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
+        w(_confirm_box(spec))                # the client's "Still to confirm" box (extras.confirm), outside the scope and the price
         if viewer_url is not None:           # the interactive 3D page instead of the embedded viewer (PDF-first documents)
             w(_viewer_link(viewer_url, viewer_note))
         else:
@@ -1018,7 +1040,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
             + (PL.FONT + PL.CSS + PL.brand_css(spec) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
             + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
-            + (PL.TIMELINE_CSS if proposal and timeline_of(spec) else "")
+            + (PL.TIMELINE_CSS if proposal and timeline_of(spec) else "") + (PL.CONFIRM_CSS if proposal and getattr(spec.extras, "confirm", None) else "")
             + "</head>" + ('<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
@@ -1198,8 +1220,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     w('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>")
     # ---- structure
     w('<h2 class="kicker" id="g-structure">Structure <span class="tag">how it stands</span></h2>')
-    st = [("Posts", f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
-           + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} there — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else "")),
+    st = [("Posts", _us_words(f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
+           + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} there — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else ""))),
           ("Frame", f"{q['beam_label']} aluminum perimeter beams with the gutter built in" + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else "")),
           ("House side", _house_side(q))]
     over = _posts_over_columns(L, q)
@@ -1278,7 +1300,18 @@ def _roof_scope(q, rp: Optional[dict] = None) -> list:
         built = f"{ftin(q['W'] * 12)} x {ftin(q['D'] * 12)} ({q['area']:g} SF)"
         sold = f"{ftin(float(rp['width_ft']) * 12)} x {ftin(float(rp['depth_ft']) * 12)} ({float(rp['area_sf']):g} SF)"
         lines = [x.replace(built, sold) for x in lines]
-    return lines
+    return [_us_words(x) for x in lines]
+
+
+_NUM_WORD = {"1": "One", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine"}
+
+
+def _us_words(x: str) -> str:
+    """The homeowner's spelling of an engine line: US spellings ("centers", "around"), and a line that would open on two
+    numbers ("2 6x6 posts") opens on a word."""
+    x = re.sub(r"\bcentres\b", "centers", re.sub(r"\bcentre\b", "center", x))
+    x = re.sub(r"\bround (every|each)\b", r"around \1", x)
+    return re.sub(r"^([1-9]) (?=\d)", lambda m: _NUM_WORD[m.group(1)] + " ", x)
 
 
 def _house_side(q: dict, short: bool = False) -> str:
@@ -1550,6 +1583,7 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     for pi, pt in enumerate(parts):
         t, flags, p = run(pt["spec"])
         r = build_set(t, flags, str(out / f"buildset-{pi + 1}"), render=False, customer=True)   # no internal flags block on G-001
+        r["sheets"] = list(r["sheets"]) + (__import__("decktakeoff.calcs", fromlist=["calc_sheets"]).calc_sheets(pt["spec"] if pt["calcs"] is True else pt["calcs"]) if pt.get("calcs") else [])   # structural calcs S-901… when the part asks: calcs=True or a calcs.Package (calcs agent)
         for num, ttl, svg in r["sheets"]:
             svg = re.sub(r"GS Exterior Experts · ([A-Z][a-z]+ \d{1,2}, \d{4}) · Rev 0", r"GSX · Jade Pender 303-550-9558 · \1 · Rev 0 · PERMIT SET", svg)
             svg = re.sub(r"<text[^>]*>(?:T-400|T-700)</text>\s*<text[^>]*>[^<]*</text>", "", svg)   # the build-set and takeoff sheets are not in a permit set

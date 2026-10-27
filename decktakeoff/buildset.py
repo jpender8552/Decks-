@@ -238,8 +238,8 @@ def composite_captions(L) -> Dict[int, str]:
     faces = _step_faces(levels)
     per = lambda f: " · ".join(f"{_lv_word(lv)} {f(lv)}" for lv in levels)
     n_lv = lambda lv: sum(len(b.posts) for b in lv.beams) + len(lv.eps)
-    ft = {"diamond_pier": f"Diamond Pier {L.frame.footing_model} footings", "caisson": "drilled caissons", "concrete": "concrete piers",
-          "existing": "existing caissons"}.get(fr.footing_type, "footings")
+    ft = {"diamond_pier": f"Diamond Pier {L.frame.footing_model} footings", "caisson": f"{int(L.frame.footing_dia_in)}\" x {ftin(L.frame.footing_depth_in)} drilled caissons",
+          "concrete": "concrete piers", "existing": "existing caissons"}.get(fr.footing_type, "footings")
     bls = [b for lv in levels for b in lv.beams]
     fs = (s.decking.fastener_system or "").lower()
     fast = "Cortex face screws + color-matched plugs" if fs.startswith("cortex") else ("face screws" if ("cap-tor" in fs or "screw" in fs) else "hidden fasteners")
@@ -287,15 +287,19 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     per = " + ".join(f"{sum(len(b.posts) for b in lv.beams) + len(lv.eps)} {lw(lv)}" for lv in levels)
     steps = []
     # 1 footings
+    from .drawings import _post_rows, _slab_posts, _id_run
+    sl_ids, sl_name = _slab_posts(s, _post_rows(levels, []))           # footings in a slab: saw-cut openings (S-100's IDs)
     lay = "; ".join(f"{lv.name} {bm.short} {ftin(bm.a[1] * 12)} out, posts at x " + " / ".join(ftin(p.x * 12) for p in bm.posts) for lv in levels for bm in lv.beams)
     steps.append(dict(n=1, code="T-400", title="Footings", still="step1",
         goes_in=items(lambda l: l.category == "Footings" and "Stone" not in l.item and "post base" not in l.item.lower()),
-        how=[("Call 811 and locate before any hole or pin. Strip the existing deck first." if s.extras.demo_existing else "Call 811 and locate before any hole or pin."),
+        how=["Call 811 and locate before any " + ("hole or pin." if ft == "diamond_pier" else "digging.") + (" Strip the existing deck first." if s.extras.demo_existing else ""),
              "Lay out in the deck's frame — x from its left end, y out from the main rear wall (the S-100 schedule): " + lay + ".",
              {"caisson": f"Auger {n_posts} holes ({per}) {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)} (frost {ftin(s.site.frost_depth_in)}), tube to 6\" above grade, cage in, pour, set the 5/8\" anchors wet. Cure 2 days.",
               "diamond_pier": f"Set {n_posts} Diamond Pier heads ({per}) level at grade on undisturbed soil and drive the 4 pins in each; caps on.",
               "concrete": f"Dig and form {n_posts} piers ({per}) {int(fr.footing_dia_in)}\" x {ftin(fr.footing_depth_in)}, pour, set the standoff bases wet.",
-              "existing": f"The {n_posts} existing caissons stay ({per}); the engineer confirms each before the new beams land on them."}[ft]],
+              "existing": f"The {n_posts} existing caissons stay ({per}); the engineer confirms each before the new beams land on them."}[ft]]
+            + ([f"{_id_run(sl_ids)} stand in the {sl_name.lower()}: saw-cut and lift out the slab at each " + ("before drilling." if ft == "caisson" else "first.")]
+               if sl_ids and ft != "existing" else []),
         check=["Footings on the layout within 1/2\"; bearing on undisturbed soil" if ft != "existing" else "Every existing caisson sound, level and on the beam line",
                "Frost depth met" if ft not in ("diamond_pier", "existing") else ("Pins fully driven, heads level" if ft == "diamond_pier" else "Epoxy cured before load"),
                "Photos before backfill"]))

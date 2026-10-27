@@ -242,6 +242,9 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     for ss in stair_specs(t):
         for lw, ld in ss.landings or []:
             sf_l = float(lw) * float(ld) / 144
+            if getattr(ss, "landing_footing", "") == "deck":   # its 4 posts stand on the deck's own footings: installed (and counted) with the deck's
+                lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"], "base rate — frame + decking; its footings are in the footing line"))
+                continue
             if s.framing.footing_type == "diamond_pier":     # the card's own rates: frame + decking per SF of landing, and $50 a pier for its 4 Diamond Piers
                 lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"], "base rate — frame + decking"))
                 lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — Diamond Pier install", 4, "pier", lr["diamond_pier_each"], "rate card"))
@@ -251,9 +254,6 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
                 lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — caissons", 4, "hole", lr["caisson_each"], "base rate"))
                 continue
             lab.append((f"Stair landing {ftin(float(lw))} x {ftin(float(ld))} — frame, deck, 4 footings", round(sf_l, 1), "SF", lr["frame_per_sf"] + lr["decking_fascia_per_sf"] + 40.0, "EST — frame + decking rate + footings"))
-    sk_ = sum(c.qty for c in t.cut_list if c.member == "Step-skirt panels")
-    if sk_:                                   # the step-face skirt: the card's skirting, per LF of face (panel + 1/8" seam)
-        lab.append(("Skirting — the step face between the levels (vertical fascia panels on nailers)", round(sk_ * (11.75 + 0.125) / 12.0, 1), "LF", lr.get("skirting_per_lf", 10.0), "rate card add-on"))
     _covs = covers_of(s)
     if _covs and s.extras.cover_labor_total is not None:
         lab.append((f"Porch cover — {'both roof covers' if len(_covs) > 1 else 'roof cover'}: posts, ledger, beam, rafters, sheathing, roofing, Hardie, set on the piers",

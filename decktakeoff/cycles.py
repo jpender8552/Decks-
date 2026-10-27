@@ -6,6 +6,7 @@ the light is a physical sky with the sun where it really is for the site, date a
 Run with a Python that has bpy (Blender as a module):
     python -m decktakeoff.cycles JOB.json OUT_DIR [view ...] [--samples 160] [--size 1400x900] [--quick]
         [--cameras=STATIONS.json] [--when=YYYY-MM-DDTHH:MM] [--dusk] [--dusk-when=...] [--dusk-exposure=3] [--led=1] [--glow=1]
+        [--foliage=summer]   (the deciduous canopy and shrubs in summer greens when the yard model carries autumn colours)
 --when puts the sun at another local time than spec.site.sun_when; --dusk renders the blue hour of that date (sun -5 deg, or
 --dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" colour), real
 fixture lights and the rooms behind the windows lit. A station with "mode": "dusk" renders at dusk without the flag.
@@ -823,7 +824,7 @@ def add_cards(g: Geo, P: np.ndarray, size: float, rng, up_bias=0.4, aspect=1.0, 
 
 
 # ====================================================================== the build
-def build(spec_path: str, out_dir: str, quick: bool = False):
+def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from decktakeoff.spec import DeckSpec
     from decktakeoff.layout import build_layout
@@ -932,7 +933,10 @@ def build(spec_path: str, out_dir: str, quick: bool = False):
     for key, g in vg.items():
         base = key.split("_", 1)[1]
         mc = (D["materials"].get(base) or {}).get("color")
-        if mc and (base not in leaf_cols or base == "leaf2"):
+        if foliage == "summer" and base in ("leaf", "leaf2", "shrub"):
+            # a summer date under an autumn yard model: the deciduous canopy and the shrubs in their summer greens
+            c1, c2, nm = {"leaf": ("#5f7f2c", "#86a03a"), "leaf2": ("#6f9433", "#94ad45"), "shrub": ("#58702f", "#7d8f3a")}[base] + (f"{base}_summer",)
+        elif mc and (base not in leaf_cols or base == "leaf2"):
             # the yard model's own colour (a key with no stock pair - ivy, the pines - or the second canopy colour, e.g. the
             # cottonwoods' autumn yellow): c2 a fifth lighter; the colour in the card's name so a cached texture never lies
             c1, c2, nm = mc, lighter(mc), f"{base}_{mc.strip('#')}"
@@ -1547,7 +1551,7 @@ def main(argv):
     samples = int(opts.get("--samples", 48 if quick else 160))
     size = tuple(int(v) for v in str(opts.get("--size", "1400x900")).split("x"))
     t = time.time()
-    spec, sc, D = build(spec_path, out_dir, quick=quick)
+    spec, sc, D = build(spec_path, out_dir, quick=quick, foliage=str(opts.get("--foliage", "")))   # --foliage=summer: green canopy
     if opts.get("--cameras"):               # camera stations from a file (the site_model.cameras format), over the job's own
         cj = json.load(open(opts["--cameras"]))
         cj = cj.get("cameras", cj)

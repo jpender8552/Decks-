@@ -13,8 +13,10 @@ is typed in per job. The methods:
   * Analysis: every joist, beam piece, header, trimmer and rim is solved as a beam on point supports (a small Euler-Bernoulli
     finite-element solver, exact for these load types), with the live load patterned span by span (the envelope is the dead
     case plus every live span that makes the effect worse). Beam pieces are continuous over their posts and end at splices.
-  * Products: Diamond Pier capacities from the Pin Foundations chart by soil (catalog.pier_capacity_lb), Simpson caps / bases
-    from the job's materials research, other connectors marked "verify" where the value is a conservative catalog reading.
+  * Footings follow the spec's footing_type: caissons / concrete piers (the engine's end bearing + skin-friction capacity,
+    uplift by the shaft's weight, IBC 1807.3.2.1 lateral embedment, frost depth) or Diamond Piers (Pin Foundations chart by
+    soil, catalog.pier_capacity_lb). Simpson caps / bases from the job's materials research; other connectors are marked
+    "verify" where the value is a conservative catalog reading.
 
 run_calcs(spec) -> Package (all checks: demand, capacity, ratio, PASS / FAIL / REVIEW, code section, basis);
 calc_package(base_spec, options) adds the option specs' checks that differ (yard stair, louvered roof);
@@ -301,6 +303,12 @@ class Section:
         if self.incised and self._ci(prop) != 1.0:
             parts.append(f"Ci {self._ci(prop):g}")
         return " x ".join(parts)
+
+
+def section_size(size: str) -> str:
+    """'(2)2x10' -> '2x10'."""
+    s = (size or "").replace(" ", "")
+    return s[s.index(")") + 1:] if s.startswith("(") and ")" in s else s
 
 
 def section(size: str, species: str, grade: str = "No.1", **kw) -> Section:
@@ -2142,6 +2150,12 @@ SCREEN_CF = 1.3              # mesh at 80-90% density taken as a solid sign (ASC
 # ================================================================== run + package
 def _analyze(spec, scope: str = "Base", exposure: Optional[str] = None) -> _CalcMore:
     k = _CalcMore(spec, scope, exposure)
+    sizes = {spec.framing.joist_size, spec.framing.post_size} | {section_size(b.size) for b in (spec.framing.beams or [])}
+    if spec.framing.system == "steel" or any(sz not in LUMBER_ACTUAL for sz in sizes if sz):
+        k.add(Check("X-1", "Joists & cantilevers", f"{spec.framing.system} frame ({', '.join(sorted(x for x in sizes if x))})", "Member design", 0, 0, "-",
+                    "AISI S100 / S240 (cold-formed steel) or the engineer's design",
+                    "this calculation covers sawn-lumber frames (NDS); the frame's members are outside it — the engineer of record designs them", status="REVIEW"))
+        return k
     for P in k.parts:
         for z in P.L.zones:
             k.zone_joists(P, z)
@@ -2194,10 +2208,13 @@ def _material_rows(k: _CalcMore) -> List[Tuple[str, str, str]]:
     seen = set()
     P = k.parts[0]
     fr = P.spec.framing
-    cands = [section(fr.joist_size, fr.joist_species, fr.joist_grade, repetitive=True), section("2x12", fr.joist_species, fr.joist_grade, repetitive=True)]
-    for ln in (ln for Q in k.parts for ln in Q.L.beam_lines):
-        cands.append(section(ln.size, ln.species, "No.1"))
-    cands.append(k.col_section(dict(size=fr.post_size, kind="beam")))
+    cands = []
+    for args in [(fr.joist_size, fr.joist_species, fr.joist_grade), ("2x12", fr.joist_species, fr.joist_grade)] + \
+            [(ln.size, ln.species, ln.species) for Q in k.parts for ln in Q.L.beam_lines]:
+        if section_size(args[0]) in LUMBER_ACTUAL:
+            cands.append(section(*args, repetitive=args[0] in (fr.joist_size, "2x12")))
+    if fr.post_size in LUMBER_ACTUAL:
+        cands.append(k.col_section(dict(size=fr.post_size, kind="beam")))
     for sec in cands:
         key = sec.label
         if key in seen:
@@ -2291,9 +2308,13 @@ def _base_review(k) -> str:
     if "no catalog part" in ck.what:
         return ("The column base on the Diamond Pier has no catalog part: detail an HDG standoff base on the single pier bolt (or a tenoned foot in an ABU66Z / ABW66RZ) "
                 "for the down / uplift / lateral values on the Caps & bases sheet.")
-    if "ABU88" in ck.what or "APB88" in ck.what:
+    on_dp = "diamond pier" in ck.member.lower()
+    if on_dp and ("ABU88" in ck.what or "APB88" in ck.what):
         return (f"{ck.what.replace('Post base ', '')} on the Diamond Pier: the base's second 5/8\" anchor is drilled into the pier head beside the cast-in bolt (owner's choice) — "
                 "not a catalog condition (5-5/8\" plinth edge distance, the head's concrete limit): Pin Foundations and the engineer confirm, or detail a single-bolt HDG standoff base.")
+    if not on_dp:
+        return (f"{ck.what.replace('Post base ', '')} bases with their 5/8\" anchors cast in the footing (catalog condition, 1\" standoff keeps the Douglas fir off the concrete): "
+                "the engineer confirms the anchor embedment and edge distance in the shaft.")
     return f"{ck.what}: confirm it on the pier for the down / uplift / lateral values on the Caps & bases sheet."
 
 
@@ -2589,7 +2610,7 @@ def calc_sheets(pkg_or_spec, meta: Optional[dict] = None, standalone: bool = Fal
                 o.append(_t(24, y, f"Caissons: end bearing at the presumptive {pkg.criteria.soil_psf:,.0f} psf (IRC Table R401.4.1) + the engine's ≈{CAISSON_SKIN_PSF:g} psf skin-friction estimate; "
                                    "uplift by the shaft's weight; lateral by IBC 1807.3.2.1 — the engineer sizes the shafts.", 7.6, 400, fill=MUTE))
         sheets.append(("Column loads and footings" + (f" ({ci + 1}/{len(chunks)})" if len(chunks) > 1 else ""),
-                       "Every column: load components, the governing ASD load, uplift, base shear, the pier specified and the smallest that works", o, "cols"))
+                       "Every column: load components, the governing ASD load, uplift, base shear, its footing and the footing's capacity", o, "cols"))
     # ---------------- check sheets, by group
     for g in GROUPS:
         cks = [ck for ck in pkg.checks if ck.group == g]

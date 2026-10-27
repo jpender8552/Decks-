@@ -274,10 +274,10 @@ def _clear(pos, targets, occ) -> float:
 
 def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, occ=None) -> List[dict]:
     """Preset cameras (plan feet): Yard, Upper deck (under the roof when there is one), Lower deck, Aerial. A measured site's
-    own camera stations (site_model.cameras) win for the first three — Yard: "yard_center" / "yard" / "yard_left" / "dusk"
-    (the one with the clearest view of the deck past the trees), Upper deck: "roof_deck" / "upper_deck" / "upper_rail",
-    Lower deck: "lower_deck"; they stand where a person can stand. Otherwise, and for the aerial, the stations come from
-    the layout (the page cuts away a tree crown between the camera and the deck)."""
+    own camera stations (site_model.cameras) win for the first three — Yard: of the stations standing on the ground, the
+    one that sees the most of the deck (and the roof) in its frame, clear of the trees and houses; Upper deck: "roof_deck"
+    / "upper_deck" / "upper_rail"; Lower deck: "lower_deck". They stand where a person can stand. Otherwise, and for the
+    aerial, the stations come from the layout (the page cuts away a tree crown between the camera and the deck)."""
     cams = cams or {}
     x0 = min(p["x0"] for p in parts); x1 = max(p["x1"] for p in parts)
     y0 = min(p["y0"] for p in parts); y1 = max(p["y1"] for p in parts)
@@ -290,20 +290,55 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, oc
     roof = next((r for r in roofs if r.get("frame")), None)
 
     occ = occ or []
-    deck_pts = [(x0 + (x1 - x0) * i / 6.0, y, hi["top"] if x0 + (x1 - x0) * i / 6.0 >= hi["x0"] - 0.5 else lo["top"])
-                for i in range(7) for y in (y1 - 0.5, (y0 + y1) / 2)]
+    # what a yard view should show: the deck's front and middle along its length (each part at its own height) and, with a
+    # louvered roof, the roof's frame
+    def top_at(x):
+        return max([p["top"] for p in parts if p["x0"] - 0.5 <= x <= p["x1"] + 0.5] or [lo["top"]])
+    deck_pts = [(x0 + (x1 - x0) * i / 8.0, y, top_at(x0 + (x1 - x0) * i / 8.0) + 1.5) for i in range(9) for y in (y1 - 0.5, (y0 + y1) / 2)]
+    if roof:
+        f = roof["frame"]
+        deck_pts += [(f["x0"] + (f["x1"] - f["x0"]) * i / 3.0, f["y1"], f.get("z_top", top + 9.0)) for i in range(4)]
 
-    def station(key, label, *names):
-        best = None
-        for i, n in enumerate(names):                    # the first listed station with the clearest view of the deck
-            c = cams.get(n)
-            if c and c.get("pos") and c.get("at"):
-                sc_ = _clear(c["pos"], deck_pts, occ) if key in ("yard", "aerial") else 1.0
-                if best is None or sc_ > best[0] + 0.15:
-                    best = (sc_, dict(key=key, label=label, pos=c["pos"], at=c["at"], fov=c.get("fov", 60), fixed=True, station=n))
+    def sees(c, pts):
+        """The share of pts inside the station's view (a 1.4:1 frame at its lens) and clear of the trees / houses."""
+        pos, at = c["pos"], c["at"]
+        fwd = [at[k] - pos[k] for k in range(3)]
+        n = math.sqrt(sum(v * v for v in fwd)) or 1.0
+        fwd = [v / n for v in fwd]
+        rt = [fwd[1], -fwd[0], 0.0]
+        m = math.hypot(rt[0], rt[1]) or 1.0
+        rt = [rt[0] / m, rt[1] / m, 0.0]
+        up = [rt[1] * fwd[2] - rt[2] * fwd[1], rt[2] * fwd[0] - rt[0] * fwd[2], rt[0] * fwd[1] - rt[1] * fwd[0]]
+        tv = math.tan(math.radians(float(c.get("fov", 60))) / 2)
+        th = tv * 1.4
+        inside = []
+        for q in pts:
+            d = [q[k] - pos[k] for k in range(3)]
+            z = sum(d[k] * fwd[k] for k in range(3))
+            if z > 1.0 and abs(sum(d[k] * rt[k] for k in range(3))) <= th * z and abs(sum(d[k] * up[k] for k in range(3))) <= tv * z:
+                inside.append(q)
+        return len(inside) / max(1, len(pts)) * _clear(pos, inside, occ) if inside else 0.0
+
+    def station(key, label, *names, ground=False):
+        """The listed station that sees the most of the deck (the first listed wins a near tie); with ground=True every
+        station standing on the ground (below the lowest deck) is a candidate too, after the listed ones."""
+        cand = [n for n in names if n in cams]
+        if ground:
+            cand += [n for n, c in cams.items() if n not in cand and c.get("pos") and float(c["pos"][2]) < lo["top"]]
+        best, scores = None, {}
+        for n in cand:
+            c = cams[n]
+            if not (c.get("pos") and c.get("at")):
+                continue
+            sc_ = sees(c, deck_pts) if ground else 1.0
+            scores[n] = round(sc_, 3)
+            if best is None or sc_ > best[0] + 0.05:
+                best = (sc_, dict(key=key, label=label, pos=c["pos"], at=c["at"], fov=c.get("fov", 60), fixed=True, station=n))
+        if best and ground:
+            best[1]["scores"] = scores                   # how much of the deck each station sees (stats / QA)
         return best[1] if best else None
     views = []
-    v = station("yard", "Yard", "yard_center", "yard", "yard_left", "dusk")
+    v = station("yard", "Yard", "yard", "yard_center", "yard_left", ground=True)
     if not v:
         d = max(36.0, min(90.0, W * 0.92))
         zg = grade(cx, y1 + d)

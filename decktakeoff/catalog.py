@@ -57,7 +57,7 @@ DECKING = {
 STOCK_LENGTHS_FT = [12, 16, 20]
 # lines that don't come in every GSX stock length, by (collection, profile). Vintage square-shoulder: 12 / 16 / 20' — the owner
 # buys 12' (27 Oct 2026), whatever the 2026 product guide lists; grooved 12 / 16 / 20'
-DECK_LENGTHS_FT = {("Vintage", "square"): (12, 16, 20), ("Vintage", "grooved"): (12, 16, 20)}
+DECK_LENGTHS_FT = {("Vintage", "square"): (16, 20), ("Vintage", "grooved"): (12, 16, 20)}   # D&D: every 12' Vintage is grooved (AZV1612EWG)
 
 
 def deck_lengths(collection: str, profile: str = "square") -> tuple:

@@ -310,6 +310,8 @@ class Extras:
     show_financing: bool = True          # proposal shows the financed price / monthly; False on a cash-only job (one-off)
     brand: str = "gs"                    # whose name, logo and colors the client documents carry: "gs" (GS Exterior Experts) | "cde" (Colorado Deck Experts, a GS company) — proposal_look.BRANDS + data/brands/<key>/
     timeline: Any = None                 # the job's own customer timeline instead of the generic day rates: a schedule model's customer block {title, precon, rows, schedule_lines}, or "schedule.json#Scenario" — report.timeline_of
+    included: List[dict] = field(default_factory=list)   # the job's own "What it is" rows over the engine's: [{"title", "text"}] — same title replaces the row ("" drops it), a new one goes after the previous entry (report._included_rows)
+    confirm: Any = None                  # the proposal's "Still to confirm" box for the client: [lines] or {"title", "intro", "items"}; prints on an engineered quote too (page._confirm_box)
 
     proposal_note: str = ""              # a closing paragraph on the proposal, under the next step (owner's terms / exclusions)
     price_breakdown: bool = True        # proposal shows a sell value per item; False -> the items listed, one total

@@ -196,6 +196,14 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
 }
 </style>"""
 
+CONFIRM_CSS = """<style>
+/* The client's "Still to confirm" box (extras.confirm). */
+.confirm { border:1px solid var(--line); border-left:3px solid var(--gold); background:var(--paper); padding:14px 18px; display:flex; flex-direction:column; gap:8px; }
+.confirm p { margin:0; max-width:72ch; }
+.confirm .opt-scope { gap:6px; }
+@media print { .confirm { padding:10px 14px; } .confirm .opt-scope { font-size:11.5px; } .confirm li { break-inside:avoid; page-break-inside:avoid; } }
+</style>"""
+
 TIMELINE_CSS = """<style>
 /* The schedule: the job's own timeline (report.timeline_of) as a Gantt of working days — the time before day 1 in the first
    column, then one bar per stretch of work. Added only to a page that has one. */
@@ -368,7 +376,8 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
     fr = L.zones[0].frame
     flush = all(b.kind == "flush" for b in (L.beam_lines or []))
     tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
-            (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")), (str(n_piers), "Diamond Piers")]
+            (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")),
+            (str(n_piers), {"diamond_pier": "Diamond Piers", "caisson": "caissons", "concrete": "concrete piers"}.get(spec.framing.footing_type, "existing caissons"))]
     rl = L.rail
     if hasattr(L, "parts") and t is not None:      # two levels: each level's height, the columns, the rail, the lights
         tele = _levels_tele(spec, L, t, n_piers)
@@ -382,7 +391,8 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
         bp = BOARDS_PALETTE.get((spec.decking.border_collection or spec.decking.collection, spec.decking.border_color))
         chips.append((bp[len(bp) // 2] if bp else "#5a4632", "Picture frame", f"{spec.decking.border_collection or spec.decking.collection} · {spec.decking.border_color}"))
     if rl:
-        chips.append((RAIL_HEX.get(rl.color.lower(), "#141414"), "Rail", f"{spec.decking.brand} {rail_name(rl.system)} · {rl.color}"))
+        from .report import rail_words
+        chips.append((RAIL_HEX.get(rl.color.lower(), "#141414"), "Rail", f"{spec.decking.brand} {rail_words(spec, rl.system)} · {rl.color}"))
     if rl and spec.railing.drink_rail and hasattr(L, "parts"):
         dc = spec.railing.drink_rail_collection or spec.decking.collection
         dp = BOARDS_PALETTE.get((dc, spec.railing.drink_rail_color or spec.decking.color))

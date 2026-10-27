@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from dataclasses import asdict
 from typing import List, Optional
 
@@ -204,7 +205,8 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"{fr_txt} — on {foot}{' with stone column bases' if s.extras.stone_bases else ''}. "
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
-      + (f", {rail_name(rl.system)}" + ("" if lv and rail_name(rl.system).endswith(" rail") else f" {'cable ' if rl.system == 'IRX' else ''}rail")
+      + (f", {rail_words(s, rl.system)}" + ("" if lv and (rail_words(s, rl.system).endswith(" rail") or rail_words(s, rl.system) != rail_name(rl.system))
+                                            else f" {'cable ' if rl.system == 'IRX' else ''}rail")
          + (f" with a {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
       + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
@@ -255,6 +257,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w("## INCLUDED — what it is")
     w("| Element | Selection |")
     w("|---|---|")
+    _inc0 = len(out)                         # the rows from here are the job's to override (extras.included)
     from .catalog import decking_facts, RAIL_SYSTEMS
     f = decking_facts(s.decking.collection)
     if lv:
@@ -271,7 +274,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Railing | The existing stucco parapet stays on the deck edges. {s.decking.brand} {rl.system} Rail, {rl.color}, {rl.height:g}\" on the new stair and landings. |")
     elif rl:
         rs = RAIL_SYSTEMS.get(rl.system, {})
-        w(f"| Railing | {s.decking.brand} {rail_name(rl.system)}{' cable rail' if rs.get('cable') else (' Rail' if rail_name(rl.system) == rl.system else '')}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
+        w(f"| Railing | {s.decking.brand} {rail_words(s, rl.system)}{' cable rail' if rs.get('cable') else (' Rail' if rail_name(rl.system) == rl.system else '')}, {rl.color}, {rl.height:g}\"{', no bottom rail' if rs.get('cable') else ''}"
           + (f"; {drink_words} drink rail on top" if s.railing.drink_rail else "") + f". {rl.rail_lf} LF. |")
     if lv and L.stairs:
         w("| Stairs | " + "; ".join(f"{getattr(ss, 'name', None) or 'Stair'}: {stair_words(ss, st, True)}" for ss, st in zip(stair_specs(t), L.stairs)) + ". |")
@@ -310,7 +313,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Hardware | {'All visible hardware black powder-coat. ' if s.framing.hardware_finish == 'black' else 'Simpson ZMAX galvanized connectors. '}"
           + f"{s.decking.fastener_system or 'Hidden'} fasteners{' with color-matched plugs' if (s.decking.fastener_system or '') == 'Cortex' else ''}"
           + (f" in the field; Cortex color-matched plugs on the picture frame{', benches' if s.geometry.benches else ''}{' and stairs' if stair_specs(t) else ''}"
-             if (s.decking.border_fastener or '') == 'Cortex' and (s.decking.fastener_system or '') != 'Cortex' else "") + ". |")
+             if (s.decking.border_fastener or '') == 'Cortex' and (s.decking.fastener_system or '') != 'Cortex' else "") + "."
+          + ((" Color-matched TOPLoc screws on the fascia" + (" and the vertical boards between the levels" if step_face_words(t) else "") + ".")
+             if lv and any(l.item.startswith("TimberTech TOPLoc") for l in t.lines) else "") + " |")
     from .spec import covers_of
     _cv = covers_of(s)
     if _cv:
@@ -320,7 +325,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
                   + ", over high-temp underlayment, with a snow bar across the low eave") if ss_ else "architectural shingles")
         fin_ = ", ".join(x for x in (("James Hardie soffit ceiling" if s.extras.cover_soffit else ""), ("HardieTrim fascia and rakes" if s.extras.cover_fascia else "")) if x)
         heights = "; ".join(f"{c['name']}: {c['clear_high_in']:g}\" clear at the house to {c['clear_low_in']:g}\" at the beam" for c in _cv if c.get("clear_high_in") and c.get("clear_low_in"))
-        w(f"| Roof covers | {len(_cv)} lean-to cover{'s' if len(_cv) > 1 else ''} replaced: 6x6 posts on the Diamond Pier foundations, a new ledger on the house, 2x8 rafters at 16\", {roof_}"
+        w(f"| Roof covers | {len(_cv)} lean-to cover{'s' if len(_cv) > 1 else ''} replaced: 6x6 posts on the "
+          + {"diamond_pier": "Diamond Pier foundations", "caisson": "caissons", "concrete": "concrete piers"}.get(s.framing.footing_type, "existing caissons")
+          + f", a new ledger on the house, 2x8 rafters at 16\", {roof_}"
           + (f"; {fin_}" + (f" in {s.extras.hardie_color}" if s.extras.hardie_color else "") if fin_ else "")
           + (f". {heights}" if heights else "") + (". The roll-down blinds are taken down, stored and rehung on the new beams" if s.extras.blinds_reinstall else "") + ". |")
     site_ = []
@@ -334,6 +341,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
         w(f"| Site | {'; '.join(site_)[0].upper() + '; '.join(site_)[1:]}. |")
     if s.extras.exclusions:
         w(f"| Not included | {'; '.join(s.extras.exclusions)}. |")
+    out[_inc0:] = _included_rows(out[_inc0:], s)
     w("")
     w("## PLAN")
     if lv:
@@ -515,6 +523,58 @@ def _span(a: int, b: int) -> str:
     return f"Day {a}" if a == b else f"Days {a}–{b}"
 
 
+def rail_words(s, system: str) -> str:
+    """The rail system as the client documents name it (catalog.rail_name), less the "modern top rail" when the drink rail
+    runs over the posts (railing.drink_rail_mount "over"): the drink-rail board takes the top rail's place."""
+    nm = rail_name(system)
+    if getattr(s.railing, "drink_rail", False) and str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over":
+        nm = re.sub(r",?\s*modern top rail\b", "", nm).strip(" ,")
+    return nm
+
+
+def foundation_words(t) -> tuple:
+    """The deck's footings from the spec's footing type, as the client documents count and name them:
+    (count, plural noun for a count, words) — Diamond Piers, caissons (diameter x depth), concrete piers, existing caissons."""
+    s, L = t.spec, t.layout
+    ft = s.framing.footing_type
+    n = L.n_footings
+    if ft == "diamond_pier":
+        n = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or n
+        return n, "Diamond Piers", f"{n} Diamond Pier foundations"
+    if ft == "caisson":
+        fr = L.frame
+        dia = float(getattr(fr, "footing_dia_in", 0) or s.framing.caisson_dia_in)
+        dep = getattr(fr, "footing_depth_in", None) or s.framing.caisson_depth_in
+        return n, "caissons", f"{n} concrete caissons, {dia:g}\" across" + (f" and {ftin(float(dep))} deep" if dep else "")
+    if ft == "concrete":
+        return n, "concrete piers", f"{n} concrete piers"
+    return n, "existing caissons", (f"the {n} existing columns and caissons" if s.framing.existing_posts else f"the {n} existing caissons")
+
+
+def _included_rows(rows: List[str], s) -> List[str]:
+    """extras.included — the job's own "What it is" rows over the engine's, [{title, text}] in order: a title the engine
+    prints replaces that row in place (an empty text drops it); a new title goes in after the previous entry's row (the
+    first ones at the top). Markdown table rows: a "|" or a line break in the text reads as "/" and a space."""
+    inc = [e for e in (getattr(s.extras, "included", None) or []) if isinstance(e, dict) and str(e.get("title", "")).strip()]
+    if not inc:
+        return rows
+    def title_of(r):
+        m = re.match(r"\|\s*(.*?)\s*\|", r)
+        return m.group(1).lower() if m else None
+    out, cur = list(rows), 0
+    for e in inc:
+        ttl = str(e["title"]).strip()
+        txt = re.sub(r"\s*\n\s*", " ", str(e.get("text") or "")).replace("|", "/").strip()
+        i = next((k for k, r in enumerate(out) if title_of(r) == ttl.lower()), None)
+        if i is not None and not txt:
+            del out[i]; cur = i
+        elif i is not None:
+            out[i] = f"| {ttl} | {txt} |"; cur = i + 1
+        elif txt:
+            out.insert(cur, f"| {ttl} | {txt} |"); cur += 1
+    return out
+
+
 def _company(s) -> str:
     """Who the client documents say does the work: "GSX", or under another brand (extras.brand) that brand's name."""
     key = str(getattr(s.extras, "brand", "gs") or "gs").lower()
@@ -541,7 +601,16 @@ def timeline_of(s) -> Optional[dict]:
             sc = d["scenarios"][name] if name else next(iter(d["scenarios"].values()))
             d = sc.get("customer", sc)
         tl = d
-    return tl if isinstance(tl, dict) else None
+    if not isinstance(tl, dict):
+        return None
+    if hasattr(s, "extras"):                 # a timeline written for other footings than the spec's is out of date: say so, never print it
+        ft = s.framing.footing_type
+        said = " ".join([str((tl.get("precon") or {}).get("text", ""))] + [str(r.get("title") or r.get("label") or "") for r in tl.get("rows") or []]
+                        + [str(x) for x in tl.get("schedule_lines") or []])
+        if (ft != "diamond_pier" and re.search(r"(?i)diamond pier", said)) or (ft == "diamond_pier" and re.search(r"(?i)\bcaissons?\b", said)):
+            raise ValueError(f"extras.timeline was written for other footings than the spec's ({ft}): re-run the schedule model for this spec, "
+                             "or drop extras.timeline to print the generic day rates")
+    return tl
 
 
 def _schedule(t: Takeoff) -> List[str]:
@@ -570,8 +639,8 @@ def _schedule(t: Takeoff) -> List[str]:
     days.append(f"{_span(d+1, d+dd)} — decking, borders first."); d += dd
     if L.rail:
         rd = max(1, round(L.rail.rail_lf / 40))
-        _rn = rail_name(L.rail.system)
-        days.append(f"{_span(d+1, d+rd)} — {_rn}" + ("" if hasattr(L, "parts") and _rn.endswith(" rail") else " rail") + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
+        _rn = rail_words(s, L.rail.system)
+        days.append(f"{_span(d+1, d+rd)} — {_rn}" + ("" if hasattr(L, "parts") and (_rn.endswith(" rail") or _rn != rail_name(L.rail.system)) else " rail") + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
     if L.stairs:
         days.append(f"Day {d+1} — stairs" + (" and the box step" if any(getattr(st, 'build', '') == 'box' for st in L.stairs) and len(L.stairs) > 1 else "")
                     + (", the vertical boards on the face between the levels" if step_face_words(t) else "") + "."); d += 1
