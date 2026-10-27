@@ -3527,10 +3527,10 @@ def _step_face_view(o, fr, levels, steps, groups, bx, cols, s):
     if rp:
         q = rp[0]
         items.append((*to_sheet(((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, q.z1)), f"{rail_name(s.railing.system)} {s.railing.height_in:g}\" {s.railing.color}"))
-    cl = [q for q in near if q.kind == "light" and "cap" in (q.tag or "")]
+    cl = [q for q in near if q.kind == "light" and ("cap" in (q.tag or "") or "accent" in (q.tag or ""))]
     if cl:
         q = cl[0]
-        items.append((*to_sheet(((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, q.z1)), "LED post-cap light on every rail post"))
+        items.append((*to_sheet(((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, q.z1)), _light_words(t)[1]))
     L_ = [it for it in items if it[0] < fr[0] + fr[2] / 2]; R_ = [it for it in items if it[0] >= fr[0] + fr[2] / 2]
     _leaders(o, L_, fr[0] + 4, "start", y_min=fr[1] + 18, y_max=fr[1] + fr[3] - 4, chars=30)
     _leaders(o, R_, fr[0] + fr[2] - 4, "end", y_min=fr[1] + 18, y_max=fr[1] + fr[3] - 4, chars=30)
@@ -3728,8 +3728,19 @@ def _composite_key(CL, S, t) -> list:
         out.append((lab, pred, where, pick))
     skirt = lambda b: (b.kind == "skirt" or "skirt" in (b.tag or "")) and "stair skirt" not in (b.tag or "")
     out.append((f"Step skirt — {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia boards installed vertically", skirt, (0.5, 0.5, 0.5), "mid"))
-    out.append(("LED riser lights + post-cap lights, low voltage", lambda b: b.kind == "light", (0.5, 0.5, 0.5), "mid"))
+    out.append((_light_words(t)[0], lambda b: b.kind == "light", (0.5, 0.5, 0.5), "mid"))
     return [k for k in out if any(k[1](b) for b in S.boxes)]
+
+
+def _light_words(t) -> Tuple[str, str]:
+    """(key label, step-face label) for the job's lights, worded from lighting.py's plan (t.lighting): a drink rail over the
+    posts makes the post lights accent lights on the post's deck side, else cap lights."""
+    plan = getattr(t, "lighting", None)
+    if plan is None:
+        return "LED lights, low voltage", "LED post light on every rail post"
+    from .lighting import post_label, post_where
+    bits = (["LED riser lights"] if plan.n_riser else []) + ([("" if plan.n_riser else "LED ") + post_label(plan)] if plan.n_cap else [])
+    return (" + ".join(bits) or "LED lights") + ", low voltage", f"LED {post_label(plan, 1)[2:]} {post_where(plan)}"
 
 
 def sheet_iso_assembled_composite(CL, S, t, meta) -> str:
