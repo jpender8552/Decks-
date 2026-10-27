@@ -771,7 +771,7 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
                 for fp in fixed_pts:
                     t_ = (fp[0] - ax_) * (bx_ - ax_) + (fp[1] - ay_) * (by_ - ay_)
                     w_ = float(fp[2]) if len(fp) > 2 else 6.0
-                    if abs((fp[0] - ax_) * (by_ - ay_) - (fp[1] - ay_) * (bx_ - ax_)) <= w_ / 2 + 0.01 and p0 - 14 <= t_ <= p1 + 14:
+                    if abs((fp[0] - ax_) * (by_ - ay_) - (fp[1] - ay_) * (bx_ - ax_)) <= w_ / 2 + 12.0 and p0 - 14 <= t_ <= p1 + 14:   # through it or within 12": it is the post there
                         roof_t[round(t_, 3)] = w_
                         roof_id[round(t_, 3)] = (round(fp[0], 1), round(fp[1], 1))
                 for t_ in sorted(roof_t):
@@ -913,7 +913,7 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
             for fp in (fixed_pts or []):
                 t_ = (fp[0] - e.x0) * ux + (fp[1] - e.y0) * uy
                 w_ = float(fp[2]) if len(fp) > 2 else 6.0
-                if abs((fp[0] - e.x0) * nx + (fp[1] - e.y0) * ny - RP) <= w_ / 2 + 0.01 and p0 - 14 <= t_ <= p1 + 14:
+                if abs((fp[0] - e.x0) * nx + (fp[1] - e.y0) * ny - RP) <= w_ / 2 + 12.0 and p0 - 14 <= t_ <= p1 + 14:   # through it or within 12": it is the post there
                     roof_t[round(t_, 3)] = w_
                     roof_id[round(t_, 3)] = (round(fp[0], 1), round(fp[1], 1))
             for t_ in sorted(roof_t):

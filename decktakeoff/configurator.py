@@ -372,21 +372,25 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
         return sum(1 << c for c in valid if c >> bits[n] & 1)
 
     def describe(m):
+        """The simplest 'shows with A (+ B), not with C (or D)' that gives exactly this mask."""
         if m == all_mask:
             return "base"
-        for n in names:
-            if m == with_(n):
-                return f"option:{labels.get(n, n)}"
-            if m == all_mask & ~with_(n):
-                return f"base, replaced by {labels.get(n, n)}"
-        for i, a in enumerate(names):
-            for b_ in names[i + 1:]:
-                if m == with_(a) & with_(b_):
-                    return f"option:{labels.get(a, a)} + {labels.get(b_, b_)}"
-                for x, y in ((a, b_), (b_, a)):
-                    if m == with_(x) & ~with_(y) & all_mask:
-                        return f"option:{labels.get(x, x)}, replaced by {labels.get(y, y)}"
-        return f"combinations {m:#x}"
+        import itertools
+        best = None
+        for states in itertools.product((0, 1, 2), repeat=len(names)):       # 0 free, 1 on, 2 off
+            mm = all_mask
+            for n, st_ in zip(names, states):
+                mm &= with_(n) if st_ == 1 else (~with_(n) if st_ == 2 else all_mask)
+            if mm == m:
+                cost = sum(1 for x in states if x)
+                if best is None or cost < best[0]:
+                    best = (cost, states)
+        if best is None:
+            return f"combinations {m:#x}"
+        on = [labels.get(n, n) for n, x in zip(names, best[1]) if x == 1]
+        off = [labels.get(n, n) for n, x in zip(names, best[1]) if x == 2]
+        txt = ("option:" + " + ".join(on)) if on else "base"
+        return txt + (", replaced by " + " or ".join(off) if off else "")
     groups: Dict[str, int] = {}
     mask_labels: Dict[int, str] = {}
     mism = []
@@ -548,7 +552,7 @@ CSS = r"""
 html, body { height: 100%; margin: 0; background: var(--space); color: var(--ink); }
 body { font: 14px/1.35 var(--body); -webkit-text-size-adjust: 100%; overflow: hidden; }
 [hidden] { display: none !important; }
-#app { position: fixed; inset: 0; display: flex; flex-direction: row; }
+#app { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: row; }
 #stage { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; background: var(--night); touch-action: none; overflow: hidden; }
 #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; -webkit-tap-highlight-color: transparent; }
 #panel { flex: 0 0 340px; width: 340px; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -561,7 +565,7 @@ body { font: 14px/1.35 var(--body); -webkit-text-size-adjust: 100%; overflow: hi
 .hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(8, 10, 13, .66); color: var(--ink); font-size: 12px;
   padding: 6px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; transition: opacity .6s; }
 .hint.gone { opacity: 0; }
-.fail { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--ink); font-size: 15px; }
+.fail { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--ink); font-size: 15px; }
 .grp { display: flex; flex-direction: column; gap: 8px; }
 .grp + .grp { border-top: 1px solid var(--line); padding-top: 12px; }
 .grp h2 { margin: 0; font: 700 11.5px/1 var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--mute); display: flex; justify-content: space-between; gap: 8px; }

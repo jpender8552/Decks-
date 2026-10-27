@@ -690,9 +690,10 @@ class _Site:
     # ---------------------------------------------------------- neighbours (massing)
     def neighbour_turned(self, nb: dict):
         """A neighbour house turned `rot` degrees (counter-clockwise in plan) about the centre of its `rect`, with an
-        optional brick `base` {z1} below the siding, windows on its faces (face_windows: [[face, u0, u1, z0, z1]], face
+        optional brick `base` {z1, color} below the siding, windows on its faces (face_windows: [[face, u0, u1, z0, z1]], face
         "y0" | "y1" | "x0" | "x1" of the unturned rect, u from that face's low corner), a gable roof along `axis`, and
-        `boxes` (a deck, a shed: [[x0, x1, y0, y1, z0, z1, mat]] in the plan frame)."""
+        `boxes` (a deck, a shed: [[x0, x1, y0, y1, z0, z1, mat]] in the plan frame). Heights (eave, ridge, base z1, window
+        z0/z1, boxes) are in the plan frame, as in neighbours(); `z` is the ground under the house."""
         x0, x1, y0, y1 = (float(v) for v in nb["rect"])
         cx, cy, hx, hy = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
         th = math.radians(float(nb.get("rot", 0.0)))
@@ -706,7 +707,7 @@ class _Site:
         self.rot("house", ax, ay, bx, by, zg - 0.5, ze, mat, 0, 2 * hy, tag=name)
         if nb.get("base"):
             (ax, ay), (bx, by) = T(-hx - 0.12, 0.0), T(hx + 0.12, 0.0)
-            self.rot("house", ax, ay, bx, by, zg - 0.5, zg + float(nb["base"].get("z1", 8.5)), nb.get("base_mat", f"{mat}_base"), 0,
+            self.rot("house", ax, ay, bx, by, zg - 0.5, float(nb["base"].get("z1", zg + 8.5)), nb.get("base_mat", f"{mat}_base"), 0,
                      2 * hy + 0.24, tag=f"{name} (brick)")
         faces = {"y1": ((-hx, hy), (1, 0), (0, 1)), "y0": ((-hx, -hy), (1, 0), (0, -1)), "x1": ((hx, -hy), (0, 1), (1, 0)), "x0": ((-hx, -hy), (0, 1), (-1, 0))}
         for face, u0, u1, wz0, wz1 in nb.get("face_windows", []):

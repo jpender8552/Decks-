@@ -854,15 +854,21 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     return sheet("D-501", "Details — steel frame", "Steel ledger · joist clips · boxed beam on the shared pier · Diamond Pier · deck edge · under the deck", o, "Schematic details, not to scale · the engineer's details govern", meta)
 
 
-def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[Tuple[List[Tuple[float, float]], Optional[str]]]] = None) -> Optional[str]:
+def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = None, marks: Optional[List[tuple]] = None) -> Optional[str]:
     """C-100 site plan: the parcel and the house from the county GIS (plan frame, feet), the new decks, roof covers and
     stairs, distances to the lot lines, the reference setbacks, north arrow, street, lot coverage and the parcel facts.
-    outlines: [(polygon, label)] when the deck is drawn as several pieces (the levels of a composite deck); None -> the
-    scene's one outline."""
+    outlines: [(polygon, label[, (x, y) label point])] when the deck is drawn as several pieces (the levels of a composite
+    deck); None -> the scene's one outline. marks: [(rects [(x0, x1, y0, y1)], label, color, posts [(x, y)])] other new
+    work drawn dashed with its distance to the rear lot line (a louvered roof, an option stair). A composite (outlines
+    given) draws the setback lines over the deck with short tags and keys them in the right column, wraps long labels,
+    and lists the deck label in the right column; setback_ref["lines"] = [{"d", "label", "color", "dash"}] adds offset
+    lines (a steps limit)."""
     s = L.spec
     sp = s.site.plan or {}
     if not sp.get("parcel"):
         return None
+    comp = outlines is not None
+    marks = marks or []
     from .spec import covers_of
     par = [tuple(p) for p in sp["parcel"]]
     xs, ys = [p[0] for p in par], [p[1] for p in par]
@@ -877,24 +883,32 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[Tuple[List[
     # reference setbacks (dashed), offset inward from the rear / side lines
     ref = sp.get("setback_ref") or {}
     rear_y = min(p[1] for p in par if p[1] > 0)
+    sb_lines = []                                        # a composite: the offset lines, drawn over the decks with short tags
     if ref.get("rear") and sp.get("setback_offset"):     # the rear setback as an offset of the rear lot line (a sloped / jogged rear line)
         cxp, cyp = sum(xs) / len(xs), sum(ys) / len(ys)
         rear_edges = [(a, b) for a, b in zip(par, par[1:] + par[:1]) if a[1] > 0 and b[1] > 0 and abs(b[0] - a[0]) > abs(b[1] - a[1]) and math.hypot(b[0] - a[0], b[1] - a[1]) > 1.0]
         lines_ = [(ref["rear"], ref.get("rear_label") or f"{ref['rear']}' rear setback", "#8a6d2a", "6 4")]
         if ref.get("rear_deck"):            # where a low deck may reach (a projection allowance into the rear setback)
             lines_.append((ref["rear_deck"], ref.get("rear_deck_label") or f"{ref['rear_deck']}' — deck projection limit", "#b3261e", "2 3"))
+        for ex in ref.get("lines") or []:   # more offset lines (a steps limit): {"d": 15, "label": "...", "color": "#2f6f8f", "dash": "8 3"}
+            lines_.append((float(ex["d"]), ex.get("label") or f"{float(ex['d']):g}' from the rear lot line", ex.get("color") or "#2f6f8f", ex.get("dash") or "8 3"))
         t_lab = float(sp.get("rear_label_t", 0.16))
         for d, lab_, col_, dash_ in lines_:
             best = None
+            segs = []
             for a, b in rear_edges:
                 ln_ = math.hypot(b[0] - a[0], b[1] - a[1]); nx_, ny_ = -(b[1] - a[1]) / ln_, (b[0] - a[0]) / ln_
                 if (cxp - a[0]) * nx_ + (cyp - a[1]) * ny_ < 0:
                     nx_, ny_ = -nx_, -ny_
                 p0, p1 = (a[0] + nx_ * d, a[1] + ny_ * d), (b[0] + nx_ * d, b[1] + ny_ * d)
-                o.append(LN(X(p0[0]), Y(p0[1]), X(p1[0]), Y(p1[1]), col_, 0.9, dash_))
+                segs.append((p0, p1))
+                if not comp:
+                    o.append(LN(X(p0[0]), Y(p0[1]), X(p1[0]), Y(p1[1]), col_, 0.9, dash_))
                 if best is None or ln_ > best[0]:
                     best = (ln_, p0, p1)
-            if best:
+            if comp:
+                sb_lines.append((d, lab_, col_, dash_, segs, best))
+            elif best:
                 _, p0, p1 = best
                 ang = math.degrees(math.atan2(-(Y(p1[1]) - Y(p0[1])), X(p1[0]) - X(p0[0])))
                 # one line: its label 22 px into the lot (as before); two lines: the setback's above it, the projection limit's below
@@ -910,23 +924,27 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[Tuple[List[
         o.append('<defs><pattern id="hatchC" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#b9ad97" stroke-width="1.2"/></pattern></defs>')
         o.append(PG([(X(x), Y(y)) for x, y in fp], "url(#hatchC)", INK, 1.3))
         cx = sum(p[0] for p in fp) / len(fp); cy = sum(p[1] for p in fp) / len(fp)
-        o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE)); o.append(T(X(cx), Y(cy) + 12, sp.get("house_label", "one-story + garage (no work)"), 7.5, 600, "middle", MUTE))
+        o.append(T(X(cx), Y(cy), "EXISTING HOUSE", 9, 900, "middle", MUTE))
+        hl = sp.get("house_label", "one-story + garage (no work)")
+        for k_, ln_ in enumerate(textwrap.wrap(hl, 44)[:4] if comp else [hl]):      # a composite wraps a long label
+            o.append(T(X(cx), Y(cy) + 12 + k_ * 9.5, ln_, 7.5, 600, "middle", MUTE))
     # decks
-    outs = outlines or [(deck_outline(S), None)]
-    for poly_, _ in outs:
-        o.append(PG([(X(x), Y(y)) for x, y in poly_], FILL["deck"], INK, 1.2))
-    out = [p for poly_, _ in outs for p in poly_]
-    if outlines and not sp.get("deck_label_inside"):              # each level named on it
-        for poly_, lab_ in outs:
-            if lab_:
-                o.append(T(X(sum(q[0] for q in poly_) / len(poly_)), Y(sum(q[1] for q in poly_) / len(poly_)) + 3, lab_, 6.4, 900, "middle", INK))
-    if sp.get("deck_label") and sp.get("deck_label_inside"):     # inside the deck (a setback line runs under its front)
+    outs = [tuple(e) for e in outlines] if outlines else [(deck_outline(S), None)]
+    for e in outs:
+        o.append(PG([(X(x), Y(y)) for x, y in e[0]], FILL["deck"], INK, 1.2))
+    out = [p for e in outs for p in e[0]]
+    if comp:                                                       # each level named on it, at its label point (the deck label: right column)
+        for e in outs:
+            if len(e) > 1 and e[1]:
+                lx_, ly_ = e[2] if len(e) > 2 and e[2] else (sum(q[0] for q in e[0]) / len(e[0]), sum(q[1] for q in e[0]) / len(e[0]))
+                o.append(T(X(lx_), Y(ly_) + 3, e[1], 6.6, 900, "middle", "#f3ead9"))
+    elif sp.get("deck_label") and sp.get("deck_label_inside"):     # inside the deck (a setback line runs under its front)
         cxd, cyd = sum(q[0] for q in out) / len(out), sum(q[1] for q in out) / len(out)
         for k_, ln_ in enumerate(textwrap.wrap(sp["deck_label"], 34)[:3]):
             o.append(T(X(cxd), Y(cyd) - 4 + k_ * 9, ln_, 7, 900, "middle", INK))
     elif sp.get("deck_label"):          # one label for the whole deck, below its front edge
         o.append(T(X(sum(q[0] for q in out) / len(out)), Y(max(q[1] for q in out)) + 12, sp["deck_label"], 7.2, 900, "middle", INK))
-    elif not outlines:
+    else:
         for z in S.meta["zones"]:
             deep = z["front"] - z["wall_y"] > 6
             o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
@@ -934,6 +952,21 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[Tuple[List[
     for b in S.boxes:
         if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
+    # other new work drawn dashed (a louvered roof, an option stair), then (a composite) the setback lines over everything
+    for rects, lab_, col_, posts_ in marks:
+        for x0_, x1_, y0_, y1_ in rects:
+            o.append(R(X(x0_), Y(y0_), (x1_ - x0_) * sc, (y1_ - y0_) * sc, "none", col_, 1.1, 'stroke-dasharray="5 3"'))
+        for px_, py_ in posts_:
+            o.append(R(X(px_) - 2.2, Y(py_) - 2.2, 4.4, 4.4, col_, INK, 0.5))
+    for d, lab_, col_, dash_, segs, best in sb_lines:
+        for p0, p1 in segs:
+            o.append(LN(X(p0[0]), Y(p0[1]), X(p1[0]), Y(p1[1]), col_, 1.0, dash_))
+        if best:                                                   # a short tag at the line's left end; the key is in the right column
+            _, p0, p1 = best
+            q0, q1 = (p0, p1) if X(p0[0]) < X(p1[0]) else (p1, p0)
+            ux, uy = X(q1[0]) - X(q0[0]), Y(q1[1]) - Y(q0[1])
+            n_ = math.hypot(ux, uy) or 1.0
+            o.append(TH(X(q0[0]) + ux / n_ * 8, Y(q0[1]) + uy / n_ * 8 - 3, f"{d:g}'", 7.2, 900, "start", col_))
     # other work on the lot under its own permit (context): a grey outline with its label
     for oth in sp.get("others") or []:
         poly = [tuple(q) for q in oth["poly"]]

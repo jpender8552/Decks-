@@ -1540,6 +1540,8 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t, add_rim
     poly = [(float(x), float(y)) for x, y in spec.geometry.outline]
     out: List[Box] = []
     for b in boxes:
+        if getattr(b, "layer", "").startswith("option:"):
+            out.append(b); continue          # an option stair and its landing sit outside the outline: their fascia and skirts stay whole
         if b.kind == "fascia" and not b.rot:
             # fascia hangs outside the outline by its own thickness: clip it along a line just inside its face, and only where
             # the outline cuts it well short (a zone rectangle's fascia past an angled corner); drop what is left of a sliver

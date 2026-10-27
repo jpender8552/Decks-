@@ -76,6 +76,7 @@ DEFAULTS = dict(
     screens=None,                           # retractable screens (an option): [{side "front" | "left" | "right", drop 0 (up in the cassette) .. 1
                                             #   (fully down), fabric "mesh" | "vinyl", density, color, bottom, mount, price / price_per_lf}]
     screens_priced=None,                    # None -> as the roof ("own" | "option")
+    nominal=None,                           # [W, D] ft: the size it is sold as (customer wording, $/SF) when the built frame differs
     note="",
 )
 SCREEN_DEFAULTS = dict(side="front", drop=0.0, fabric="mesh", density=90, color="black",
@@ -224,7 +225,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     q.update({k: v for k, v in (r or {}).items() if v is not None})
     x0, x1 = sorted((float(q["x0"]), float(q["x1"])))
     y0, y1 = sorted((float(q["y0"]), float(q["y1"])))
-    W_nom, D_nom = x1 - x0, y1 - y0         # the size as sold (the price's area); the built frame can differ by an edge clearance / snap
+    W_nom, D_nom = (float(q["nominal"][0]), float(q["nominal"][1])) if q.get("nominal") else (x1 - x0, y1 - y0)   # the size as sold
     notes: List[str] = []
     p = float(q["post_in"]) * IN
     rp = RAIL_POST_INSET * IN
@@ -278,6 +279,8 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
         if not house:
             posts = [(x0 + p / 2, y0 + p / 2), (x1 - p / 2, y0 + p / 2)] + posts
     W, D = x1 - x0, y1 - y0
+    if abs(W - W_nom) > 0.04 or abs(D - D_nom) > 0.04:
+        notes.append(f"built frame {ftin(W * 12)} x {ftin(D * 12)} ({W * D:.1f} SF); sold as {ftin(W_nom * 12)} x {ftin(D_nom * 12)} ({W_nom * D_nom:g} SF)")
 
     # ---- beams: the front by its post-to-post span; the house, side and divider beams by theirs
     ymax = max(pt[1] for pt in posts) if posts else y1
@@ -695,8 +698,9 @@ def descriptors(L) -> List[dict]:
 
 # ================================================================== rail integration
 def rail_points(spec, zones) -> List[Tuple[float, float, float]]:
-    """layout.build_layout: (x, y, post size) in inches, the layout's frame, of the roof posts that stand on a deck-edge rail
-    line — rail_layout_edges makes each a fixed rail post (one near a run's end takes that end)."""
+    """layout.build_layout: (x, y, post size) in inches, the layout's frame, of the roof posts. A rail run whose post line
+    passes through one or within 12" of it takes it as a fixed rail post (one near a run's end takes that end, so no rail
+    post stands beside a roof post: the owner's roof posts ARE the rail posts where the rail ties in)."""
     return _rail_points(spec, zone_surfaces(zones, spec.geometry.height_in))
 
 
@@ -712,7 +716,7 @@ def _rail_points(spec, surf: List[dict]) -> List[Tuple[float, float, float]]:
     out = []
     for r in roofs:
         q = resolve(r, surf)
-        out += [(pt["x"] * 12.0, pt["y"] * 12.0, q["post"] * 12.0) for pt in q["posts"] if pt["on_rail"]]
+        out += [(pt["x"] * 12.0, pt["y"] * 12.0, q["post"] * 12.0) for pt in q["posts"]]     # the layout keeps those a rail run passes within 12" of
     return out
 
 
@@ -777,6 +781,12 @@ def takeoff_hook(t) -> None:
         t.schedule["Rail"] += (f"; {words} at {xs} from the left end of this level: the 6x6 aluminum post is base-plated on the deck over solid "
                                f"blocking / the column below and the rail panels hang on wall-mount brackets screwed into it")
     t.notes.append(f"louvered roof: {words} at {xs} — no rail post kit there; {ends} wall-mount bracket kits")
+    for p_ in roof:                          # a run that ends beside a roof post (its line passes outside the post's faces)
+        if isinstance(p_.roof, tuple):
+            off = max(abs(p_.x - p_.roof[0]), abs(p_.y - p_.roof[1])) - 3.0
+            if off > 0.25:
+                t.notes.append(f"louvered roof: the rail run ({p_.tag.rsplit(' ', 1)[0]}) ends {ftin(off)} off the roof post's face at {ftin(p_.roof[0])}, "
+                               f"{ftin(p_.roof[1])} — its wall-mount bracket takes a filler block to reach the post")
     # a rail post left standing next to a roof post: its surface base must clear the roof post's base plate
     try:
         surf = zone_surfaces(t.layout.zones, t.spec.geometry.height_in)
@@ -805,6 +815,9 @@ def rail_base_in(system: str) -> float:
 
 # ================================================================== prices (sell = check / ACH)
 def roof_area_sf(r: dict) -> float:
+    """The area the roof is sold by: `nominal` [W, D] (ft) when set, else the frame rectangle."""
+    if r.get("nominal"):
+        return float(r["nominal"][0]) * float(r["nominal"][1])
     return abs(float(r["x1"]) - float(r["x0"])) * abs(float(r["y1"]) - float(r["y0"]))
 
 
@@ -1009,7 +1022,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     if len(front_posts) > 1:
         for a_, b_ in zip(front_posts, front_posts[1:]):
             dim_h(o, X, Y(py1) - 26, a_["x"], b_["x"], f"{ftin((b_['x'] - a_['x']) * 12)} post to post", 7.2)
-    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame · {q['area_nom']:g} SF", 8)
+    dim_h(o, X, Y(py1) - 8, x0, x1, f"{ftin(q['W'] * 12)} frame" + (f" · {q['area_nom']:g} SF" if abs(q['area'] - q['area_nom']) < 1.0 else ""), 8)
     dim_v(o, Y, X(x1) + 18, y0, y1, ftin(q["D"] * 12), 8, left=False)
     if front_posts:
         fp = front_posts[0]
@@ -1168,7 +1181,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
         "House side: the brackets go into the wall framing — field verify the eave, the wall and the framing behind it; flashed and sealed at every fastener.",
     ] + ([("Screens option — " + ", ".join(f"{sc['side']} {ftin(sc['width'] * 12)}" for sc in q["screens"]) + f" wide, {ftin(max(sc['max_drop'] for sc in q['screens']) * 12)} drop, "
            + ("clear vinyl" if q["screens"][0]["fabric"] == "vinyl" else f"{q['screens'][0]['color']} mesh") + f"; {q['screens'][0]['housing'] * 12:g}\" housings under the frame "
-           + ("inside the rail" if q["screens"][0]["mount"] == "inside" else "on the beams' outer faces") + ", side tracks, a bottom bar down to the deck")] if q["screens"] else []) + list(q["notes"])
+           + ("inside the rail" if q["screens"][0]["mount"] == "inside" else "on the beams' outer faces") + ", side tracks, a bottom bar down to the deck")] if q["screens"] else []) + [n for n in q["notes"] if not n.startswith("built frame")]
     yy = 371
     for ln in notes:
         for k2, w_ in enumerate(textwrap.wrap(ln, 112)):
