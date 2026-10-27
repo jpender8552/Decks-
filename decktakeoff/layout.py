@@ -1516,7 +1516,8 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
             stair_posts += nr_sides * (n + 1)
         # landing guard: level panels along the landings' open sides (the landing is a walking surface over 30")
         land_secs = []; land_posts = 0; land_lf = 0.0
-        if s.landings and geo.guard_required and (rise - geo.flights[0].rise_in) > eng.GUARD_TRIGGER_HEIGHT and any(frails):
+        g_land = -float(s.landing_grade_in) if getattr(s, "landing_grade_in", None) is not None and s.landing_grade_in < 0 else 0.0   # a yard falling away under the landing
+        if s.landings and geo.guard_required and (rise - geo.flights[0].rise_in) + g_land > eng.GUARD_TRIGGER_HEIGHT and any(frails):
             if s.landing_guard_lf is not None:
                 land_lf = float(s.landing_guard_lf)
             else:
@@ -1567,7 +1568,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
             sl.landing_footings = 4 * len(s.landings)
             for li in range(len(s.landings)):
                 fi = min(li, len(geo.flights) - 2)               # the flight this landing is the foot of (a turn square + its big landing share one level)
-                below = sum(fg.rise_in for fg in geo.flights[fi + 1:])
+                below = sum(fg.rise_in for fg in geo.flights[fi + 1:]) - float(getattr(s, "landing_grade_in", None) or 0.0)   # + the yard's fall under it
                 sl.landing_post_h.append(round(below - f["thick"] - actual(spec.framing.joist_size)[1], 2))
         if sl.handrail == "each flight":
             sl.handrail_lf = round(sum(math.hypot(fg.run_in, fg.rise_in - geo.riser_in) for fg, r_ in zip(geo.flights, frails) if r_) / 12.0, 1)

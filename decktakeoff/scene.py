@@ -433,8 +433,18 @@ def build_scene(L) -> Scene:
                 Le = math.hypot(ex1 - ex0, ey1 - ey0); ux_, uy_ = (ex1 - ex0) / Le, (ey1 - ey0) / Le
                 nx_, ny_ = -uy_, ux_                    # outward (the outline runs clockwise in the plan frame)
                 ox, oy = nx_ * fas_t / 2, ny_ * fas_t / 2
-                B.append(rot_box("fascia", ex0 + ox - ux_ * fas_t / 2, ey0 + oy - uy_ * fas_t / 2, ex1 + ox + ux_ * fas_t / 2, ey1 + oy + uy_ * fas_t / 2,
-                                 jbot - 0.15, zt - 0.02, "fascia", 6, fas_t, tag=f"fascia side {e_.name}"))
+                gaps_ = sorted((getattr(L, "fascia_gaps", None) or {}).get(e_.name, []))      # composite: where an inset stair's base ledger is bolted on
+                cur_, segs_ = 0.0, []
+                for g0_, g1_ in gaps_:
+                    if g0_ * IN > cur_ + 0.05:
+                        segs_.append((cur_, g0_ * IN))
+                    cur_ = max(cur_, g1_ * IN)
+                if Le > cur_ + 0.05:
+                    segs_.append((cur_, Le))
+                for a_, b_ in segs_:
+                    ea_ = fas_t / 2 if a_ < 0.01 else 0.0; eb_ = fas_t / 2 if b_ > Le - 0.01 else 0.0     # the corner overlap only at the edge's own ends
+                    B.append(rot_box("fascia", ex0 + ux_ * (a_ - ea_) + ox, ey0 + uy_ * (a_ - ea_) + oy, ex0 + ux_ * (b_ + eb_) + ox, ey0 + uy_ * (b_ + eb_) + oy,
+                                     jbot - 0.15, zt - 0.02, "fascia", 6, fas_t, tag=f"fascia side {e_.name}"))
     # ---------------- frame per zone
     for zi, z in enumerate(L.zones if OF is None else []):
         fr = z.frame
@@ -953,11 +963,13 @@ def build_scene(L) -> Scene:
                 xj = x0_ + (x1_ - x0_) * j / nj
                 add("joist", xj - 0.75 * IN, xj + 0.75 * IN, y0_ + 1.5 * IN, y1_ - 1.5 * IN, z_top - bt - jd, z_top - bt, "timber", 4, tag=f"landing {li} joist")
             ins = max(0.5, pb_ / 2 + 0.1)
+            lg_ = getattr(ss, "landing_grade_in", None)
+            zg_ = (zt - g.total_rise_in * IN + lg_ * IN) if lg_ is not None else 0.0     # the ground under the landing (Stair.landing_grade_in), else z 0
             for px in (x0_ + ins, x1_ - ins):
                 for py in (y0_ + ins, y1_ - ins):
-                    add("post", px - pb_ / 2, px + pb_ / 2, py - pb_ / 2, py + pb_ / 2, 0.55, z_top - bt - jd, "timber", 2, tag=f"landing {li} post")
-                    add("base", px - pb_ / 2 - 0.02, px + pb_ / 2 + 0.02, py - pb_ / 2 - 0.02, py + pb_ / 2 + 0.02, 0.45, 0.57, "steel", 2)
-                    add("footing", px - 0.55, px + 0.55, py - 0.55, py + 0.55, -0.1, 0.45, "concrete", 1, tag="landing footing")
+                    add("post", px - pb_ / 2, px + pb_ / 2, py - pb_ / 2, py + pb_ / 2, zg_ + 0.55, z_top - bt - jd, "timber", 2, tag=f"landing {li} post")
+                    add("base", px - pb_ / 2 - 0.02, px + pb_ / 2 + 0.02, py - pb_ / 2 - 0.02, py + pb_ / 2 + 0.02, zg_ + 0.45, zg_ + 0.57, "steel", 2)
+                    add("footing", px - 0.55, px + 0.55, py - 0.55, py + 0.55, zg_ - 0.1, zg_ + 0.45, "concrete", 1, tag="landing footing")
 
         def landing_guard(rects, z_top, openings):
             """Level guard on the landings' open sides: the union outline of the landing rectangles less the house side and the flight openings.

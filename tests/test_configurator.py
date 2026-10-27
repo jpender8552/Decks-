@@ -49,10 +49,10 @@ def test_masks_follow_the_options():
     assert groups["base"] > 100 and groups["option:Stairs to the yard"] > 0 and groups["option:Lighting"] > 0
     assert any(g.startswith("option:Stairs to the yard + Lighting") for g in groups)       # the yard stair's own lights
     bits = {o["key"]: o["bit"] for o in data["options"]}
-    with_lights = sum(1 << c for c in data["combos"] if c >> bits["lights"] & 1)
+    with_lights = sum(1 << i for i, c in enumerate(data["combos"]) if c >> bits["lights"] & 1)     # bit i = the i-th valid combination
     assert data["fixtures"] and all(f[9] & ~with_lights == 0 for f in data["fixtures"])   # a light shows only with the lighting option
     kinds, B, k = data["kinds"], data["boxes"], data["stride"]
-    with_stairs = sum(1 << c for c in data["combos"] if c >> bits["stairs"] & 1)
+    with_stairs = sum(1 << i for i, c in enumerate(data["combos"]) if c >> bits["stairs"] & 1)
     tread = kinds.index("tread")
     # the upper level's inter-level stair is base; the yard stair's treads come only with the stairs option
     masks = {B[i + 12] for i in range(0, len(B), k) if B[i + 9] == tread}
@@ -70,3 +70,22 @@ def test_page_is_one_self_contained_file(tmp_path):
     data = json.loads(payload.replace("<\\/", "</"))
     assert data["options"][0]["label"] == "Stairs to the yard" and len(data["boxes"]) % data["stride"] == 0
     assert "THREE.WebGLRenderer" in html and "window.__ready = true" in html
+
+
+def test_two_layouts_of_one_option_are_exclusive():
+    opts = _options()
+    alt = copy.deepcopy(TWO)
+    alt["geometry"]["parts"][0]["stairs"] = [{"side": "front", "width_in": 48, "position_in": 150, "landing": "grade", "rails": 2,
+                                              "name": "Stairs to the yard"}]
+    data, st = configurator_data(TWO, {"stairs": opts["stairs"], "stairs_alt": alt, "lights": opts["lights"]})
+    bits = {o["key"]: o["bit"] for o in data["options"]}
+    assert st["combos"] == 6 and not any(c >> bits["stairs"] & 1 and c >> bits["stairs_alt"] & 1 for c in data["combos"])
+    by = {o["key"]: o for o in data["options"]}
+    assert by["stairs"]["excludes"] == ["stairs_alt"] and by["stairs_alt"]["excludes"] == ["stairs"] and by["lights"]["excludes"] == []
+    assert by["stairs_alt"]["label"] == "Stairs to the yard — along the deck"
+    on = lambda key: sum(1 << i for i, c in enumerate(data["combos"]) if c >> bits[key] & 1)
+    tread = data["kinds"].index("tread")
+    B, k = data["boxes"], data["stride"]
+    masks = {B[i + 12] for i in range(0, len(B), k) if B[i + 9] == tread}
+    assert on("stairs") in masks and on("stairs_alt") in masks                     # each layout's treads show with it alone
+    assert not st["warnings"]

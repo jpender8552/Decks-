@@ -199,6 +199,53 @@ def _stair_landings(parts: List["Part"]) -> None:
                     break
 
 
+def _stair_ledger_fascia(parts: List["Part"]) -> None:
+    """An inset stair's base ledger (and the notch posts on it) is bolted to the rim of the part it lands on: that part's
+    fascia stops there — Layout.fascia_gaps (edge name -> [(t0, t1)] inches along the edge) for its 3D, the cut list for the order."""
+    import math
+    for p in parts:
+        for st in p.layout.stairs:
+            nt = getattr(st, "notch", None)
+            q = next((q_ for q_ in parts if q_.name == getattr(st, "lands_on", "")), None)
+            if not (getattr(st, "inset", False) and nt and q is not None and "ledger_lo" in nt):
+                continue
+            P = q.placement
+            ends = []
+            for v in (nt["ledger_lo"], nt["ledger_hi"]):
+                lx, ly = (nt["out"], v) if nt.get("axis", "x") == "x" else (v, nt["out"])
+                gx, gy = p.placement.pt(lx / 12.0, ly / 12.0)
+                dx, dy = gx - P.ox, gy - P.oy                          # into q's frame (the placement matrix is orthonormal)
+                ends.append(((P.xx * dx + P.yx * dy) * 12.0, (P.xy * dx + P.yy * dy) * 12.0))
+            for e in getattr(q.layout, "outline_edges", None) or []:
+                Le = math.hypot(e.x1 - e.x0, e.y1 - e.y0)
+                if Le < 1.0:
+                    continue
+                ux, uy = (e.x1 - e.x0) / Le, (e.y1 - e.y0) / Le
+                if any(abs((x - e.x0) * uy - (y - e.y0) * ux) > 3.0 for x, y in ends):
+                    continue                                           # the ledger is not on this edge's line
+                t0, t1 = sorted((x - e.x0) * ux + (y - e.y0) * uy for x, y in ends)
+                t0, t1 = max(0.0, t0), min(Le, t1)
+                if t1 - t0 < 1.0:
+                    continue
+                gaps = dict(getattr(q.layout, "fascia_gaps", None) or {})
+                gaps.setdefault(e.name, []).append((round(t0, 2), round(t1, 2)))
+                q.layout.fascia_gaps = gaps
+                cl = q.takeoff.cut_list
+                names_ = {f"fascia {e.name}", "fascia " + e.name.replace("edge:", "side ")}     # an outline's sides read "side N" in the cut list
+                for i, c in enumerate(cl):
+                    if c.nominal == "fascia" and c.member.lower() in names_:
+                        keep = [(a, b) for a, b in ((0.0, t0), (t1, Le)) if b - a > 1.0]
+                        cl[i:i + 1] = [CutPiece(f"{c.member} ({k + 1} of {len(keep)}, stops at the stair base ledger)", c.nominal, round(b - a + 0.75, 2), 1, c.note)
+                                       for k, (a, b) in enumerate(keep)]
+                        from .units import ftin
+                        old_ = f"{c.member.lower()} {ftin(c.length_in)}"
+                        new_ = " · ".join(f"{c.member.lower()} {ftin(b - a + 0.75)}" for a, b in keep) + " (stops at the stair base ledger)"
+                        for ln in q.takeoff.lines:              # the fascia line's piece list says so too
+                            if ln.category == "Fascia" and old_ in (ln.why or ""):
+                                ln.why = ln.why.replace(old_, new_)
+                        break
+
+
 def _pool_decking(spec: DeckSpec, parts: List[Part], lines: List[Line]) -> None:
     """One cut plan for the field boards of every part and the spares once per job (the standard: field +2, 1 spare border):
     the merge alone packs each level on its own — no offcut crosses a level — and carries every part's spares. The stair treads
@@ -272,6 +319,7 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
                        ox=float(pd.get("placement", {}).get("origin", [0, 0])[0]), oy=float(pd.get("placement", {}).get("origin", [0, 0])[1]))
         parts.append(Part(pd["name"], sub, t, f, pl))
     _stair_landings(parts)          # a stair from one level onto another: no stand-in boards under its foot
+    _stair_ledger_fascia(parts)     # ... and the lower part's fascia stops at the inset stair's base ledger
     # ---- merge the orders: same category + item -> one line, quantities summed, reasons joined
     merged: "OrderedDict[Tuple[str, str], Line]" = OrderedDict()
     whys: "OrderedDict[Tuple[str, str], OrderedDict[str, List[str]]]" = OrderedDict()

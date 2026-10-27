@@ -5,8 +5,11 @@ angle, the roof's screens running up and down, and the lights glowing at night. 
 framing layers, no exploded view, no build steps (decktakeoff.viewer is the technical viewer).
 
     from decktakeoff.configurator import build_configurator
-    build_configurator(base_spec, {"stairs": stair_spec, "lights": lights_spec, "roof": roof_spec, "screens": screens_spec},
-                       "out/fillmore_3d.html", title="7303 S Fillmore Cir")
+    build_configurator(base_spec, {"stairs": stair_spec, "stairs_alt": stair_alt_spec, "lights": lights_spec, "roof": roof_spec,
+                                   "screens": screens_spec}, "out/fillmore_3d.html", title="7303 S Fillmore Cir")
+
+Two layouts of one option (the horseshoe yard stair and the one along the deck) are an exclusive group: at most one is on,
+turning one on turns the other off, and every other option combines with either (EXCLUSIVE, the `exclusive` argument).
 
 How the options become toggles (exact, no hand tagging needed): every option is a spec (the base plus that option). Its
 change against the base (against the base plus its prerequisites, for "screens": the roof) is a JSON patch; the page's
@@ -494,24 +497,32 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
     def with_(n):
         return sum(1 << ci[c] for c in valid if c >> bits[n] & 1)
 
+    terms = [(labels.get(n, n), with_(n)) for n in names]       # what a mask can be said in: each option, and "either layout"
+    for g in excl:
+        either = 0
+        for n in g:
+            either |= with_(n)
+        terms.append((" or ".join(labels.get(n, n) for n in g), either))
+
     def describe(m):
         """The simplest 'shows with A (+ B), not with C (or D)' that gives exactly this mask."""
         if m == all_mask:
             return "base"
         import itertools
         best = None
-        for states in itertools.product((0, 1, 2), repeat=len(names)):       # 0 free, 1 on, 2 off
+        for states in itertools.product((0, 1, 2), repeat=len(terms)):       # 0 free, 1 on, 2 off
+            cost = sum(1 for x in states if x)
+            if best is not None and cost >= best[0]:
+                continue
             mm = all_mask
-            for n, st_ in zip(names, states):
-                mm &= with_(n) if st_ == 1 else (~with_(n) if st_ == 2 else all_mask)
+            for (_lab, w), st_ in zip(terms, states):
+                mm &= w if st_ == 1 else (~w if st_ == 2 else all_mask)
             if mm == m:
-                cost = sum(1 for x in states if x)
-                if best is None or cost < best[0]:
-                    best = (cost, states)
+                best = (cost, states)
         if best is None:
             return f"combinations {m:#x}"
-        on = [labels.get(n, n) for n, x in zip(names, best[1]) if x == 1]
-        off = [labels.get(n, n) for n, x in zip(names, best[1]) if x == 2]
+        on = [lab for (lab, _w), x in zip(terms, best[1]) if x == 1]
+        off = [lab for (lab, _w), x in zip(terms, best[1]) if x == 2]
         txt = ("option:" + " + ".join(on)) if on else "base"
         return txt + (", replaced by " + " or ".join(off) if off else "")
     groups: Dict[str, int] = {}
@@ -1525,7 +1536,9 @@ function dateLabel(d) { var p = d.split('-').map(Number); return ['Jan', 'Feb', 
 function sunWords(s) { if (s.el < -0.833) return 'sun ' + Math.round(-s.el) + '° below the horizon'; return 'sun ' + WIND[Math.floor((s.az + 11.25) / 22.5) % 16] + ', ' + Math.round(s.el) + '° up'; }
 function syncUI() {
   OPT.forEach(function (o) { var b = $('opt-' + o.key); if (!b) return; b.setAttribute('aria-pressed', S.on[o.key] ? 'true' : 'false');
-    b.title = o.requires.length && !o.requires.every(function (r) { return S.on[r]; }) ? 'Adds ' + o.requires.map(function (r) { return OBYKEY[r].label; }).join(', ') + ' too' : ''; });
+    var rep = (o.excludes || []).filter(function (x) { return S.on[x]; });
+    b.title = o.requires.length && !o.requires.every(function (r) { return S.on[r]; }) ? 'Adds ' + o.requires.map(function (r) { return OBYKEY[r].label; }).join(', ') + ' too'
+      : (rep.length ? 'Shows this instead of ' + rep.map(function (x) { return OBYKEY[x].label; }).join(', ') : ''); });
   if (document.activeElement !== tIn) tIn.value = S.min;
   dIn.value = S.date;
   SEASONS.forEach(function (s) { var b = $('season-' + s[0]); if (b) b.classList.toggle('on', S.date === s[2]); });
