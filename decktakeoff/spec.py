@@ -272,6 +272,7 @@ class Stair:
 class Extras:
     demo_existing: bool = False
     demo_sf: Optional[float] = None
+    stair_rule: bool = False             # the owner's stairs: risers x pricebook stair_sell_per_riser (railing included), landings at deck_sell_per_sf_no_rail
     labor_extras: List[dict] = field(default_factory=list)   # owner-set labor lines [{"item", "qty", "unit", "rate"}] (e.g. slab openings 6 x $200), marked up like the card
     demo_columns: List[dict] = field(default_factory=list)   # masonry columns out [{"what": "brick columns (9)", "lf": 55}] -> the card's stone / stucco column demo per LF
     hot_tub: bool = False

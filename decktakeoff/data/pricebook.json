@@ -1418,5 +1418,20 @@
       "sell": 85.0,
       "cost": 35.0
     }
+  },
+  "stair_sell_per_riser": {
+    "Prime+": 533.0,
+    "Summit": 527.0,
+    "Terrain+": 573.0,
+    "Reserve": 618.0,
+    "Vintage": 682.0,
+    "_note": "Pricing Sheet To Fit GS (owner, Drive 1gY0Vadbtg…, rev 14 Jul 2026): stair sell per riser, installed, RAILING INCLUDED (2' of rail per riser) — Vintage cost $409 + margin $273 = $682 (40% GM); owner 27 Oct: 'we charge $682 per riser … includes railing'"
+  },
+  "deck_sell_per_sf_no_rail": {
+    "Prime+": 81.33,
+    "Terrain+": 86.42,
+    "Reserve": 94.82,
+    "Vintage": 109.66,
+    "_note": "Pricing Sheet To Fit GS: deck with no railing, sell per SF (40% GM) — a stair landing sells at this rate, its level guard at the rail rule"
   }
 }

@@ -409,6 +409,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
                plate=float(q["plate_in"]) * IN, gutter=bool(q["gutter"]), lights=bool(q["lights"]), downspouts=str(q.get("downspouts") or "none"),
                brackets=brackets, house_clear=hc, eave=eave, riser=riser, notes=notes, price=q.get("price"), price_per_sf=q.get("price_per_sf"), priced=str(q.get("priced") or "own"),
                option_name=q.get("option_name"), note=q.get("note", ""), global_=bool(r.get("_global")))
+    res["screens_price"] = q.get("screens_price")
     res["screens"] = _screens(res, q.get("screens") or [], surfaces)
     res["screens_priced"] = str(q.get("screens_priced") or res["priced"])
     return res

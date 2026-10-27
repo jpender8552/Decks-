@@ -10,6 +10,7 @@ Jason Ct (dimensional) uses the same engine with tax 8.5% destination, factor 1.
 from __future__ import annotations
 from .units import ftin
 
+import json
 import math
 import copy
 from dataclasses import dataclass, field
@@ -327,7 +328,43 @@ def gc_lines_for(t: Takeoff) -> Tuple[List[Tuple[str, float, str]], float, List[
     return [("General conditions", base, f"${PRICEBOOK['general_conditions']['per_sf']:g}/SF x {L.deck_sf:g} SF")] + [(i, v, "at cost") for i, v in extras], base, extras
 
 
-def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bool = True) -> Pricing:
+_STAIRLESS: Dict[str, float] = {}       # the stairless takeoff's margin-carrying work, per (spec, gm, tax)
+
+
+def stair_rule(t: Takeoff, gm: float, tax_rate: float, rate_lf, margin_work: float) -> Tuple[float, float, str]:
+    """extras.stair_rule — the owner's stairs (Pricing Sheet To Fit GS): every riser at stair_sell_per_riser, railing included; a
+    landing at the deck's no-rail $/SF with its level guard at the rail rule. -> (sell, work, note). The stairs' work is the job's
+    margin-carrying work less the same job with its stairs taken out: every line a stair adds (its treads cut from the field, its
+    caissons and posts, its fascia, its labor) and nothing the stairs do not."""
+    s, L = t.spec, t.layout
+    per_riser = PRICEBOOK.get("stair_sell_per_riser", {}).get(s.decking.collection)
+    if not (s.extras.stair_rule and per_riser and L.stairs):
+        return 0.0, 0.0, ""
+    d = s.to_dict()
+    d["stairs"] = []
+    for part in d.get("geometry", {}).get("parts") or []:
+        part["stairs"] = []
+    key = json.dumps(d, sort_keys=True, default=str) + f"|{gm}|{tax_rate}"
+    if key not in _STAIRLESS:
+        s0 = DeckSpec.from_dict(d)
+        if s0.geometry.parts:
+            from .composite import build_composite
+            t0 = build_composite(s0)[0]
+        else:
+            from .takeoff import build_takeoff
+            t0 = build_takeoff(s0)
+        _STAIRLESS[key] = price(t0, gm=gm, tax_rate=tax_rate, with_options=False, _stairless=True).margin_work
+    psf = float(PRICEBOOK.get("deck_sell_per_sf_no_rail", {}).get(s.decking.collection, 0.0))
+    n_r = sum(st.geo.risers for st in L.stairs)
+    land_sf = round(sum(float(w) * float(dd) / 144 for ss in stair_specs(t) for w, dd in (ss.landings or [])), 1)
+    guard_lf = round(sum(st.landing_rail_lf for st in L.stairs), 1)
+    sell = n_r * float(per_riser) + land_sf * psf + (guard_lf * float(rate_lf) if rate_lf else 0.0)
+    note = (f"{n_r} stair risers at ${float(per_riser):,.0f}, railing included" + (f"; {land_sf:g} SF of landing at ${psf:,.2f}/SF" if land_sf else "")
+            + (f" + its {guard_lf:g} LF guard at ${float(rate_lf):,.0f}/LF" if guard_lf and rate_lf else ""))
+    return round(sell, 2), margin_work - _STAIRLESS[key], note
+
+
+def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bool = True, _stairless: bool = False) -> Pricing:
     s, L = t.spec, t.layout
     pb = PRICEBOOK
     gm = gm if gm is not None else (s.extras.gm if s.extras.gm is not None else pb["gm_default"])
@@ -403,14 +440,17 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         builtin_work += sum(e for i, q, u, r_, e in labor_lines if i.startswith(label))
     # lights the owner prices per light, installed (extras.lights.sell_each): they sell at that price; their work comes off the margin base
     light_sell, light_work = __import__("decktakeoff.lighting", fromlist=["fixed_sell"]).fixed_sell(t, labor_lines, factor, rate)
-    sell = round((work - rail_work - builtin_work - light_work) / (1 - gm) + rail_sell + builtin_sell + light_sell + gc)
-    sell_floor = round((work - rail_work - builtin_work - light_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + light_sell + gc)
+    margin_work = work - rail_work - builtin_work - light_work
+    # stairs the owner prices per riser (extras.stair_rule): they sell at that price; their work comes off the margin base
+    stair_sell, stair_work, stair_note = (0.0, 0.0, "") if _stairless else stair_rule(t, gm, rate, rate_lf, margin_work)
+    sell = round((margin_work - stair_work) / (1 - gm) + rail_sell + builtin_sell + light_sell + stair_sell + gc)
+    sell_floor = round((margin_work - stair_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + light_sell + stair_sell + gc)
     gm_base = gm
     # an owner-set sell: sell_override (the price), else extras.sell_per_sf (the price per deck SF x the deck's SF); either way the
     # allocation scales to it and the margin is what that price carries
     psf = None if s.extras.sell_override else sell_per_sf_rule(s)
     set_sell = s.extras.sell_override or (round(psf[0] * L.deck_sf) if psf else None)
-    if (rail_sell or builtin_sell or light_sell) and not set_sell:
+    if (rail_sell or builtin_sell or light_sell or stair_sell) and not set_sell:
         gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
     if set_sell:
         sell = round(float(set_sell))
@@ -428,7 +468,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell) and not set_sell else gm))
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or stair_sell) and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
@@ -468,7 +508,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         alloc.append(("Foundation & structure", round(comp(frame_m, labsum("Frame", "Diamond Pier", "Caissons", "Large footings", "Concrete piers", "Extra beam", "Hot-tub", "Steel frame", "Under-deck")))))
         alloc.append(("Decking & fascia", round(comp(deck_m, labsum("Decking")))))
         rail_c = (round(rail_sell) if rail_sell else round(comp(rail_m, labsum("Railing", "Cable rail")))) if L.rail else 0
-        stair_c = round(comp(stair_m, labsum("Stairs"))) if L.stairs else 0
+        stair_c = (round(stair_sell) if stair_sell else round(comp(stair_m, labsum("Stairs")))) if L.stairs else 0
         if L.rail and (rail_c >= 100 or not L.stairs):
             alloc.append(("Railing", rail_c))
         else:
@@ -508,6 +548,11 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if rail_sell and not set_sell:
         pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f})" + (" · " + pr.rail_note if getattr(pr, 'rail_note', '') else "") + f", everything else at {gm_base:.1%} GM"
     pr.light_sell, pr.light_work = light_sell, light_work      # attributes (option_delta, price_options): the lights at their set price
+    pr.margin_work = margin_work                               # the work that carries the job margin (before the owner's stair rule)
+    pr.stair_sell, pr.stair_work = stair_sell, stair_work
+    if stair_sell and not set_sell:
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"stairs at the owner's rule: {stair_note} (${stair_sell:,.0f}; their cost "
+                        f"${stair_work:,.0f}, {1 - stair_work / stair_sell:.0%} margin)")
     if light_sell and not set_sell:
         _lp = t.lighting
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"{_lp.fixtures} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "

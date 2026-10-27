@@ -4019,6 +4019,367 @@ def _panel_level_change(o, note, CL, levels, steps):
 
 
 # ------------------------------------------------------------------ the composite set
+# ------------------------------------------------------------------ D-502 / D-504 connection details (whole deck)
+def _ord(t, *words, cat=None):
+    """The first order line whose item holds every word (case-insensitive), in the category when given."""
+    for l in getattr(t, "lines", None) or []:
+        if (cat is None or l.category == cat) and all(w.lower() in l.item.lower() for w in words):
+            return l
+    return None
+
+
+def _ord_n(t, *words, cat=None) -> float:
+    return sum(l.net for l in getattr(t, "lines", None) or [] if (cat is None or l.category == cat) and all(w.lower() in l.item.lower() for w in words))
+
+
+def sheet_details_frame_composite(CL, S, t, levels, steps, meta) -> str:
+    """D-502 for a two-level deck: the frame's connections drawn from the spec and worded from the order — the ledger at the
+    house band (the cantilevered band: the engineer's detail), the hangers, joists on the drop beam, the beam on the column
+    cap, the post base on its footing (anchors, rebar, the slab opening), the step-face nailers behind the skirt."""
+    s = CL.spec
+    fr = CL.frame
+    js = s.framing.joist_size
+    js_ = js.replace("x", "")
+    dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    cortex = (s.decking.fastener_system or "").lower().startswith("cortex")
+    hs = s.framing.hanger or HANGER_FOR_JOIST.get(js, "LUS210Z")
+    items = " ".join(l.item for l in t.lines)
+    bls = [b for lv in levels for b in lv.beams]
+    b0 = bls[0] if bls else None
+    bsize = b0.size if b0 else "6x10"
+    bsp = b0.species if b0 else "DF"
+    cap_mid = getattr(b0.bl, "cap_mid", "") if b0 else ""
+    cap_end = getattr(b0.bl, "cap_end", "") if b0 else ""
+    base = _post_base_name(s, t)
+    pw = post_words(s)
+    psz = s.framing.post_size
+    cant = bool(s.extras.ledger_on_cantilevered_floor or any(p.spec.extras.ledger_on_cantilevered_floor for p in CL.parts)
+                or re.search(r"cantilever(ed)?[ -](floor|ledger|band)", " ".join([str(getattr(s, "notes", "") or "")] + [str(f_.get("text", "")) if isinstance(f_, dict) else str(f_) for f_ in (getattr(s.extras, "field_flags", None) or [])]), re.I))
+    band = [z.name for lv in levels for z in lv.zones if z.ledger and abs(z.y0) < 0.05]       # the ledgers on the main rear wall
+    W3, H2, P = _grid6()
+    o = []
+    # 1 the ledger at the house band
+    x, y = P[0]; _panel(o, x, y, W3, H2, "1", "LEDGER ON THE CANTILEVERED BAND — SECTION" if cant else "LEDGER AT THE HOUSE BAND — SECTION")
+    if cant:
+        o.append(R(x + 24, y + 150, 20, 92, FILL["house"], INK, 0.9)); o.append(T(x + 37, y + 200, "wall below", 6, 700, "middle", MUTE, rot=-90))
+        _wood(o, x + 24, y + 120, 82, 30)
+        o.append(LN(x + 44, y + 158, x + 112, y + 158, RED, 0.8)); o.append(T(x + 78, y + 168, "2'-0\" cantilever", 6.4, 800, "middle", RED))
+    else:
+        o.append(R(x + 40, y + 150, 66, 92, FILL["house"], INK, 0.9))
+        _wood(o, x + 40, y + 120, 66, 30)
+    o.append(R(x + 90, y + 40, 22, 80, FILL["house"], INK, 0.8))
+    _wood(o, x + 106, y + 120, 6, 30, dark=True)
+    o.append(R(x + 112, y + 114, 2.5, 46, "#3f5d8a", "none", 0))
+    _wood(o, x + 115, y + 120, 9, 30)
+    _wood(o, x + 124, y + 121, 172, 29)
+    o.append(R(x + 122, y + 128, 6, 22, "#7b8186", INK, 0.6))
+    o.append(R(x + 112, y + 112, 186, 7, FILL["deck"], INK, 0.5))
+    o.append(f'<polyline points="{x + 100},{y + 100} {x + 114},{y + 106} {x + 114},{y + 112} {x + 126},{y + 112}" fill="none" stroke="{GOLD}" stroke-width="2"/>')
+    for yy in (126, 144):
+        o.append(LN(x + 84, y + yy, x + 124, y + yy, INK, 1.1)); o.append(C(x + 124, y + yy, 1.8, INK))
+    o.append(LN(x + 52, y + 135, x + 212, y + 135, "#5b6166", 1.2, "4 2"))
+    o.append(R(x + 48, y + 130, 8, 10, "#5b6166", INK, 0.5)); o.append(R(x + 208, y + 130, 8, 10, "#5b6166", INK, 0.5))
+    fl = _ord(t, "flashing"); mb = _ord(t, "membrane") or _ord(t, "Vycor")
+    lat = _ord(t, "lateral tie")
+    _lead(o, x + 106, y + 103, x + 150, y + 28, (fl.item.split(" (")[0] if fl else "Flashing") + " over the ledger, under the siding, lapped over the membrane")
+    _lead(o, x + 236, y + 116, x + 200, y + 66, f"{s.decking.collection} {s.decking.color} decking" + (", Cortex + plugs" if cortex else ""))
+    _lead(o, x + 260, y + 140, x + 200, y + 88, f"{js} joist @ {fr.spacing:g}\" OC in a Simpson {hs}")
+    _lead(o, x + 52, y + 135, x + 24, y + 28, (f"DTT1Z lateral ties, 2 near each end of every ledger ({int(_ord_n(t, 'lateral tie'))})" if lat else "Lateral ties per the engineer"))
+    _lead(o, x + 113, y + 156, x + 140, y + 178, (mb.item.split(" (")[0] if mb else "Self-adhered membrane") + " behind the ledger, lapped under the flashing")
+    _lead(o, x + 120, y + 146, x + 140, y + 206, f"{s.ledger_size} ledger, LedgerLOK 3-5/8\" 2 rows staggered 12\" OC, 2\" from top / bottom")
+    if cant or s.extras.engineered:
+        txt = ((f"ENGINEER'S DETAIL: the {' / '.join(band)} ledger" + ("s sit" if len(band) > 1 else " sits") if band else "ENGINEER'S DETAIL: the ledger sits")
+               + " on the 2'-0\" cantilevered floor band, not on a wall or sill plate (IRC R507.9.1.2). The stamped detail governs: blocked cantilever joists, "
+               "or a free-standing beam on posts at the house." if cant else
+               "ENGINEER'S DETAIL: the ledger attachment per the stamped set; verify a solid rim behind the ledger before fastening (IRC R507.9.1).")
+        o.append(R(x + 14, y + 248, W3 - 28, 40, "#fff6e0", RED, 0.8))
+        for j, w in enumerate(textwrap.wrap(txt, 76)[:4]):
+            o.append(T(x + 20, y + 259 + j * 8.5, w, 6.4, 700, fill=RED))
+    # 2 hangers at the ledger and the side rim
+    x, y = P[1]; _panel(o, x, y, W3, H2, "2", "HANGERS — PLAN AT THE LEDGER + SIDE RIM")
+    o.append(R(x + 20, y + 30, W3 - 40, 18, FILL["house"], INK, 0.8)); o.append(T(x + W3 / 2, y + 42, "HOUSE", 6.6, 800, "middle", MUTE))
+    _wood(o, x + 20, y + 48, W3 - 40, 8, dark=True)
+    _wood(o, x + 30, y + 56, 8, 120); _wood(o, x + 38, y + 56, 8, 120)
+    _wood(o, x + 56, y + 56, 6, 120)
+    for k in range(3):
+        _wood(o, x + 120 + k * 60, y + 56, 6, 120)
+    for xx in [56] + [120 + k * 60 for k in range(3)]:
+        o.append(R(x + xx - 3, y + 56, 12, 9, "#7b8186", INK, 0.6))
+    o.append(R(x + 28, y + 56, 20, 11, "#5b6166", INK, 0.6))
+    o.append(LN(x + 46, y + 150, x + 56, y + 150, RED, 0.8)); o.append(T(x + 51, y + 146, "1-1/2\"", 6.2, 800, "middle", RED))
+    o.append(LN(x + 123, y + 140, x + 183, y + 140, RED, 0.8)); o.append(T(x + 153, y + 136, f"{fr.spacing:g}\" OC", 6.6, 800, "middle", RED))
+    rim_h = [w_ for k_, w_ in (("HUCQ", f"HUCQ{js_}-2-SDS concealed-flange"), (f"SUR{js_}-2Z", f"SUR/SUL{js_}-2Z skewed (45°)")) if k_ in items]
+    _lead(o, x + 38, y + 62, x + 24, y + 192, ("Doubled rims at the ledger in Simpson " + " · ".join(rim_h) + " double hangers") if rim_h else "Doubled rim in a double hanger at the ledger")
+    _lead(o, x + 186, y + 60, x + 166, y + 192, f"Simpson {hs} face-mount hanger, every joist, every hole nailed (Camo 9ga HDG hanger nails)")
+    _lead(o, x + 59, y + 120, x + 24, y + 246, "Picture-frame joist 1-1/2\" inboard of the rim")
+    _lead(o, x + 42, y + 160, x + 166, y + 246, f"{fr.rim_plies}-ply {js} rim, GRK RSS 3-1/8\", 2 rows @ 12\" staggered")
+    # 3 joists on the drop beam
+    drop = [b for b in bls if b.kind == "drop"]
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "JOISTS ON THE DROP BEAM — SECTION" if drop else "JOISTS INTO THE FLUSH BEAM")
+    o.append(R(x + 20, y + 74, W3 - 40, 7, FILL["deck"], INK, 0.5))
+    for k in range(5):
+        xx = x + 36 + k * 58
+        _wood(o, xx, y + 81, 7, 44)
+        o.append(R(xx + 7, y + 120, 6, 12, "#7b8186", INK, 0.5))
+        if k < 4:
+            _wood(o, xx + 7, y + 83, 51, 40, dark=True)
+    if s.framing.joist_tape:
+        o.append(R(x + 36, y + 79, 248, 2.5, "#111", "none", 0))
+    _wood(o, x + 24, y + 125, W3 - 48, 52, dark=True)
+    o.append(T(x + W3 / 2, y + 156, f"{bsize} {bsp} — solid sawn", 6.8, 800, "middle", "#fff"))
+    h25 = _ord(t, "H2.5AZ")
+    _lead(o, x + 41, y + 126, x + 24, y + 210, f"Simpson H2.5AZ every joist + rim to the beam ({int(h25.net) if h25 else 'per S-101'}, hidden, inside face)")
+    _lead(o, x + 160, y + 170, x + 150, y + 230, f"{len(drop) or len(bls)} {bsize} {bsp} {'drop' if drop else 'flush'} beam lines; a splice lands on a column cap (S-101)")
+    if s.framing.joist_tape:
+        _lead(o, x + 200, y + 80, x + 200, y + 40, "G-Tape 2\" on every joist and block, 4\" on rims and the beam")
+    can = [(lv, max(b_.cantilever for b_ in lv.L.frame.beams)) for lv in levels if getattr(lv.L.frame, "beams", None)]
+    o.append(T(x + 24, y + 270, "Joists bear the full beam width; each level on its own beams", 6.6, 700))
+    if can:
+        o.append(T(x + 24, y + 282, "Past the beam: " + " · ".join(f"{_lv_word(lv)} {ftin(c)}" for lv, c in can), 6.6, 700))
+    # 4 the beam on the column cap
+    x, y = P[3]; _panel(o, x, y, W3, H2, "4", f"{bsize} BEAM ON THE {psz} COLUMN — ELEVATION")
+    _wood(o, x + 20, y + 56, W3 - 40, 52, dark=True)
+    o.append(R(x + 118, y + 106, 68, 14, "#5b6166", INK, 0.6))
+    o.append(R(x + 114, y + 56, 4, 64, "#5b6166", INK, 0.5)); o.append(R(x + 186, y + 56, 4, 64, "#5b6166", INK, 0.5))
+    for yy in (70, 90):
+        for xx in (116, 188):
+            o.append(C(x + xx, y + yy, 1.6, INK, "none", 0))
+    _wood(o, x + 128, y + 120, 48, 166)
+    _lead(o, x + 150, y + 112, x + 24, y + 150, f"Simpson {cap_mid or 'column cap'}" + (f" (SDS screws incl.); {cap_end} only where a beam ends flush on a column" if cap_end else " (SDS screws incl.)"))
+    _lead(o, x + 60, y + 80, x + 24, y + 36, f"{bsize} {bsp} drop beam, centred on the column; the beam overhangs its end columns")
+    _lead(o, x + 152, y + 240, x + 210, y + 250, f"{psz} {pw} column, cut to the string line (post lengths on S-100)")
+    # 5 the post base on the footing
+    ft = s.framing.footing_type
+    x, y = P[4]
+    if ft == "caisson":
+        _panel(o, x, y, W3, H2, "5", f"{base} ON THE {int(fr.footing_dia_in)}\" CAISSON — SECTION")
+        sc_ = 2.4                                                              # px per inch, one scale for the whole section
+        gy = y + 112
+        top = gy - 6 * sc_                                                     # the caisson top, 6" above grade
+        bot = min(y + H2 - 10, gy + fr.footing_depth_in * sc_)
+        cw = fr.footing_dia_in * sc_
+        cx = x + 104
+        o.append(R(x + 14, gy, W3 - 28, bot - gy + 4, "#ece6d8", "none", 0))
+        o.append(R(cx - cw / 2, top, cw, bot - top, FILL["concrete"], INK, 0.9))
+        o.append(LN(x + 14, gy, x + W3 - 14, gy, INK, 1.0)); o.append(T(x + 18, gy - 3, "grade", 6.4, 700, fill=MUTE))
+        fy = gy + s.site.frost_depth_in * sc_
+        if fy < bot:
+            o.append(LN(x + 14, fy, x + W3 - 14, fy, "#3f5d8a", 0.8, "4 3")); o.append(T(x + 18, fy - 3, f"frost {ftin(s.site.frost_depth_in)}", 6.4, 700, fill="#3f5d8a"))
+        for xx in (cx - cw / 2 + 6, cx - cw / 2 + 12, cx + cw / 2 - 12, cx + cw / 2 - 6):
+            o.append(LN(xx, top + 8, xx, bot - 5, "#3f5d8a", 1.0))
+        yy = top + 16
+        while yy < bot - 8:
+            o.append(LN(cx - cw / 2 + 4, yy, cx + cw / 2 - 4, yy, "#3f5d8a", 0.6, "3 2")); yy += 12 * sc_
+        for ax_ in (cx - 4.6, cx + 4.6):                                       # the two cast-in anchors
+            o.append(LN(ax_, top - 4, ax_, top + 8 * sc_, "#5b6166", 1.6))
+        o.append(R(cx - 11, top - 4, 22, 4, "#5b6166", INK, 0.6))              # the standoff base: plate + side flanges
+        o.append(R(cx - 12, top - 26, 2.2, 22, "#5b6166", INK, 0.5)); o.append(R(cx + 9.8, top - 26, 2.2, 22, "#5b6166", INK, 0.5))
+        _wood(o, cx - 9.6, y + 24, 19.2, top - 5 - (y + 24))
+        o.append(T(cx, y + 60, f"{psz}", 6.2, 800, "middle", INK, rot=-90))
+        dim_v(o, lambda v: v, cx + cw / 2 + 10, gy, bot, ftin(fr.footing_depth_in), 6.4, left=False)
+        anc = _ord(t, "anchor bolt", "cast-in"); sds = _ord(t, "post screws") or _ord(t, "SDS")
+        n_b = max(1, int(_ord_n(t, base))) if base else 1
+        per_ = int(round(anc.net / n_b)) if anc else 2
+        _lead(o, cx + 11, top - 6, x + 172, y + 30, f"Simpson {base} standoff base" + (f", {sds.item.split(': ')[-1]}" if sds and ':' in sds.item else ", SDS screws into the post"))
+        anc_txt = anc.item.split(" w/")[0] if anc else "5/8\" anchor bolts"
+        _lead(o, cx + 4.6, top + 10, x + 172, y + 66, f"({per_}) {anc_txt}, cast in on the base template")
+        reb4 = _ord(t, "#4 rebar"); reb3 = _ord(t, "#3 rebar")
+        _lead(o, cx + cw / 2 - 6, (top + bot) / 2, x + 172, y + 132, f"{int(fr.footing_dia_in)}\" caisson x {ftin(fr.footing_depth_in)}, top 6\" above grade"
+              + (", (4) #4 verticals + #3 ties" if (reb4 and reb3) else "") + " — the engineer sizes them")
+        rows_ = _post_rows(levels, S.boxes)
+        sl_ids, sl_name = _slab_posts(s, rows_)
+        if sl_ids:
+            for j, w in enumerate(textwrap.wrap(f"{_id_run(sl_ids)} in the {sl_name.lower()}: saw-cut an opening, drill through, an isolation joint round the caisson, "
+                                                "poured flush — the slab carries no column.", 40)):
+                o.append(T(x + 172, y + 222 + j * 8.5, w, 6.2, 700, fill=RED))
+    else:
+        _panel(o, x, y, W3, H2, "5", "POST BASE ON THE FOOTING")
+        for j, w in enumerate(textwrap.wrap(_footing_words(s, CL, t) + ".", 60)):
+            o.append(T(x + 20, y + 40 + j * 10, w, 6.8, 600))
+    # 6 the step face: nailers behind the skirt
+    x, y = P[5]; _panel(o, x, y, W3, H2, "6", "STEP FACE — NAILERS BEHIND THE SKIRT")
+    if steps:
+        lo, hi = steps[0][0], steps[0][1]
+        rise = hi.h_in - lo.h_in
+        sk = getattr(hi.spec.geometry, "step_skirt", None) or getattr(lo.spec.geometry, "step_skirt", None) or {}
+        oc = float(sk.get("stud_oc_in", 16))
+        ys0, ys1 = y + 54, y + 54 + min(190.0, rise * 3.2)
+        _wood(o, x + 20, ys0 - 22, W3 - 40, 22, dark=True)                     # the upper level's rim
+        o.append(T(x + W3 / 2, ys0 - 8, f"{hi.name.lower()}'s {js} rim", 6.4, 800, "middle", "#fff"))
+        o.append(R(x + 20, ys1 + 4, W3 - 40, 7, FILL["deck"], INK, 0.5)); o.append(T(x + 24, ys1 + 20, f"{lo.name.lower()} decking", 6.2, 700, fill=MUTE))
+        step_px = oc * 3.2
+        k, xx = 0, x + 30
+        while xx < x + W3 / 2:                                                 # the left half: the framing (studs, blocking)
+            _wood(o, xx, ys0, 7, ys1 - ys0 - 2)
+            o.append(R(xx - 2, ys0, 11, 5, "#5b6166", INK, 0.4))
+            k += 1; xx += step_px
+        for yy in ((ys0 + ys1) / 2,):
+            o.append(R(x + 30, yy - 3, W3 / 2 - 30, 6, FILL["timber_dk"], INK, 0.4))
+        pw_ = 11.75 * 3.2                                                      # the right half: the skirt panels (11-3/4" fascia), vertical
+        for k_ in range(8):
+            px_ = x + W3 / 2 + k_ * (pw_ + 0.4)
+            if px_ + pw_ > x + W3 - 22:
+                break
+            o.append(R(px_, ys0, pw_, ys1 - ys0 - 1, FILL["fascia"], INK, 0.5))
+            for sy in (ys0 + 6, (ys0 + ys1) / 2, ys1 - 8):
+                o.append(C(px_ + 6, sy, 1.0, INK, "none", 0)); o.append(C(px_ + pw_ - 6, sy, 1.0, INK, "none", 0))
+        dim_v(o, lambda v: v, x + W3 - 10, ys0 - 22, ys1 + 4, f"{inch(rise)}", 6.4, left=True)
+        a35 = next((l for l in t.lines if "A35Z" in l.item and "skirt" in l.item.lower()), None)
+        rss = next((l for l in t.lines if "RSS" in l.item and "skirt" in l.item.lower()), None)
+        top_ = next((l for l in t.lines if "TOPLoc" in l.item and "skirt" in l.item.lower()), None)
+        _lead(o, x + 33, ys0 + 30, x + 24, y + H2 - 46, f"2x4 nailers @ {oc:g}\" OC hung from the rim" + (", Simpson A35Z at each top" if a35 else "")
+              + (", GRK RSS 2 per top" if rss else ""))
+        _lead(o, x + 60, (ys0 + ys1) / 2, x + 24, y + H2 - 22, "2x4 blocking between the nailers, 2 screws each end")
+        _lead(o, x + W3 / 2 + 12, ys1 - 20, x + W3 / 2 + 10, y + H2 - 46, f"{s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia panels, vertical, "
+              + ("TOPLoc screws: 2 at each end + 2 every 12\" on the nailers" if top_ else "screwed to the nailers"))
+    else:
+        o.append(T(x + 20, y + 40, "(no step between levels)", 6.8, 600, fill=MUTE))
+    return sheet("D-502", "Connection details — frame", "Ledger" + (" (cantilevered band)" if cant else "") + f" · hangers · beam + cap · {base} on the footing · "
+                 + "step-face nailers", o, _detail_note(s), meta)
+
+
+def sheet_details_edge_composite(CL, S, t, levels, steps, meta) -> str:
+    """D-504 for a two-level deck: rail post on its blocking, the drink rail over the posts (inserts + clips), the deck edge,
+    the guard bay, the lateral ties and the fastening schedule — worded from the order."""
+    s = CL.spec
+    fr = CL.frame
+    js = s.framing.joist_size
+    dk = f"{s.decking.brand} {s.decking.collection} {s.decking.color}"
+    rs = RAIL_SYSTEMS.get(s.railing.system, {})
+    rname = "TimberTech Impression Rail Express" if s.railing.system.startswith("IRX") else s.railing.system
+    cortex_b = (s.decking.border_fastener or "").lower().startswith("cortex")
+    over = str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over"
+    W3, H2, P = _grid6()
+    o = []
+    pk = _ord(t, "post kit") or _ord(t, " post ", cat="Rail")
+    hl = _ord(t, "HeadLOK")
+    # 1 rail post on its blocking
+    x, y = P[0]; _panel(o, x, y, W3, H2, "1", "RAIL POST — SURFACE MOUNT ON BLOCKING" if rs.get("surface") else "RAIL POST AT THE RIM")
+    _wood(o, x + 200, y + 160, 9, 40); _wood(o, x + 209, y + 160, 9, 40)
+    _wood(o, x + 160, y + 160, 9, 40)
+    _wood(o, x + 169, y + 162, 31, 36, dark=True)
+    o.append(R(x + 218, y + 156, 6, 52, FILL["fascia"], INK, 0.5))
+    o.append(R(x + 150, y + 152, 74, 8, FILL["border"], INK, 0.5)); o.append(R(x + 40, y + 152, 108, 8, FILL["deck"], INK, 0.5))
+    o.append(R(x + 168, y + 146, 40, 6, FILL["railmetal"], INK, 0.6)); o.append(R(x + 180, y + 40, 16, 106, FILL["railmetal"], INK, 0.6))
+    for xx in (172, 202):
+        o.append(LN(x + xx, y + 146, x + xx, y + 196, INK, 1.0)); o.append(C(x + xx, y + 146, 1.6, INK))
+    dim_v(o, lambda v: v, x + 150, y + 40, y + 152, f"{s.railing.height_in:g}\"", 6.6, left=True)
+    _lead(o, x + 188, y + 60, x + 230, y + 50, (pk.item.replace(rname, "").strip(" ,") if pk else f"{rname} post") + f", {s.railing.color}")
+    _lead(o, x + 188, y + 149, x + 230, y + 96, "Post base on the decking, (4) FastenMaster HeadLOK 6\" through the base into the blocking" if hl else "Post base on the decking, through-fastened into the blocking")
+    _lead(o, x + 184, y + 180, x + 24, y + 230, f"{js} blocking pair between the rim and the PF joist at every post, (3) GRK RSS each end — guard 200 lb point load")
+    _lead(o, x + 214, y + 200, x + 236, y + 240, f"{fr.rim_plies}-ply {js} rim, {s.decking.collection} fascia over")
+    # 2 the drink rail over the posts
+    x, y = P[1]
+    ins = _ord(t, "post insert"); clip = _ord(t, "clip kit") or _ord(t, "drink rail clip")
+    drk = next((l for l in t.lines if l.category == "Rail" and l.item.startswith("Drink rail")), None)
+    _panel(o, x, y, W3, H2, "2", "DRINK RAIL OVER THE POSTS — ELEVATION" if over else "DRINK RAIL — SECTION")
+    if s.railing.drink_rail:
+        bt, x0_, x1_ = y + 64, x + 150, x + W3 - 16                          # the drawing on the right, the words on the left
+        xm_ = (x0_ + x1_) / 2
+        o.append(R(x0_ - 6, bt - 9, x1_ - x0_ + 12, 9, FILL["border"], INK, 0.6))   # the drink rail board (1x6 on its face)
+        o.append(LN(xm_, bt - 9, xm_, bt, "#fff", 1.0))                       # its seam on the post centre
+        for d_ in (-11, -6, 6, 11):
+            o.append(C(xm_ + d_, bt - 4.5, 1.1, "#fff", "none", 0))
+        o.append(R(xm_ - 10, bt, 20, 160, FILL["railmetal"], INK, 0.6))       # the post, cut level
+        o.append(R(xm_ - 7, bt, 14, 9, "#7b8186", INK, 0.5))                  # the insert in the post top
+        for a_, b_ in ((x0_, xm_ - 10), (xm_ + 10, x1_)):
+            o.append(R(a_, bt + 2, b_ - a_, 6, FILL["railmetal"], INK, 0.5))   # the universal panel covers
+            k_ = a_ + 12
+            while k_ < b_ - 4:
+                o.append(R(k_, bt + 8, 2.2, 140, FILL["railmetal"], "none", 0)); k_ += 13
+        for cx_ in (x0_ + 22, x1_ - 22):
+            o.append(R(cx_ - 5, bt - 1, 10, 4, "#7b8186", INK, 0.4))           # clips under the board
+        coll_ = getattr(s.railing, "drink_rail_collection", "") or s.decking.collection
+        col_ = getattr(s.railing, "drink_rail_color", "") or s.decking.color
+        rows_ = [(x0_ + 40, bt - 6, f"Drink rail: {coll_} {col_} 1x6 board" + (" over the posts" if over else "") + ", mitred at every turn" + (f" ({int(drk.net)} boards)" if drk else "")),
+                 (xm_ - 4, bt + 5, ("A drink-rail 3\" post insert in each post: the post cut level, (3) 2-1/2\" screws each side of a seam" if (over and ins)
+                                    else "Drink-rail bracket on each post")),
+                 (x0_ + 22, bt + 1, ("Drink-rail clips on the panel covers: 6 per 8' bay, 4 per 6'" if clip else "Drink-rail brackets")),
+                 (x0_ + 60, bt + 6, "Universal panel cover in place of the top rail, under the board")]
+        for k_, (ax_, ay_, txt_) in enumerate(rows_):
+            _lead(o, ax_, ay_, x + 14, y + 34 + k_ * 56, txt_)
+        o.append(T(x + 14, y + 278, "Seams on post centres, no butt joint between posts", 6.4, 700))
+    # 3 the deck edge: picture frame + fascia
+    x, y = P[2]; _panel(o, x, y, W3, H2, "3", "DECK EDGE — PICTURE FRAME + FASCIA")
+    _wood(o, x + 170, y + 110, 10, 60); _wood(o, x + 180, y + 110, 10, 60); _wood(o, x + 140, y + 110, 9, 60)
+    o.append(R(x + 190, y + 104, 5, 70, FILL["fascia"], INK, 0.5))
+    o.append(R(x + 134, y + 101, 62, 9, FILL["border"], INK, 0.5)); o.append(R(x + 30, y + 101, 102, 9, FILL["deck"], INK, 0.5))
+    o.append(R(x + 140, y + 108, 9, 2.5, "#111", "none", 0)); o.append(R(x + 170, y + 108, 20, 2.5, "#111", "none", 0))
+    for xx in (160, 186):
+        o.append(LN(x + xx, y + 96, x + xx, y + 120, INK, 0.9))
+    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk}, mitred, " + ("Cortex screws + color-matched plugs, 2 per bearing" if cortex_b else "face-screwed, 2 per bearing"))
+    _lead(o, x + 80, y + 104, x + 24, y + 60, ("Field: Cortex face screws + color-matched plugs, 2 per board at every joist" if (s.decking.fastener_system or "").lower().startswith("cortex")
+                                              else f"Field: {s.decking.fastener_system or 'hidden clips'}") + f", {ftin(s.deck_gap)} gaps")
+    _lead(o, x + 193, y + 150, x + 236, y + 140, f"{s.decking.collection} fascia, " + ("TOPLoc fascia screws: 2 at each end, then alternate top / bottom every 12\", pre-drilled"
+                                                                                     if _ord(t, "TOPLoc") else "pre-drilled, 2 screws at each end then alternating @ 12\""))
+    _lead(o, x + 145, y + 140, x + 24, y + 200, "PF joist 1-1/2\" inboard of the rim carries the border's inside edge")
+    if s.framing.joist_tape:
+        _lead(o, x + 180, y + 110, x + 236, y + 210, "G-Tape 4\" on the rim tops, 2\" on the joists")
+    # 4 the guard: one bay
+    x, y = P[3]; _panel(o, x, y, W3, H2, "4", "GUARD — ONE BAY, ELEVATION")
+    secs = [s_ for lv in levels if lv.L.rail for s_ in lv.L.rail.sections]
+    o.append(R(x + 20, y + 230, W3 - 40, 8, FILL["deck"], INK, 0.5))
+    for xx in (40, W3 - 56):
+        o.append(R(x + xx, y + 70, 12, 160, FILL["railmetal"], INK, 0.6))
+    o.append(R(x + 34, y + 61, W3 - 70, 9, FILL["border"] if (s.railing.drink_rail and over) else FILL["railmetal"], INK, 0.6))
+    o.append(R(x + 52, y + 70, W3 - 108, 8, FILL["railmetal"], INK, 0.6)); o.append(R(x + 52, y + 214, W3 - 108, 6, FILL["railmetal"], INK, 0.6))
+    for k in range(1, 18):
+        bx_ = x + 52 + k * (W3 - 108) / 18
+        o.append(R(bx_ - 1.2, y + 78, 2.4, 136, FILL["railmetal"], "none", 0))
+    if secs:
+        dim_h(o, lambda v: v, y + 258, x + 46, x + W3 - 50, f"bay {ftin(max(s_.ctc for s_ in secs))} CTC max", 6.6, up=False)
+    dim_v(o, lambda v: v, x + 30, y + 61, y + 230, f"{s.railing.height_in:g}\" min.", 6.4, left=True)
+    o.append(C(x + 120, y + 150, 10, "none", RED, 0.8, "2 2")); o.append(R(x + 132, y + 145, 72, 12, "#fff", "none", 0)); o.append(T(x + 134, y + 154, "4\" sphere won't pass", 6.4, 800, fill=RED))
+    _lead(o, x + 200, y + 64, x + 170, y + 30, ("Drink rail board over the posts and the panel covers" if (s.railing.drink_rail and over) else f"Top rail, {s.railing.color}"))
+    _lead(o, x + 90, y + 110, x + 24, y + 30, "Vertical aluminum balusters in the level panel")
+    o.append(T(x + 24, y + 276, "Guard: 200 lb at the top, 50 lb on 1 SF of infill (IRC Table R301.5);", 6.4, 700))
+    o.append(T(x + 24, y + 286, "the step between the levels is guarded except at the stair", 6.4, 700))
+    # 5 lateral ties
+    x, y = P[4]; _panel(o, x, y, W3, H2, "5", "LATERAL LOAD — TIES TO THE FLOOR FRAMING (PLAN)")
+    o.append(R(x + 20, y + 40, W3 - 40, 110, FILL["house"], INK, 0.6))
+    o.append(T(x + 30, y + 54, "house floor framing — a floor joist, or blocking where parallel (engineer)", 6.2, 700, fill=MUTE))
+    for k in range(5):
+        o.append(R(x + 40 + k * 56, y + 60, 5, 90, FILL["timber_dk"], INK, 0.4))
+    _wood(o, x + 20, y + 150, W3 - 40, 8, dark=True)
+    for k in range(6):
+        _wood(o, x + 36 + k * 50, y + 158, 6, 64)
+    for xx in (36, 86, 236, 286):
+        o.append(LN(x + xx + 3, y + 100, x + xx + 3, y + 200, "#5b6166", 1.4)); o.append(R(x + xx - 2, y + 196, 10, 8, "#5b6166", INK, 0.5)); o.append(R(x + xx - 2, y + 96, 10, 8, "#5b6166", INK, 0.5))
+    o.append(T(x + 160, y + 216, "deck joists", 6.4, 700, "middle", MUTE))
+    nl = int(_ord_n(t, "lateral tie"))
+    _lead(o, x + 89, y + 200, x + 24, y + 240, (f"({nl}) Simpson DTT1Z, 2 near each end of every ledger: 1/2\" threaded rod through the ledger and the band into a floor joist "
+                                                "(or blocking) inside — 750 lb each (IRC R507.9.2); the engineer's lateral detail governs" if nl else "Lateral ties per the engineer"))
+    # 6 the fastening schedule, from the order
+    x, y = P[5]; _panel(o, x, y, W3, H2, "6", "FASTENING SCHEDULE")
+    hs = s.framing.hanger or HANGER_FOR_JOIST.get(js, "LUS210Z")
+    bls = [b for lv in levels for b in lv.beams]
+    cap = getattr(bls[0].bl, "cap_mid", "") if bls else ""
+    base = _post_base_name(s, t)
+    sds = _ord(t, "post screws")
+    rows = [("Ledger to house", "LedgerLOK 3-5/8\", 2 rows @ 12\" staggered" + ("; engineer's detail" if s.extras.engineered else "")),
+            ("Lateral", f"({nl}) DTT1Z, 1/2\" rod into the floor framing" if nl else "per the engineer"),
+            ("Joist to ledger / rim", f"{hs}, every hole nailed"),
+            ("Rim to ledger", "HUCQ210-2-SDS, SDS screws" if "HUCQ" in " ".join(l.item for l in t.lines) else "double hanger"),
+            ("Rim plies", "GRK RSS 3-1/8\", 2 rows @ 12\" staggered")]
+    if bls:
+        rows += [("Joist to beam", "H2.5AZ each joist + rim, 10d x 1-1/2\"" if all(b.kind == "drop" for b in bls) else f"{hs} at flush beams; H2.5AZ at drop beams"),
+                 ("Beam to column", f"{cap} cap, SDS screws (incl.)" if cap else "column cap per the engineer")]
+    rows += [("Column to footing", f"{base}, (2) 5/8\" cast-in anchors" + (", (8) SDS 1/4\" x 3\"" if sds else "") if s.framing.footing_type == "caisson" else f"{base} on the footing"),
+             ("Field boards", "Cortex + plugs, 2 per board per joist" if (s.decking.fastener_system or "").lower().startswith("cortex") else (s.decking.fastener_system or "per maker")),
+             ("Borders / fascia", ("Cortex + plugs · fascia: TOPLoc" if cortex_b else "face screws · fascia: TOPLoc") if _ord(t, "TOPLoc") else "per maker"),
+             ("Rail posts", "(4) HeadLOK 6\" into the blocking" if hl else "per the rail maker")]
+    if s.railing.drink_rail:
+        rows.append(("Drink rail", "clips on the panel covers; post inserts, (3) screws a side" if over else "drink-rail brackets"))
+    if steps:
+        rows.append(("Step skirt", "nailers: A35Z + RSS to the rim · panels: TOPLoc"))
+    yy = y + 34
+    for a, b in rows[:13]:
+        o.append(T(x + 14, yy, a, 6.6, 800)); o.append(T(x + 108, yy, textwrap.shorten(b, 60, placeholder="…"), 6.2, 500)); yy += 18.5
+        o.append(LN(x + 10, yy - 12.5, x + W3 - 10, yy - 12.5, "#e2dccf", 0.5))
+    return sheet("D-504", "Connection details — deck edge, rail, lateral", "Rail post on blocking · drink rail" + (" over the posts" if over else "")
+                 + " · picture frame + fascia · guard · lateral ties · schedule", o, _detail_note(s), meta)
+
+
 def _site_marks(S0) -> list:
     """C-100 marks for a composite deck (sheet_site `marks`), from the full scene: a louvered roof built into the set (its
     frame outline and posts) and each option's stair (its treads and landings), drawn dashed."""
@@ -4119,6 +4480,11 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
         tm = _NS(schedule=ms, summary=t.summary, lines=t.lines)
         p6 = (("STEP BETWEEN THE LEVELS", lambda o_, note_: _panel_level_change(o_, note_, CL, levels, steps)) if steps else None)
         out.append(("D-501", "Details", sheet_details(CL, _NS(meta=dict(edge=edge)), tm, meta, panel6=p6, base=_post_base_name(CL.spec, t))))
+    if CL.spec.framing.system == "dimensional":                      # the connection details, drawn from the spec, worded from the order
+        if want("D-502"):
+            out.append(("D-502", "Connection details — frame", sheet_details_frame_composite(CL, S, t, levels, steps, meta)))
+        if want("D-504"):
+            out.append(("D-504", "Connection details — deck edge, rail, lateral", sheet_details_edge_composite(CL, S, t, levels, steps, meta)))
     index = [("G-001", "General notes · design criteria")]
     for num, ttl, _ in out[1:]:
         if num == "A-002":

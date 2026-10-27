@@ -285,7 +285,7 @@ def _clear(pos, targets, occ) -> float:
     return ok / max(1, len(targets))
 
 
-def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, occ=None) -> List[dict]:
+def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, occ=None, stair_box=None) -> List[dict]:
     """Preset cameras (plan feet): Yard, Upper deck (under the roof when there is one), Lower deck, Aerial. A measured site's
     own camera stations (site_model.cameras) win for the first three — Yard: of the stations standing on the ground, the
     one that sees the most of the deck (and the roof) in its frame, clear of the trees and houses; Upper deck: "roof_deck"
@@ -370,6 +370,14 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, oc
         sg = -1 if far == hi["x1"] else 1
         v = dict(key="upper", label=up_label, pos=[far + sg * 2.5, hi["y1"] - 2.0, hi["top"] + 5.4], at=[nxt, (hi["y0"] + hi["y1"]) / 2, hi["top"] + 2.2], fov=60)
     views.append(v)
+    if stair_box:                            # a yard-stair option: a view of the stairs (the site's station, else in front of them)
+        v = station("stairs", "Stairs", "stair_yard", "dusk_stair")
+        if not v:
+            sx0, sx1, sy0, sy1, sz0, sz1 = stair_box
+            scx, scy = (sx0 + sx1) / 2, (sy0 + sy1) / 2
+            d = max(16.0, (sx1 - sx0) * 1.1)
+            v = dict(key="stairs", label="Stairs", pos=[scx + d * 0.35, sy1 + d, grade(scx, sy1 + d) + 5.4], at=[scx, scy, (sz0 + sz1) / 2], fov=58)
+        views.append(v)
     if len(parts) > 1:
         v = station("lower", "Lower deck", "lower_deck")
         if not v:
@@ -384,6 +392,8 @@ def _views(parts: List[dict], roofs: List[dict], cams: Optional[dict], grade, oc
     R, e, a_ = max(70.0, W * 1.25), math.radians(62), math.radians(10)
     views.append(dict(key="aerial", label="Aerial", pos=[at[0] + R * math.cos(e) * math.sin(a_), at[1] + R * math.cos(e) * math.cos(a_), at[2] + R * math.sin(e)],
                       at=at, fov=40, fit=W + 14))
+    order = ["yard", "stairs", "upper", "lower", "aerial"]
+    views.sort(key=lambda v: order.index(v["key"]) if v["key"] in order else len(order))
     return [dict(v, pos=[round(float(q), 2) for q in v["pos"]], at=[round(float(q), 2) for q in v["at"]]) for v in views]
 
 
@@ -602,7 +612,18 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
             grade = lambda x, y: 0.0
     else:
         grade = lambda x, y: 0.0
-    vws = views or _views(parts, list(roofs.values()), (meta0 or {}).get("cameras"), grade, _occluders(b for b, _m in union.values()))
+    stair_keys = [n for n in names if n.startswith("stairs")]
+    stair_box = None
+    if stair_keys:                          # what shows only with a yard-stair option (either layout): the Stairs view frames it
+        either = 0
+        for n in stair_keys:
+            either |= with_(n)
+        sb = [b for b, m in union.values() if m and not (m & ~either) and b.shape != "mesh"]
+        if sb:
+            stair_box = (min(b.x0 for b in sb), max(b.x1 for b in sb), min(b.y0 for b in sb), max(b.y1 for b in sb),
+                         min(b.z0 for b in sb), max(b.z1 for b in sb))
+    vws = views or _views(parts, list(roofs.values()), (meta0 or {}).get("cameras"), grade, _occluders(b for b, _m in union.values()),
+                          stair_box)
     bx0 = min(p["x0"] for p in parts); bx1 = max(p["x1"] for p in parts)
     by0 = min(p["y0"] for p in parts); by1 = max(p["y1"] for p in parts)
     ztop = max([p["top"] for p in parts] + [float((r.get("frame") or {}).get("z_top", 0.0)) for r in roofs.values()])
@@ -755,8 +776,8 @@ input[type=date] { font: 600 13px var(--body); color: var(--ink); background: va
   #g-view { display: none; }
   .vbar:not([hidden]) { display: flex; }
 }
-.vbar { display: none; position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; gap: 5px; overflow-x: auto; }
-.vbar .btn { background: rgba(14, 16, 20, .78); min-height: 34px; padding: 0 8px; font-size: 12px; white-space: nowrap; flex: 0 0 auto; }
+.vbar { display: none; position: absolute; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; gap: 4px; overflow-x: auto; }
+.vbar .btn { background: rgba(14, 16, 20, .78); min-height: 34px; padding: 0 6px; font-size: 11.5px; white-space: nowrap; flex: 0 0 auto; }
 .vbar .btn.on { background: var(--gold); }
 @media (max-height: 520px) and (orientation: landscape) {
   #panel { flex-basis: 300px; width: 300px; gap: 10px; }
@@ -1429,7 +1450,7 @@ function updCam() {
 }
 var tween = null;
 function goView(key, instant) {
-  var v = VIEWS[key] || D.views[0]; S.view = v.key;
+  var v = VIEWS[key] || D.views[0]; S.view = v.key; S.manual = false;
   var p = viewPose(v);
   if (instant || RM || STILL) { tween = null; setPose(p); }
   else tween = { t: 0, from: { pos: cam.position.clone(), at: tgt.clone(), fov: FOV }, to: p };
@@ -1442,16 +1463,16 @@ function stepTween(dt) {
   if (tween.t >= 1) tween = null;
   return true;
 }
-function orbit(dx, dy) { sph.theta -= dx * 0.0065; sph.phi -= dy * 0.0065; tween = null; updCam(); }
+function orbit(dx, dy) { sph.theta -= dx * 0.0065; sph.phi -= dy * 0.0065; tween = null; S.manual = true; updCam(); }
 function pan(dx, dy) {
   var k = sph.radius * 2 * Math.tan(FOV * RAD / 2) / Math.max(1, stageH);
   var right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1);
-  tgt.addScaledVector(right, -dx * k).addScaledVector(up, dy * k); tween = null; updCam();
+  tgt.addScaledVector(right, -dx * k).addScaledVector(up, dy * k); tween = null; S.manual = true; updCam();
 }
 function zoom(f) {
   var r = sph.radius * f;
   if (r < 3.0 && f < 1) { var fwd = tgt.clone().sub(cam.position).normalize(); tgt.addScaledVector(fwd, 3.0 - r); r = 3.0; }   // walk forward past the target
-  sph.radius = r; tween = null; updCam();
+  sph.radius = r; tween = null; S.manual = true; updCam();
 }
 var el3 = renderer.domElement, drag = null, touches = null;
 el3.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -1482,7 +1503,10 @@ var chips = $('chips');
 chips.appendChild(el('span', { class: 'chip base' }, '<span class="tick"></span>Base deck'));
 OPT.forEach(function (o) {
   var b = el('button', { type: 'button', class: 'chip', 'data-opt': o.key, 'aria-pressed': 'false', id: 'opt-' + o.key }, '<span class="tick"></span>' + o.label);
-  b.addEventListener('click', function () { toggleOpt(o.key); applyOptions(); writeURL(); });
+  b.addEventListener('click', function () {
+    toggleOpt(o.key); applyOptions(); writeURL();
+    if (S.on[o.key] && o.key.indexOf('stairs') === 0 && VIEWS.stairs && S.view !== 'aerial' && S.view !== 'stairs' && !S.manual) goView('stairs');
+  });
   chips.appendChild(b);
 });
 var seasons = $('seasons');
@@ -1621,7 +1645,8 @@ window.cfg = {
     var t0 = performance.now(); for (var i = 0; i < n; i++) { if (shadows) renderer.shadowMap.needsUpdate = true; renderer.render(scene, cam); }
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return (performance.now() - t0) / n; },
   info: function () { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes: GMESH.length, fixtures: FX.length, fxn: FXN, maxFragmentUniforms: maxFU }; },
-  camera: function () { return { pos: cam.position.toArray(), target: tgt.toArray(), fov: cam.fov }; }
+  camera: function () { return { pos: cam.position.toArray(), target: tgt.toArray(), fov: cam.fov }; },
+  busy: function () { return !!tween || S.louverGoal != null || S.playing || Object.keys(S.scrGoal).some(function (k) { return S.scrGoal[k] != null; }); }
 };
 setLouvers(S.louver);
 paintTrack();
