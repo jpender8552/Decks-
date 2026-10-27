@@ -770,12 +770,14 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         base = POST_BASE.get(spec.framing.post_size, {}).get("diamond_pier", "ABA66Z")
         if base == "ABA66Z" and spec.framing.post_rough:
             base = "ABA66RZ"                # a rough-sawn 6x6 is a full 6": the R base, as every drawing calls it
-        if spec.framing.post_size == "8x8" and model == "DP-50/50" and not spec.framing.post_rough:
-            base = "ECB88HDG"               # a 7-1/2" S4S 8x8 on the DP-50's single 1/2" bolt (a rough 8x8 won't fit it: custom base)
+        if base == "ABU88Z" and spec.framing.post_rough:
+            base = "ABU88RZ"                # a rough 8x8 takes the R-series ABU88
         uc, src = _price("footings", base)
         lines.append(Line("Footings", _desc("footings", base, base) + " on the pier bolt", n_posts, n_posts, "ea", "exact", uc, src, base,
-                          "no stock Simpson base takes a rough 8x8 on a single pier bolt — Pin Foundations + the engineer approve the base" if base == "DP_base_8x8_custom"
-                          else "ECB88 on the DP-50 bolt — Pin Foundations + the engineer accept it" if base == "ECB88HDG" else ""))
+                          "ABU88: (2) 5/8\" anchors — the cast-in pier bolt + one drilled into the pier head (Pin Foundations / engineer confirm)" if base.startswith("ABU88") else ""))
+        if base.startswith("ABU88"):
+            d_, uc_, src_ = _item("footings", "abu88_sds_anchor_set", "Simpson SDS 1/4\" x 3\" (8 per base) + 5/8\" x 6\" Titen HD (1 per base, the second anchor in the pier head)")
+            lines.append(Line("Footings", d_, n_posts, n_posts, "set", "exact  (one set per ABU88 base)", uc_ or 18.0, src_ or "EST — SDS25300 x 8 + THD62600H x 1"))
         base_screws = n_posts * POST_BASE_SCREWS.get(base, 12)
     elif ft == "caisson":
         dia, depth = fr0.footing_dia_in, fr0.footing_depth_in

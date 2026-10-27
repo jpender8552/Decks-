@@ -222,13 +222,18 @@
     },
     "ABU88RZ": {
       "each": 87.0,
-      "source": "EST — retail $86.99 (toolnut.com, 27 Oct 2026)",
-      "desc": "Simpson ABU88RZ adjustable standoff post base, rough 8x8 — needs (2) 5/8\" anchors: concrete footings only, NOT a single-bolt Diamond Pier"
+      "source": "EST — retail $86.99 (toolnut.com, 27 Oct 2026); D&D to quote",
+      "desc": "Simpson ABU88RZ adjustable standoff post base, rough 8x8, ZMAX"
     },
     "DP_base_8x8_custom": {
       "each": 225.0,
       "source": "EST — fabricated base; Pin Foundations + the engineer approve it (no stock Simpson base takes a rough 8x8 on one pier bolt)",
       "desc": "Custom HDG standoff post base for a rough 8x8, single anchor on the Diamond Pier bolt (1/2\" DP-50 / 5/8\" DP-75)"
+    },
+    "abu88_sds_anchor_set": {
+      "each": 18.0,
+      "source": "EST — (8) SDS25300 + (1) THD62600H per base",
+      "desc": "ABU88 fastener set: (8) Simpson SDS 1/4\" x 3\" into the post + (1) 5/8\" x 6\" Titen HD into the pier head (the second anchor)"
     }
   },
   "hardware": {

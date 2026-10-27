@@ -135,11 +135,11 @@ TIMBER_BASE = {"8x8": ("APB88_black", "ABU88Z"), "6x6": ("ABU66Z_black", "ABU66Z
 DOUBLE_HANGER = {"2x8": "HUCQ28-2-SDS", "2x10": "HUCQ210-2-SDS", "2x12": "HUCQ212-2-SDS", "4x8": "HUC410", "4x10": "HUC410", "4x12": "HUC410"}
 TRIPLE_HANGER = {"2x10": "HUCQ210-3-SDS"}
 H25_NAILS = 10        # H2.5AZ: 5 x 8d x 1-1/2" each leg
-# an 8x8 on a Diamond Pier: no Simpson base takes a single pier bolt (ABA88Z doesn't exist; ABU88 needs two anchors) — a custom HDG standoff
-# base on the DP-75's 5/8" bolt, Pin Foundations + the engineer to approve (Fillmore materials review, 27 Oct 2026)
+# an 8x8: the Simpson ABU88Z adjustable standoff base (ABU88RZ for a rough 8x8) — on a Diamond Pier its second 5/8" anchor is
+# drilled into the pier head beside the cast-in bolt (Pin Foundations / the engineer confirm); owner 27 Oct 2026
 POST_BASE = {"6x6": {"diamond_pier": "ABA66Z", "concrete": "ABU66Z"}, "4x4": {"diamond_pier": "ABA44Z", "concrete": "ABA44Z"},
-             "8x8": {"diamond_pier": "DP_base_8x8_custom", "concrete": "ABU88Z"}}
-POST_BASE_SCREWS = {"ABA66Z": 12, "ABA66RZ": 12, "ABU66Z": 12, "ABA44Z": 8, "DP_base_8x8_custom": 0, "ABU88Z": 0}   # the 8x8 bases through-bolt
+             "8x8": {"diamond_pier": "ABU88Z", "concrete": "ABU88Z"}}
+POST_BASE_SCREWS = {"ABA66Z": 12, "ABA66RZ": 12, "ABU66Z": 12, "ABA44Z": 8, "DP_base_8x8_custom": 0, "ABU88Z": 0, "ABU88RZ": 0}   # ABU88: (8) 1/4" x 3" SDS, listed on its own line
 POST_CAP_SCREWS = {"CCQ76SDS2.5": 0, "BC46Z": 10, "BC6Z": 10, "BCS2-3/6Z": 12, "BCS2-2/4Z": 8,
                    "CCQ68SDS2.5": 0, "ECCQ68SDS2.5": 0, "CCQ66SDS2.5": 0, "ECCQ66SDS2.5": 0, "CCQ88SDS2.5": 0}     # CCQ / ECCQ ship with their SDS screws
 # Pin Foundations Residential Load Chart (DOC0008, 2018): 1,500 psf silts / clays; 2,000 psf sands / gravels allow 4,400 / 6,400 lb

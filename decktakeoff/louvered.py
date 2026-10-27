@@ -203,123 +203,125 @@ def _num(v, d):
     return d if v is None else float(v)
 
 
+def _pick_frame(q: dict, key: str, span: float) -> Tuple[str, float, float, float]:
+    """(label, w_in, h_in, max span) of a beam: the spec's [w, h] (key, else `beam`), else the lightest Suncoast frame for the span."""
+    v = q.get(key) or q.get("beam")
+    if v:
+        w_in, h_in = float(v[0]), float(v[1])
+        lim = max([f[3] for f in FRAMES if f[1] <= w_in and f[2] <= h_in] or [FRAMES[0][3]])
+        return f"{w_in:g}x{h_in:g}", w_in, h_in, lim
+    f = next((f for f in FRAMES if f[3] >= span - 1e-6), FRAMES[-1])
+    return f[0], f[1], f[2], f[3]
+
+
 def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
-    """Everything about one roof, in its frame (ft): the frame rectangle (after a snap), beams, motor zones, blades (pivot,
-    length, zone), posts (centre, deck height, whether it is a rail post), heights and clearances, the house brackets."""
+    """Everything about one roof, in its frame (ft): the frame rectangle as built (edge clearance, corner snap), the beams,
+    motor zones, blades (pivot, length, zone), posts (centre, deck height, which rail lines run through them), heights and
+    clearances, the house brackets / stand-offs, the screens."""
     from .layout import RAIL_POST_INSET
     surfaces = surfaces or []
     q = dict(DEFAULTS)
     q.update({k: v for k, v in (r or {}).items() if v is not None})
     x0, x1 = sorted((float(q["x0"]), float(q["x1"])))
     y0, y1 = sorted((float(q["y0"]), float(q["y1"])))
-    W, D = x1 - x0, y1 - y0
-    W_nom, D_nom = W, D                      # the size as sold (the price's area); the built frame can differ by a snap of an inch or two
+    W_nom, D_nom = x1 - x0, y1 - y0         # the size as sold (the price's area); the built frame can differ by an edge clearance / snap
     notes: List[str] = []
     p = float(q["post_in"]) * IN
-    rp = _num(q.get("post_inset_in"), RAIL_POST_INSET) * IN
-    house = str(q["attach"]).lower().startswith("house")
+    rp = RAIL_POST_INSET * IN
+    ec = float(q.get("edge_clear_in") if q.get("edge_clear_in") is not None else 2.0) * IN
+    att = str(q["attach"]).lower()
+    house = att.startswith("house")
+    mount = str(q.get("house_mount") or "roof").lower()
+    for k_, m_ in (("roofline", "roof"), ("roof_line", "roof"), ("wall", "wall"), ("fascia", "fascia"), ("soffit", "fascia")):
+        if house and att.endswith(k_):
+            mount = m_
     under = [s for s in surfaces if min(x1, s["x1"]) - max(x0, s["x0"]) > 0.1 and min(y1, s["y1"]) - max(y0, s["y0"]) > 0.1]
     z_deck = max((s["z"] for s in under), default=0.0)
-
-    # ---- posts: explicit, or the outer corners (on the rail line at a deck edge), snapped to the rail corner post
-    shift = 0.0
-    explicit = bool(q.get("posts"))
-
-    # the deck the roof stands on: the surfaces under its footprint, and any at their height that continue them
-    zs_ = {round(s_["z"], 3) for s_ in under}
+    zs_ = {round(s_["z"], 3) for s_ in under}          # the deck the roof stands on: under its footprint, and what continues it
     own = [s_ for s_ in surfaces if round(s_["z"], 3) in zs_] if under else []
+    explicit = bool(q.get("posts"))
+    shift = 0.0
 
-    def front_line(x):
-        s = _surface_at(own, x, y1, tol=0.6)
-        if s is not None and abs(s["y1"] - y1) <= 1.0:
-            return s, s["y1"] - rp
-        return None, y1 - p / 2
-
-    def default_posts(xa, xb):
-        pts = []
-        for x in (xa + p / 2, xb - p / 2):
-            s, yf = front_line(x)
-            pts.append((x, yf))
-        if not house:
-            pts = [(xa + p / 2, y0 + p / 2), (xb - p / 2, y0 + p / 2)] + pts
-        return pts
+    def front_of(x):                          # the deck front under a front post at x, when the roof's front is near it
+        s_ = _surface_at(own, x, y1, tol=0.6)
+        return s_ if (s_ is not None and abs(s_["y1"] - y1) <= 1.0) else None
 
     if explicit:
         posts = [(float(a), float(b)) for a, b in q["posts"]]
     else:
-        posts = default_posts(x0, x1)
-        if q.get("snap", True):
-            def corner_d(px, py):              # how far a default front post sits from the deck's rail corner post near it
-                s, yf = front_line(px)
-                if s is None or abs(py - yf) > 1e-6:
+        # posts at the deck edge keep their outer faces `edge_clear` inside it; the frame's front lines up with them
+        s_f = front_of((x0 + x1) / 2) or front_of(x0 + p / 2) or front_of(x1 - p / 2)
+        if s_f is not None and y1 > s_f["y1"] - ec + 1e-6:
+            if y1 - (s_f["y1"] - ec) > 0.6 * IN:
+                notes.append(f"the frame's front at y {s_f['y1'] - ec:.3f}: the posts' outer faces {ec * 12:g}\" inside the deck edge (the plates bear on the framing)")
+            y1 = s_f["y1"] - ec
+        if q.get("snap", True):               # a front post near a deck corner slides to it: outer face `edge_clear` inside the side edge
+            def corner_d(px):
+                s_ = front_of(px)
+                if s_ is None:
                     return None
-                ds = [xe + sgn * rp - px for xe, sgn in _front_corners(surfaces, s)]
+                ds = [xe + sgn * (ec + p / 2) - px for xe, sgn in _front_corners(surfaces, s_)]
                 ds = [d for d in ds if abs(d) <= SNAP_FT]
                 return min(ds, key=abs) if ds else None
-            fr_ = [pt for pt in posts if abs(pt[1] - max(pp[1] for pp in posts)) < 1e-6]
-            dl = corner_d(*fr_[0]) if fr_ else None
-            dr = corner_d(*fr_[-1]) if len(fr_) > 1 else None
-            if dl is not None and dr is not None and (abs(dl) > 0.01 or abs(dr) > 0.01):    # both posts on corners: the frame fits between them
+            dl, dr = corner_d(x0 + p / 2), corner_d(x1 - p / 2)
+            if dl is not None and dr is not None and (abs(dl) > 0.01 or abs(dr) > 0.01):
                 x0, x1 = x0 + dl, x1 + dr
-                notes.append(f"the frame fits the deck's rail corners: x {x0:.3f}-{x1:.3f} ({ftin((x1 - x0) * 12)} wide), both posts are the corner rail posts")
-            elif (dl if dl is not None else dr) is not None and abs(dl if dl is not None else dr) > 0.01:
-                shift = dl if dl is not None else dr
-                x0, x1 = x0 + shift, x1 + shift
-                notes.append(f"frame at x {x0:.3f}-{x1:.3f}: its corner post is the rail's corner post ({ftin(abs(shift) * 12)} "
-                             f"{'left' if shift < 0 else 'right'} of the x {x0 - shift:.3f}-{x1 - shift:.3f} asked for)")
-            if x1 - x0 != W:
-                W = x1 - x0
-            posts = default_posts(x0, x1)
+                notes.append(f"the frame fits between the deck's corners: x {x0:.3f}-{x1:.3f} ({ftin((x1 - x0) * 12)}), both posts are the corner rail posts")
+            else:
+                d_ = dl if dl is not None else dr
+                if d_ is not None and abs(d_) > 0.01:
+                    shift = d_
+                    x0, x1 = x0 + shift, x1 + shift
+                    notes.append(f"frame at x {x0:.3f}-{x1:.3f}: its corner post is the rail's corner post ({ftin(abs(shift) * 12)} "
+                                 f"{'left' if shift < 0 else 'right'} of the x {x0 - shift:.3f}-{x1 - shift:.3f} asked for)")
+        posts = [(x0 + p / 2, y1 - p / 2), (x1 - p / 2, y1 - p / 2)]
+        if not house:
+            posts = [(x0 + p / 2, y0 + p / 2), (x1 - p / 2, y0 + p / 2)] + posts
+    W, D = x1 - x0, y1 - y0
 
-    if not explicit and posts:                 # posts on the rail line: the front beam's face lines up with theirs
-        yp = max(pt[1] for pt in posts)
-        if abs(yp + p / 2 - y1) < 2.0 * IN and yp + p / 2 != y1:
-            y1 = yp + p / 2
-            D = y1 - y0
-    # ---- frame size: by the longest post-to-post span the beams carry
-    front = sorted((pt for pt in posts if abs(pt[1] - max(pp[1] for pp in posts)) < 0.6), key=lambda t: t[0])
+    # ---- beams: the front by its post-to-post span; the house, side and divider beams by theirs
+    ymax = max(pt[1] for pt in posts) if posts else y1
+    front = sorted((pt for pt in posts if abs(pt[1] - ymax) < 0.6), key=lambda t: t[0])
     span = max([b[0] - a[0] for a, b in zip(front, front[1:])] + [0.0])
-    if not house:
-        span = max(span, D - p)
-    else:
-        span = max(span, D - p / 2)          # the side beams: house beam to the front post
-    if q.get("beam"):
-        bw_in, bh_in = float(q["beam"][0]), float(q["beam"][1])
-        lim = max([f[3] for f in FRAMES if f[1] <= bw_in and f[2] <= bh_in] or [FRAMES[0][3]])
-        flabel = f"{bw_in:g}x{bh_in:g}"
-    else:
-        f_ = next((f for f in FRAMES if f[3] >= span - 1e-6), FRAMES[-1])
-        flabel, bw_in, bh_in, lim = f_
-    if not explicit and span > lim + 1e-6 and len(front) == 2:      # add posts under the front beam
-        n_b = int(math.ceil(span / lim - 1e-9))
+    flabel, fw_in, fh_in, flim = _pick_frame(q, "front_beam", span)
+    if not explicit and span > flim + 1e-6 and len(front) == 2:      # posts added under the front beam
+        n_b = int(math.ceil(span / flim - 1e-9))
         (ax, ay), (bx, by) = front
         mids = [(ax + (bx - ax) * k / n_b, ay) for k in range(1, n_b)]
         posts = posts + mids
-        notes.append(f"{len(mids)} post{'s' if len(mids) > 1 else ''} added under the front beam: {span:.1f}' exceeds the {flabel} frame's {lim:g}' span")
+        notes.append(f"{len(mids)} post{'s' if len(mids) > 1 else ''} added under the front beam: {span:.1f}' exceeds the {flabel} frame's {flim:g}' span")
         front = sorted(front + mids, key=lambda t: t[0])
         span = max(b[0] - a[0] for a, b in zip(front, front[1:]))
-    w, h = bw_in * IN, bh_in * IN
+    blabel, bw_in, bh_in, blim = _pick_frame(q, "frame_beam", D - p / 2)
+    if not house:                            # freestanding: the rear beam spans like the front
+        blabel, bw_in, bh_in, blim = flabel, fw_in, fh_in, flim
+    w_f, h_f, w_b, h_b = fw_in * IN, fh_in * IN, bw_in * IN, bh_in * IN
+    hmax = max(h_f, h_b)
 
-    # ---- heights
-    z_attach = _num(q.get("z_attach"), z_deck + 9.0)
-    z_top = _num(q.get("z_top"), z_attach if house else z_deck + 9.0)
-    z_bot = z_top - h
-    z_piv = z_top - h / 2
+    # ---- heights: the frame is level
+    if q.get("z_top") is not None:
+        z_top = float(q["z_top"])
+    elif house and q.get("z_attach") is not None:
+        z_top = float(q["z_attach"])
+    else:
+        z_top = z_deck + float(q.get("clear_ft") or 8.333) + hmax
+    z_bot = z_top - hmax                     # the frame's underside (its deepest beam)
+    z_piv = z_top - float(q.get("pivot_drop_in") or 3.0) * IN
 
-    # ---- motor zones and blades
+    # ---- motor zones and blades (blade ends over the gutters, blades stacked between the gutters)
     area = W * D
-    ldir = q.get("louver_dir") or ("y" if D <= W else "x")
+    ldir = q.get("louver_dir") or ("x" if house else ("y" if D <= W else "x"))
     n_motor = int(q["zones"]) if q.get("zones") else max(1, int(math.ceil(area / MOTOR_SF - 1e-9)))
     if ldir == "y":
-        n_y = max(1, int(math.ceil((D - 2 * w) / BLADE_SPAN_MAX_FT - 1e-9)))
+        n_y = max(1, int(math.ceil((D - w_b - w_f) / BLADE_SPAN_MAX_FT - 1e-9)))
         n_x = max(1, int(math.ceil(n_motor / n_y)))
     else:
-        n_x = max(1, int(math.ceil((W - 2 * w) / BLADE_SPAN_MAX_FT - 1e-9)))
+        n_x = max(1, int(math.ceil((W - 2 * w_b) / BLADE_SPAN_MAX_FT - 1e-9)))
         n_y = max(1, int(math.ceil(n_motor / n_x)))
     xs = [x0 + W * k / n_x for k in range(1, n_x)]          # divider beams along y at these x
     ys = [y0 + D * k / n_y for k in range(1, n_y)]          # cross beams along x at these y
-    xb = [x0 + w] + [v for x_ in xs for v in (x_ - w / 2, x_ + w / 2)] + [x1 - w]
-    yb = [y0 + w] + [v for y_ in ys for v in (y_ - w / 2, y_ + w / 2)] + [y1 - w]
+    xb = [x0 + w_b] + [v for x_ in xs for v in (x_ - w_b / 2, x_ + w_b / 2)] + [x1 - w_b]
+    yb = [y0 + w_b] + [v for y_ in ys for v in (y_ - w_b / 2, y_ + w_b / 2)] + [y1 - w_f]
     cells = [dict(x0=xb[2 * i], x1=xb[2 * i + 1], y0=yb[2 * j], y1=yb[2 * j + 1]) for j in range(n_y) for i in range(n_x)]
     bwid, sp = float(q["blade_in"]) * IN, float(q["spacing_in"]) * IN
     ang = max(ANGLE_RANGE[0], min(ANGLE_RANGE[1], float(q["angle_deg"])))
@@ -327,6 +329,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     for zi, c in enumerate(cells):
         a0, a1 = (c["x0"], c["x1"]) if ldir == "y" else (c["y0"], c["y1"])     # stacking axis
         l0, l1 = (c["y0"], c["y1"]) if ldir == "y" else (c["x0"], c["x1"])     # long axis
+        a0, a1 = a0 + GUTTER_W, a1 - GUTTER_W
         n = max(1, int(math.floor((a1 - a0) / sp + 1e-6)))
         off = (a1 - a0 - n * sp) / 2
         c["n_blades"] = n
@@ -334,101 +337,122 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
         for i in range(n):
             s_ = a0 + off + sp / 2 + i * sp
             ctr = (s_, (l0 + l1) / 2) if ldir == "y" else ((l0 + l1) / 2, s_)
-            blades.append(dict(zone=zi, i=i, motor=(i == n // 2), pivot=[ctr[0], ctr[1], z_piv], length=(l1 - l0) - 0.04))
-    # ---- posts as built
+            blades.append(dict(zone=zi, i=i, motor=(i == n // 2), pivot=[ctr[0], ctr[1], z_piv], length=(l1 - l0) - 2 * GUTTER_W))
+
+    # ---- posts as built: the deck under each, and the rail lines that run through it (then it IS the rail post there)
     pts = []
     for (px, py) in posts:
-        s = _surface_at(own, px, py)
-        zd = s["z"] if s else z_deck
-        on_rail = bool(s) and abs(py - (s["y1"] - rp)) < 0.5 / 12 + 1e-6
-        pts.append(dict(x=px, y=py, z_deck=zd, on_rail=on_rail, surface=s["name"] if s else ""))
+        s_ = _surface_at(own, px, py)
+        zd = s_["z"] if s_ else z_deck
+        rails = []
+        if s_ is not None:
+            yr = s_["y1"] - rp
+            if abs(py - yr) <= p / 2 + 1e-6:
+                rails.append("front")
+                for xe, sgn in _front_corners(surfaces, s_):
+                    if abs(px - (xe + sgn * rp)) <= p / 2 + 1e-6:
+                        rails.append("side")
+        pts.append(dict(x=px, y=py, z_deck=zd, on_rail=bool(rails), rails=rails, edge_y=(s_["y1"] if s_ else None), surface=s_["name"] if s_ else ""))
     if not under:
         notes.append("no deck surface under the roof: the posts stand at z = 0")
     clear = z_bot - z_deck
     brackets = [x0 + 0.5 + k * BRACKET_OC_FT for k in range(int((W - 1.0) / BRACKET_OC_FT) + 1)] if house else []
+    hc = q.get("house_clear_ft")
+    hc = float(hc) if hc is not None else (y0 + 1.4 if (house and mount in ("roof", "fascia")) else y0 + w_b)
     res = dict(src=r, name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], hex=HEX.get(str(q["color"]).lower(), "#141416"),
-                x0=x0, x1=x1, y0=y0, y1=y1, W=W, D=D, area=round(area, 2), shift=shift, attach="house" if house else "freestanding",
-                W_nom=W_nom, D_nom=D_nom, area_nom=round(W_nom * D_nom, 2),
-                beam=(bw_in, bh_in), beam_label=flabel, span_ft=round(span, 2), span_max_ft=lim, w=w, h=h,
-                z_deck=z_deck, z_attach=z_attach, z_top=z_top, z_bot=z_bot, z_pivot=z_piv, clear_ft=clear,
-                louver_dir=ldir, blade_w=bwid, blade_t=float(q["blade_t_in"]) * IN, motor_t=float(q["motor_t_in"]) * IN, spacing=sp,
-                angle_deg=ang, zones=cells, n_zones=len(cells), xs=xs, ys=ys, blades=blades, posts=pts, post=p,
-                plate=float(q["plate_in"]) * IN, gutter=bool(q["gutter"]), lights=bool(q["lights"]), downspouts=str(q.get("downspouts") or "none"),
-                brackets=brackets, notes=notes, price=q.get("price"), price_per_sf=q.get("price_per_sf"), priced=str(q.get("priced") or "own"),
-                option_name=q.get("option_name"), note=q.get("note", ""), global_=bool(r.get("_global")))
+               x0=x0, x1=x1, y0=y0, y1=y1, W=W, D=D, area=round(area, 2), shift=shift, attach="house" if house else "freestanding",
+               house_mount=mount if house else None, W_nom=W_nom, D_nom=D_nom, area_nom=round(W_nom * D_nom, 2),
+               beam_label=flabel, frame_label=blabel, w_f=w_f, h_f=h_f, w_b=w_b, h_b=h_b, span_ft=round(span, 2), span_max_ft=flim,
+               z_deck=z_deck, z_attach=z_top if house else None, z_top=z_top, z_bot=z_bot, z_pivot=z_piv, clear_ft=clear,
+               louver_dir=ldir, blade_w=bwid, blade_t=float(q["blade_t_in"]) * IN, motor_t=float(q["motor_t_in"]) * IN, spacing=sp,
+               angle_deg=ang, zones=cells, n_zones=len(cells), xs=xs, ys=ys, blades=blades, posts=pts, post=p, edge_clear=ec,
+               plate=float(q["plate_in"]) * IN, gutter=bool(q["gutter"]), lights=bool(q["lights"]), downspouts=str(q.get("downspouts") or "none"),
+               brackets=brackets, house_clear=hc, notes=notes, price=q.get("price"), price_per_sf=q.get("price_per_sf"), priced=str(q.get("priced") or "own"),
+               option_name=q.get("option_name"), note=q.get("note", ""), global_=bool(r.get("_global")))
     res["screens"] = _screens(res, q.get("screens") or [], surfaces)
     res["screens_priced"] = str(q.get("screens_priced") or res["priced"])
     return res
 
 
 def _screens(q: dict, screens: List[dict], surfaces: List[dict]) -> List[dict]:
-    """Retractable screens as built: per side the cassette, the fabric plane and its extent, the top (cassette underside),
-    the bottom stop and the drop. "inside": the cassette hangs under the frame just inside the posts and the fabric comes
-    down inside the rail onto the deck; "outside": the cassette is face-mounted on the beam's outer face."""
+    """Retractable screens as built (research.md 5): per side the housing, the fabric plane and its extent, the top (housing
+    underside), the bottom stop, the drop, a slim track post and a fixed panel where an end screen stops at the house gutter.
+    "inside" (default): the front screen inboard of the rail between the posts' faces, tracks on the posts' house-side faces,
+    the bar on the deck; an end screen under its side beam from the gutter line to the front post. "outside": the housing
+    face-mounted on the beam's outer face (the left-end alternate: outside the step face, down to the lower deck)."""
     out = []
-    x0, x1, y0, y1, w, p = q["x0"], q["x1"], q["y0"], q["y1"], q["w"], q["post"]
-    front_posts = [pt for pt in q["posts"] if pt["y"] > (y0 + y1) / 2]
+    x0, x1, y0, y1, p = q["x0"], q["x1"], q["y0"], q["y1"], q["post"]
+    w_f, w_b = q["w_f"], q["w_b"]
+    zf_bot, zb_bot = q["z_top"] - q["h_f"], q["z_top"] - q["h_b"]
+    front_posts = sorted([pt for pt in q["posts"] if pt["y"] > (y0 + y1) / 2], key=lambda pt: pt["x"])
+    y_in = min([pt["y"] - p / 2 for pt in front_posts] or [y1 - w_f])       # the front posts' house-side faces
+    hc = q["house_clear"]
     for k, s in enumerate(screens):
         sd = dict(SCREEN_DEFAULTS)
         sd.update({kk: v for kk, v in (s or {}).items() if v is not None})
         side = str(sd["side"]).lower()
-        hs = float(sd["housing_in"]) * IN
         inside = str(sd["mount"]).lower() != "outside"
+        hs = float(sd["housing_in"]) * IN if sd.get("housing_in") else 5.5 * IN
         if side == "front":
+            plane = "y"
             if inside:
-                yin = min([pt["y"] - p / 2 for pt in front_posts] or [y1 - w])
-                c = yin - hs / 2
-                ext = (x0 + w, x1 - w)
+                line = y_in - TRACK_D / 2
+                a, b = ((front_posts[0]["x"] + p / 2, front_posts[-1]["x"] - p / 2) if len(front_posts) > 1 else (x0 + w_b, x1 - w_b))
+                zh1 = zf_bot
             else:
-                c = y1 + hs / 2
-                ext = (x0, x1)
-            plane, line = "y", c
+                line, (a, b), zh1 = y1 + hs / 2, (x0, x1), zf_bot + 2.0 * IN
         elif side in ("left", "right"):
-            sgn = 1 if side == "left" else -1
-            xe = x0 if side == "left" else x1
+            plane = "x"
+            sgn, xe = (1, x0) if side == "left" else (-1, x1)
             if inside:
-                c = xe + sgn * (p + hs / 2)
-                fr = [sd2 for sd2 in screens if str((sd2 or {}).get("side", "front")).lower() == "front"]
-                yin = min([pt["y"] - p / 2 for pt in front_posts] or [y1 - w])
-                ext = (y0 + w, (yin - hs) if fr else yin)
+                line, (a, b), zh1 = xe + sgn * (w_b + hs / 2), (hc, y_in), zb_bot
             else:
-                c = xe - sgn * hs / 2
-                ext = (y0, y1)
-            plane, line = "x", c
+                line, (a, b), zh1 = xe - sgn * hs / 2, (hc, y1), zb_bot + 2.0 * IN
         else:
             continue
-        a, b = ext
         if sd.get("from_ft") is not None:
             a = float(sd["from_ft"])
         if sd.get("to_ft") is not None:
             b = float(sd["to_ft"])
         a, b = min(a, b), max(a, b)
         mid = ((a + b) / 2, line) if plane == "y" else (line, (a + b) / 2)
-        sf = _surface_at(surfaces, mid[0], mid[1], tol=1.0)
+        sf = _surface_at(surfaces, mid[0], mid[1], tol=0.05)
         bottom = float(sd["bottom"]) if sd.get("bottom") is not None else (sf["z"] if sf else q["z_deck"])
-        if inside:
-            hz0, hz1 = q["z_bot"] - hs, q["z_bot"]
-        else:
-            hz1 = q["z_bot"] + 2.0 * IN
-            hz0 = hz1 - hs
-        drop = max(0.0, min(1.0, float(sd.get("drop") or 0.0)))
-        max_drop = hz0 - bottom
-        if plane == "y":
-            pa, pb = [a, line], [b, line]
-            cass = (a, b, line - hs / 2, line + hs / 2)
-        else:
-            pa, pb = [line, a], [line, b]
-            cass = (line - hs / 2, line + hs / 2, a, b)
-        fab = str(sd["fabric"]).lower()
         width = b - a
+        if not sd.get("housing_in") and (width > 22.0 or (zh1 - hs) - bottom > 11.0):
+            hs = 7.0 * IN                     # Suncoast's 7" round housing: to 30' wide and a 22' drop
+            if plane == "y":
+                line = (y_in - TRACK_D / 2) if inside else (y1 + hs / 2)
+            else:
+                line = (xe + sgn * (w_b + hs / 2)) if inside else (xe - sgn * hs / 2)
+        zh0 = zh1 - hs
+        drop = max(0.0, min(1.0, float(sd.get("drop") or 0.0)))
+        cass = (a, b, line - hs / 2, line + hs / 2) if plane == "y" else (line - hs / 2, line + hs / 2, a, b)
+        tp = sd.get("track_post")
+        if tp is None and plane == "x" and a > y0 + w_b + 0.1:           # an end screen short of the house: a slim track post at its end
+            tp = [line, a]
+        fp = sd.get("fixed_panel")
+        if fp is None and tp is not None and plane == "x":
+            fp = [y0, a]
+        fab = str(sd["fabric"]).lower()
+        fab = fab if fab in FABRIC else "mesh"
         price_known = sd.get("price") is not None or sd.get("price_per_lf") is not None
-        sell = (float(sd["price"]) if sd.get("price") is not None else
-                float(sd.get("price_per_lf") if sd.get("price_per_lf") is not None else SCREEN_EST_PER_LF) * width)
-        out.append(dict(index=k, side=side, mount="inside" if inside else "outside", plane=plane, line=line, a=pa, b=pb, width=width,
-                        z_top=hz0, z_bottom=bottom, max_drop=max_drop, drop=drop, cassette=dict(x0=cass[0], x1=cass[1], y0=cass[2], y1=cass[3], z0=hz0, z1=hz1),
-                        housing=hs, fabric=fab if fab in FABRIC else "mesh", color=str(sd["color"]),
-                        name=sd.get("name") or f"{side} screen", sell=round(sell, 2), estimate=not price_known,
-                        rate=(None if sd.get("price") is not None else float(sd.get("price_per_lf") if sd.get("price_per_lf") is not None else SCREEN_EST_PER_LF))))
+        if sd.get("price") is not None:
+            sell, rate = float(sd["price"]), None
+        elif sd.get("price_per_lf") is not None:
+            sell, rate = float(sd["price_per_lf"]) * width, float(sd["price_per_lf"])
+        else:
+            rate = SCREEN_EST["per_lf"]
+            sell = (SCREEN_EST["per_screen"] + rate * width + (SCREEN_EST["track_post"] if tp else 0.0) + (SCREEN_EST["fixed_panel"] if fp else 0.0)
+                    + (SCREEN_EST["round_housing"] if hs > 6.0 * IN else 0.0))
+        out.append(dict(index=k, side=side, mount="inside" if inside else "outside", plane=plane, line=line,
+                        a=([a, line] if plane == "y" else [line, a]), b=([b, line] if plane == "y" else [line, b]), width=width,
+                        z_top=zh0, z_bottom=bottom, max_drop=zh0 - bottom, drop=drop,
+                        cassette=dict(x0=cass[0], x1=cass[1], y0=cass[2], y1=cass[3], z0=zh0, z1=zh1), housing=hs,
+                        track_post=(list(tp) if tp else None), track_post_top=(zb_bot if plane == "x" else zf_bot),
+                        fixed_panel=(list(fp) if fp else None), fixed_top=q["z_deck"] + max(6.5, q["clear_ft"] - 1.0),
+                        fabric=fab, density=float(sd.get("density") or 90), color=str(sd["color"]),
+                        name=sd.get("name") or f"{side} screen", sell=round(sell, 2), estimate=not price_known, rate=rate))
     return out
 
 
@@ -501,20 +525,26 @@ def draw_roof(add, q: dict) -> None:
     """The boxes of one resolved roof (layer "louvered", phase 8). add(kind, x0, x1, y0, y1, z0, z1, mat, phase, **kw)."""
     def A(kind, x0, x1, y0, y1, z0, z1, mat=MAT, tag="", **k):
         add(kind, x0, x1, y0, y1, z0, z1, mat, PHASE, tag=f"{q['name']}: {tag}" if tag else q["name"], layer=LAYER, **k)
-    x0, x1, y0, y1, w, h = q["x0"], q["x1"], q["y0"], q["y1"], q["w"], q["h"]
-    zt, zb = q["z_top"], q["z_bot"]
-    bl = q["beam_label"]
-    # perimeter beams (the house-side and front beams run the full length; the sides fit between them)
-    A("lvbeam", x0, x1, y0, y0 + w, zb, zt, tag=(f"house-side {bl} beam on wall brackets at the soffit / roof line" if q["attach"] == "house" else f"rear {bl} beam"))
-    A("lvbeam", x0, x1, y1 - w, y1, zb, zt, tag=f"front {bl} beam, integrated gutter")
-    A("lvbeam", x0, x0 + w, y0 + w, y1 - w, zb, zt, tag=f"side {bl} beam, integrated gutter")
-    A("lvbeam", x1 - w, x1, y0 + w, y1 - w, zb, zt, tag=f"side {bl} beam, integrated gutter")
+    x0, x1, y0, y1 = q["x0"], q["x1"], q["y0"], q["y1"]
+    wf, hf, wb, hb = q["w_f"], q["h_f"], q["w_b"], q["h_b"]
+    zt = q["z_top"]
+    zbf, zbb = zt - hf, zt - hb
+    fl, bl = q["beam_label"], q["frame_label"]
+    house = q["attach"] == "house"
+    mount = q.get("house_mount") or "roof"
+    # the beams: the house-side and front beams run the full length; the sides and dividers fit between them
+    A("lvbeam", x0, x1, y0, y0 + wb, zbb, zt, tag=((f"house-side {bl} beam on flashed stand-off brackets on the existing roof (roof-line mount)" if mount == "roof" else
+                                                    f"house-side {bl} beam on wall brackets under the soffit" if mount == "wall" else f"house-side {bl} beam hung at the fascia line")
+                                                   if house else f"rear {bl} beam"))
+    A("lvbeam", x0, x1, y1 - wf, y1, zbf, zt, tag=f"front {fl} beam, integrated gutter, on {len([p_ for p_ in q['posts'] if p_['y'] > (y0 + y1) / 2])} posts")
+    A("lvbeam", x0, x0 + wb, y0 + wb, y1 - wf, zbb, zt, tag=f"side {bl} beam, integrated gutter")
+    A("lvbeam", x1 - wb, x1, y0 + wb, y1 - wf, zbb, zt, tag=f"side {bl} beam, integrated gutter")
     for xd in q["xs"]:
-        A("lvbeam", xd - w / 2, xd + w / 2, y0 + w, y1 - w, zb, zt, tag=f"zone divider {bl} beam, gutters both sides")
+        A("lvbeam", xd - wb / 2, xd + wb / 2, y0 + wb, y1 - wf, zbb, zt, tag=f"zone divider {bl} beam (carries the blade ends), gutters both sides")
     for yd in q["ys"]:
-        A("lvbeam", x0 + w, x1 - w, yd - w / 2, yd + w / 2, zb, zt, tag=f"cross {bl} beam, gutters both sides")
+        A("lvbeam", x0 + wb, x1 - wb, yd - wb / 2, yd + wb / 2, zbb, zt, tag=f"cross {bl} beam, gutters both sides")
     # the gutter round every zone, on the beams' inner faces at their bottom; the LED strip in its light track
-    gz0, gz1 = zb, zb + GUTTER_H
+    gz0, gz1 = zbb, zbb + GUTTER_H
     for c in q["zones"]:
         cx0, cx1, cy0, cy1 = c["x0"], c["x1"], c["y0"], c["y1"]
         if q["gutter"]:
@@ -523,10 +553,10 @@ def draw_roof(add, q: dict) -> None:
             A("lvgutter", cx0, cx0 + GUTTER_W, cy0 + GUTTER_W, cy1 - GUTTER_W, gz0, gz1, tag="integrated gutter")
             A("lvgutter", cx1 - GUTTER_W, cx1, cy0 + GUTTER_W, cy1 - GUTTER_W, gz0, gz1, tag="integrated gutter")
         if q["lights"]:
-            e, t_ = GUTTER_W + 0.01, 0.05
+            e, t_ = GUTTER_W + 0.01, 0.04
             for (a0, a1, b0, b1) in ((cx0 + e, cx1 - e, cy0 + e - t_, cy0 + e), (cx0 + e, cx1 - e, cy1 - e, cy1 - e + t_),
                                      (cx0 + e - t_, cx0 + e, cy0 + e, cy1 - e), (cx1 - e, cx1 - e + t_, cy0 + e, cy1 - e)):
-                A("lvled", a0, a1, b0, b1, gz0 - 0.02, gz0 + 0.03, mat=LED_MAT, tag="LED light strip")
+                A("lvled", a0, a1, b0, b1, gz0 - 0.02, gz0 + 0.02, mat=LED_MAT, tag="LED light strip")
     # blades: each a mesh turned about its own long axis
     for b in q["blades"]:
         t_ = q["motor_t"] if b["motor"] else q["blade_t"]
@@ -538,55 +568,71 @@ def draw_roof(add, q: dict) -> None:
     p, pl = q["post"], q["plate"]
     for pt in q["posts"]:
         px, py, zd = pt["x"], pt["y"], pt["z_deck"]
-        rail = " — the rail post here (the rail panels bracket into it)" if pt["on_rail"] else ""
-        A("lvplate", px - pl / 2, px + pl / 2, py - pl / 2, py + pl / 2, zd, zd + 0.04, tag="post base plate, bolted through the decking into the structure below")
+        top = zbf if py > (y0 + y1) / 2 else zbb
+        rail = " — the rail post here (the rail panels end into it on wall-mount brackets)" if pt["on_rail"] else ""
+        A("lvplate", px - pl / 2, px + pl / 2, py - pl / 2, py + pl / 2, zd, zd + 0.04, tag="base plate, through-bolted into solid blocking over the post below")
         A("lvpost", px - p / 2 - 0.02, px + p / 2 + 0.02, py - p / 2 - 0.02, py + p / 2 + 0.02, zd + 0.04, zd + 0.36, tag="post base cover")
-        A("lvpost", px - p / 2, px + p / 2, py - p / 2, py + p / 2, zd + 0.04, zb, tag=f"{q['post'] * 12:g}x{q['post'] * 12:g} aluminum post{rail}")
+        A("lvpost", px - p / 2, px + p / 2, py - p / 2, py + p / 2, zd + 0.04, top, tag=f"{q['post'] * 12:g}x{q['post'] * 12:g} aluminum post{rail}")
         out_y = 1 if py > (y0 + y1) / 2 else -1
-        if q["downspouts"] == "post":     # down inside the post, through the deck, then a 2x3 leader down the deck edge to grade + a kick-out
-            ye = py + out_y * (RAIL_POST_INSET_FT + 0.18)
-            ya, yb_ = sorted((ye - 0.1, ye + 0.1))
-            ztop = zd - 0.95
-            if ztop > 0.6:
-                A("lvdown", px - 0.13, px + 0.13, ya, yb_, 0.25, ztop, tag="downspout from inside the post, down the deck edge to grade")
-                A("lvdown", px - 0.13, px + 0.13, min(yb_, yb_ + out_y * 0.6), max(yb_, yb_ + out_y * 0.6) if out_y > 0 else ya, 0.05, 0.25, tag="downspout kick-out at grade")
+        if q["downspouts"] == "post" and zd > 2.0:
+            # inside the post, through a sleeve in the plate, decking and blocking; a black leader down the deck post below to the
+            # patio level, then solid pipe out past the deck edge to the lawn (>= 5' from the foundation)
+            lx = px + 0.45
+            A("lvdown", lx - 0.11, lx + 0.11, py - 0.11, py + 0.11, 0.2, zd - 0.95, tag="downspout leader from inside the post, down the deck post below")
+            ye = (pt.get("edge_y") or py) + 2.0
+            A("lvdown", lx - 0.11, lx + 0.11, min(py, ye), max(py, ye), 0.0, 0.2, tag="downspout piped out to the lawn")
         elif q["downspouts"] == "external":
             yo = py + out_y * p / 2
             ya, yb_ = sorted((yo, yo + out_y * 0.21))
-            A("lvdown", px - 0.12, px + 0.12, ya, yb_, zd + 0.35, zb + 0.15, tag="2x3 downspout on the post")
+            A("lvdown", px - 0.12, px + 0.12, ya, yb_, zd + 0.35, top + 0.15, tag="2x3 downspout on the post")
             A("lvdown", px - 0.12, px + 0.12, min(yb_, yb_ + out_y * 0.35), max(yb_, yb_ + out_y * 0.35) if out_y > 0 else ya, zd + 0.12, zd + 0.35, tag="downspout kick-out")
-    # the house-side beam's wall brackets
+    # the house side: stand-offs on the roof (roof-line mount) or brackets on the wall / fascia
     for bx in q["brackets"]:
-        A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + 0.03, zb - 0.45, zb, tag="wall bracket (into the wall framing)")
-        A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + w - 0.02, zb - 0.03, zb, tag="wall bracket seat")
+        if mount == "roof":
+            A("lvbracket", bx - 0.09, bx + 0.09, y0 + wb / 2 - 0.09, y0 + wb / 2 + 0.09, zbb - 0.42, zbb, tag="stand-off bracket, lagged into a rafter over solid blocking")
+            A("lvbracket", bx - 0.22, bx + 0.22, y0 + wb / 2 - 0.22, y0 + wb / 2 + 0.22, zbb - 0.45, zbb - 0.42, tag="stand-off flashing boot")
+        else:
+            A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + 0.03, zbb - 0.45, zbb, tag="wall bracket (into the wall framing)")
+            A("lvbracket", bx - 0.125, bx + 0.125, y0, y0 + wb - 0.02, zbb - 0.03, zbb, tag="wall bracket seat")
     for sc in q.get("screens") or []:
         draw_screen(A, sc)
 
 
 def draw_screen(A, sc: dict) -> None:
-    """One retractable screen (the screens option): the cassette, a side track at each end, the fabric down to the drop
-    and the bottom bar. Fabric and bar are kind "lvscreen" (a live viewer hides them and draws its own)."""
+    """One retractable screen (the screens option): the housing, a track at each end, the fabric down to the drop and the
+    bottom bar; a slim track post and a fixed panel where an end screen stops at the house gutter. Fabric and bar are kind
+    "lvscreen" (a live viewer hides them and draws its own); the fixed panel is "lvfixed", the tracks "lvtrack"."""
     nm = f"screen ({sc['side']}) — screens option"
     c = sc["cassette"]
     A("lvcassette", c["x0"], c["x1"], c["y0"], c["y1"], c["z0"], c["z1"], tag=f"{nm}: {sc['housing'] * 12:g}\" housing, motor inside")
     zt, zb = sc["z_top"], sc["z_bottom"]
     zh = zt - HEM_H - sc["drop"] * (sc["max_drop"] - HEM_H)          # the bottom bar's underside
+    ln = sc["line"]
     if sc["plane"] == "y":
-        ln, (a, b) = sc["line"], (sc["a"][0], sc["b"][0])
+        a, b = sc["a"][0], sc["b"][0]
         for e, sg in ((a, 1), (b, -1)):
-            A("lvtrack", min(e, e + sg * TRACK_W), max(e, e + sg * TRACK_W), ln - TRACK_D / 2, ln + TRACK_D / 2, zb, zt, tag=f"{nm}: side track")
+            A("lvtrack", min(e, e + sg * TRACK_W), max(e, e + sg * TRACK_W), ln - TRACK_D / 2, ln + TRACK_D / 2, zb, zt, tag=f"{nm}: zipper track")
         a_, b_ = a + TRACK_W, b - TRACK_W
         if zt - (zh + HEM_H) > 0.01:
             A("lvscreen", a_, b_, ln - 0.01, ln + 0.01, zh + HEM_H, zt, mat=SCREEN_MAT, tag=f"{nm}: {sc['fabric']} fabric")
         A("lvscreen", a_, b_, ln - HEM_T / 2, ln + HEM_T / 2, zh, zh + HEM_H, tag=f"{nm}: bottom bar")
     else:
-        ln, (a, b) = sc["line"], (sc["a"][1], sc["b"][1])
+        a, b = sc["a"][1], sc["b"][1]
         for e, sg in ((a, 1), (b, -1)):
-            A("lvtrack", ln - TRACK_D / 2, ln + TRACK_D / 2, min(e, e + sg * TRACK_W), max(e, e + sg * TRACK_W), zb, zt, tag=f"{nm}: side track")
+            A("lvtrack", ln - TRACK_D / 2, ln + TRACK_D / 2, min(e, e + sg * TRACK_W), max(e, e + sg * TRACK_W), zb, zt, tag=f"{nm}: zipper track")
         a_, b_ = a + TRACK_W, b - TRACK_W
         if zt - (zh + HEM_H) > 0.01:
             A("lvscreen", ln - 0.01, ln + 0.01, a_, b_, zh + HEM_H, zt, mat=SCREEN_MAT, tag=f"{nm}: {sc['fabric']} fabric")
         A("lvscreen", ln - HEM_T / 2, ln + HEM_T / 2, a_, b_, zh, zh + HEM_H, tag=f"{nm}: bottom bar")
+    if sc.get("track_post"):
+        tx, ty = sc["track_post"]
+        A("lvtrack", tx - 1.0 * IN, tx + 1.0 * IN, ty - 1.0 * IN, ty + 1.0 * IN, zb, sc["track_post_top"], tag=f"{nm}: 2x2 track post at the gutter line")
+    if sc.get("fixed_panel"):
+        fa, fb = sorted(sc["fixed_panel"])
+        if sc["plane"] == "x":
+            A("lvfixed", ln - 0.01, ln + 0.01, fa, fb - 1.0 * IN, zb, sc["fixed_top"], mat=SCREEN_MAT, tag=f"{nm}: fixed screen panel under the eave")
+        else:
+            A("lvfixed", fa, fb, ln - 0.01, ln + 0.01, zb, sc["fixed_top"], mat=SCREEN_MAT, tag=f"{nm}: fixed screen panel")
 
 
 def draw(add, L) -> List[dict]:
@@ -632,15 +678,17 @@ def descriptors(L) -> List[dict]:
                          thick=(q["motor_t"] if b["motor"] else q["blade_t"]), offset=[0.0, 0.0], motor=b["motor"], zone=b["zone"], index=b["i"],
                          tag=f"{q['name']}: {'motor blade (Gaposa motor inside)' if b['motor'] else 'louver blade'} — zone {b['zone'] + 1}, blade {b['i'] + 1}")
                     for b in q["blades"]],
-            frame=dict(x0=q["x0"], x1=q["x1"], y0=q["y0"], y1=q["y1"], z_top=q["z_top"], z_bottom=q["z_bot"], beam_w=q["w"], beam_h=q["h"],
-                       beam=q["beam_label"], attach=q["attach"], z_attach=q["z_attach"], dividers_x=q["xs"], dividers_y=q["ys"]),
+            frame=dict(x0=q["x0"], x1=q["x1"], y0=q["y0"], y1=q["y1"], z_top=q["z_top"], z_bottom=q["z_bot"],
+                       front_beam=q["beam_label"], front_w=q["w_f"], front_h=q["h_f"], frame_beam=q["frame_label"], frame_w=q["w_b"], frame_h=q["h_b"],
+                       attach=q["attach"], house_mount=q["house_mount"], z_attach=q["z_attach"], dividers_x=q["xs"], dividers_y=q["ys"]),
             zones=[dict(x0=c["x0"], x1=c["x1"], y0=c["y0"], y1=c["y1"], blades=c["n_blades"], motor_blade=c["motor"]) for c in q["zones"]],
             posts=[dict(x=pt["x"], y=pt["y"], z0=pt["z_deck"], z1=q["z_bot"], size=q["post"], rail_post=pt["on_rail"]) for pt in q["posts"]],
             z_deck=q["z_deck"], clear_ft=q["clear_ft"],
             screens=[dict(side=sc["side"], a=sc["a"], b=sc["b"], plane=sc["plane"], line=sc["line"], z_top=sc["z_top"], z_bottom=sc["z_bottom"],
                           max_drop=sc["max_drop"], down_default=sc["drop"], thick=0.02, hem=dict(h=HEM_H, t=HEM_T, mat=MAT), track_w=TRACK_W,
                           mat=SCREEN_MAT, box_kind="lvscreen", fabric=sc["fabric"], color=sc["color"], mount=sc["mount"],
-                          cassette=sc["cassette"], tag=f"{q['name']}: screen ({sc['side']}) — screens option")
+                          cassette=sc["cassette"], track_post=sc["track_post"], fixed_panel=sc["fixed_panel"], fixed_kind="lvfixed",
+                          tag=f"{q['name']}: screen ({sc['side']}) — screens option")
                      for sc in q["screens"]]))
     return out
 
@@ -684,8 +732,10 @@ def takeoff_hook(t) -> None:
         return
     from collections import Counter
     pk = Counter(p.kind for p in roof)
-    n = len(roof)
-    words = f"{n} {'is a' if n == 1 else 'are'} louvered-roof post{'s' if n != 1 else ''}"
+    n = len(roof)                                   # rail post positions taken by roof posts (a corner roof post ends two runs)
+    n_roof = len({(p.roof if isinstance(p.roof, tuple) else (round(p.x / 12, 1), round(p.y / 12, 1))) for p in roof})
+    words = (f"{n} {'is a' if n == 1 else 'are'} louvered-roof post{'s' if n != 1 else ''}" if n == n_roof else
+             f"{n} rail post positions are the {n_roof} louvered-roof posts")
     for ln in t.lines:
         if ln.category != "Rail":
             continue
@@ -719,7 +769,7 @@ def takeoff_hook(t) -> None:
     ends = ends or 2 * n
     color = rl.color or "black"
     t.lines.append(Line("Rail", IRX_WALL_KIT["desc"].replace("{color}", color), ends, ends, "kit",
-                        f"exact  ({ends} panel end{'s' if ends != 1 else ''} on the {n} roof post{'s' if n != 1 else ''})", IRX_WALL_KIT["each"], IRX_WALL_KIT["source"],
+                        f"exact  ({ends} panel end{'s' if ends != 1 else ''} on the {n_roof} roof post{'s' if n_roof != 1 else ''})", IRX_WALL_KIT["each"], IRX_WALL_KIT["source"],
                         IRX_WALL_KIT["sku"]))
     xs = ", ".join(ftin(p.x) for p in roof)
     if "Rail" in t.schedule:
@@ -759,9 +809,11 @@ def scope_words(q: dict) -> List[str]:
     out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area_nom']:g} SF), {str(q['color']).lower()} powder-coated aluminum",
            f"{n_bl} louver blades, {q['blade_w'] * 12:g}\" wide on {q['spacing'] * 12:g}\" centres, in {nz} motor zone{'s' if nz != 1 else ''} "
            f"(one Gaposa motor blade each); the blades turn from closed to {ANGLE_RANGE[1]:g} degrees open by remote or app",
-           f"{q['beam_label']} aluminum perimeter frame with the integrated gutter round every zone"
+           f"Aluminum frame with the integrated gutter round every zone: {q['beam_label']} front beam, {q['frame_label']} house, side" + (" and divider" if q["xs"] or q["ys"] else "") + " beams"
            + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else ""),
-           (f"House side: the beam hangs on the house wall on brackets at the soffit / roof line — no posts at the house"
+           ((f"House side: the beam bears on flashed stand-off brackets on the existing roof over the wall line, lagged into the rafters — no posts at the house"
+             if q["house_mount"] == "roof" else "House side: the beam hangs on brackets on the house wall under the soffit — no posts at the house"
+             if q["house_mount"] == "wall" else "House side: the beam hangs at the fascia line — no posts at the house")
             if q["attach"] == "house" else "Freestanding on posts at every corner"),
            f"{len(q['posts'])} {q['post'] * 12:g}x{q['post'] * 12:g} aluminum posts on base plates on the deck"
            + (f"; {'both are' if rail_posts == 2 else ('it is' if rail_posts == 1 else f'{rail_posts} are')} the rail post{'s' if rail_posts != 1 else ''} at the deck edge — the rail panels bracket into {'them' if rail_posts != 1 else 'it'}" if rail_posts else ""),
@@ -863,8 +915,11 @@ def sheet(L, S, t, meta) -> Optional[str]:
     surf = surfaces_of(L)
     q = resolve(roofs[0], surf)
     o: List[str] = []
-    x0, x1, y0, y1, w, h, p = q["x0"], q["x1"], q["y0"], q["y1"], q["w"], q["h"], q["post"]
+    x0, x1, y0, y1, p = q["x0"], q["x1"], q["y0"], q["y1"], q["post"]
+    w, wf, hf, wb, hb = q["w_b"], q["w_f"], q["h_f"], q["w_b"], q["h_b"]
+    h = max(hf, hb)
     zd, zt, zb = q["z_deck"], q["z_top"], q["z_bot"]
+    mount = q.get("house_mount") or "roof"
     BLACK, HOUSE, DECK = "#1d1d1f", FILL["house"], FILL["deck"]
     rp = RAIL_POST_INSET * IN
     front_posts = sorted([pt for pt in q["posts"] if pt["y"] > (y0 + y1) / 2], key=lambda pt: pt["x"])
@@ -914,9 +969,10 @@ def sheet(L, S, t, meta) -> Optional[str]:
         cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
         o.append(TH(X(cx_), Y(cy_) - 4, f"ZONE {zi + 1}", 8.4, 900, "middle", halo="#fff"))
         o.append(TH(X(cx_), Y(cy_) + 8, f"{c['n_blades']} blades · 1 motor blade (heavy line)", 6.6, 700, "middle", halo="#fff"))
-    o.append(TH(X(x0) + 8, Y(y0 + w) + 11, (f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house"
-                                             if q["attach"] == "house" else f"rear {q['beam_label']} beam"), 6.6, 700, halo="#fff"))
-    o.append(TH(X(x0) + 8, Y(y1 - w) - 6, f"front {q['beam_label']} beam, integrated gutter + LED strip all round", 6.6, 700, halo="#fff"))
+    o.append(TH(X(x0) + 8, Y(y0 + w) + 11, ((f"house-side {q['frame_label']} beam on stand-offs on the roof @ {BRACKET_OC_FT * 12:g}\" OC (roof-line mount) — no posts at the house"
+                                              if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC — no posts at the house")
+                                             if q["attach"] == "house" else f"rear {q['frame_label']} beam"), 6.6, 700, halo="#fff"))
+    o.append(TH(X(x0) + 8, Y(y1 - wf) - 6, f"front {q['beam_label']} beam on the 2 posts · {q['frame_label']} sides" + (" and divider" if q["xs"] else "") + " · gutter + LED strip all round", 6.6, 700, halo="#fff"))
     # dimensions: zones in the house band, the frame and post spans below, the depth at the right
     if len(q["zones"]) > 1 and q["louver_dir"] == "y":
         edges_ = [x0] + list(q["xs"]) + [x1]
@@ -943,53 +999,74 @@ def sheet(L, S, t, meta) -> Optional[str]:
 
     # ---------------------------------------------------------------- section A
     _panel(o, 584, 4, 402, 336, "A", "SECTION — HOUSE WALL, ROOF, DECK")
-    sy0, sy1 = y0 - 2.0, y1 + 4.8
+    sy0, sy1 = y0 - 2.4, y1 + 4.6
     z_lo, z_hi = zd - 3.2, zt + 3.4
     Xs, Zs, scs = elev_xform(sy0, sy1, z_lo, z_hi, 596, 26, 330, 304)
-    o.append(R(Xs(sy0), Zs(z_hi - 0.2), (y0 - sy0) * scs, (z_hi - 0.2 - z_lo) * scs, HOUSE, INK, 0.9))
-    o.append(T(Xs((sy0 + y0) / 2) + 3, Zs((zd + zb) / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
-    soff = 1.0
-    o.append(PG([(Xs(y0), Zs(zt + 0.04)), (Xs(y0 + soff), Zs(zt + 0.04)), (Xs(y0 + soff), Zs(zt + 0.6)), (Xs(y0), Zs(zt + 1.15))], "#cfc6b4", INK, 0.7))
-    yf = max((s_["y1"] for s_ in surf if abs(s_["z"] - zd) < 0.01 and s_["x0"] - 0.1 <= xa <= s_["x1"] + 0.1), default=y1)
+    z_sof = zd + max(6.67, q["clear_ft"] - 1.08)          # the existing soffit (research: about 7'-3" above the deck; field verify)
+    pitch = 4.0 / 12
+    eave_y = y0 + 1.5
+    z_eave = z_sof + 0.35
+    def roof_z(yy):
+        return z_eave + (eave_y - yy) * pitch
+    o.append(R(Xs(sy0), Zs(z_sof), (y0 - sy0) * scs, (z_sof - z_lo) * scs, HOUSE, INK, 0.9))
+    o.append(T(Xs((sy0 + y0) / 2) + 3, Zs((zd + z_sof) / 2), "HOUSE", 8, 900, "middle", MUTE, rot=-90))
+    o.append(PG([(Xs(sy0), Zs(roof_z(sy0))), (Xs(eave_y), Zs(z_eave)), (Xs(eave_y), Zs(z_sof)), (Xs(sy0), Zs(z_sof))], "#cfc6b4", INK, 0.7))
+    o.append(R(Xs(eave_y), Zs(z_eave + 0.05), 0.42 * scs, 0.45 * scs, "#9a948b", INK, 0.5))       # the existing gutter
+    yf = max((s_["y1"] for s_ in surf if abs(s_["z"] - zd) < 0.01 and s_["x0"] - 0.1 <= (x0 + x1) / 2 <= s_["x1"] + 0.1), default=y1 + q["edge_clear"])
     o.append(R(Xs(y0), Zs(zd), (yf - y0 + 0.08) * scs, 0.1 * scs, DECK, INK, 0.7))
     o.append(R(Xs(y0), Zs(zd - 0.1), (yf - y0) * scs, jd * scs, FILL["timber"], INK, 0.6))
     py = front_posts[0]["y"] if front_posts else y1 - p / 2
     o.append(R(Xs(py - 0.33), Zs(zd - 0.1 - jd), 0.67 * scs, (zd - 0.1 - jd - z_lo) * scs, FILL["timber"], INK, 0.6, 'stroke-dasharray="4 2" fill-opacity="0.5"'))
-    o.append(R(Xs(y0), Zs(zt), w * scs, h * scs, BLACK, INK, 0.5))
-    o.append(R(Xs(y1 - w), Zs(zt), w * scs, h * scs, BLACK, INK, 0.5))
-    o.append(R(Xs(y0), Zs(zb), 0.05 * scs + 1, 0.42 * scs, BLACK, INK, 0.3))
-    o.append(R(Xs(y0), Zs(zb), (w - 0.02) * scs, 0.04 * scs + 1, BLACK, INK, 0.3))
-    o.append(R(Xs(py - p / 2), Zs(zb), p * scs, (zb - zd) * scs, BLACK, INK, 0.5))
+    o.append(R(Xs(y0), Zs(zt), wb * scs, hb * scs, BLACK, INK, 0.5))
+    o.append(R(Xs(y1 - wf), Zs(zt), wf * scs, hf * scs, BLACK, INK, 0.5))
+    zbb = zt - hb
+    if q["attach"] == "house" and mount == "roof":           # stand-off brackets from the house roof up to the house beam
+        ys_ = y0 + wb / 2
+        o.append(R(Xs(ys_ - 0.08), Zs(zbb), 0.16 * scs, max(1.0, (zbb - roof_z(ys_)) * scs), BLACK, INK, 0.4))
+        o.append(LN(Xs(ys_ - 0.25), Zs(roof_z(ys_ - 0.25)), Xs(ys_ + 0.25), Zs(roof_z(ys_ + 0.25)), INK, 2.2))
+    elif q["attach"] == "house":
+        o.append(R(Xs(y0), Zs(zbb), 0.05 * scs + 1, 0.42 * scs, BLACK, INK, 0.3))
+        o.append(R(Xs(y0), Zs(zbb), (wb - 0.02) * scs, 0.04 * scs + 1, BLACK, INK, 0.3))
+    o.append(R(Xs(py - p / 2), Zs(zt - hf), p * scs, (zt - hf - zd) * scs, BLACK, INK, 0.5))
     o.append(R(Xs(py - q["plate"] / 2), Zs(zd + 0.05), q["plate"] * scs, 0.05 * scs + 1, "#555", INK, 0.4))
     ang = math.radians(q["angle_deg"])
     if q["louver_dir"] == "y":            # the blades run along the cut: the next blade seen lengthwise
         ext = abs(q["blade_w"] / 2 * math.sin(ang)) + q["blade_t"] / 2
-        o.append(R(Xs(y0 + w + 0.05), Zs(q["z_pivot"] + ext), (q["D"] - 2 * w - 0.1) * scs, 2 * ext * scs, "#77777c", INK, 0.4))
+        o.append(R(Xs(y0 + wb + 0.05), Zs(q["z_pivot"] + ext), (q["D"] - wb - wf - 0.1) * scs, 2 * ext * scs, "#77777c", INK, 0.4))
     else:                                  # the blades cut across, each at its angle
         for bl in [b for b in q["blades"] if b["zone"] == 0]:
             cy_, cz_ = bl["pivot"][1], bl["pivot"][2]
             pts_ = [(cy_ + u * math.cos(ang) - v * math.sin(ang), cz_ + u * math.sin(ang) + v * math.cos(ang)) for u, v in blade_profile(q["blade_w"], q["blade_t"])]
             o.append(PG([(Xs(a_), Zs(b_)) for a_, b_ in pts_], "#3c3c40", INK, 0.3))
     rh = float(spec.railing.height_in or 36.0) * IN          # the rail, cut at A: top rail, bottom rail, a baluster, the drink rail on top
-    o.append(R(Xs(py - 0.11), Zs(zd + rh), 0.22 * scs, 0.13 * scs, "#8a8a90", INK, 0.4))
-    o.append(R(Xs(py - 0.06), Zs(zd + 0.38), 0.12 * scs, 0.09 * scs, "#8a8a90", INK, 0.4))
-    o.append(R(Xs(py - 0.03), Zs(zd + rh - 0.13), 0.06 * scs, (rh - 0.13 - 0.38) * scs, "#8a8a90", INK, 0.3))
+    yr = yf - rp
+    o.append(R(Xs(yr - 0.11), Zs(zd + rh), 0.22 * scs, 0.13 * scs, "#8a8a90", INK, 0.4))
+    o.append(R(Xs(yr - 0.06), Zs(zd + 0.38), 0.12 * scs, 0.09 * scs, "#8a8a90", INK, 0.4))
+    o.append(R(Xs(yr - 0.03), Zs(zd + rh - 0.13), 0.06 * scs, (rh - 0.13 - 0.38) * scs, "#8a8a90", INK, 0.3))
     if spec.railing.drink_rail:
-        o.append(R(Xs(py - 0.23), Zs(zd + rh + 0.21), 0.46 * scs, 0.08 * scs, DECK, INK, 0.4))
+        o.append(R(Xs(yr - 0.23), Zs(zd + rh + 0.21), 0.46 * scs, 0.08 * scs, DECK, INK, 0.4))
+    for sc in q["screens"]:                # a front screen inboard of the rail: housing under the front beam, fabric to the deck
+        if sc["plane"] == "y":
+            c_ = sc["cassette"]
+            o.append(R(Xs(c_["y0"]), Zs(c_["z1"]), (c_["y1"] - c_["y0"]) * scs, (c_["z1"] - c_["z0"]) * scs, "#2c2c30", INK, 0.4))
+            o.append(LN(Xs(sc["line"]), Zs(c_["z0"]), Xs(sc["line"]), Zs(sc["z_bottom"] + 0.1), "#5b6e8c", 1.2, "3 2"))
     xr = 596 + 330 + 8
     dim_v(o, Zs, xr, zd, zb, f"{ftin((zb - zd) * 12)} clear", 7, left=False)
     dim_v(o, Zs, xr, zb, zt, f"{h * 12:g}\"", 6.2, left=False)
     dim_v(o, Zs, xr + 22, zd, zt, f"{ftin((zt - zd) * 12)} deck to top", 7, left=False)
-    dim_h(o, Xs, Zs(zt + 1.6), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
+    dim_h(o, Xs, Zs(zt + 1.75), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
     o.append(T(Xs(y1) + 8, Zs(zt) + 9, f"TOP OF FRAME {ftin(zt * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) - 4, f"DECK {ftin(zd * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) + 6, "above the patio" if zd > 3 else "above grade", 6.0, 600, "start", MUTE))
-    _lead(o, Xs(y0 + soff * 0.5), Zs(zt + 0.5), Xs(y0 + 1.6), Zs(zt + 2.9), "existing eave / soffit — field verify", 6.2)
-    _lead(o, Xs(y0 + 0.02), Zs(zb - 0.25), Xs(y0 + 0.9), Zs(zb - 1.15), f"house-side {q['beam_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing", 6.2)
-    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.6), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
-    _lead(o, Xs(py), Zs(zd + 2.6), Xs(y0 + 3.4), Zs(zd + 2.1), f"{p * 12:g}x{p * 12:g} aluminum post: the rail post, downspout inside", 6.2)
-    _lead(o, Xs(py - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.0), "rail (cut): the panels hang on wall-mount brackets in the post", 6.2)
-    _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "column / beam under the roof post (framing plan)", 6.2)
+    _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.4), Zs(zt + 3.0), "existing eave, gutter and soffit (~7'-3\" above the deck) — field verify", 6.2)
+    if q["attach"] == "house":
+        _lead(o, Xs(y0 + wb / 2), Zs(zbb - 0.12), Xs(y0 + 1.2), Zs(zb - 1.1),
+              (f"house-side {q['frame_label']} beam on flashed stand-offs @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters over solid blocking (roof-line mount)"
+               if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing"), 6.2)
+    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 2.9), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
+    _lead(o, Xs(py), Zs(zd + 2.6), Xs(y0 + 3.4), Zs(zd + 2.2), f"{p * 12:g}x{p * 12:g} aluminum post, {q['edge_clear'] * 12:g}\" inside the deck edge: the rail post, downspout inside", 6.2)
+    _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.0), "rail (cut) ends into the post on wall-mount brackets", 6.2)
+    _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck post + pier directly under the roof post (framing plan)", 6.2)
 
     # ---------------------------------------------------------------- detail 1: the post on the deck edge
     _panel(o, 584, 346, 402, 260, "1", "THE ROOF POST ON THE DECK EDGE — IT IS THE RAIL POST")
@@ -1033,22 +1110,25 @@ def sheet(L, S, t, meta) -> Optional[str]:
     def SX(v): return sx + v * k_
     def SZ(v): return sz - v * k_
     rp_in = rp * 12
+    pc_in = (q["edge_clear"] + p / 2) * 12        # the post centre, in from the frame face (its outer face edge_clear inside)
     o.append(T(SX(-30), 380, "SECTION", 6.6, 900, fill=MUTE))
     o.append(R(SX(-30), SZ(jd_in), 24.0 * k_, jd_in * k_, FILL["timber"], INK, 0.5, 'fill-opacity="0.55"'))
     o.append(R(SX(-6.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber_dk"], INK, 0.6))
     o.append(R(SX(-3.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber"], INK, 0.6))
     o.append(R(SX(0), SZ(jd_in + 1.0), 0.5 * k_ + 1, (jd_in + 1.0) * k_, DECK, INK, 0.5))
     o.append(R(SX(-30), SZ(zbase), 30.97 * k_, 1.0 * k_, DECK, INK, 0.6))
-    for bx in (-rp_in - pl_in / 2 + 0.9, -rp_in + pl_in / 2 - 0.9):
+    for bx in (-pc_in - pl_in / 2 + 0.9, -pc_in + pl_in / 2 - 0.9):
         o.append(LN(SX(bx), SZ(zbase + 0.6), SX(bx), SZ(zbase - jd_in * 0.8), INK, 1.4))
-    o.append(R(SX(-rp_in - pl_in / 2), SZ(zbase + 0.5), pl_in * k_, 0.5 * k_ + 1, "#555", INK, 0.5))
-    o.append(R(SX(-rp_in - p_in / 2), SZ(zbase + 28.0), p_in * k_, 27.5 * k_, BLACK, INK, 0.6))
+    o.append(R(SX(-pc_in - pl_in / 2), SZ(zbase + 0.5), pl_in * k_, 0.5 * k_ + 1, "#555", INK, 0.5))
+    o.append(R(SX(-pc_in - p_in / 2), SZ(zbase + 28.0), p_in * k_, 27.5 * k_, BLACK, INK, 0.6))
+    o.append(LN(SX(-rp_in), SZ(zbase + 30.0), SX(-rp_in), SZ(zbase + 1.0), GOLD, 1.2, "4 2"))
     o.append(T(SX(-18), SZ(jd_in / 2) + 2, "solid blocking", 5.8, 800, "middle"))
-    o.append(LN(SX(0), SZ(-2.4), SX(-rp_in), SZ(-2.4), INK, 0.6)); o.append(LN(SX(0), SZ(-1.4), SX(0), SZ(-3.4), INK, 0.6))
-    o.append(LN(SX(-rp_in), SZ(-1.4), SX(-rp_in), SZ(-3.4), INK, 0.6))
-    o.append(T(SX(-rp_in / 2), SZ(-2.4) + 9, f"{ftin(rp_in)}", 6.0, 800, "middle"))
-    _lead(o, SX(-rp_in), SZ(zbase + 20), SX(-29), SZ(zbase + 36), "post centre on the rail line, in from the frame face", 5.8)
-    _lead(o, SX(-rp_in + pl_in / 2 - 0.9), SZ(zbase - 3.0), SX(-29), SZ(zbase + 25), "through-bolts into the blocking", 5.8)
+    for d_, lab_, z_ in ((q["edge_clear"] * 12, f"{q['edge_clear'] * 12:g}\"", -2.4), (rp_in, f"{ftin(rp_in)} rail line", -6.0)):
+        o.append(LN(SX(0), SZ(z_), SX(-d_), SZ(z_), INK, 0.6)); o.append(LN(SX(0), SZ(z_ + 1.0), SX(0), SZ(z_ - 1.0), INK, 0.6))
+        o.append(LN(SX(-d_), SZ(z_ + 1.0), SX(-d_), SZ(z_ - 1.0), INK, 0.6))
+        o.append(T(SX(-d_) - 3, SZ(z_) + 3, lab_, 5.8, 800, "end"))
+    _lead(o, SX(-rp_in), SZ(zbase + 24), SX(-29), SZ(zbase + 36), "the rail line (gold) runs into the post: the panels end on its faces", 5.8)
+    _lead(o, SX(-pc_in + pl_in / 2 - 0.9), SZ(zbase - 3.0), SX(-29), SZ(zbase + 25), "through-bolts into the blocking; tie-down to the post below", 5.8)
 
     # ---------------------------------------------------------------- what it is
     _panel(o, 14, 346, 560, 260, "", "WHAT IT IS")

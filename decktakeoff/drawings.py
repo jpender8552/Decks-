@@ -236,8 +236,61 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
     return sheet("G-001", "General notes · design criteria", "Loads, codes, structure summary, sheet index, site — the permit-set cover", o, "No scale", meta)
 
 
+def sheet_general_notes(L, meta) -> Optional[str]:
+    """G-002: the job's numbered general notes (site.general_notes, or site.plan["general_notes"]) — the jurisdiction's
+    requirements the permit reviewer reads; None when the job has none."""
+    s = L.spec
+    notes = getattr(s.site, "general_notes", None) or (s.site.plan or {}).get("general_notes") or []
+    if not notes:
+        return None
+    o = [T(24, 24, "GENERAL NOTES", 9, 800, fill=GOLD)]
+    wrapped = [textwrap.wrap(str(n), 86) for n in notes]
+    half = sum(len(w) for w in wrapped) / 2
+    x, y, acc = 24, 44, 0
+    for i, w in enumerate(wrapped):
+        if x == 24 and acc > half and i > 0:
+            x, y = 512, 44
+        o.append(T(x, y, f"{i + 1}.", 8.4, 800, fill=GOLD))
+        for j, ln in enumerate(w):
+            o.append(T(x + 22, y + j * 11.5, ln, 8.2, 400))
+        y += 11.5 * len(w) + 7
+        acc += len(w)
+    return sheet("G-002", "General notes", "The jurisdiction's requirements for this work — read with G-001 and the details", o, "No scale", meta)
+
+
 def _design_criteria(L) -> List[Tuple[str, str]]:
-    """G-001's design-criteria rows (label, text) for the job: loads, wind, frost, soil, seismic, wildfire, codes, engineering."""
+    """G-001's design-criteria rows (label, text) for the job: loads, wind, frost, soil, seismic, wildfire, codes, engineering.
+    A louvered roof built into the set adds its roof-snow / dead-load / post-reaction wording; the job's own rows
+    (site.design_criteria, or site.plan["design_criteria"]: [[label, text], ...]) replace the engine's row of the same
+    label (matched on the words before any parenthesis) or are added."""
+    s = L.spec
+    rows = _design_criteria_engine(L)
+    if __import__("decktakeoff.louvered", fromlist=["has_roofs"]).has_roofs(s) and not (s.geometry.cover or s.geometry.covers):
+        out = []
+        for k, v in rows:
+            if k == "Dead load":
+                v += " · louvered roof dead load and post reactions per the roof engineer, carried on the deck posts and piers"
+            if k == "Design total":
+                v += " · the roof posts add snow + dead + wind uplift to the deck frame and piers (engineered)"
+            out.append((k, v))
+            if k == "Dead load":
+                out.append(("Roof snow (louvered roof)", f"{s.site.ground_snow_psf:g} psf non-reducible roof snow + sliding snow off the house roof and drift at the wall "
+                                                         "(ASCE 7-16 Ch. 7) — louvered roof, engineered"))
+        rows = out
+    own = getattr(s.site, "design_criteria", None) or (s.site.plan or {}).get("design_criteria") or []
+    if own:
+        key = lambda k: str(k).split(" (")[0].strip().lower()
+        rows = list(rows)
+        for lab, txt in own:
+            hit = next((i for i, (k, _) in enumerate(rows) if key(k) == key(lab)), None)
+            if hit is None:
+                rows.append((str(lab), str(txt)))
+            else:
+                rows[hit] = (str(lab), str(txt))
+    return rows
+
+
+def _design_criteria_engine(L) -> List[Tuple[str, str]]:
     s = L.spec
     cover = bool(s.geometry.cover or s.geometry.covers)
     crit = [("Deck live load", "40 psf uniform (IRC Table R301.5); guards 200 lb concentrated / 50 plf"),
@@ -262,7 +315,11 @@ def _design_criteria(L) -> List[Tuple[str, str]]:
 
 
 def _site_lines(s) -> List[str]:
-    """G-001's site lines: setbacks and the deck's distances to the lot lines, easements, the site notes."""
+    """G-001's site lines: setbacks and the deck's distances to the lot lines, easements, the site notes. The job's own
+    lines (site.site_lines, or site.plan["site_lines"]) replace the generated setback / easement lines."""
+    own = getattr(s.site, "site_lines", None) or (s.site.plan or {}).get("site_lines")
+    if own:
+        return [str(x) for x in own] + (textwrap.wrap(s.site.notes, 70) if s.site.notes else [])
     site = []
     if s.site.rear_setback_required_ft is not None or s.site.deck_to_rear_line_ft is not None:
         site.append(f"Rear / front lot line: deck edge {s.site.deck_to_rear_line_ft if s.site.deck_to_rear_line_ft is not None else '?'}' from the line, " + (f"{s.site.rear_setback_required_ft:g}' required" if s.site.rear_setback_required_ft is not None else "setback per the PUD — Planning to confirm (C-100)"))
@@ -1363,6 +1420,9 @@ def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: boo
     meta = sheet_meta(L, customer=customer)
     _STEEL["on"] = L.spec.framing.system == "steel"
     out = [("G-001", "General notes · design criteria", "")]              # built last, from the sheets actually in the set
+    gn = sheet_general_notes(L, meta)                                      # the job's own numbered notes, when it has them
+    if gn:
+        out.append(("G-002", "General notes", gn))
     site = sheet_site(L, S, t, meta)
     if site:
         out.append(("C-100", "Site plan", site))
@@ -2750,7 +2810,7 @@ def sheet_notes_composite(CL, S, t, flags, meta, levels, steps, index) -> str:
     groups = [g for g in _stair_groups(S, levels) if not g.option]
     struct = [("Footings", f"{n_ft} " + (f"Diamond Pier {CL.frame.footing_model}" if fr.footing_type == "diamond_pier" else fr.footing_type.replace("_", " ") + " footings")
                            + " — " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)),
-              ("Posts", f"{fr.post_size} {post_words(s)} on {post_base_sku(s)}: " + " · ".join(f"{_lv_word(lv)} " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)),
+              ("Posts", f"{fr.post_size} {post_words(s)} on {_post_base_name(s, t)} bases: " + " · ".join(f"{_lv_word(lv)} " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)),
               ("Beams", f"{len(bls)} {' / '.join(sorted({b.kind for b in bls}))} beam lines, {' / '.join(sorted({b.size + ' ' + b.species for b in bls}))}, {n_ft} posts"
                         + (f" (worst {worst:,.0f} lb)" if worst else "") + " — " + "; ".join(f"{_lv_word(lv)} " + ", ".join(b.short for b in lv.beams) for lv in levels if lv.beams) + " (S-100 / S-101)"),
               ("Joists", t.summary.get("joists", "")), ("Rims", t.summary.get("rims", "")), ("Ledger", ms.get("Ledger", "—"))]
@@ -3057,7 +3117,7 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
     _level_tags(o, X, Y, levels)
     ft = CL.frame
     desc = {"caisson": f"{int(ft.footing_dia_in)}\" drilled caisson x {ftin(ft.footing_depth_in)} + 6\" above grade, (4) #4 verticals + #3 ties, 5/8\" x 8\" cast-in anchor",
-            "diamond_pier": f"Diamond Pier {ft.footing_model}: precast head + 4 driven pins, no excavation; {post_base_sku(s)} base on the pier bolt",
+            "diamond_pier": f"Diamond Pier {ft.footing_model}: precast head + 4 driven pins, no excavation; {_post_base_name(s, CL.parts[0].takeoff)} base on the pier bolt",
             "concrete": f"{int(ft.footing_dia_in)}\" concrete pier x {ftin(ft.footing_depth_in)}, wet-set standoff base",
             "existing": "Existing caissons stay — verify plumb, bearing and condition (engineer)"}[s.framing.footing_type]
     y0 = 384
@@ -3079,7 +3139,7 @@ def sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=None) -> st
             yy += 10.4
     notes = [("#", "FOUNDATION NOTES"),
              "x from the deck's left end, y from the main rear wall toward the yard (the plan frame of every sheet).",
-             f"Post = top of the {post_base_sku(s)} base to the beam seat — field-measure each to the string line before cutting.",
+             f"Post = top of the post base to the beam seat — field-measure each to the string line before cutting.",
              f"{len(rows)} footings: " + " · ".join(f"{_lv_word(lv)} {sum(len(b.posts) for b in lv.beams) + len(lv.eps)}" for lv in levels)
              + (f" · stairs {sum(1 for r in rows if r.kind == 'stair')}" if any(r.kind == "stair" for r in rows) else ""),
              f"Frost {ftin(s.site.frost_depth_in)} · soil {s.site.soil_bearing_psf:,.0f} psf presumptive · worst post {max((r.load or 0) for r in rows):,.0f} lb."]
@@ -3396,7 +3456,7 @@ def sheet_elevations_composite(CL, S, t, levels, steps, meta) -> str:
                 p_ = sorted(posts, key=lambda b: b.x0)[len(posts) // 2]
                 ax_, ay_ = to_sheet(((p_.x0 + p_.x1) / 2, p_.y1, p_.z0 + (p_.z1 - p_.z0) * 0.3))
                 o.append(LN(ax_, ay_, ax_ + 18, gy + 14, INK, 0.5)); o.append(C(ax_, ay_, 1.4, INK, "none", 0))
-                o.append(TH(ax_ + 20, gy + 17, f"{n_} {s.framing.post_size} {post_words(s)} columns on {post_base_sku(s)} bases + Diamond Piers"
+                o.append(TH(ax_ + 20, gy + 17, f"{n_} {s.framing.post_size} {post_words(s)} columns on {_post_base_name(s, t)} bases + Diamond Piers"
                             if s.framing.footing_type == "diamond_pier" else f"{n_} {s.framing.post_size} {post_words(s)} columns", 6.6, 700))
     if steps:
         lo, hi = steps[0][0], steps[0][1]
@@ -3549,7 +3609,7 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
         items.append((*at(q[0], 0.5, 0.45), f"{s.framing.post_size} {post_words(s)} column"))
     q = [b for b in cutA if b.kind == "footing"] or [b for d, b in beyA if b.kind == "footing"]
     if q:
-        items.append((*at(q[0], 0.5, 1.0), f"Diamond Pier {CL.frame.footing_model} + {post_base_sku(s)}" if s.framing.footing_type == "diamond_pier" else "Footing"))
+        items.append((*at(q[0], 0.5, 1.0), f"Diamond Pier {CL.frame.footing_model} + {_post_base_name(s, t)} base" if s.framing.footing_type == "diamond_pier" else "Footing"))
     q = [b for b in cutA if b.kind in ("toprail", "drink") and b.z0 < hi.top]
     if q:
         items.append((*at(q[0], 0.5, 1.0), f"{rail_name(s.railing.system)} {s.railing.height_in:g}\"" + (" + drink rail" if s.railing.drink_rail else "")))
@@ -3643,6 +3703,64 @@ def sheet_section_composite(CL, S, t, levels, steps, meta) -> str:
                  "Sections · from the model · not to a common scale · dimensions govern", meta)
 
 
+def _post_base_name(s, t) -> str:
+    """The post base the order carries: its Simpson SKU, or 'custom standoff' for a made-to-order base (a rough 8x8 on a
+    Diamond Pier); post_base_sku() when the order has no base line."""
+    for l in getattr(t, "lines", None) or []:
+        if l.category == "Footings" and "base" in l.item.lower():
+            sku = getattr(l, "sku", "") or ""
+            return sku if re.match(r"^[A-Z]{2,}\d", sku) else "custom standoff"
+    return post_base_sku(s)
+
+
+def _composite_key(CL, S, t) -> list:
+    """member_key for a composite deck, worded for what this job carries: the field fastener as ordered (Cortex face screws +
+    plugs are not hidden fasteners), the post base the order carries, the step skirt and the lights when the model has them."""
+    s = CL.spec
+    base, std = _post_base_name(s, t), post_base_sku(s)
+    cortex = (s.decking.fastener_system or "").lower().startswith("cortex")
+    out = []
+    for lab, pred, where, pick in member_key(CL, S, t):
+        if cortex and lab.endswith("field decking, hidden fasteners"):
+            lab = lab.replace("hidden fasteners", "Cortex face screws + color-matched plugs")
+        if base != std:
+            lab = lab.replace(f"{_a(std)} {std} standoff base", f"a {base} base").replace(std, base)
+        out.append((lab, pred, where, pick))
+    skirt = lambda b: (b.kind == "skirt" or "skirt" in (b.tag or "")) and "stair skirt" not in (b.tag or "")
+    out.append((f"Step skirt — {s.decking.collection} {s.decking.fascia_color or s.decking.color} fascia boards installed vertically", skirt, (0.5, 0.5, 0.5), "mid"))
+    out.append(("LED riser lights + post-cap lights, low voltage", lambda b: b.kind == "light", (0.5, 0.5, 0.5), "mid"))
+    return [k for k in out if any(k[1](b) for b in S.boxes)]
+
+
+def sheet_iso_assembled_composite(CL, S, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind not in ("ground", "glass", "stringer")]     # closed risers hide the stringers
+    fit = [b for b in bx if not _house(b)]
+    hidden = ("post", "beam", "joist", "rim", "ledger", "block", "gravel", "stepbase", "sheath", "underlay")
+    key = [k for k in _composite_key(CL, S, t) if not any(k[1](b) for b in S.boxes if b.kind in hidden)]
+    return _axo_sheet("A-002", "Isometric — assembled, labeled", "Both levels, everything you see: piers, columns, decking, picture frame, step skirt, stair, rail", CL, S, t, meta, bx,
+                      fit=fit, key=key, note="House shown for context only (the deck work only). The frame under the decking is called out on S-102 and A-003.")
+
+
+def sheet_iso_exploded_composite(CL, S, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind not in ("ground", "glass") and not _house(b)]
+    sub = ("Both levels, each build layer lifted in order: piers · posts · beams · frame · decking" + (" · stair" if any(b.kind in ("tread", "stringer") for b in bx) else "")
+           + (" · rail" if CL.rail else ""))
+    return _axo_sheet("A-003", "Isometric — exploded, labeled", sub, CL, S, t, meta, bx, explode=True, az=35, el=24, key=_composite_key(CL, S, t),
+                      note="Layers lifted in build order. Lifts are for clarity only; every member returns straight down to its place.")
+
+
+def sheet_iso_structure_composite(CL, S, t, meta) -> str:
+    bx = [b for b in S.boxes if b.kind in ("footing", "base", "post", "brace", "cap", "beam", "joist", "rim", "ledger", "block", "stringer", "gravel", "header", "doubler")]
+    key = [k for k in _composite_key(CL, S, t) if any(k[1](b) for b in bx)]
+    kinds = {b.kind for p in CL.parts for b in p.layout.beam_lines}
+    items = " ".join(ln.item.lower() for ln in getattr(t, "lines", []))
+    note = ("Decking, rail and house removed to show the frame of both levels, each on its own posts and beams. Joists hang from the ledgers in face-mount hangers"
+            + ("; they bear on the drop beams with H2.5AZ ties" if "drop" in kinds else "") + ("; joists hang on both faces of the flush beams" if "flush" in kinds else "")
+            + ("; double rims in concealed-flange hangers" if "concealed" in items else "") + ".")
+    return _axo_sheet("S-102", "Structure isometric — frame, labeled", "Both levels: piers, post bases, columns, beams, joists, rims, ledgers, blocking, the stair stringers",
+                      CL, S, t, meta, bx, az=-32, el=32, key=key, note=note)
+
+
 def _panel_level_change(o, note, CL, levels, steps):
     """D-501 panel 6 for a two-level deck: the step between the levels in section — the lower deck's border and rim, the upper
     level's rim on its own posts, the skirt boards over it from deck to deck on furring, the picture frame nosing over the skirt."""
@@ -3708,15 +3826,15 @@ def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool
     if want("A-100"):
         out.append(("A-100", "Dimension plan — inches", sheet_dimensions_composite(CL, S, levels, steps, meta, boxes_all=allb)))
     if want("A-002"):
-        out.append(("A-002", "Isometric — assembled, labeled", sheet_iso_assembled(CL, S, t, meta)))
+        out.append(("A-002", "Isometric — assembled, labeled", sheet_iso_assembled_composite(CL, S, t, meta)))
     if want("A-003"):
-        out.append(("A-003", "Isometric — exploded, labeled", sheet_iso_exploded(CL, S, t, meta)))
+        out.append(("A-003", "Isometric — exploded, labeled", sheet_iso_exploded_composite(CL, S, t, meta)))
     if want("S-100"):
         out.append(("S-100", "Foundation plan", sheet_foundation_composite(CL, S, levels, steps, meta, boxes_all=allb)))
     if want("S-101"):
         out.append(("S-101", "Framing plan", sheet_framing_composite(CL, S, t, levels, steps, meta)))
     if want("S-102"):
-        out.append(("S-102", "Structure isometric, labeled", sheet_iso_structure(CL, S, t, meta)))
+        out.append(("S-102", "Structure isometric, labeled", sheet_iso_structure_composite(CL, S, t, meta)))
     if want("A-101"):
         out.append(("A-101", "Decking plan", sheet_decking_composite(CL, S, t, levels, steps, meta)))
     if want("A-201") and CL.rail:

@@ -388,12 +388,13 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
         return f"combinations {m:#x}"
     groups: Dict[str, int] = {}
     mism = []
+    lab2key = {labels.get(n, n): n for n in names}
     for b, m in union.values():
         g = describe(m)
         groups[g] = groups.get(g, 0) + 1
-        lo = _layer_option(b)
-        if lo and not g.startswith(f"option:{lo}") and len(mism) < 12:
-            mism.append(f"{b.kind} {b.tag[:60]!r}: layer says {lo}, the specs say {g}")
+        n_lo = lab2key.get(_layer_option(b))      # a box the engine marks as an option's must show only with that option on
+        if n_lo is not None and m & ~with_(n_lo) and len(mism) < 12:
+            mism.append(f"{b.kind} {b.tag[:60]!r}: layer says {labels.get(n_lo, n_lo)}, the specs say {g}")
     stats["groups"] = dict(sorted(groups.items(), key=lambda kv: -kv[1]))
     if mism:
         stats["warnings"].append("engine option layers vs spec diffs: " + "; ".join(mism))
@@ -450,7 +451,7 @@ def configurator_data(spec_base, options: Optional[Dict[str, object]] = None, *,
     # ---- frame, region, cameras
     parts = _parts_of(L0)
     sm = getattr(spec0.geometry, "site_model", None)
-    if sm and sm.get("grade"):
+    if sm and sm.get("grade") and any((b.layer or "") == "site" for b, _m in union.values()):     # the yard is drawn: stand on it
         try:
             from .landscape import grade_at
             grade = lambda x, y: float(grade_at(sm, x, y))
@@ -1171,8 +1172,8 @@ function applySun() {
 function applyGlow() {
   var lit = NIGHT;
   FXU.fxGain.value = lit;
-  LED_M.forEach(function (m) { m.emissiveIntensity = 0.15 + 5.5 * lit; });
-  GLASS_M.forEach(function (m) { m.emissiveIntensity = 0.9 * lit; m.opacity = m.userData.op0 + (Math.min(0.9, m.userData.op0 + 0.55) - m.userData.op0) * lit; });
+  LED_M.forEach(function (m) { m.emissiveIntensity = 0.1 + 2.6 * lit; });
+  GLASS_M.forEach(function (m) { m.emissiveIntensity = 0.5 * lit; m.opacity = m.userData.op0 + (Math.min(0.92, m.userData.op0 + 0.6) - m.userData.op0) * lit; });
   if (HALO) HALO.material.uniforms.uGlow.value = lit;
 }
 

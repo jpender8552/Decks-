@@ -610,10 +610,16 @@ def _screens_basis(rr: dict) -> str:
     """How the roof's screens are priced, for the internal set: the owner's price, or the louvered engine's placeholder rate."""
     scr = rr.get("screens") or []
     lf = sum(float(x.get("width_ft") or 0) for x in scr)
-    rates = sorted({float(x.get("rate_per_lf") or 0) for x in scr if x.get("rate_per_lf")})
     est = any(x.get("estimate") for x in scr)
-    rate = (f"${rates[0]:,.0f}/LF x {lf:.1f} LF of screen" if len(rates) == 1 else f"{lf:.1f} LF of screen")
-    return (f"ESTIMATE — the louvered engine's placeholder {rate}; the owner has not set this price" if est else f"set on the roof: {rate}")
+    what = f"{len(scr)} screen{'s' if len(scr) != 1 else ''}, {lf:.1f} LF (" + ", ".join(f"{x.get('side')} ${float(x.get('sell') or 0):,.0f}" for x in scr) + ")"
+    if not est:
+        return f"set on the roof: {what}"
+    try:
+        from .louvered import SCREEN_EST
+        rule = " + ".join(f"{k.replace('_', ' ')} ${float(v):,.0f}" for k, v in SCREEN_EST.items())
+    except Exception:
+        rule = "louvered.py"
+    return f"ESTIMATE — the louvered engine's placeholder ({rule}): {what}; the owner has not set this price"
 
 
 def _viewer_link(url: str, note: Optional[str] = None) -> str:
@@ -1062,6 +1068,13 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if facts.get("what"):
         w("<ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in facts["what"]) + "</ul>")
     w("<h3>This roof</h3><ul class='opt-scope'>" + "".join(f"<li>{E(x)}</li>" for x in _roof_scope(q, rp)) + "</ul>")
+    # ---- controls, motor, gutters, lights (the product, with what it is: page 2 of the PDF)
+    groups = [("Controls and motor", facts.get("controls")), ("Gutters and drainage", facts.get("gutters")), ("Lights", facts.get("lights") if q["lights"] else None),
+              ("Sensors and add-ons Suncoast offers", facts.get("accessories"))]
+    groups = [(h_, v_) for h_, v_ in groups if v_]
+    if groups:
+        w('<h2 class="kicker" id="g-controls">Controls, motor, gutters, lights</h2><div class="facts-cols">'
+          + "".join(f"<div><h3>{E(h_)}</h3><ul>" + "".join(f"<li>{E(x)}</li>" for x in v_) + "</ul></div>" for h_, v_ in groups) + "</div>")
     # ---- size and placement
     under = sorted({f"{b[0]} {b[1]}" for b in _plan_boxes(L) if min(q["x1"], b[3]) - max(q["x0"], b[2]) > 0.5 and min(q["y1"], b[5]) - max(q["y0"], b[4]) > 0.5})
     w('<h2 class="kicker pb" id="g-size">Size and placement <span class="tag">plan · house at the top</span></h2>')
@@ -1084,13 +1097,6 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
         st.append(("Under the posts", over))
     st += [(k, v) for k, v in (facts.get("structure_rows") or [])]
     w('<dl class="reads levels">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in st) + "</dl>")
-    # ---- controls, motor, gutters, lights
-    groups = [("Controls and motor", facts.get("controls")), ("Gutters and drainage", facts.get("gutters")), ("Lights", facts.get("lights") if q["lights"] else None),
-              ("Sensors and add-ons Suncoast offers", facts.get("accessories"))]
-    groups = [(h_, v_) for h_, v_ in groups if v_]
-    if groups:
-        w('<h2 class="kicker" id="g-controls">Controls, motor, gutters, lights</h2><div class="facts-cols">'
-          + "".join(f"<div><h3>{E(h_)}</h3><ul>" + "".join(f"<li>{E(x)}</li>" for x in v_) + "</ul></div>" for h_, v_ in groups) + "</div>")
     # ---- the screens add-on
     if has_screens:
         figs = _render_figs(dict(renders=sa.get("renders") or sorted(n_ for n_ in have if n_.startswith("screens-")), renders_dir=sa.get("renders_dir") or str(rd)),

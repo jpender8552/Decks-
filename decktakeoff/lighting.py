@@ -596,34 +596,57 @@ def with_lights(spec, on: bool = True, **cfg):
     return DeckSpec.from_dict(d)
 
 
+def _terms(spec, check: float) -> Tuple[float, float, float]:
+    """(check, financed, monthly) for a set price — pricing.fixed_terms when it is there (financed / 0.93 or x the job's markup)."""
+    try:
+        from .pricing import fixed_terms
+        return fixed_terms(spec, check)
+    except ImportError:
+        from .catalog import PRICEBOOK
+        retail = round(check / PRICEBOOK["retail_factor"])
+        r, n = PRICEBOOK["finance_rate"] / 12, PRICEBOOK["finance_years"] * 12
+        return round(check), retail, retail * r / (1 - (1 + r) ** -n)
+
+
 def option_price(spec, **cfg) -> dict:
     """The lighting option on this spec: the whole installed difference of the spec with the lights against it without
-    (materials + labor at the job margin; check, financed, monthly, cost), and the counts."""
+    (check, financed, monthly; cost = the work delta). With extras.lights.sell_each the option sells at that price per light
+    (risers + posts), financed and monthly as usual; otherwise materials + labor at the job margin. Plus the counts."""
     from . import run
     off = with_lights(spec, on=False)
     on = with_lights(spec, on=True, **cfg)
     t0, _, p0 = run(off)
     t1, _, p1 = run(on)
-    try:
-        from .pricing import option_delta
-        check, retail, monthly = option_delta(p0, p1)
-    except ImportError:
-        check, retail, monthly = p1.sell - p0.sell, p1.retail - p0.retail, p1.monthly - p0.monthly
     plan = getattr(t1, "lighting", None)
-    return dict(check=round(check), financed=round(retail), monthly=round(monthly, 2), cost=round(p1.work - p0.work, 2),
+    each = plan.cfg.get("sell_each") if plan is not None else None
+    if each:
+        check, retail, monthly = _terms(on, float(each) * plan.fixtures)
+    else:
+        try:
+            from .pricing import option_delta
+            check, retail, monthly = option_delta(p0, p1)
+        except ImportError:
+            check, retail, monthly = p1.sell - p0.sell, p1.retail - p0.retail, p1.monthly - p0.monthly
+    cost = round(p1.work - p0.work, 2)
+    return dict(check=round(check), financed=round(retail), monthly=round(monthly, 2), cost=cost,
+                gm=round(1 - cost / check, 4) if check else 0.0, sell_each=each, fixtures=plan.fixtures if plan else 0,
                 materials=round(sum(l.ext for l in t1.lines if l.category == CATEGORY), 2),
                 labor=round(sum(e for i, q, u, r, e in p1.labor_lines if i.startswith("Lighting")), 2),
-                risers=plan.n_riser if plan else 0, caps=plan.n_cap if plan else 0, load_w=plan.load_w if plan else 0.0,
-                transformers=list(plan.transformers) if plan else [], wire_lf=plan.wire_lf if plan else 0,
+                risers=plan.n_riser if plan else 0, caps=plan.n_cap if plan else 0, post_kind=plan.post_kind if plan else "",
+                load_w=plan.load_w if plan else 0.0, transformers=list(plan.transformers) if plan else [], wire_lf=plan.wire_lf if plan else 0,
                 words=words(plan) if plan else "", lines=[l for l in t1.lines if l.category == CATEGORY])
 
 
 def stair_addon(base_spec, with_stair_spec, **cfg) -> dict:
     """The extra for the lights when another option (the yard stair) is also chosen: the lighting option on the spec with
-    that option, less the lighting option on the base."""
+    that option, less the lighting option on the base (with sell_each: sell_each x the stair's lights, financed as usual)."""
     a, b = option_price(base_spec, **cfg), option_price(with_stair_spec, **cfg)
-    return dict({k: round(b[k] - a[k], 2) for k in ("check", "financed", "monthly", "cost", "materials", "labor", "risers", "caps", "load_w", "wire_lf")},
-                base=a, with_stair=b)
+    out = {k: round(b[k] - a[k], 2) for k in ("check", "financed", "monthly", "cost", "materials", "labor", "risers", "caps", "fixtures", "load_w", "wire_lf")}
+    if a.get("sell_each") and b.get("sell_each"):
+        out["check"], out["financed"], out["monthly"] = _terms(with_lights(with_stair_spec, on=True, **cfg), out["check"])
+        out["monthly"] = round(out["monthly"], 2)
+    out["gm"] = round(1 - out["cost"] / out["check"], 4) if out["check"] else 0.0
+    return dict(out, base=a, with_stair=b)
 
 
 # ================================================================== 3D: fixture boxes on the finished stair and rail boxes
@@ -638,22 +661,28 @@ def _kelvin_hex(k: float) -> str:
 
 
 def materials(spec) -> Dict[str, dict]:
-    """led_riser / led_cap: the lenses — `color` is the daylight lens colour (the WebGL viewer), `emission` + `emission_strength`
-    (W/m², a physical estimate to tune at render) and `lumens` light them at night; led_housing: the riser faceplates (the
-    post-cap collar and top use the rail's own railmetal: the cap comes in the rail's finish)."""
+    """led_riser / led_cap / led_accent: the lenses — `color` is the daylight lens colour (the WebGL viewer), `emission` +
+    `emission_strength` (W/m², a physical estimate to tune at render) and `lumens` light them at night; led_housing: the riser
+    faceplates (the post-cap collar and top and the accent light's housing use the rail's own railmetal: they come in the rail's
+    finish). Only the post light the job uses is listed (led_cap or led_accent)."""
     cfg = lights_of(spec)
     if cfg is None:
         return {}
     k = float(cfg.get("kelvin", 2700))
     glow = _kelvin_hex(k)
-    rp, cp = product(cfg, cfg["riser_sku"]), product(cfg, cfg["cap_sku"])
-    return dict(
+    rp, pp = product(cfg, cfg["riser_sku"]), product(cfg, post_sku(spec, cfg))
+    out = dict(
         led_riser=dict(color="#fff0d8", rough=0.25, emission=glow, emission_strength=60.0, kelvin=k, watts=rp.get("watts", 2.0), lumens=50,
                        light="riser", label=f"{rp['desc']} — lens"),
-        led_cap=dict(color="#fff2de", rough=0.3, emission=glow, emission_strength=30.0, kelvin=k, watts=cp.get("watts", 4.0), lumens=100,
-                     light="post_cap", label=f"{cp['desc']} — lens"),
         led_housing=dict(color="#141416", metal=0.55, rough=0.5, label="matte black powder-coat (riser light faceplates)"),
     )
+    if post_fixture(spec, cfg) == "accent":       # a 1 W accent light washing down the post face onto the deck
+        out["led_accent"] = dict(color="#fff2de", rough=0.3, emission=glow, emission_strength=40.0, kelvin=k, watts=pp.get("watts", 1.0), lumens=30,
+                                 light="accent", aim="down", label=f"{pp['desc']} — lens")
+    else:
+        out["led_cap"] = dict(color="#fff2de", rough=0.3, emission=glow, emission_strength=30.0, kelvin=k, watts=pp.get("watts", 3.0), lumens=100,
+                              light="post_cap", label=f"{pp['desc']} — lens")
+    return out
 
 
 def _covers(q, x: float, y: float) -> bool:
@@ -664,6 +693,39 @@ def _covers(q, x: float, y: float) -> bool:
         u, v = (x - cx) * c - (y - cy) * s, (x - cx) * s + (y - cy) * c
         return abs(u) <= (q.x1 - q.x0) / 2 + 1e-6 and abs(v) <= (q.y1 - q.y0) / 2 + 1e-6
     return q.x0 - 1e-6 <= x <= q.x1 + 1e-6 and q.y0 - 1e-6 <= y <= q.y1 + 1e-6
+
+
+def _post_inward(p, rails, walk) -> Tuple[str, int]:
+    """(axis, +1 / -1): the face of a rail post that looks onto what it guards — the deck, the stair, the landing. The rail line
+    through the post (its balusters and rails) gives the axis it runs along; the face is across it, on the side where a walking
+    surface (deck board, tread) lies at the post's foot."""
+    cx, cy, pw = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, max(p.x1 - p.x0, p.y1 - p.y0)
+    votes = {"x": 0.0, "y": 0.0}
+    for q in rails:
+        qx, qy = (q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2
+        if q.z1 < p.z0 - 0.2 or q.z0 > p.z1 + 0.4:
+            continue
+        if q.kind == "baluster":
+            dx, dy = qx - cx, qy - cy
+            if 0.1 < math.hypot(dx, dy) < 1.6:
+                votes["x" if abs(dx) > abs(dy) else "y"] += 1.0
+        else:
+            along_x = (q.x1 - q.x0) >= (q.y1 - q.y0)
+            if along_x and q.y0 - 0.3 <= cy <= q.y1 + 0.3 and q.x0 - 0.3 <= cx <= q.x1 + 0.3:
+                votes["x"] += 3.0
+            elif not along_x and q.x0 - 0.3 <= cx <= q.x1 + 0.3 and q.y0 - 0.3 <= cy <= q.y1 + 0.3:
+                votes["y"] += 3.0
+    run = "x" if votes["x"] >= votes["y"] else "y"
+    ax = "y" if run == "x" else "x"
+    def hits(sg):                       # walking surface on that side: at the post's own level counts double (a notch's guard
+        n = 0                           # faces the deck it stands on, not the stair below it)
+        for dist in (pw / 2 + 0.6, pw / 2 + 1.5, pw / 2 + 2.5):
+            px, py = (cx + sg * dist, cy) if ax == "x" else (cx, cy + sg * dist)
+            zs = [q.z1 for q in walk if q.x0 <= px <= q.x1 and q.y0 <= py <= q.y1 and p.z0 - 1.5 <= q.z1 <= p.z0 + 0.8]
+            n += (2 if any(abs(z - p.z0) < 0.15 for z in zs) else 1) if zs else 0
+        return n
+    hp, hm = hits(1), hits(-1)
+    return ax, (1 if hp >= hm else -1)
 
 
 def _overlap(a0, a1, b0, b1, tol=0.0) -> bool:
@@ -756,6 +818,29 @@ def scene_lights(boxes: list, spec) -> list:
         every = max(1, int(cfg.get("every") or 1))
         if every > 1:
             posts = sorted(posts, key=lambda q: (round(q.y0, 1), q.x0))[::every]
+        if post_fixture(spec, cfg) == "accent":
+            # a drink rail over the posts: no caps — a small accent light on the post's face toward the deck (the stair, the
+            # landing), its top 2" below the post top (just under the drink rail; the panels hang off the side faces), a lens low on
+            # its face washing down onto the deck; housing in the rail's finish
+            ap = product(cfg, cfg["accent_sku"])
+            aw, ad, ah = [v * IN for v in ap.get("size_in", (1.625, 0.75, 4.25))]
+            lw, lh = [v * IN for v in ap.get("lens_in", (1.0, 1.25))]
+            rails = [b for b in boxes if b.kind in ("baluster", "toprail", "botrail", "drink", "cable") and (not b.rot or b.rot_axis in ("x", "y"))]
+            walk = [b for b in boxes if b.kind in ("board", "border", "tread")]
+            for p in posts:
+                ax, sg = _post_inward(p, rails, walk)
+                cx, cy = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2
+                face = (p.x1 if sg > 0 else p.x0) if ax == "x" else (p.y1 if sg > 0 else p.y0)
+                zt_ = p.z1 - 2.0 * IN
+                zl = zt_ - ah + 0.5 * IN                                # the lens: low on the face
+                for kind, mat, w_, t0, t1, z0, z1, what in (("fixture", "railmetal", aw, face - sg * 0.01, face + sg * ad, zt_ - ah, zt_, "accent light housing"),
+                                                             ("light", "led_accent", lw, face + sg * (ad - 0.01), face + sg * (ad + 0.03 * IN), zl, zl + lh, "accent light")):
+                    a0, a1 = sorted((t0, t1))
+                    if ax == "x":
+                        out.append(Box(kind, a0, a1, cy - w_ / 2, cy + w_ / 2, z0, z1, mat, 7, tag=f"{opt}: {what}"))
+                    else:
+                        out.append(Box(kind, cx - w_ / 2, cx + w_ / 2, a0, a1, z0, z1, mat, 7, tag=f"{opt}: {what}"))
+            return out
         for p in posts:
             cx, cy, pw = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, max(p.x1 - p.x0, p.y1 - p.y0)
             top, seen = p.z1, set()

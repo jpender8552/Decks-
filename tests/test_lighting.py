@@ -94,3 +94,39 @@ def test_option_delta_and_stair_addon():
                                             "rails": 2, "name": "Stair to the yard"}]
     add = lighting.stair_addon(base, DeckSpec.from_dict(d))
     assert add["risers"] > 0 and add["caps"] > 0 and add["check"] > 0
+
+
+def test_drink_rail_over_the_posts_takes_accent_lights():
+    """A drink rail OVER the posts leaves no post caps: each post light is a small accent light on the post's deck side, just
+    below the drink rail (railing.drink_rail_mount "over", or extras.lights.post_light "accent")."""
+    d = copy.deepcopy(TWO)
+    d["railing"]["drink_rail_mount"] = "over"
+    spec = lit(d, post_light="accent")
+    t, _, p = run(spec)
+    pl = t.lighting
+    assert pl.post_kind == "accent" and lighting.post_fixture(spec, pl.cfg) == "accent"
+    skus = {l.sku for l in lighting_lines(t)}
+    assert "AZTIXLEDACCB" in skus and "AZTDL3X3LANCAPB" not in skus
+    assert pl.cap_w == 1.0 and pl.load_w == pl.n_riser * 2.0 + pl.n_cap * 1.0
+    sc = build_scene(t.layout)
+    acc = [b for b in sc.boxes if b.mat == "led_accent"]
+    posts = [b for b in sc.boxes if b.kind == "railpost"]
+    assert len(acc) == len(posts) and not [b for b in sc.boxes if b.mat == "led_cap"]
+    for b in acc:                                     # on a side face of its post, below the post top, tagged for the option
+        cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+        q = min(posts, key=lambda q: abs((q.x0 + q.x1) / 2 - cx) + abs((q.y0 + q.y1) / 2 - cy))
+        assert (b.x0 >= q.x1 - 0.05 or b.x1 <= q.x0 + 0.05 or b.y0 >= q.y1 - 0.05 or b.y1 <= q.y0 + 0.05) and b.z1 < q.z1
+        assert b.tag.endswith("Lighting option: accent light")
+    assert "led_accent" in sc.materials and "led_cap" not in sc.materials
+
+
+def test_sell_each_prices_the_lights_per_light():
+    """extras.lights.sell_each: the lights sell at that price each, installed; the rest of the job keeps its margin."""
+    t0, _, p0 = run(DeckSpec.from_dict(TWO))
+    t1, _, p1 = run(lit(TWO, sell_each=200))
+    n = t1.lighting.fixtures
+    assert abs((p1.sell - p0.sell) - 200 * n) <= 1
+    assert dict(p1.allocation)[lighting.short_words(t1.lighting)] == 200 * n
+    assert abs(p1.light_sell - 200 * n) < 0.01 and p1.light_work > 0
+    a = lighting.option_price(DeckSpec.from_dict(TWO), sell_each=200)
+    assert a["check"] == 200 * a["fixtures"] and a["financed"] > a["check"]

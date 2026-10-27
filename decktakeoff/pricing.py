@@ -100,7 +100,9 @@ def option_delta(base: "Pricing", other: "Pricing") -> Tuple[float, float, float
     way price_options prices extras.options on that deck."""
     if not getattr(base, "per_sf", 0.0):
         return other.sell - base.sell, other.retail - base.retail, other.monthly - base.monthly
-    check = round((other.work - base.work) / (1 - base.options_gm))
+    ls_ = getattr(other, "light_sell", 0.0) - getattr(base, "light_sell", 0.0)          # lights at their set price each (extras.lights.sell_each)
+    lw_ = getattr(other, "light_work", 0.0) - getattr(base, "light_work", 0.0)
+    check = round((other.work - base.work - lw_) / (1 - base.options_gm) + ls_)
     retail = round(check / PRICEBOOK["retail_factor"])
     return check, retail, _monthly(retail)
 
@@ -384,14 +386,16 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     for cat, label, n, sv in bsell:
         builtin_work += sum(l.ext for l in t.lines if l.category == cat) * factor * (1 + rate)
         builtin_work += sum(e for i, q, u, r_, e in labor_lines if i.startswith(label))
-    sell = round((work - rail_work - builtin_work) / (1 - gm) + rail_sell + builtin_sell + gc)
-    sell_floor = round((work - rail_work - builtin_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + gc)
+    # lights the owner prices per light, installed (extras.lights.sell_each): they sell at that price; their work comes off the margin base
+    light_sell, light_work = __import__("decktakeoff.lighting", fromlist=["fixed_sell"]).fixed_sell(t, labor_lines, factor, rate)
+    sell = round((work - rail_work - builtin_work - light_work) / (1 - gm) + rail_sell + builtin_sell + light_sell + gc)
+    sell_floor = round((work - rail_work - builtin_work - light_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + light_sell + gc)
     gm_base = gm
     # an owner-set sell: sell_override (the price), else extras.sell_per_sf (the price per deck SF x the deck's SF); either way the
     # allocation scales to it and the margin is what that price carries
     psf = None if s.extras.sell_override else sell_per_sf_rule(s)
     set_sell = s.extras.sell_override or (round(psf[0] * L.deck_sf) if psf else None)
-    if (rail_sell or builtin_sell) and not set_sell:
+    if (rail_sell or builtin_sell or light_sell) and not set_sell:
         gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
     if set_sell:
         sell = round(float(set_sell))
@@ -409,7 +413,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if rail_sell and not set_sell else gm))
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell) and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
@@ -488,6 +492,11 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         pr.rail_note = " · ".join(f"{n} {('bench section' if c == 'Benches' else 'planter')}{'s' if n > 1 else ''} at ${sv / n:,.0f} (${sv:,.0f})" for c, _l, n, sv in bsell)
     if rail_sell and not set_sell:
         pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f})" + (" · " + pr.rail_note if getattr(pr, 'rail_note', '') else "") + f", everything else at {gm_base:.1%} GM"
+    pr.light_sell, pr.light_work = light_sell, light_work      # attributes (option_delta, price_options): the lights at their set price
+    if light_sell and not set_sell:
+        _lp = t.lighting
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"{_lp.fixtures} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "
+                        f"their cost ${light_work:,.0f}, {1 - light_work / light_sell:.0%} margin)" + ("" if rail_sell else f", everything else at {gm_base:.1%} GM"))
     if with_options and s.extras.options:
         pr.options = price_options(t, pr, pr.options_gm)
     return pr
@@ -513,6 +522,7 @@ def price_options(t: Takeoff, base: Pricing, gm: float) -> List[OptionPrice]:
     base_dict["extras"]["options"] = []
     for o in t.spec.extras.options:
         dcost = 0.0
+        lset = (0.0, 0.0)            # (sell, work) of lights the option adds at their set price each
         note = o.note
         if o.changes:
             try:
@@ -520,10 +530,11 @@ def price_options(t: Takeoff, base: Pricing, gm: float) -> List[OptionPrice]:
                 t2 = build_takeoff(sp2)
                 p2 = price(t2, gm=gm, tax_rate=base.tax_rate, with_options=False)
                 dcost += p2.work - base.work
+                lset = (getattr(p2, "light_sell", 0.0) - getattr(base, "light_sell", 0.0), getattr(p2, "light_work", 0.0) - getattr(base, "light_work", 0.0))
             except Exception as e:  # an option that can't be built is reported, never silently dropped
                 note = (note + "; " if note else "") + f"could not price change: {e}"
         if o.cost:
             dcost += o.cost
-        check = round(dcost / (1 - gm))
+        check = round((dcost - lset[1]) / (1 - gm) + lset[0])     # lights at their set price each (none: dcost / (1 - GM) as always)
         out.append(OptionPrice(o.name, round(check / pb["retail_factor"]), check, round(dcost, 2), note))
     return out

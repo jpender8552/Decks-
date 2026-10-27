@@ -135,6 +135,63 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
     return DeckSpec.from_dict(d)
 
 
+def _stair_foot(p: "Part", st) -> Optional[Tuple[float, float]]:
+    """Where a single-flight stair of part p lands: a plan point (global feet) 6" past its bottom riser, centred on its width."""
+    L = p.layout
+    run = st.geo.total_run_in
+    if getattr(st, "inset", False) and st.notch:
+        nt = st.notch
+        along = nt["out"] - nt["sgn"] * (nt.get("skirt_t", 0.0) + 6.0)
+        across = (nt["lo"] + nt["hi"]) / 2
+        x, y = (along, across) if nt["axis"] == "x" else (across, along)
+        return p.placement.pt(x / 12.0, y / 12.0)
+    if len(st.geo.flights) > 1 or not L.zones:
+        return None
+    side, a0, w = st.side, st.opening.start_in, st.width
+    if side in ("left", "end:left"):
+        z = L.zones[0]; x, y = z.x0 - run - 6.0, z.wall_y + a0 + w / 2
+    elif side in ("right", "end:right"):
+        z = L.zones[-1]; x, y = z.x0 + z.W + run + 6.0, z.wall_y + a0 + w / 2
+    elif side == "front" or side.startswith("front:"):
+        zn = side.split(":")[1] if ":" in side else None
+        z = next((q for q in L.zones if q.name == zn), L.zones[0]); x, y = z.x0 + a0 + w / 2, z.wall_y + z.D + run + 6.0
+    elif side.startswith("edge:") and getattr(L, "outline_edges", None):
+        e = next((q for q in L.outline_edges if q.name == side), None)
+        if e is None:
+            return None
+        ln = e.length or 1.0
+        ux, uy = (e.x1 - e.x0) / ln, (e.y1 - e.y0) / ln
+        nx, ny = -uy, ux                                   # outward: the outline runs clockwise
+        t_ = a0 + w / 2
+        x, y = e.x0 + ux * t_ + nx * (run + 6.0), e.y0 + uy * t_ + ny * (run + 6.0)
+    else:
+        return None
+    return p.placement.pt(x / 12.0, y / 12.0)
+
+
+def _stair_landings(parts: List["Part"]) -> None:
+    """A "deck" stair whose foot falls on another part, at that part's height, lands on it: StairLayout.lands_on names that
+    part, and the stair then draws no stand-in boards under its foot (they would z-fight with the part's own decking)."""
+    for p in parts:
+        for st in p.layout.stairs:
+            if st.landing != "deck":
+                continue
+            foot = _stair_foot(p, st)
+            if foot is None:
+                continue
+            z_low = p.spec.geometry.height_in - st.geo.total_rise_in
+            for q in parts:
+                if q is p or abs(q.spec.geometry.height_in - z_low) > 6.0:
+                    continue
+                for z in q.layout.zones:
+                    x0, x1, y0, y1 = q.placement.box(z.x0 / 12, (z.x0 + z.W) / 12, z.wall_y / 12, (z.wall_y + z.D) / 12)
+                    if x0 - 0.25 <= foot[0] <= x1 + 0.25 and y0 - 0.25 <= foot[1] <= y1 + 0.25:
+                        st.lands_on = q.name
+                        break
+                if getattr(st, "lands_on", ""):
+                    break
+
+
 def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
     parts: List[Part] = []
     for pd in spec.geometry.parts:
@@ -144,6 +201,7 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
         pl = Placement(**{k: float(v) for k, v in pd.get("placement", {}).items() if k in ("xx", "xy", "yx", "yy")},
                        ox=float(pd.get("placement", {}).get("origin", [0, 0])[0]), oy=float(pd.get("placement", {}).get("origin", [0, 0])[1]))
         parts.append(Part(pd["name"], sub, t, f, pl))
+    _stair_landings(parts)          # a stair from one level onto another: no stand-in boards under its foot
     # ---- merge the orders: same category + item -> one line, quantities summed, reasons joined
     merged: "OrderedDict[Tuple[str, str], Line]" = OrderedDict()
     for p in parts:

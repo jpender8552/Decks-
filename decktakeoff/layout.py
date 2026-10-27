@@ -766,13 +766,15 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
             p0, p1 = a + RP, b - RP          # post pocket sits inside the rail section, never in the opening
             p0 = max(RP, min(p0, end - RP)); p1 = max(RP, min(p1, end - RP))
             # louvered-roof posts on this run's post line (louvered.rail_points): fixed rail posts; one within 14" of an end takes it
-            roof_t = {}
+            roof_t, roof_id = {}, {}
             if fixed_pts:
                 (ax_, ay_), (bx_, by_) = to_xy(0.0), to_xy(1.0)
                 for fp in fixed_pts:
                     t_ = (fp[0] - ax_) * (bx_ - ax_) + (fp[1] - ay_) * (by_ - ay_)
-                    if abs((fp[0] - ax_) * (by_ - ay_) - (fp[1] - ay_) * (bx_ - ax_)) < 1.0 and p0 - 14 <= t_ <= p1 + 14:
-                        roof_t[round(t_, 3)] = float(fp[2]) if len(fp) > 2 else 6.0
+                    w_ = float(fp[2]) if len(fp) > 2 else 6.0
+                    if abs((fp[0] - ax_) * (by_ - ay_) - (fp[1] - ay_) * (bx_ - ax_)) <= w_ / 2 + 0.01 and p0 - 14 <= t_ <= p1 + 14:
+                        roof_t[round(t_, 3)] = w_
+                        roof_id[round(t_, 3)] = (round(fp[0], 1), round(fp[1], 1))
                 for t_ in sorted(roof_t):
                     if abs(t_ - p0) <= 14:
                         p0 = t_
@@ -797,8 +799,9 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
             for i, s in enumerate(xs):
                 kind = k0 if i == 0 else k1 if i == n else "LINE"
                 pp_ = add_post(*to_xy(s), kind, f"{side} {i+1}")
-                if any(abs(s - t_) < 0.6 for t_ in roof_t):
-                    pp_.roof = True
+                hit = [t_ for t_ in roof_t if abs(s - t_) < 0.6]
+                if hit:
+                    pp_.roof = roof_id[hit[0]]
             rail_lf += (b - a)
 
     if "left" in r.sides:
@@ -907,11 +910,13 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
             p1 = (t_last if (t_last is not None and b > L - 0.5) else b - RP)
             # louvered-roof posts on this run's post line (louvered.rail_points): each is a fixed rail post, one within 14" of
             # a segment end takes that end's place; a divider post within 24" of one is dropped (the roof post is the post there)
-            roof_t = {}
+            roof_t, roof_id = {}, {}
             for fp in (fixed_pts or []):
                 t_ = (fp[0] - e.x0) * ux + (fp[1] - e.y0) * uy
-                if abs((fp[0] - e.x0) * nx + (fp[1] - e.y0) * ny - RP) < 1.0 and p0 - 14 <= t_ <= p1 + 14:
-                    roof_t[round(t_, 3)] = float(fp[2]) if len(fp) > 2 else 6.0
+                w_ = float(fp[2]) if len(fp) > 2 else 6.0
+                if abs((fp[0] - e.x0) * nx + (fp[1] - e.y0) * ny - RP) <= w_ / 2 + 0.01 and p0 - 14 <= t_ <= p1 + 14:
+                    roof_t[round(t_, 3)] = w_
+                    roof_id[round(t_, 3)] = (round(fp[0], 1), round(fp[1], 1))
             for t_ in sorted(roof_t):
                 if abs(t_ - p0) <= 14:
                     p0 = t_
@@ -934,8 +939,9 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
             for i, t in enumerate(ts):
                 kind = "END" if i in (0, len(ts) - 1) else "LINE"
                 placed.append(add_post(e.x0 + ux * t + nx * RP, e.y0 + uy * t + ny * RP, kind, f"{e.name} {i + 1}"))
-                if any(abs(t - t_) < 0.6 for t_ in roof_t):
-                    placed[-1].roof = True
+                hit = [t_ for t_ in roof_t if abs(t - t_) < 0.6]
+                if hit:
+                    placed[-1].roof = roof_id[hit[0]]      # which roof post (x, y): two runs ending in one corner post name the same one
             for (fa, fb), (pa, pb) in zip(zip(ts, ts[1:]), zip(placed, placed[1:])):
                 ctc = fb - fa
                 cut = ctc - post_w - 2 * allow - sum((w_ - post_w) / 2 for t_, w_ in roof_t.items() if min(abs(t_ - fa), abs(t_ - fb)) < 0.6)

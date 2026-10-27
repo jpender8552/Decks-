@@ -873,7 +873,7 @@ def build_scene(L) -> Scene:
                         sb_("joist", ua + 1.5 * IN, ub - 1.5 * IN, v - 0.75 * IN, v + 0.75 * IN, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
                 sb_("stepbase", 0.0, n_t * run, va_, vb_, zb0 - 0.36, zb0 - 0.04, "gravel", 1, tag=f"box step base {tag_}")
             else:
-                nst = max(2, st.stringers)
+                nst = max(2, st.stringers) if n_t else 0     # a single riser down onto a landing needs no stringers
                 for i in range(nst):
                     v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (nst - 1)
                     zc = z_top_edge - (depth / 2) / math.cos(theta)
@@ -1105,7 +1105,7 @@ def build_scene(L) -> Scene:
                 cur_u0 = world(cur_dir, cur_u0, trun + ld)
             land_rects += rects
             z_land = z_next
-            if st.landing_rail_lf and frails[fi]:
+            if st.landing_rail_lf and (frails[fi] or (fi + 1 < len(frails) and frails[fi + 1])):
                 landing_guard(rects, z_next, openings)
             z_cur = z_next
         if getattr(st, "option", ""):

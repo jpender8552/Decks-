@@ -229,7 +229,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     posts and ledger named and placed in the deck's frame (x from its left end, y out from the main rear wall — the frame of
     the S-100 schedule), the level change, every part's stairs and the step skirt, the lights when the job has them."""
     import re as _re
-    from .drawings import _comp_levels, _step_faces, _merged_schedule
+    from .drawings import _comp_levels, _step_faces, _merged_schedule, _post_base_name
     from .takeoff import inches_frac
     s = L.spec
     timber = s.is_timber
@@ -265,8 +265,9 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     seat = {frozenset({"drop"}): "the joist bottom (drop beams)", frozenset({"flush"}): "the joist top (flush beams)"}.get(frozenset(kinds), "the joist bottom (drop beam) or the joist top (flush beam)")
     plen = " · ".join(f"{lw(lv)} " + ", ".join(b.short for b in lv.beams) + " " + " / ".join(sorted({ftin(b.post_len) for b in lv.beams})) for lv in levels if lv.beams)
     steps.append(dict(n=2, code="T-401", title="Posts", still="step2",
-        goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item) + items(lambda l: "post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item),
-        how=[f"{s.framing.post_size} {post_words(s)} posts on the {post_base_sku(s)} bases, cut so the beam top lands at {seat}: {plen} — field-measure each"
+        goes_in=items(lambda l: l.category == "Lumber" and s.framing.post_size in l.item)
+                + items(lambda l: not l.item.startswith("Diamond Pier") and ("post base" in l.item.lower() or "anchor" in l.item.lower() or "to the edge posts" in l.item)),
+        how=[f"{s.framing.post_size} {post_words(s)} posts on the {_post_base_name(s, t)} bases, cut so the beam top lands at {seat}: {plen} — field-measure each"
              + (f"; the {lw(hi)}'s posts stand {inch(rise)} taller than the {lw(lo)}'s." if faces else "."),
              "Plumb both ways, brace, then the caps go on with the beams."]
             + ([f"Knee braces: 4x4 at 45°, {ftin(s.framing.knee_leg_in)} legs, both directions at every post; 1/2\" through-bolt each end."] if s.framing.knee_braces else [])
@@ -298,7 +299,8 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     js = s.framing.joist_size
     ztxt = "; ".join(f"{z.name}: {len(z.z.frame.joist_x)} joists @ {z.z.frame.spacing:g}\" OC x {ftin(z.z.frame.joist_len)}" for lv in levels for z in lv.zones)
     stairs = [(p, ss, sl) for p in L.parts for ss, sl in zip(p.spec.stairs or [], p.layout.stairs or []) if not getattr(ss, "option", "")]
-    notch = [f"the notch for {ss.name or 'the stair'} in the {p.name.lower()}" for p, ss, sl in stairs if getattr(ss, "inset", False) or str(sl.side).startswith("edge:")]
+    low1 = lambda w: (w[0].lower() + w[1:]) if w.lower().startswith(("stair", "box step")) else w
+    notch = [f"the notch for the {low1(ss.name or 'stair')} in the {p.name.lower()}" for p, ss, sl in stairs if getattr(ss, "inset", False) or str(sl.side).startswith("edge:")]
     fhow = [f"Ledgers: {ms.get('Ledger', 'per the schedule')}.",
             f"{ztxt}. Crown up, hangers at the ledger" + (", both faces of the flush beam" if "flush" in kinds else "") + "."]
     if faces:
@@ -351,7 +353,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
         steps.append(dict(n=8, code="T-407", title=("Stairs and the step skirt" if faces and stairs else "The step skirt" if faces else "Stairs"), still="yard",
             goes_in=items(lambda l: (l.category == "Lumber" and any(k in (l.why or "") for k in ("stair", "box step", "skirt")))
                           or (l.category == "Stairs" and "door step" not in l.item.lower()) or (l.category == "Hardware" and ("stair" in l.item.lower() or "box step" in l.item.lower()))
-                          or "skirt" in l.item.lower() or "furring" in l.item.lower(), 14),
+                          or (l.category in ("Fascia", "Stairs", "Lumber") and ("skirt" in l.item.lower() or "furring" in l.item.lower())), 14),
             how=shw,
             check=["Risers within 3/8\" of each other; treads level, nosings straight", "Skirt boards plumb, gaps even, 1/2\" off the lower decking" if faces else "Landing at the bottom firm and level, 36\" deep",
                    "Plugs set flush"]))

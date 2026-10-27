@@ -179,6 +179,9 @@ table.optsum tr.total td { border-top:1px solid rgba(244,242,236,.5); font-weigh
   .optblock figure img { max-height:2.45in; object-fit:cover; }
   .opt-addon { break-inside:avoid; page-break-inside:avoid; }
   .v3d-link { break-inside:avoid; page-break-inside:avoid; }
+  .facts-cols > div { break-inside:avoid; page-break-inside:avoid; }
+  .facts-cols, .opt-scope { font-size:12.5px; }
+  .plan-fig { break-inside:avoid; page-break-inside:avoid; }
 }
 </style>"""
 
