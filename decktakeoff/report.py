@@ -280,8 +280,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     lt = lights_of(t)
     if lt["total"]:
         _tr = lt["transformer"].lower()
+        _pl, _pw = post_light_terms(t)
         w("| Lighting | " + " and ".join(x for x in ((f"{lt['riser']} LED riser lights (one in every riser)" if lt["riser"] else ""),
-                                                    (f"{lt['post_cap']} LED post-cap lights (one on every rail post)" if lt["post_cap"] else ""),
+                                                    (f"{lt['post_cap']} LED {_pl} ({_pw})" if lt["post_cap"] else ""),
                                                     (f"{lt['other']} more LED lights" if lt["other"] else "")) if x)
           + (("; low voltage, on a transformer" + (" with a photocell and timer" if "photo" in _tr and "timer" in _tr else
                                                      (" with a photocell" if "photo" in _tr else (" with a timer" if "timer" in _tr else "")))) if lt["transformer"] else "") + ". |")
@@ -431,6 +432,20 @@ def lights_of(t) -> dict:
     return out
 
 
+def post_light_terms(t) -> tuple:
+    """How the post lights read on this job: (plural label, where) — "post accent lights", "on the deck side of every rail post,
+    just below the drink rail" when the drink rail runs over the posts (no caps), else "post-cap lights", "on top of every rail
+    post" — from the lighting plan (lighting.post_label / post_where)."""
+    plan = getattr(t, "lighting", None)
+    if plan is not None:
+        try:
+            from .lighting import post_label, post_where
+            return post_label(plan), post_where(plan)
+        except Exception:
+            pass
+    return "post-cap lights", "on top of every rail post"
+
+
 def stair_words(ss, st, composite: bool = False) -> str:
     """One stair as the homeowner reads it: risers, width, flights and landings, where it lands; an inset stair and its skirt."""
     from .takeoff import inches_frac
@@ -529,7 +544,7 @@ def _schedule(t: Takeoff) -> List[str]:
                     + (", the vertical boards on the face between the levels" if step_face_words(t) else "") + "."); d += 1
     lt = lights_of(t)
     if lt["total"]:
-        days.append(f"Day {d+1} — low-voltage lighting: " + " and ".join(x for x in (("riser lights" if lt["riser"] else ""), ("post-cap lights" if lt["post_cap"] else ""),
+        days.append(f"Day {d+1} — low-voltage lighting: " + " and ".join(x for x in (("riser lights" if lt["riser"] else ""), (post_light_terms(t)[0] if lt["post_cap"] else ""),
                                                                                      ("deck lights" if lt["other"] else "")) if x)
                     + (" wired to the transformer" if lt["transformer"] else "") + "."); d += 1
     nb = len(s.geometry.benches or []); npl = len(s.geometry.planters or [])

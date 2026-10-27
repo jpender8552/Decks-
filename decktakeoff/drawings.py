@@ -3462,7 +3462,7 @@ def sheet_elevations_composite(CL, S, t, levels, steps, meta) -> str:
         lo, hi = steps[0][0], steps[0][1]
         o.append(T(20, 334, f"STEP FACE — seen from the {lo.name.lower()} ({inch(hi.h_in - lo.h_in)} up)", 9, 800, fill=GOLD))
         groups = [g for g in _stair_groups(S, levels) if not g.option]
-        _step_face_view(o, (20, 336, 600, 196), levels, steps, groups, bx, cols, s)
+        _step_face_view(o, (20, 336, 600, 196), levels, steps, groups, bx, cols, s, t)
     notes = [" · ".join(f"{lv.name}: surface {ftin(lv.h_in)} above grade" for lv in levels),
              "Heights AFG = above finished grade at the beam line; field-verify grade before setting the piers",
              f"Deck frame: {s.framing.joist_size} {s.framing.joist_grade} @ {CL.frame.spacing:g}\" OC on {sum(len(lv.beams) for lv in levels)} "
@@ -3477,7 +3477,7 @@ def sheet_elevations_composite(CL, S, t, levels, steps, meta) -> str:
                  "Elevations · orthographic · not to scale · heights govern", meta)
 
 
-def _step_face_view(o, fr, levels, steps, groups, bx, cols, s):
+def _step_face_view(o, fr, levels, steps, groups, bx, cols, s, t=None):
     """The step face from the lower level: the skirt, the stair (cut into the upper level or off its face), the upper rail."""
     from .axo import View, draw
     lo, hi = steps[0][0], steps[0][1]

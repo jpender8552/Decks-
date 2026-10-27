@@ -1155,7 +1155,7 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
 
 
 # ================================================================== inset stairs: the notch, its framing, the step-face skirt
-NOTCH_POST_OFFSET = 1.0      # notch posts stand 1" in from the face the notch is cut in (clear of the lower level's fascia and board nose)
+NOTCH_POST = "4x4"           # the inset-stair notch's corner posts (PT, on the stair base ledger; structure.md §5.2: 4x4 or 4x6)
 SKIRT_GAP_BOTTOM = 0.25      # step-skirt panels stand 1/4" off the lower level's boards
 SKIRT_GAP_TREAD = 0.125      # cheek panels stand 1/8" off the treads they meet
 
@@ -1340,8 +1340,9 @@ def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
                 run_ = (nt["depth"] + fas_t - r_t) / max(1, geo_.treads)
                 if not eng.TREAD_MIN <= run_ <= tread_w + 1.0:
                     run_ = tread_w
-                a_c = nt["out"] + nt["sgn"] * (NOTCH_POST_OFFSET + pb / 2)
-                nts.append((nt, run_, geo_.riser_in, r_t, geo_.treads, [notch_pt(nt, a_c, nt["lo"] - pb / 2), notch_pt(nt, a_c, nt["hi"] + pb / 2)]))
+                pbn, pdn = actual(NOTCH_POST)
+                a_c = nt["out"] + nt["sgn"] * pbn / 2
+                nts.append((nt, run_, geo_.riser_in, r_t, geo_.treads, [notch_pt(nt, a_c, nt["lo"] - pdn / 2), notch_pt(nt, a_c, nt["hi"] + pdn / 2)]))
     edges = {e.name: e for e in outline_poly_edges(spec)}
     names = list(sk.get("edges") or [])
     if not names:
@@ -1558,20 +1559,23 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         if sl.handrail == "each flight":
             sl.handrail_lf = round(sum(math.hypot(fg.run_in, fg.rise_in - geo.riser_in) for fg, r_ in zip(geo.flights, frails) if r_) / 12.0, 1)
         if nt is not None:
-            pb = actual(spec.framing.post_size)[0]
-            a_c = nt["out"] + nt["sgn"] * (NOTCH_POST_OFFSET + pb / 2)          # the notch posts' and the foot carrier's line
-            standoff = {"diamond_pier": DP_STANDOFF, "concrete": CONC_STANDOFF, "caisson": CAISSON_STANDOFF, "existing": CAISSON_STANDOFF}.get(spec.framing.footing_type, CONC_STANDOFF)
-            post_len = max(6.0, spec.geometry.height_in - f["thick"] - actual(spec.framing.joist_size)[1] - standoff)
-            sl.inset, sl.notch_posts, sl.notch_post_len = True, 2, round(post_len, 1)
-            sl.notch = dict(nt, post_line=a_c, posts=[notch_pt(nt, a_c, nt["lo"] - pb / 2), notch_pt(nt, a_c, nt["hi"] + pb / 2)],
-                            skirt_t=skirt_t, riser_t=r_t, run=geo.tread_in, carrier_len=round(nt["width"], 2), carrier_top=-(rise + f["thick"]))
+            # structure.md §5.2: the header ends and the stringer heels come down onto the lower level's rim — a doubled PT 2x6 stair
+            # base ledger through-bolted to its upper-level face, top flush with it, and two short PT posts on that ledger under the
+            # header / rim corners. No new footings (the walk-out slab is below).
+            pb, pd = actual(NOTCH_POST)
+            jd_ = actual(spec.framing.joist_size)[1]
+            a_c = nt["out"] + nt["sgn"] * pb / 2                                 # the posts' centre line, on the base ledger
+            sl.inset, sl.notch_posts, sl.notch_post_len = True, 2, round(rise - jd_, 2)    # base ledger top (lower joist tops) to the header bottom
+            sl.notch = dict(nt, post_size=NOTCH_POST, post_line=a_c, posts=[notch_pt(nt, a_c, nt["lo"] - pd / 2), notch_pt(nt, a_c, nt["hi"] + pd / 2)],
+                            skirt_t=skirt_t, riser_t=r_t, run=geo.tread_in, ledger_lo=nt["lo"] - 6.0, ledger_hi=nt["hi"] + 6.0,
+                            ledger_top=-(rise + f["thick"]), ledger_bolts=int(math.ceil((nt["width"] + 12.0) / 12.0)) + 1)
             if sl.handrail in ("guard posts", ""):
                 sl.handrail = "guard posts"
                 fg = geo.flights[0]
                 sl.handrail_lf = round(math.hypot(fg.run_in + r_t, fg.rise_in - geo.riser_in) / 12.0, 1)
-            sl.notes += [f"inset in the {ftin(nt['width'])} x {ftin(nt['depth'])} notch on {s.side}: the stringers hang on the trimmer at the top riser (LSCZ) and bear on a "
-                         f"(2){spec.framing.joist_size} carrier at the foot, hung between {sl.notch_posts} {spec.framing.post_size} posts at the notch's outer corners "
-                         f"(they carry the header ends too), each on a footing; the cheeks are clad in the step skirt, the deck's picture-frame board is the top nosing"]
+            sl.notes += [f"inset in the {ftin(nt['width'])} x {ftin(nt['depth'])} notch on {s.side}: the stringers hang on the trimmer at the top riser (LSCZ) and their heels "
+                         f"bear on a (2)2x6 PT stair base ledger through-bolted to the lower level's rim; {NOTCH_POST} PT posts ({ftin(sl.notch_post_len)}) on that ledger carry "
+                         f"the header ends (structure.md §5.2); the cheeks are clad in the step skirt, the deck's picture-frame board is the top nosing"]
             if geo.handrail_required:
                 sl.notes.append(f"graspable handrail on the {sl.handrail_side} going down, bracketed to the deck guard's posts along that cheek, 34–38\" over the nosings, "
                                 f"top riser to bottom riser ({sl.handrail_lf:g}' of rail)")

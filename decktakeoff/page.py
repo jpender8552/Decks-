@@ -353,7 +353,8 @@ def _reads_levels(t, L, sm):
         reads.append(("Step face", step_face_words(t)))
     lt = lights_of(t)
     if lt["total"]:
-        reads.append(("Lighting", ", ".join(x for x in ((f"{lt['riser']} riser lights" if lt["riser"] else ""), (f"{lt['post_cap']} post-cap lights" if lt["post_cap"] else ""),
+        from .report import post_light_terms
+        reads.append(("Lighting", ", ".join(x for x in ((f"{lt['riser']} riser lights" if lt["riser"] else ""), (f"{lt['post_cap']} {post_light_terms(t)[0]}" if lt["post_cap"] else ""),
                                                         (f"{lt['other']} more" if lt["other"] else "")) if x) + " · LED, low voltage"))
     n_p = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or L.n_footings
     found = f"{n_p} Diamond Pier foundations" if s.framing.footing_type == "diamond_pier" else sm["posts"].split(" on ")[-1]

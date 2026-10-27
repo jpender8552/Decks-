@@ -218,7 +218,10 @@ def _lighting_step(t: Takeoff) -> Optional[dict]:
         if getattr(plan, "n_riser", 0):
             how.append(f"{plan.n_riser} riser lights: cut each riser board for the housing before it goes on; the lead behind the riser to the run.")
         if getattr(plan, "n_cap", 0):
-            how.append(f"{plan.n_cap} post-cap lights: the lead down inside the post to the run under the deck; the light takes the post's cap.")
+            from .lighting import post_label, post_where
+            how.append(f"{post_label(plan, plan.n_cap)} {post_where(plan)}: " + (
+                "a 3/8\" wire hole behind each light, the lead down inside the post to the run under the deck, two #8 x 3/4\" screws."
+                if getattr(plan, "post_kind", "cap") == "accent" else "the lead down inside the post to the run under the deck; the light takes the post's cap."))
     how.append("Splices in silicone-filled wire nuts; test every run before the skirt and fascia close it in.")
     return dict(n=9, code="T-408", title="Lights", still="yard", goes_in=[f"({l.net:g}) {l.item}" for l in lt][:8], how=how,
                 check=["Every light on at dusk and off on the timer", "No open splice; cable stapled clear of every decking screw", "Transformer on a GFCI outlet with an in-use cover"])
