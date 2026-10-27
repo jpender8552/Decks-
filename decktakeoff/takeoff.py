@@ -169,6 +169,11 @@ def pack_boards(pieces: List[Tuple[str, float]], stocks=(16, 20), kerf: float = 
     """Pack deck-board pieces (label, length) first-fit-decreasing into the longest stock, then relabel each board
     with the shortest stock that holds it. Returns {stock_ft: [[pieces in board], ...]}."""
     cap = max(stocks) * 12
+    split = []
+    for label, L in pieces:             # a piece longer than the longest stock is two (or more) boards, joined over a bearing point
+        n = int(math.ceil(L / (cap - kerf))) if L > cap else 1
+        split += [(f"{label} ({i + 1} of {n})" if n > 1 else label, L / n) for i in range(n)]
+    pieces = split
     bins: List[List[Tuple[str, float]]] = []
     for label, L in sorted(pieces, key=lambda t: -t[1]):
         L = min(L, cap)
@@ -1561,7 +1566,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         stairs=[f"{stair_name(ss, s_)}: {s_.geo.risers} risers @ {inches_frac(s_.geo.riser_in)}, {s_.geo.treads} tread{'s' if s_.geo.treads != 1 else ''}, "
                 + (f"framed box, no stringers" if getattr(s_, 'build', '') == 'box' else f"{s_.stringers} stringers") + (", fascia skirts" if getattr(s_, 'skirts', False) and getattr(s_, 'build', '') != 'box' else "")
                 + f", {ftin(s_.width)} wide"
-                + (" — " + " + ".join(f"{fg.risers} risers" for fg in s_.geo.flights) + f" ({ss.turn})" if len(s_.geo.flights) > 1 else "")
+                + (" — " + " + ".join(f"{fg.risers} riser{'s' if fg.risers != 1 else ''}" for fg in s_.geo.flights) + f" ({ss.turn})" if len(s_.geo.flights) > 1 else "")
                 + ("; landings " + " + ".join(f"{ftin(a)} x {ftin(b)}" for a, b in ss.landings) if ss.landings else "")
                 + (f"; landing guard {s_.landing_rail_lf:g} LF" if s_.landing_rail_lf else "")
                 for s_, ss in zip(stairs, spec.stairs)],

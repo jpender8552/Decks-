@@ -131,6 +131,9 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
     r.update(part.get("railing", {}))
     d["railing"] = r
     d["stairs"] = part.get("stairs", [])
+    dk = dict(d.get("decking", {}))       # a part may set its own decking keys (breaker lines in its own frame: divider_x_ft)
+    dk.update(part.get("decking", {}))
+    d["decking"] = dk
     d["job"] = f"{spec.job} — {part['name']}"
     return DeckSpec.from_dict(d)
 
