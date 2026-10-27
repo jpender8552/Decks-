@@ -17,6 +17,7 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
   Demo $2/SF (no column-demo line, no skirting line). Caisson $150/hole + large-footing (20"+) $150. Stairs $150 a riser,
   railing included.
 - Slab openings for the upper caissons: **$200 each** (`extras.labor_extras`).
+- Lighting install: **$25 a fixture**, the transformer and runs included (pricebook `lighting_fixture_each`).
 - A stair is stringers, treads, risers, fascia, railing and some blocking with joist tape — no mid-run carrier, no pad.
   A landing is its own scope (frame, decking, posts, caissons, guard).
 - Louvered roof: **$175/SF → $35,000** (Suncoast, black, 20' x 10'). **Screens are not in the $175/SF: $15,000** (front + right end).

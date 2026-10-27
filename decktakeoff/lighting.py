@@ -494,8 +494,10 @@ def labor_lines(t, lr: dict) -> list:
     what = (f"{plan.n_riser} riser + {plan.n_cap} post accent lights: cut the riser openings, drill each post (3/8\" wire hole, 2 screws), "
             "fish the lead down the post, splice under the deck, mount" if plan.post_kind == "accent" else
             f"{plan.n_riser} riser + {plan.n_cap} post-cap lights: cut the riser openings, pull the 12/2 through the posts, splice, mount")
-    out = [(f"Lighting — install {what}", plan.fixtures, "fixture", float(lr.get("lighting_fixture_each", 50.0)), "ESTIMATE — no lighting rate on the card; confirm")]
-    if plan.transformers:
+    own = "lighting_fixture_each" in lr            # the owner's rate (pricebook labor), else the estimate
+    out = [(f"Lighting — install {what}", plan.fixtures, "fixture", float(lr.get("lighting_fixture_each", 50.0)),
+            "owner rate — $25 a fixture, the transformer and runs included" if own else "ESTIMATE — no lighting rate on the card; confirm")]
+    if plan.transformers and float(lr.get("lighting_transformer_each", 175.0)) > 0:
         out.append((f"Lighting — mount the transformer{'s' if len(plan.transformers) > 1 else ''}, run the home runs, set the photocell and timer, test",
                     len(plan.transformers), "ea", float(lr.get("lighting_transformer_each", 175.0)), "ESTIMATE — no lighting rate on the card; confirm"))
     return out

@@ -1121,7 +1121,10 @@
     "privacy_screen_per_lf": 40.0,
     "inlay_each": 1000.0,
     "diagonal_per_sf": 2.0,
-    "bench_per_6x2": 1500.0
+    "bench_per_6x2": 1500.0,
+    "lighting_fixture_each": 25.0,
+    "lighting_transformer_each": 0.0,
+    "_lighting": "owner 27 Oct 2026: lighting install $25 a fixture (the transformer, home runs, photocell and timer inside it)"
   },
   "general_conditions": {
     "per_sf": 4.0,
