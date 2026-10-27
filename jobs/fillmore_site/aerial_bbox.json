@@ -1,0 +1,54 @@
+{
+ "bbox_EPSG2232_ft": [
+  3154229,
+  1638053,
+  3154479,
+  1638303
+ ],
+ "size_ft": [
+  250,
+  250
+ ],
+ "size_px": [
+  2000,
+  2000
+ ],
+ "ft_per_px": 0.125,
+ "corners_EPSG4326_lonlat": {
+  "sw": [
+   -104.95278994711676,
+   39.58396746055127
+  ],
+  "nw": [
+   -104.95278460425307,
+   39.58465379076218
+  ],
+  "ne": [
+   -104.95189760808624,
+   39.584649653229214
+  ],
+  "se": [
+   -104.95190295960991,
+   39.58396332305777
+  ]
+ },
+ "note": "image rows = northing (top = ymax), cols = easting; same bbox for every year. Native GSD: 2016-2026 about 3 in, older years coarser; 2000 px oversamples by 2x. Export limit is 4096 px.",
+ "source": "https://gis.arapahoegov.com/arcgis/rest/services/ArapaMAP/MapServer/export?layers=show:<layer>&bbox=...&bboxSR=2232&imageSR=2232&size=2000,2000&format=jpg&f=image",
+ "layers": {
+  "2026": 437,
+  "2024": 422,
+  "2022": 398,
+  "2020": 399,
+  "2018": 400,
+  "2016": 401,
+  "2014": 402,
+  "2012": 403,
+  "2010": 404,
+  "2008": 405,
+  "2006": 406,
+  "2004": 407,
+  "2002": 408,
+  "2000": 409,
+  "1998": 410
+ }
+}

@@ -1,0 +1,94 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "Building_ID": 814393,
+    "area_sqft": 3522.5,
+    "Bldg_Height_ft": 28,
+    "Ground_Elevation_ft": 5565,
+    "CreateDate": "2015-11-30",
+    "Update_Status": "NC",
+    "includes_deck": true,
+    "note": "DRCOG stereo-compiled roof print (eave outline). Its NNE edge (vertex1->vertex2, 62.81 ft) and the ESE edge down to the 1.47-ft step are the elevated DECK's outer boundary, not roof: the orthos show deck boards/furniture there. Identical geometry in AC layers 64/65/66 and Centennial Planimetrics_2024 layer 6.",
+    "source": "Arapahoe County ArapaMAP MapServer layer 66 (Building Roof Prints 2022)"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -104.95241065,
+       39.58442595
+      ],
+      [
+       -104.9522091,
+       39.58435241
+      ],
+      [
+       -104.95223858,
+       39.58430404
+      ],
+      [
+       -104.95223389,
+       39.58430233
+      ],
+      [
+       -104.95224961,
+       39.58427654
+      ],
+      [
+       -104.95224437,
+       39.58427463
+      ],
+      [
+       -104.95229504,
+       39.58419149
+      ],
+      [
+       -104.95230037,
+       39.58419344
+      ],
+      [
+       -104.95236898,
+       39.58421847
+      ],
+      [
+       -104.95237894,
+       39.5842221
+      ],
+      [
+       -104.95236336,
+       39.58424766
+      ],
+      [
+       -104.95243371,
+       39.58427332
+      ],
+      [
+       -104.9524147,
+       39.58430452
+      ],
+      [
+       -104.95247796,
+       39.5843276
+      ],
+      [
+       -104.9524309,
+       39.58440483
+      ],
+      [
+       -104.95242487,
+       39.58440263
+      ],
+      [
+       -104.95241065,
+       39.58442595
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

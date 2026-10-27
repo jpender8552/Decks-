@@ -1,0 +1,72 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "what": "owner hand-sketch deck outline placed in the plan frame (ESTIMATE)",
+    "status": "E (+/-1 ft position, +/-2 ft vs lot lines)",
+    "anchors": "outer edge = roof-print NNE edge; arm outer side = roof-print ESE edge; walls from owner dims"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -104.9522091,
+       39.58435241
+      ],
+      [
+       -104.95241154,
+       39.58442628
+      ],
+      [
+       -104.9524297,
+       39.58439648
+      ],
+      [
+       -104.95238825,
+       39.58438135
+      ],
+      [
+       -104.95238522,
+       39.58438632
+      ],
+      [
+       -104.95224857,
+       39.58433646
+      ],
+      [
+       -104.9522579,
+       39.58432115
+      ],
+      [
+       -104.95225228,
+       39.5843191
+      ],
+      [
+       -104.95225985,
+       39.58430668
+      ],
+      [
+       -104.95226547,
+       39.58430873
+      ],
+      [
+       -104.952269,
+       39.58430294
+      ],
+      [
+       -104.95224466,
+       39.58429406
+      ],
+      [
+       -104.9522091,
+       39.58435241
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

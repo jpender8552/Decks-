@@ -1,0 +1,1171 @@
+{
+ "address": "7303 S Fillmore Cir, Centennial, CO 80122",
+ "address_point_latlon": [
+  39.5843223,
+  -104.9523515
+ ],
+ "address_point_source": "Arapahoe County ArapaMAP layer 2 (Address Points)",
+ "units": "US survey feet",
+ "native_crs": "EPSG:2232 NAD83 / Colorado Central (ftUS)",
+ "rear_side": "NNE (creek/greenbelt side). Street (S Fillmore Cir) and garage are on the SSW side.",
+ "rear_outward_normal_deg_true": 25.25,
+ "rear_outward_normal_deg_grid": 24.9,
+ "arm_end": "ESE end = LEFT end when standing in the rear yard facing the house (facing about 205 deg)",
+ "frame_definition": "origin = rear-wall corner where the main rear wall (zone B) meets the arm's side wall; +x along the rear wall away from the arm (bearing 295.2 deg true, WNW); +y into the yard (bearing 25.2 deg true, NNE). Plot +y DOWN for a true (non-mirrored) plan (house at top, arm at left, as in the owner's sketch).",
+ "origin_EPSG2232": [
+  3154380.77,
+  1638188.32
+ ],
+ "origin_lonlat": [
+  -104.95224857,
+  39.58433646
+ ],
+ "transform_from_EPSG2232": {
+  "u": "u = (E - 3154334.89)*0.907041 + (N - 1638220.65)*-0.421042",
+  "v": "v = (E - 3154334.89)*0.421042 + (N - 1638220.65)*0.907041",
+  "x": "x = 55.223 - u",
+  "y": "y = v + 10.000",
+  "note": "u,v = roof-print frame (origin roof-print vertex 1 = WNW outer deck corner; +u toward the arm along the roof-print rear edge; +v outward)"
+ },
+ "origin_basis": "E: arm outer side = roof-print ESE edge (u=62.81, stereo) minus owner 7'7\"; rear wall = roof-print NNE edge (deck outer edge, v=0) minus owner 10'. Walls are hidden under the eaves in every ortho, so the origin is +/-1 ft.",
+ "owner_sketch_ft": {
+  "A_arm_width": 7.583,
+  "A_outer_edge_to_door_wall": 23.5,
+  "B_width": 21.583,
+  "C_width": 21.0,
+  "D_width": 12.917,
+  "BC_depth": 10.0,
+  "D_depth": 12.0,
+  "D_wall_setback": 2.0,
+  "total_outer_edge": 63.083,
+  "side_wall_door_to_chimney": 2.333,
+  "chimney_length": 5.0,
+  "arm_clear_at_chimney": 5.833,
+  "chimney_projection": 1.75,
+  "side_wall_chimney_to_rear_corner_as_written": 5.5,
+  "side_wall_chimney_to_rear_corner_implied": 6.167,
+  "C_D_level_above_A_B": 3.0
+ },
+ "deck_outline_xy": [
+  [
+   -7.58,
+   10.0
+  ],
+  [
+   55.5,
+   10.0
+  ],
+  [
+   55.5,
+   -2.0
+  ],
+  [
+   42.58,
+   -2.0
+  ],
+  [
+   42.58,
+   0.0
+  ],
+  [
+   0.0,
+   0.0
+  ],
+  [
+   0.0,
+   -6.17
+  ],
+  [
+   -1.75,
+   -6.17
+  ],
+  [
+   -1.75,
+   -11.17
+  ],
+  [
+   0.0,
+   -11.17
+  ],
+  [
+   0.0,
+   -13.5
+  ],
+  [
+   -7.58,
+   -13.5
+  ],
+  [
+   -7.58,
+   10.0
+  ]
+ ],
+ "zones_xy": {
+  "A_arm": [
+   [
+    -7.58,
+    10.0
+   ],
+   [
+    0.0,
+    10.0
+   ],
+   [
+    0.0,
+    -13.5
+   ],
+   [
+    -7.58,
+    -13.5
+   ]
+  ],
+  "B": [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    21.58,
+    0.0
+   ],
+   [
+    21.58,
+    10.0
+   ],
+   [
+    0.0,
+    10.0
+   ]
+  ],
+  "C": [
+   [
+    21.58,
+    0.0
+   ],
+   [
+    42.58,
+    0.0
+   ],
+   [
+    42.58,
+    10.0
+   ],
+   [
+    21.58,
+    10.0
+   ]
+  ],
+  "D": [
+   [
+    42.58,
+    -2.0
+   ],
+   [
+    55.5,
+    -2.0
+   ],
+   [
+    55.5,
+    10.0
+   ],
+   [
+    42.58,
+    10.0
+   ]
+  ]
+ },
+ "stair_xy_approx": [
+  [
+   21.58,
+   6.25
+  ],
+  [
+   25.08,
+   6.25
+  ],
+  [
+   25.08,
+   10.0
+  ],
+  [
+   21.58,
+   10.0
+  ]
+ ],
+ "chimney_xy": [
+  [
+   0.0,
+   -11.17
+  ],
+  [
+   -1.75,
+   -11.17
+  ],
+  [
+   -1.75,
+   -6.17
+  ],
+  [
+   0.0,
+   -6.17
+  ]
+ ],
+ "walls_xy_estimate": [
+  [
+   [
+    55.5,
+    -2.0
+   ],
+   [
+    42.58,
+    -2.0
+   ],
+   [
+    42.58,
+    0.0
+   ],
+   [
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    -6.17
+   ],
+   [
+    -1.75,
+    -6.17
+   ],
+   [
+    -1.75,
+    -11.17
+   ],
+   [
+    0.0,
+    -11.17
+   ],
+   [
+    0.0,
+    -13.5
+   ],
+   [
+    -7.58,
+    -13.5
+   ]
+  ]
+ ],
+ "deck_area_sqft_sketch": 750.3,
+ "parcel_xy": [
+  [
+   -16.14,
+   -77.64
+  ],
+  [
+   -15.9,
+   -81.66
+  ],
+  [
+   -12.13,
+   -81.53
+  ],
+  [
+   1.64,
+   -81.27
+  ],
+  [
+   15.41,
+   -81.37
+  ],
+  [
+   43.65,
+   -81.94
+  ],
+  [
+   48.55,
+   -82.08
+  ],
+  [
+   53.43,
+   -82.31
+  ],
+  [
+   58.32,
+   -82.63
+  ],
+  [
+   58.49,
+   -80.35
+  ],
+  [
+   66.09,
+   22.62
+  ],
+  [
+   57.63,
+   22.79
+  ],
+  [
+   -22.1,
+   24.41
+  ],
+  [
+   -16.14,
+   -77.64
+  ]
+ ],
+ "roof_print_xy": [
+  [
+   55.22,
+   10.0
+  ],
+  [
+   -7.58,
+   10.0
+  ],
+  [
+   -7.58,
+   -9.48
+  ],
+  [
+   -9.04,
+   -9.48
+  ],
+  [
+   -9.04,
+   -19.87
+  ],
+  [
+   -10.67,
+   -19.87
+  ],
+  [
+   -10.67,
+   -53.35
+  ],
+  [
+   -9.01,
+   -53.35
+  ],
+  [
+   12.37,
+   -53.35
+  ],
+  [
+   15.47,
+   -53.35
+  ],
+  [
+   15.47,
+   -43.06
+  ],
+  [
+   37.39,
+   -43.06
+  ],
+  [
+   37.39,
+   -30.49
+  ],
+  [
+   57.1,
+   -30.49
+  ],
+  [
+   57.1,
+   0.61
+  ],
+  [
+   55.22,
+   0.61
+  ],
+  [
+   55.22,
+   10.0
+  ]
+ ],
+ "ortho_trace_uv": {
+  "outer_edge_v_stereo": 0.0,
+  "W_end_u_stereo": 0.0,
+  "arm_outer_u_stereo": 62.81,
+  "length_ortho_mean": 62.7,
+  "length_ortho_sd": 0.39,
+  "length_ortho_n": 6,
+  "BC_break_from_W_end_mean": 33.69,
+  "BC_break_from_W_end_sd": 0.98,
+  "BC_break_n": 4,
+  "rear_eave_v_stereo": -9.39,
+  "arm_visible_end_v_stereo": -19.48,
+  "arm_visible_width_2014": 5.4,
+  "chimney_stack_from_W_end_mean": 56.89,
+  "chimney_stack_from_outer_edge_mean": 19.73,
+  "chimney_sd": [
+   0.84,
+   1.12
+  ],
+  "per_year": {
+   "2010": {
+    "v_outer": 0.26,
+    "u_W": 0.13,
+    "u_E": 62.83,
+    "length": 62.7,
+    "contrast": [
+     166.2,
+     197.4,
+     97.3
+    ],
+    "u_BC": 34.38,
+    "BC_from_W": 34.25,
+    "BC_from_E": 28.45,
+    "chimney_from_W_end": 57.79,
+    "chimney_from_outer_edge": 17.66,
+    "chim_extent_u": 1.6,
+    "chim_extent_v": 4.4
+   },
+   "2012": {
+    "v_outer": 0.02,
+    "u_W": -3.53,
+    "u_E": 59.02,
+    "length": 62.55,
+    "contrast": [
+     224.5,
+     263.9,
+     129.9
+    ],
+    "u_BC": 30.48,
+    "BC_from_W": 34.01,
+    "BC_from_E": 28.54,
+    "chimney_from_W_end": 57.49,
+    "chimney_from_outer_edge": 20.1,
+    "chim_extent_u": 1.8,
+    "chim_extent_v": 4.2
+   },
+   "2014": {
+    "v_outer": -1.79,
+    "u_W": 0.5,
+    "u_E": 63.24,
+    "length": 62.74,
+    "contrast": [
+     264.6,
+     267.1,
+     71.8
+    ],
+    "u_BC": 32.73,
+    "BC_from_W": 32.23,
+    "BC_from_E": 30.51,
+    "chimney_from_W_end": 56.25,
+    "chimney_from_outer_edge": 20.79,
+    "chim_extent_u": 1.8,
+    "chim_extent_v": 4.3
+   },
+   "2008": {
+    "v_outer": -1.94,
+    "u_W": -3.06,
+    "u_E": 60.28,
+    "length": 63.34,
+    "contrast": [
+     117.1,
+     200.8,
+     126.3
+    ],
+    "u_BC": 31.22,
+    "BC_from_W": 34.28,
+    "BC_from_E": 29.06,
+    "chimney_from_W_end": 56.49,
+    "chimney_from_outer_edge": 20.28,
+    "chim_extent_u": 2.4,
+    "chim_extent_v": 5.1
+   },
+   "2018": {
+    "v_outer": 0.19,
+    "u_W": -1.34,
+    "u_E": 61.38,
+    "length": 62.72,
+    "contrast": [
+     277.2,
+     353.8,
+     143.1
+    ],
+    "chimney_from_W_end": 55.73,
+    "chimney_from_outer_edge": 20.21,
+    "chim_extent_u": 2.4,
+    "chim_extent_v": 5.6
+   },
+   "2022": {
+    "v_outer": 0.16,
+    "u_W": -0.13,
+    "u_E": 62.01,
+    "length": 62.14,
+    "contrast": [
+     312.9,
+     298.0,
+     166.2
+    ],
+    "chimney_from_W_end": 57.57,
+    "chimney_from_outer_edge": 19.31,
+    "chim_extent_u": 4.0,
+    "chim_extent_v": 5.8
+   }
+  }
+ },
+ "deck_to_lot_line_ft_sketch_placement": {
+  "rear_NNE (SSPRD greenbelt 2077-25-3-14-001)": 12.83,
+  "side_WNW (7313 S Fillmore 2077-25-3-08-023)": 8.75,
+  "side_ESE (Tiffany HOA tract 2077-25-3-08-035)": 12.28,
+  "front_SSW (S Fillmore Cir ROW)": 64.7
+ },
+ "deck_outer_edge_to_rear_lot_line_ft_at_ends": {
+  "WNW_end_D": 12.84,
+  "ESE_end_arm": 14.11
+ },
+ "house_walls_estimate_to_lot_line_ft": {
+  "rear_NNE (SSPRD greenbelt 2077-25-3-14-001)": 23.09,
+  "side_WNW (7313 S Fillmore 2077-25-3-08-023)": 8.75,
+  "side_ESE (Tiffany HOA tract 2077-25-3-08-035)": 12.28,
+  "front_SSW (S Fillmore Cir ROW)": 64.7
+ },
+ "house_roofprint_excl_deck_to_lot_line_ft": {
+  "rear_NNE (SSPRD greenbelt 2077-25-3-14-001)": 22.19,
+  "side_WNW (7313 S Fillmore 2077-25-3-08-023)": 5.05,
+  "side_ESE (Tiffany HOA tract 2077-25-3-08-035)": 6.87,
+  "front_SSW (S Fillmore Cir ROW)": 24.9
+ },
+ "setbacks_NC6_ft": {
+  "front": 20,
+  "street_side": 10,
+  "side": 5,
+  "side_total": 12,
+  "rear": 20
+ },
+ "deck_ge_4ft_min_distance_to_rear_lot_line_ft": 8,
+ "terrain": {
+  "A arm (x=-3.8)": {
+   "x": -3.8,
+   "wall_y": -13.5,
+   "rear_lot_line_y": 24.04,
+   "wall": {
+    "y": -13.5,
+    "dem_bilinear": 5569.0,
+    "contour_interp": 5569.5
+   },
+   "y0": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.9
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.1
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.4
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5566.1,
+    "contour_interp": 5565.8
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5565.0,
+    "contour_interp": 5565.3
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5564.4,
+    "contour_interp": 5564.8
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5563.6,
+    "contour_interp": 5564.1
+   },
+   "lot_line": {
+    "y": 24.04,
+    "dem_bilinear": 5564.9,
+    "contour_interp": 5564.9
+   }
+  },
+  "B (x=5)": {
+   "x": 5.0,
+   "wall_y": 0.0,
+   "rear_lot_line_y": 23.86,
+   "wall": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5568.2
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.6
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.9,
+    "contour_interp": 5567.0
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5566.4,
+    "contour_interp": 5566.5
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5566.0,
+    "contour_interp": 5565.8
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5564.7,
+    "contour_interp": 5565.0
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5563.0,
+    "contour_interp": 5563.9
+   },
+   "lot_line": {
+    "y": 23.86,
+    "dem_bilinear": 5565.0,
+    "contour_interp": 5565.2
+   }
+  },
+  "B (x=15)": {
+   "x": 15.0,
+   "wall_y": 0.0,
+   "rear_lot_line_y": 23.66,
+   "wall": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5568.3
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.8
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.2
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.6
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5566.2,
+    "contour_interp": 5566.0
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5565.1,
+    "contour_interp": 5565.0
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5563.2,
+    "contour_interp": 5563.3
+   },
+   "lot_line": {
+    "y": 23.66,
+    "dem_bilinear": 5565.6,
+    "contour_interp": 5565.3
+   }
+  },
+  "C (x=26)": {
+   "x": 26.0,
+   "wall_y": 0.0,
+   "rear_lot_line_y": 23.44,
+   "wall": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5568.4
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5567.3,
+    "contour_interp": 5567.9
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5567.3
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.6
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5566.0,
+    "contour_interp": 5566.0
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5565.3,
+    "contour_interp": 5565.0
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5564.0,
+    "contour_interp": 5563.0
+   },
+   "lot_line": {
+    "y": 23.44,
+    "dem_bilinear": 5566.0,
+    "contour_interp": 5565.3
+   }
+  },
+  "C (x=37)": {
+   "x": 37.0,
+   "wall_y": 0.0,
+   "rear_lot_line_y": 23.21,
+   "wall": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5568.5
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.8
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5567.1
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.5
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5566.1,
+    "contour_interp": 5566.0
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5565.0,
+    "contour_interp": 5565.0
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5563.7,
+    "contour_interp": 5562.5
+   },
+   "lot_line": {
+    "y": 23.21,
+    "dem_bilinear": 5565.8,
+    "contour_interp": 5565.3
+   }
+  },
+  "D (x=46)": {
+   "x": 46.0,
+   "wall_y": -2.0,
+   "rear_lot_line_y": 23.03,
+   "wall": {
+    "y": -2.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5568.0
+   },
+   "y0": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.8
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5567.1,
+    "contour_interp": 5567.1
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.7
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.2
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5566.0,
+    "contour_interp": 5565.6
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5564.4,
+    "contour_interp": 5564.4
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5561.8,
+    "contour_interp": 5561.9
+   },
+   "lot_line": {
+    "y": 23.03,
+    "dem_bilinear": 5565.9,
+    "contour_interp": 5565.1
+   }
+  },
+  "D (x=53)": {
+   "x": 53.0,
+   "wall_y": -2.0,
+   "rear_lot_line_y": 22.89,
+   "wall": {
+    "y": -2.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.4
+   },
+   "y0": {
+    "y": 0.0,
+    "dem_bilinear": 5568.0,
+    "contour_interp": 5567.1
+   },
+   "y5": {
+    "y": 5.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.7
+   },
+   "y10": {
+    "y": 10.0,
+    "dem_bilinear": 5567.0,
+    "contour_interp": 5566.3
+   },
+   "y15": {
+    "y": 15.0,
+    "dem_bilinear": 5566.1,
+    "contour_interp": 5565.6
+   },
+   "y20": {
+    "y": 20.0,
+    "dem_bilinear": 5565.9,
+    "contour_interp": 5564.5
+   },
+   "y25": {
+    "y": 25.0,
+    "dem_bilinear": 5564.8,
+    "contour_interp": 5563.0
+   },
+   "y30": {
+    "y": 30.0,
+    "dem_bilinear": 5561.7,
+    "contour_interp": 5561.5
+   },
+   "lot_line": {
+    "y": 22.89,
+    "dem_bilinear": 5565.6,
+    "contour_interp": 5563.6
+   }
+  }
+ },
+ "address_point_dem_ft": 5570.1,
+ "accuracy": "positions +/-1 ft inside the deck frame; +/-2 ft relative to lot lines (GIS parcel lines are not a survey)",
+ "brief_frame": {
+  "definition": "BRIEF.md plan frame: x_brief = x + 7.5833 (0 at the deck's left end = arm A's open side, as seen from the yard), y_brief = y, z = 0 at the walk-out patio slab",
+  "patio_slab_elevation_ft_NAVD88_E": 5568.0,
+  "patio_slab_note": "E: County_DEM is flat at 5568 under the deck from the wall to y~9 (the slab, seen by LiDAR through the boards); +/-0.5 ft",
+  "deck_outline_xy_brief": [
+   [
+    0.0,
+    10.0
+   ],
+   [
+    63.08,
+    10.0
+   ],
+   [
+    63.08,
+    -2.0
+   ],
+   [
+    50.17,
+    -2.0
+   ],
+   [
+    50.17,
+    0.0
+   ],
+   [
+    7.58,
+    0.0
+   ],
+   [
+    7.58,
+    -6.17
+   ],
+   [
+    5.83,
+    -6.17
+   ],
+   [
+    5.83,
+    -11.17
+   ],
+   [
+    7.58,
+    -11.17
+   ],
+   [
+    7.58,
+    -13.5
+   ],
+   [
+    0.0,
+    -13.5
+   ],
+   [
+    0.0,
+    10.0
+   ]
+  ],
+  "zones_xy_brief": {
+   "A_arm": [
+    [
+     0.0,
+     10.0
+    ],
+    [
+     7.58,
+     10.0
+    ],
+    [
+     7.58,
+     -13.5
+    ],
+    [
+     0.0,
+     -13.5
+    ]
+   ],
+   "B": [
+    [
+     7.58,
+     0.0
+    ],
+    [
+     29.17,
+     0.0
+    ],
+    [
+     29.17,
+     10.0
+    ],
+    [
+     7.58,
+     10.0
+    ]
+   ],
+   "C": [
+    [
+     29.17,
+     0.0
+    ],
+    [
+     50.17,
+     0.0
+    ],
+    [
+     50.17,
+     10.0
+    ],
+    [
+     29.17,
+     10.0
+    ]
+   ],
+   "D": [
+    [
+     50.17,
+     -2.0
+    ],
+    [
+     63.08,
+     -2.0
+    ],
+    [
+     63.08,
+     10.0
+    ],
+    [
+     50.17,
+     10.0
+    ]
+   ]
+  },
+  "chimney_xy_brief_from_door_wall": [
+   [
+    7.58,
+    -11.17
+   ],
+   [
+    5.83,
+    -11.17
+   ],
+   [
+    5.83,
+    -6.17
+   ],
+   [
+    7.58,
+    -6.17
+   ]
+  ],
+  "rear_lot_line_xy_brief": [
+   [
+    73.68,
+    22.62
+   ],
+   [
+    65.21,
+    22.79
+   ],
+   [
+    65.21,
+    22.79
+   ],
+   [
+    -14.52,
+    24.41
+   ]
+  ],
+  "parcel_xy_brief": [
+   [
+    -8.55,
+    -77.64
+   ],
+   [
+    -8.32,
+    -81.66
+   ],
+   [
+    -4.55,
+    -81.53
+   ],
+   [
+    9.22,
+    -81.27
+   ],
+   [
+    22.99,
+    -81.37
+   ],
+   [
+    51.24,
+    -81.94
+   ],
+   [
+    56.13,
+    -82.08
+   ],
+   [
+    61.02,
+    -82.31
+   ],
+   [
+    65.9,
+    -82.63
+   ],
+   [
+    66.07,
+    -80.35
+   ],
+   [
+    73.68,
+    22.62
+   ],
+   [
+    65.21,
+    22.79
+   ],
+   [
+    -14.52,
+    24.41
+   ],
+   [
+    -8.55,
+    -77.64
+   ]
+  ],
+  "roof_print_xy_brief": [
+   [
+    62.81,
+    10.0
+   ],
+   [
+    -0.0,
+    10.0
+   ],
+   [
+    -0.0,
+    -9.48
+   ],
+   [
+    -1.46,
+    -9.48
+   ],
+   [
+    -1.46,
+    -19.87
+   ],
+   [
+    -3.09,
+    -19.87
+   ],
+   [
+    -3.09,
+    -53.35
+   ],
+   [
+    -1.43,
+    -53.35
+   ],
+   [
+    19.95,
+    -53.35
+   ],
+   [
+    23.05,
+    -53.35
+   ],
+   [
+    23.05,
+    -43.06
+   ],
+   [
+    44.97,
+    -43.06
+   ],
+   [
+    44.97,
+    -30.49
+   ],
+   [
+    64.69,
+    -30.49
+   ],
+   [
+    64.69,
+    0.61
+   ],
+   [
+    62.81,
+    0.61
+   ],
+   [
+    62.81,
+    10.0
+   ]
+  ]
+ }
+}
