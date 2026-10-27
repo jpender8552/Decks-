@@ -251,10 +251,24 @@ class _Builder:
             for p in w.get("panels", []):
                 self.slab(w, p["u0"], p["u1"], p["z0"], p["z1"], 0.0, float(p.get("d", 0.06)), "trim", p.get("mat", "haccent"),
                           tag=p.get("name", "panel"))
-        for bd in w.get("bands", []):           # horizontal trim boards
+        for bd in w.get("bands", []):           # horizontal trim boards, stopped at the openings (casings) they would cross
             d0, d1 = (0.0, float(bd["d"])) if isinstance(bd.get("d"), (int, float)) else tuple(bd.get("d", (0.0, 0.06)))
-            self.slab(w, float(bd.get("u0", 0.0)), float(bd.get("u1", L)), bd["z0"], bd["z1"], d0, d1, "trim", bd.get("mat", "haccent"),
-                      tag=bd.get("name", "trim band"))
+            segs = [(float(bd.get("u0", 0.0)), float(bd.get("u1", L)))]
+            for o in ops:
+                m = self.margin(o)
+                if o["z0"] - m < bd["z1"] and o["z1"] + m > bd["z0"]:
+                    segs = [s for a, b in segs for s in ((a, min(b, o["u0"] - m)), (max(a, o["u1"] + m), b)) if s[1] - s[0] > 0.01]
+            for a, b in segs:
+                self.slab(w, a, b, bd["z0"], bd["z1"], d0, d1, "trim", bd.get("mat", "haccent"), tag=bd.get("name", "trim band"))
+            if bd.get("dentils"):                # blocks along the band: {w_in, h_in, oc_in, z0, mat}
+                dn = bd["dentils"]
+                dw, oc = float(dn.get("w_in", 4.0)) * IN, float(dn.get("oc_in", 6.0)) * IN
+                dz0 = float(dn.get("z0", bd["z0"])); dz1 = dz0 + float(dn.get("h_in", 2.5)) * IN
+                for a, b in segs:
+                    u = a + (oc - dw) / 2
+                    while u + dw <= b + 1e-6:
+                        self.slab(w, u, u + dw, dz0, dz1, d1, d1 + 0.06, "trim", dn.get("mat", "siding"), tag="dentil block")
+                        u += oc
         cw = float(w.get("corner_in", 3.5)) * IN
         for end in w.get("corners", []):        # corner boards
             ua = 0.0 if end == "a" else L - cw

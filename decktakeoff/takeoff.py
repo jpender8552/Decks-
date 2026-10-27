@@ -1541,7 +1541,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                          + (f", {len(rl.sections)} bays at " + " / ".join(sorted(set(ftin(s_.ctc) for s_ in rl.sections))) + " CTC (8' kits cut to bay), posts on the divider lines, no bottom rail; HeadLOK 6\" x 4 per post" if cable
                             else " surface-mounted on the decking over a 2x blocking pair between the rim plies and the PF joist at every post, (4) HeadLOK 6\" per post through the base" if sysd.get("surface")
                             else " inside the outer rim ply, inner ply pocketed 2\" wide, (2) 7/16\" x 4-1/2\" bolts per post")
-                         + (f"; drink rail board on {rbrand} drink-rail brackets, mitred at every turn" if spec.railing.drink_rail else ""))
+                         + (((f"; drink rail board over the posts on the {rbrand} drink-rail clips" + (" and post inserts (posts cut level)" if f"{sysn}|post_insert_8" in PRICEBOOK["rail"] else "")
+                              + ", seams on post centres, mitred at every turn") if (spec.railing.drink_rail_mount or "between") == "over"
+                             else f"; drink rail board on {rbrand} drink-rail brackets, mitred at every turn") if spec.railing.drink_rail else ""))
         for n in rl.notes:
             notes.append(n)
 
