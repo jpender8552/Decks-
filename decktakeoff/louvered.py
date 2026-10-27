@@ -76,6 +76,8 @@ DEFAULTS = dict(
     gutter=True, lights=True,               # integrated gutter; LED light strip in the gutter's light track
     downspouts="post",                      # "post" (inside the posts, through the deck, a black leader down the post below, piped to the lawn) |
                                             #   "external" (2x3 on the post face) | "none"
+    downspout_jog_ft=None,                  # per post (the posts' order): ft the pipe runs along x on the patio before it turns out to the
+                                            #   lawn (+ = toward +x), e.g. round a stair foot in front of the post; None / 0 -> straight out
     house_clear_ft=None,                    # end screens stop at the house gutter line (y); None -> 1.4' attached by the roof line / fascia
     price=None, price_per_sf=None,          # sell (check / ACH): fixed, or $/SF x the roof area
     priced="own",                           # "own" (its own document; the deck's price does not change) | "option" (also an option on the deck's quote)
@@ -380,7 +382,8 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
 
     # ---- posts as built: the deck under each, and the rail lines that run through it (then it IS the rail post there)
     pts = []
-    for (px, py) in posts:
+    jogs = q.get("downspout_jog_ft") or []
+    for i_p, (px, py) in enumerate(posts):
         s_ = _surface_at(own, px, py)
         zd = s_["z"] if s_ else z_deck
         rails = []
@@ -391,7 +394,8 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
                 for xe, sgn in _front_corners(surfaces, s_):
                     if abs(px - (xe + sgn * rp)) <= p / 2 + 1e-6:
                         rails.append("side")
-        pts.append(dict(x=px, y=py, z_deck=zd, on_rail=bool(rails), rails=rails, edge_y=(s_["y1"] if s_ else None), surface=s_["name"] if s_ else ""))
+        pts.append(dict(x=px, y=py, z_deck=zd, on_rail=bool(rails), rails=rails, edge_y=(s_["y1"] if s_ else None), surface=s_["name"] if s_ else "",
+                        jog=float(jogs[i_p] or 0.0) if i_p < len(jogs) else 0.0))
     if not under:
         notes.append("no deck surface under the roof: the posts stand at z = 0")
     clear = z_bot - z_deck
@@ -627,6 +631,10 @@ def draw_roof(add, q: dict) -> None:
             lx = px + 0.45
             A("lvdown", lx - 0.11, lx + 0.11, py - 0.11, py + 0.11, 0.2, zd - 0.95, tag="downspout leader from inside the post, down the deck post below")
             ye = (pt.get("edge_y") or py) + 2.0
+            if pt.get("jog"):                 # along the patio first (round a stair foot in front of the post), then out
+                xa, xb = sorted((lx, lx + pt["jog"]))
+                A("lvdown", xa - 0.11, xb + 0.11, py - 0.11, py + 0.11, 0.0, 0.2, tag="downspout piped along the patio, round the stair foot")
+                lx += pt["jog"]
             A("lvdown", lx - 0.11, lx + 0.11, min(py, ye), max(py, ye), 0.0, 0.2, tag="downspout piped out to the lawn")
         elif q["downspouts"] == "external":
             yo = py + out_y * p / 2

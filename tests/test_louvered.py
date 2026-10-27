@@ -100,3 +100,17 @@ def test_sold_size_and_eave_heights():
     assert "20'-0\" x 10'-0\" (200 SF)" in lv.scope_words(q)[0] and any(n.startswith("built frame") for n in q["notes"])
     qf = lv.resolve(dict(r, soffit_z=16.48, house_mount="fascia"), surf)       # hung under the soffit instead
     assert qf["z_top"] == pytest.approx(16.48) and qf["clear_ft"] == pytest.approx(7.25, abs=0.01)
+
+
+def test_downspout_jog_rounds_a_stair_foot():
+    """downspout_jog_ft: the left post's pipe runs along the patio first, then out to the lawn; the other post is unchanged."""
+    def pipes(**kw):
+        S = build_scene(run(_spec(ROOF, **kw))[0].layout)
+        return sorted(((b.x0 + b.x1) / 2, b.y0, b.y1, b.tag) for b in S.boxes if b.kind == "lvdown" and "piped" in b.tag)
+    plain, jog = pipes(), pipes(downspout_jog_ft=[1.5, 0])
+    assert len(plain) == 2 and len(jog) == 3
+    along = [q for q in jog if "along the patio" in q[3]]
+    assert len(along) == 1
+    out_l = min((q for q in jog if "out to the lawn" in q[3]), key=lambda q: q[0])
+    assert out_l[0] == pytest.approx(min(q[0] for q in plain) + 1.5)          # the left pipe turns out 1.5' further along
+    assert max(q[0] for q in jog if "out to the lawn" in q[3]) == pytest.approx(max(q[0] for q in plain))   # the right one as before

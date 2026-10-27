@@ -32,8 +32,9 @@ Specs: `jobs/fillmore_centennial*.json` (base, _lighting, _yardstair, _yardstair
   - BASE, 8 columns on **24" x 42" caissons** (end bearing alone carries every column: max 4,179 lb vs 4,712):
     L1 x 2.6 / 15.0 / 26.85, A2 x 1.0 / 5.5, U1 x 32.77 / 46.17 / 59.52 (13'-4" spans, overhangs at L/4 — 3 columns is the
     6x10's deflection limit on U1; L1 and A2 are at their minimum).
-  - ROOF VERSION (_roof / _roof_screens / _all), 9 columns: U1 x 29.80 / 39.87 / 49.94 / 62.60 with a column under each roof
+  - ROOF VERSION (_roof / _roof_screens / _all), 9 columns: U1 x 29.97 / 39.87 / 49.94 / 62.60 with a column under each roof
     post, **30" x 42" caissons** under the upper level. Its deck structure is priced into Option 3 at the 40% margin.
+  - Roof version + Option 2B (clash fix, 27 Oct; roof size, price and takeoff unchanged): U1 sits 2" toward the house (setback 3¼"), U1-1 and the left roof post 2" right (x 29.80 → 29.97), the left downspout runs 1'-3" along the patio, so the column clears the 2B flight by 2" — don't move them back.
 - **Caissons flush with the patio slab** where they go through it (upper row); lower row 7" above the beds.
 - **Never wet-set** (owner 27 Oct: "We don't wet set. ABU is meant to be placed once cured"): ABU88RZ / ABU66RZ go on after
   the cure on 5/8" Titen HD screw anchors drilled into the concrete (2 per ABU88, 1 per ABU66).
