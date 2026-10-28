@@ -170,8 +170,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                         "6-mil liner over a drainage mat, deck-board skin on every side, picture-frame cap; Cortex.")
         if getattr(s.geometry, "door_step", None):
             how_.append("Door step: the framed 2x6 box on the deck at the door, decked, " + ("HardieTrim riser" if s.extras.hardie_skirt else "riser board") + " and returns.")
-        steps.append(dict(n=9, code="T-408", title="Built-ins — " + ", ".join(w for w, on in (("benches", s.geometry.benches), ("planter" + ("s" if len(s.geometry.planters or []) > 1 else ""), s.geometry.planters),
-                                                                                            ("door step", getattr(s.geometry, "door_step", None))) if on), still="corner",
+        steps.append(dict(n=9, code="T-408", title=("Door step" if not (s.geometry.benches or s.geometry.planters) else "Built-ins — " + ", ".join(w for w, on in (("benches", s.geometry.benches), ("planter" + ("s" if len(s.geometry.planters or []) > 1 else ""), s.geometry.planters),
+                                                                                            ("door step", getattr(s.geometry, "door_step", None))) if on)), still="corner",
             goes_in=items(lambda l: l.category in ("Benches", "Planters") or "door step" in l.item.lower(), 14),
             how=how_,
             check=(["Bench seats level at the seat height, backs plumb, posts tight to the rim"] if s.geometry.benches else [])

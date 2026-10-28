@@ -296,7 +296,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     elif lv:
         w(f"| Frame | {composite_frame_words(t)} |")
     else:
-        w(f"| Frame | {sm['joists']}; {sm['rims']}; {'; '.join(sm['beams'])}. |")
+        w(f"| Frame | {'; '.join(x for x in [sm['joists'], sm['rims']] + list(sm['beams']) if x)}. |")
     if s.extras.stone_bases:
         w(f"| Column bases | Stone veneer 2'x2' x 3' with a 24\" stone cap at all {n_posts} posts. |")
     _fd = sm['posts'] if s.framing.footing_type == "existing" else sm['posts'].split(' on ')[-1]
