@@ -620,14 +620,26 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         edge = (dk0.fascia_t + NOSE) if spec.decking.fascia else OVERHANG_NO_FASCIA
         bw, gap = dk0.bw, dk0.gap
         div_xs = [x for x, _, _, _ in L.plan.dividers]
+        opoly = [(float(a_) * 12, float(b_) * 12) for a_, b_ in (spec.geometry.outline or [])]
+
+        def side_of(x0, y0, x1, y1):
+            """The outline side (as A-100 numbers it) a border run lies along, else its start point."""
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            for i_, (pa, pb) in enumerate(zip(opoly, opoly[1:] + opoly[:1])):
+                dx, dy = pb[0] - pa[0], pb[1] - pa[1]
+                ll = math.hypot(dx, dy) or 1.0
+                if abs((mx - pa[0]) * dy - (my - pa[1]) * dx) / ll < 8.0 and -2 <= ((mx - pa[0]) * dx + (my - pa[1]) * dy) / ll <= ll + 2:
+                    return f"side {i_ + 1}"
+            return f"{ftin(min(x0, x1))},{ftin(min(y0, y1))}"
         for x0, y0, x1, y1, _ in L.plan.borders:
             xa, xb = sorted((x0, x1))
+            sd = side_of(x0, y0, x1, y1)
             cuts_x = [xa] + [x for x in div_xs if xa + 1 < x < xb - 1] + [xb]
             if abs(y1 - y0) < 0.5 and len(cuts_x) > 2:
-                for a, b in zip(cuts_x, cuts_x[1:]):
-                    Qz.border_pieces.append((f"border {ftin(a)}-{ftin(b)}", b - a - (bw / 2 + gap) * ((a != xa) + (b != xb))))
+                for k_, (a, b) in enumerate(zip(cuts_x, cuts_x[1:])):
+                    Qz.border_pieces.append((f"border {sd} ({k_ + 1} of {len(cuts_x) - 1})", b - a - (bw / 2 + gap) * ((a != xa) + (b != xb))))
             else:
-                Qz.border_pieces.append((f"border {ftin(xa)},{ftin(min(y0, y1))}", math.hypot(x1 - x0, y1 - y0) + (bw if abs(y1 - y0) > 0.5 and abs(x1 - x0) > 0.5 else edge)))
+                Qz.border_pieces.append((f"border {sd}", math.hypot(x1 - x0, y1 - y0) + (bw if abs(y1 - y0) > 0.5 and abs(x1 - x0) > 0.5 else edge)))
         for x, y_lo, y_hi, lab in L.plan.dividers:
             Qz.border_pieces.append((f"breaker {lab}", y_hi - y_lo))
         Qz.border_screws = sum(2 * (int(math.floor(Lb / 16)) + 2) for _, Lb in Qz.border_pieces)
@@ -1438,9 +1450,10 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         d = PRICEBOOK["decking"]["Cortex_TimberTech_350"]
         nb = Qz.border_screws + stair_face
         bboxes = max(1, int(math.ceil(nb / d["count"])))
-        lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {bcolor} plugs — picture frame, dividers and stair treads", bboxes, bboxes, "box",
+        lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {bcolor} plugs — picture frame, dividers" + (" and stair treads" if stair_face else ""), bboxes, bboxes, "box",
                           f"{nb} screws  (border/divider {Qz.border_screws}" + (f" · stairs {stair_face}" if stair_face else "") + f") · {bboxes * d['count']} supplied", d["each"], d["source"]))
-        sched["Picture frame + stairs"] = "Cortex face screws with color-matched plugs: borders and dividers 2 per bearing point, stair treads 2 per stringer per board"
+        sched["Picture frame + stairs" if stair_face else "Picture frame"] = ("Cortex face screws with color-matched plugs: borders and dividers 2 per bearing point"
+                                                                         + (", stair treads 2 per stringer per board" if stair_face else ""))
         face -= Qz.border_screws; stair_face = 0
     fascia_pvc = dkf["material"] == "PVC" and Qz.fascia_screws and face >= Qz.fascia_screws and "TOPLoc_PVC_fascia_100" in PRICEBOOK["decking"]
     if fascia_pvc:      # Advanced PVC fascia takes TimberTech TOPLoc fascia screws (color-matched heads), not deck screws

@@ -199,6 +199,9 @@ body{background:#f7f3ea;} .wrap{max-width:none;padding:0 0.5in 0.4in;} .band{pad
 .step{break-inside:avoid;page-break-inside:avoid;} .sheets .sheet{break-inside:avoid;page-break-inside:avoid;} .sheets summary{list-style:none;} .sheets summary::-webkit-details-marker{display:none;}
 table{font-size:11.5px;} tr{break-inside:avoid;page-break-inside:avoid;} .quote{break-before:page;page-break-before:always;}
 h2.pb{break-before:page;page-break-before:always;} footer{padding-bottom:0.4in;} .strip{break-inside:avoid;}
+@page sheet{size:Letter landscape;margin:0.3in 0.2in;}
+.sheets{page:sheet;} h2.kicker:has(+ .sheets){page:sheet;} .sheets .sheet{break-before:page;page-break-before:always;margin:0;border:0;}
+.sheets .sheet:first-child{break-before:auto;page-break-before:auto;} .sheets .sheet svg{width:100%;height:auto;max-height:7.3in;display:block;}
 </style>"""
 
 
@@ -1034,7 +1037,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         strip = ('<div class="strip"><div><span class="sl">Square feet</span><span class="sv">%g</span></div><div><span class="sl">Footings</span><span class="sv">%d</span></div>'
                  '<div><span class="sl">Order lines</span><span class="sv">%d</span></div><div><span class="sl">Height</span><span class="sv">%s</span></div></div>'
                  % (L.deck_sf, n_piers, sum(1 for l in t.lines if l.category != "Site"), ftin(spec.geometry.height_in)))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · material take-off + build set · for Decks &amp; Docks</div><h1>{E(name)}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · take-off + build set for Decks &amp; Docks</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
                 f'<p>{E(sub or addr)} · {E(today)}</p><p>Account GSEXT1 · ship to {E(addr)} · please quote every line; call Jade Pender 303-550-9558 with substitutions.</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings' + ("; the stamped engineering set governs structure" if spec.extras.engineered else "") + '. Quote requested — no pricing on this sheet.</span></footer></main>'
         title = f"{name} — Take-off + Build Set"
@@ -1043,7 +1046,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  '<div><span class="sl">Cost</span><span class="sv">%s</span></div><div><span class="sl">Gross profit</span><span class="sv">%s</span></div>'
                  '<div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
                  % (money(p.sell), money(p.retail), money(p.cost), money(p.gp), 100 * p.gp / p.sell, L.deck_sf))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div><h1>{E(name)}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Cost stack: materials at the order x {p.material_factor:g}, tax, labor at the rate card, site services at cost; {p.gm:.1%} GM on the work. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Cost Stack"
@@ -1054,12 +1057,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  '<div><span class="sl">Tax</span><span class="sv">%s</span></div><div><span class="sl">Labor</span><span class="sv">%s</span></div>'
                  '<div><span class="sl">Site services</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
                  % (money(cost_total), money(p.materials), money(tax_raw), money(p.labor), money(p.gc), L.deck_sf))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · sold — cost to build</div><h1>{E(name)}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · sold — cost to build</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Cost to build: materials at invoice, labor at the rate card, site services at cost. Internal.</span></footer></main>'
         title = f"{name} — Cost to Build"
     else:
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div><h1>{E(name)}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')
         gm_note = (f"sold at {money(p.sell)} · {p.gp / p.sell:.1%} margin on the sold price ({p.gm:.1%} on the work)" if spec.extras.sell_override else
                    f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else ""))
@@ -1546,7 +1549,7 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
     section = "".join(o)
     who = "Prepared for the owner" + (f" · {addr}" if addr else "") + f" · {today}"
     have0 = built[hero_from]["have"]
-    head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name)}</h1><p class="who">{E(who)}</p>'
+    head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1><p class="who">{E(who)}</p>'
             f'<div class="pricebar"><div><span class="l">Both decks · check or ACH</span><span class="v">{money(sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(retail)}</span><span class="s">no money down</span></div>'
             f'<div><span class="l">Monthly</span><span class="v">{money(monthly)}</span><span class="s">6.99% · 10 years</span></div></div>'
             + (f'<img class="herofig" src="r/{hk}-{hero}.jpg" alt="rendering">' if hero in have0 else "")
@@ -1575,7 +1578,8 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
 PERMIT_CSS = """<style>
 .sheet-page{margin:0 0 28px;} .sheet-page svg{width:100%;height:auto;display:block;border:1px solid var(--line);background:#fff;}
 .index{columns:2;column-gap:28px;font-size:14px;} .index li{break-inside:avoid;}
-@media print{@page{size:Letter landscape;margin:0.3in;} .band{padding:0.35in 0.5in;} .wrap{padding:0 0.2in;} .sheet-page{break-after:page;page-break-after:always;margin:0;} .sheet-page svg{border:0;max-height:7.6in;}
+.vpage h3{margin:0 0 12px;} .vgal{display:block;} .vgal figure{margin:0;} .vgal img{width:100%;height:auto;display:block;}
+@media print{.vpage{break-inside:avoid;} .vpage~.vpage{break-before:page;page-break-before:always;} .vgal img{width:auto;max-width:100%;max-height:6.4in;margin:0 auto;} @page{size:Letter landscape;margin:0.3in;} .band{padding:0.35in 0.5in;} .wrap{padding:0 0.2in;} .sheet-page{break-after:page;page-break-after:always;margin:0;} .sheet-page svg{border:0;max-height:7.6in;}
   .cover-list{break-after:page;page-break-after:always;} h2.kicker{margin-top:10px;} figure{break-inside:avoid;} .gal{gap:8px;}}
 </style>"""
 
@@ -1624,25 +1628,31 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
         for num, ttl, svg in r["sheets"]:
             svg = re.sub(r"GS Exterior Experts · ([A-Z][a-z]+ \d{1,2}, \d{4}) · Rev 0", r"GSX · Jade Pender 303-550-9558 · \1 · Rev 0 · PERMIT SET", svg)
             svg = re.sub(r"<text[^>]*>(?:T-400|T-700)</text>\s*<text[^>]*>[^<]*</text>", "", svg)   # the build-set and takeoff sheets are not in a permit set
+            svg = re.sub(r" — the cut list is on T-\d+", "", svg)                                  # nor is the cut list
             index.append((pt["title"], num, ttl))
             sheet_html.append(f'<div class="sheet-page" id="s-{pi + 1}-{num}"><h3>{E(pt["title"])} · {num} · {E(ttl)}</h3>{svg}</div>')
     w(f'<section class="job" id="job-{key}">')
+    if renders:
+        index.append((parts[0]["title"], "A-001", "Isometric · renders (3D views, design intent)"))
     w('<div class="cover-list"><h2 class="kicker" id="g-index">Sheet index</h2><ol class="index">' + "".join(f"<li>{E(a)} · <b>{b}</b> {E(c)}</li>" for a, b, c in index) + "</ol>")
     eng_any = any(pt_["spec"].extras.engineered for pt_ in parts) and not no_engineering
     w('<p>' + ("Design intent. The stamped engineering set governs structure, dimensions and locations. " if eng_any else "Design intent per the 2021 IRC R507 prescriptive provisions. ")
       + 'Field verify. Do not scale. This set carries no pricing.</p></div>')
     w("".join(sheet_html))
     if renders:
-        w('<h2 class="kicker" id="g-views">3D views <span class="tag">design intent</span></h2>')
+        # the 3D views as sheet A-001: one view to a page, large, each page headed, nothing split across a page break
+        w('<span id="g-views"></span>')
         for gi, (ttl, items) in enumerate(renders.items()):
-            w(f"<h3>{E(ttl)}</h3><div class=\"gal\">")
-            for cap, path in items:
-                fn = f"r/{key}-{Path(path).stem}.jpg" if len(renders) == 1 else f"r/{key}{gi + 1}-{Path(path).stem}.jpg"   # one file per deck
-                files[fn] = str(Path(path).resolve())
-                w(f'<figure><img src="{fn}" alt="{E(cap)}" loading="lazy"><figcaption>{E(cap)}</figcaption></figure>')
-            w("</div>")
+            chunks = [items[k:k + 1] for k in range(0, len(items))]
+            for ci, chunk in enumerate(chunks):
+                w(f'<div class="vpage"><h3>{E(ttl)} · <b>A-001</b> Isometric · renders <span class="tag">design intent · {ci + 1} of {len(chunks)}</span></h3><div class="gal vgal">')
+                for cap, path in chunk:
+                    fn = f"r/{key}-{Path(path).stem}.jpg" if len(renders) == 1 else f"r/{key}{gi + 1}-{Path(path).stem}.jpg"   # one file per deck
+                    files[fn] = str(Path(path).resolve())
+                    w(f'<figure><img src="{fn}" alt="{E(cap)}" loading="lazy"><figcaption>{E(cap)}</figcaption></figure>')
+                w("</div></div>")
     w("</section>")
-    head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · permit set</div><h1>{E(name)}</h1>'
+    head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · permit set</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
             f'<p>{E(sub or addr)} · {E(today)}</p></div></header>')
     body = head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division · Jade Pender 303-550-9558</span><span>Permit set — drawings only. ' + ("Design intent; the stamped engineering set governs." if eng_any else "Design intent; 2021 IRC R507 prescriptive.") + '</span></footer></main>'
     title = f"{name} — Permit Set"
