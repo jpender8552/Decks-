@@ -454,8 +454,9 @@ def lines_for(plan: LightPlan) -> list:
         p = product(cfg, cfg["connector_sku"])
         need = int(math.ceil(2 * plan.splices * 1.1))             # two conductors at every splice, +10% spares
         n = int(math.ceil(need / p.get("count", 25)))
-        out.append(Line(CATEGORY, p["desc"] + (" — splices on the run under the deck at each post and behind the risers" if accent else
-                                               " — splices in the post-cap cavity and behind the risers"),
+        behind_ = " and behind the risers" if plan.n_riser else ""
+        out.append(Line(CATEGORY, p["desc"] + (" — splices on the run under the deck at each post" + behind_ if accent else
+                                               " — splices in the post-cap cavity" + behind_),
                         n, n, "pk", f"{need} needed  ({plan.splices} splices x 2 conductors, +10%)", p["each"], p["source"], p["sku"]))
         p = product(cfg, cfg["staple_sku"])
         need = int(math.ceil((plan.wire_ft - sum(n.wire_ft for r in plan.runs for n in r.nodes if n.what == "post")) / 1.5))
@@ -494,9 +495,11 @@ def labor_lines(t, lr: dict) -> list:
     plan = getattr(t, "lighting", None)
     if plan is None or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
         return []
-    what = (f"{plan.n_riser} riser + {plan.n_cap} post accent lights: cut the riser openings, drill each post (3/8\" wire hole, 2 screws), "
+    rz_ = f"{plan.n_riser} riser + " if plan.n_riser else ""
+    cut_ = "cut the riser openings, " if plan.n_riser else ""
+    what = (f"{rz_}{plan.n_cap} post accent lights: {cut_}drill each post (3/8\" wire hole, 2 screws), "
             "fish the lead down the post, splice under the deck, mount" if plan.post_kind == "accent" else
-            f"{plan.n_riser} riser + {plan.n_cap} post-cap lights: cut the riser openings, pull the 12/2 through the posts, splice, mount")
+            f"{rz_}{plan.n_cap} post-cap lights: {cut_}pull the 12/2 through the posts, splice, mount")
     own = "lighting_fixture_each" in lr            # the owner's rate (pricebook labor), else the estimate
     out = [(f"Lighting — install {what}", plan.fixtures, "fixture", float(lr.get("lighting_fixture_each", 50.0)),
             "owner rate — $25 a fixture, the transformer and runs included" if own else "ESTIMATE — no lighting rate on the card; confirm")]

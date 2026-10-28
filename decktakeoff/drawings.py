@@ -547,6 +547,7 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
         draw_plan_boxes(o, X, Y, sc, field + [b for b in S.boxes if b.kind == "board" and not (b.tag or "").startswith("pf field")], ("board",), "#8f8f8c", 0.25)
     else:
         draw_plan_boxes(o, X, Y, sc, S.boxes, ("board",), "#8f8f8c", 0.25)
+    draw_plan_boxes(o, X, Y, sc, S.boxes, ("tread",), "#444", 0.4)           # the stairs' and box steps' treads, in the field board
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("border",), "#222", 0.3)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("railpost",), INK, 0.5)
     zs = S.meta["zones"]
@@ -1774,8 +1775,8 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
     from .spec import covers_of
     _cv0 = (covers_of(s) or [{}])[0]
     ks = [
-        (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "first"),
-        ((f"6x6 {post_words(s)} deck post on {post_base_sku(s)}, steel saddle to the boxed beam" if s.framing.steel_deck_post == "wood" else "3x3 galvanized HSS post stub on a pier-head bracket") if steel else f"{s.framing.post_size} {post_words(s) if s.framing.post_species else ''} post on {_a(post_base_sku(s))} {post_base_sku(s)} standoff base".replace("  ", " "), lambda b: b.kind == "post", (0.5, 0.5, 0.6), "first"),
+        (f"Diamond Pier {L.frame.footing_model} — head + 4 driven pins (frost-protected, no excavation)", lambda b: b.kind == "footing" and "Diamond" in (b.tag or ""), (0.5, 0.5, 1.0), "front"),
+        ((f"6x6 {post_words(s)} deck post on {post_base_sku(s)}, steel saddle to the boxed beam" if s.framing.steel_deck_post == "wood" else "3x3 galvanized HSS post stub on a pier-head bracket") if steel else f"{s.framing.post_size} {post_words(s) if s.framing.post_species else ''} post on {_a(post_base_sku(s))} {post_base_sku(s)} standoff base".replace("  ", " "), lambda b: b.kind == "post", (0.5, 0.5, 0.6), "front"),
         (f"4x4 {'DF #1' if s.framing.post_species.upper().startswith('DF') else ''} knee brace at 45°, both directions, through-bolted".replace("  ", " "), lambda b: b.kind == "brace", (0.5, 0.5, 0.5), "first"),
         ((f"Boxed CEMCO {s.framing.steel_joist} beam (2 C toe-to-toe, G90), flush" if steel else beam_lab), lambda b: b.kind == "beam", (0.3, 0.5, 1.0), "last"),
         ((f"CEMCO {s.framing.steel_joist} C-joist, G90, @ {L.frame.spacing:g}\" OC — clip angles each end" if steel
@@ -1792,7 +1793,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
           f"{s.decking.brand} {s.decking.collection} fascia, {s.decking.fascia_color or s.decking.color}, over the rim" if s.decking.fascia else "Fascia"),
          lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
         (f"Stair — steel stringers, {s.decking.collection} treads, closed risers, lands on grade" if steel else stair_lab, lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
-        (f"{rail_name(s.railing.system)} rail, {s.railing.color}, {s.railing.height_in:g}\"" if (s.railing and L.rail) else "Rail", lambda b: b.kind in ("toprail",), (0.5, 0.5, 1.0), "mid"),
+        (f"{rail_name(s.railing.system)}{'' if rail_name(s.railing.system).lower().endswith('rail') else ' rail'}, {s.railing.color}, {s.railing.height_in:g}\"" if (s.railing and L.rail) else "Rail", lambda b: b.kind in ("toprail",), (0.5, 0.5, 1.0), "mid"),
         (f"Built-in bench — 4x4 posts bolted through the rim, all wrapped in {dk}", lambda b: b.kind == "benchpost" or (b.tag or "").startswith("bench seat"), (0.5, 0.5, 1.0), "mid"),
         (f"Planter — treated 2x4 box, OSB, {dk} skin, picture-frame cap", lambda b: (b.tag or "").startswith("planter") and "soil" not in (b.tag or ""), (0.5, 0.5, 1.0), "mid"),
         ("Gravel over 6-mil poly under the decks", lambda b: b.kind == "gravel", (0.3, 0.6, 1.0), "first"),
@@ -2425,7 +2426,8 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     # 2 deck edge
     x, y = P[1]; _panel(o, x, y, W3, H2, "2", "DECK EDGE — PICTURE FRAME + FASCIA")
     _wood(o, x + 170, y + 110, 10, 60); _wood(o, x + 180, y + 110, 10, 60); _wood(o, x + 140, y + 110, 9, 60)
-    o.append(R(x + 190, y + 104, 5, 70, FILL["deck"], INK, 0.5))
+    hk_ = L.spec.extras.hardie_skirt
+    o.append(R(x + 190, y + 104, 5, 70, "#f1efe8" if hk_ else FILL["deck"], INK, 0.5))
     o.append(R(x + 134, y + 101, 62, 9, FILL["border"], INK, 0.5)); o.append(R(x + 30, y + 101, 102, 9, FILL["deck"], INK, 0.5))
     o.append(R(x + 140, y + 108, 9, 2.5, "#111", "none", 0)); o.append(R(x + 170, y + 108, 20, 2.5, "#111", "none", 0))
     for xx in (160, 186):
@@ -2433,7 +2435,8 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     o.append(R(x + 128, y + 104, 4, 6, "#5b6166", INK, 0.4))
     _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitred, {pf_fast} 2 per bearing @ {L.spec.joist_spacing:g}\"")
     _lead(o, x + 130, y + 106, x + 24, y + 60, f"{fsys} clip in every gap at every joist (3/16\" gap)")
-    _lead(o, x + 193, y + 150, x + 236, y + 140, f"{s.decking.collection} fascia, pre-drilled, 2 screws at each end then alternating @ 12\"")
+    _lead(o, x + 193, y + 150, x + 236, y + 140, (f"HardieTrim {L.spec.extras.hardie_color or ''} skirt, pre-drilled, color-matched 316SS trim screws, 2 at each end then @ 12\"".replace("  ", " ") if hk_ else
+                                                   f"{s.decking.collection} fascia, pre-drilled, 2 screws at each end then alternating @ 12\""))
     _lead(o, x + 145, y + 140, x + 24, y + 200, "PF joist 1-1/2\" inboard of the rim carries the border's inside edge")
     _lead(o, x + 180, y + 110, x + 236, y + 210, "G-Tape 4\" on the rim tops, 2\" on the joists")
     # 3 guard bay

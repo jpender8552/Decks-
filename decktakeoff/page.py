@@ -907,11 +907,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "isolow", "under"], have))
         w(alt_html)
         w(sun_html)
-        w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
+        w('<h2 class="kicker" id="g-iso">Isometrics <span class="tag">the model from above</span></h2>')
         w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
-        w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
+        w('<h2 class="kicker" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
-        w('<h2 class="kicker pb" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
+        w('<h2 class="kicker" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
         w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
         ob = _option_blocks(spec, t, p, blocks, key, rd, files) if blocks else None
         if ob:
@@ -946,7 +946,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "under", "isolow"], have))
         w(alt_html)
         w(sun_html)
-        w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from four corners</span></h2>')
+        w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from above</span></h2>')
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso"], have))
         w('<h2 class="kicker pb" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))

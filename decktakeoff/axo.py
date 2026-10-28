@@ -179,7 +179,13 @@ def anchor(boxes: Sequence[Box], pred: Callable[[Box], bool], explode: bool = Fa
     if not m:
         return None
     m.sort(key=lambda b: ((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2))
-    b = {"first": m[0], "last": m[-1]}.get(pick, m[len(m) // 2])
+    if pick == "front":         # the one nearest the yard (nothing built in front of it), the most central of those
+        ymax = max(b_.y1 for b_ in m)
+        xs_ = [((b_.x0 + b_.x1) / 2) for b_ in m]
+        xc = (min(xs_) + max(xs_)) / 2
+        b = min((b_ for b_ in m if b_.y1 >= ymax - 0.5), key=lambda b_: abs((b_.x0 + b_.x1) / 2 - xc))
+    else:
+        b = {"first": m[0], "last": m[-1]}.get(pick, m[len(m) // 2])
     cs = corners(b, lift_of(b, explode, gaps))
     xs, ys, zs = [c[0] for c in cs], [c[1] for c in cs], [c[2] for c in cs]
     return (min(xs) + (max(xs) - min(xs)) * where[0], min(ys) + (max(ys) - min(ys)) * where[1], min(zs) + (max(zs) - min(zs)) * where[2])

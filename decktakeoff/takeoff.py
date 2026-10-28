@@ -1413,7 +1413,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
 
     # ================= FASTENERS
     fsys = spec.decking.fastener_system or default_fastener_system(coll, spec.decking.profile)
-    face = Qz.first_row + Qz.border_screws + Qz.fascia_screws
+    fas_face = 0 if spec.extras.hardie_skirt else Qz.fascia_screws        # a HardieTrim skirt takes its own trim screws (the Fascia lines), not deck screws
+    face = Qz.first_row + Qz.border_screws + fas_face
     stair_face = sum((st.tread_pieces + st.riser_pieces) * (st.stringers or int(math.ceil(st.width / 16.0)) + 1) * 2 for st in stairs)
     if fsys == "Camo EdgeClip":
         d = PRICEBOOK["decking"]["Camo_EdgeClip_90"]
@@ -1438,7 +1439,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             bboxes = max(1, int(math.ceil(nb / d["count"])))
             lines.append(Line("Fasteners", f"Cortex for TimberTech {dkf['material']}, {bcolor} plugs — borders + dividers", bboxes, bboxes, "box", f"{nb} screws", d["each"], d["source"]))
         sched["Field"] = f"Cortex face screws with color-matched plugs: 2 per board at every joist and at both ends of every run, color-matched plugs ({n} field + {Qz.border_screws} border/divider)"
-        face = Qz.fascia_screws; stair_face = 0         # the fascia still takes its own screws (below)
+        face = fas_face; stair_face = 0                  # the fascia still takes its own screws (below)
     else:
         n = Qz.clips
         d = PRICEBOOK["decking"]["CapTor_xd_350"]
@@ -1469,10 +1470,12 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         boxes = max(1, int(math.ceil(tot / d["count"])))
         lines.append(Line("Fasteners", f"Starborn Cap-Tor xd 2-3/4\" Epoxy {color} 350 ct", boxes, boxes, "box",
                           f"{tot} screws needed  (" + " · ".join(f"{k_} {v_}" for k_, v_ in (("first row", Qz.first_row), ("border", 0 if (spec.decking.border_fastener or '') == 'Cortex' else Qz.border_screws),
-                                                                         ("fascia", 0 if fascia_pvc else Qz.fascia_screws), ("stairs", stair_face)) if v_) + ")", d["each"], d["source"]))
+                                                                         ("fascia", 0 if fascia_pvc else fas_face), ("stairs", stair_face)) if v_) + ")", d["each"], d["source"]))
         cx_b = (spec.decking.border_fastener or "") == "Cortex"
         sched["Face screws"] = ("Cap-Tor xd color-matched ONLY at: first row 1 per joist on the house edge · " + ("" if cx_b else "borders 2 per bearing point @ 16\" · ")
-                                + "fascia 2 at each board end then alternate top/bottom every 12\", pre-drilled" + (" · stair treads 2 per stringer per board" if stairs and not cx_b else ""))
+                                + ("" if spec.extras.hardie_skirt else "fascia 2 at each board end then alternate top/bottom every 12\", pre-drilled")
+                                + (" · stair treads 2 per stringer per board" if stairs and not cx_b else ""))
+        sched["Face screws"] = sched["Face screws"].rstrip(" ·")
 
     # ================= RAIL
     if rl:
