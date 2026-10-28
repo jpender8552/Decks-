@@ -8,6 +8,8 @@ Run with a Python that has bpy (Blender as a module):
         [--cameras=STATIONS.json] [--when=YYYY-MM-DDTHH:MM] [--dusk] [--dusk-when=...] [--dusk-exposure=3] [--led=1] [--glow=1]
         [--foliage=summer]   (the deciduous canopy and shrubs in summer greens when the yard model carries autumn colors)
         [--styling=0]        (leave out the styling furniture, geometry.furniture: it is drawn by default, never priced)
+        [--hdri=NAME|0 --hdri-dir=PATH] [--cam=photo|0] [--lawn=oct|0]   (cycles_env.py: image-based sky light with the
+                             sun lamp kept, the camera model - exposure, WB, AgX, lens - and the late-October lawn)
 --when puts the sun at another local time than spec.site.sun_when; --dusk renders the blue hour of that date (sun -5 deg, or
 --dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" color), real
 fixture lights and the rooms behind the windows lit. A station with "mode": "dusk" renders at dusk without the flag.
@@ -30,6 +32,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 import bpy  # noqa: E402  (Blender as a Python module)
 import mathutils
+
+from decktakeoff import cycles_env as ENV   # --hdri / --cam / --lawn (each off unless its flag is given)
 
 IN = 1 / 12.0
 SKILL_BOARDS = os.environ.get("TT_BOARDS_SKILL", "/root/.claude/skills/synced/607fe818-1870-48a4-acf4-521f29c0bf01_8ba838c8-b3cb-4abb-8652-1992d2c2ba58/timbertech-boards/scripts")
@@ -1428,6 +1432,8 @@ def _lawn_nodes(nt, key: str, md: dict, relative: bool = False):
     """The lawn's color field in world coordinates, shared by the ground and the blades near the cameras: broad dry /
     green patches (~25'), mottling (~4'), clumps (~1') and blade speckle. relative=True returns it as a multiplier about
     1.0 (the blades keep their own colors and take the patches). Returns (color socket, height socket for a bump)."""
+    if ENV.on("lawn") and key in ("lawn", "ground", "meadow", "groundcover"):   # --lawn=oct: late October (cycles_env)
+        return ENV.lawn_nodes(nt, key, md, relative)
     if key in LAWN:
         green, base, dry = LAWN[key]
     else:
@@ -1557,6 +1563,8 @@ def _grass_mask(spec, D):
 
 def add_grass(spec, D, cams: Dict[str, dict], names: List[str], col, reach: float = 34.0, cell: float = 1.0):
     """Instance blade patches on the lawn within `reach` ft of the cameras that will render (and in front of them)."""
+    if ENV.on("lawn"):                      # --lawn=oct: late-October blades, filled to the edges (cycles_env)
+        return ENV.add_grass(spec, D, cams, names, col, reach, cell)
     from decktakeoff.landscape import Grade
     sm = spec.geometry.site_model or {}
     gm = sm.get("grade", {})
@@ -1728,6 +1736,8 @@ def _sky_with_clouds(nt, sky_col, v):
 
 
 def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065, fill_sat=0.5):
+    if ENV.on("hdri"):                      # --hdri=NAME: a puresky HDRI for the sky light + this sun lamp (cycles_env)
+        return ENV.setup_world(D, spec, sun_strength)
     scn = bpy.context.scene
     sun = D["meta"].get("sun") or [-0.5, 0.5, 0.7]
     v = mathutils.Vector(B(*sun)).normalized()                  # toward the sun, Blender frame
@@ -1947,6 +1957,8 @@ def setup_dusk(D, spec, sun_vec, sky_strength=1.0, fill_strength=1.0, fill_sat=0
     """Twilight: the same physical sky (Blender's multiple-scattering model holds a sun below the horizon: deep blue
     overhead, the afterglow low on the sunset side), seen by the camera and lighting the scene at full strength (no
     daylight fill trick); a warm, weak sun lamp only while the sun is still up. set_mode("dusk") switches to it."""
+    if ENV.on("hdri_dusk"):                 # --hdri-dusk=NAME (default with --hdri): a blue-hour HDRI (cycles_env)
+        return ENV.setup_dusk(D, spec, sun_vec)
     scn = bpy.context.scene
     v = mathutils.Vector(B(*sun_vec)).normalized()
     el = math.asin(max(-1, min(1, v.z)))
@@ -2031,6 +2043,8 @@ def set_sun(v):
     m["sun"].rotation_euler = vb.to_track_quat("Z", "Y").to_euler()
     m["sun"].data.color = _sun_rgb(math.degrees(el))
     m["sun"].data.energy = m.get("energy", 5.0) if el > 0 else 0.0
+    if ENV.on("hdri"):                      # the HDRI turns with the sun; the lamp keeps the capture's sun color
+        ENV.on_set_sun(vb)
     LIGHTS["sun_now"] = tuple(v)
 
 
@@ -2195,12 +2209,15 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
         if c.get("eye") is not None:            # a person's eye height above whatever they stand on (the deck, else the yard)
             pos[2] = standing_z(D, spec, pos[0], pos[1]) + float(c["eye"])
         cam = camera(f"cam_{out_nm}", pos, c["at"], float(c.get("fov", 40)), size)
+        ENV.camera_hook(cam, c, nm, pos)       # --cam: DOF on close-ups; --lawn: only this view's grass renders
         scn.camera = cam
         jpg = os.path.join(out_dir, f"{out_nm}.jpg")
         scn.render.filepath = os.path.join(out_dir, "_exr", f"{out_nm}.exr") if TONEMAP == "grade" else jpg
         t = time.time()
         bpy.ops.render.render(write_still=True)
-        if TONEMAP == "grade":
+        if TONEMAP == "grade" and ENV.on("cam"):   # --cam=photo: WB, lens, AgX, grain (cycles_env)
+            ENV.grade_exr(scn.render.filepath, jpg, scn.view_settings.exposure, mode=mode)
+        elif TONEMAP == "grade":
             grade_exr(scn.render.filepath, jpg, scn.view_settings.exposure, lift=LIFT.get(mode, LIFT["day"]))
             scn.render.filepath = jpg
         done[out_nm] = jpg
@@ -2222,6 +2239,7 @@ def main(argv):
     spec_path, out_dir = args[0], args[1]
     names = args[2:] or ["yard", "corner", "ondeck"]
     os.makedirs(out_dir, exist_ok=True)
+    ENV.configure(opts, sys.modules[__name__])
     quick = bool(opts.get("--quick"))
     if opts.get("--black"):                 # --black=#hex sets the black powder-coat floor, --black=none renders the spec's color as is
         globals()["BLACK_PC"] = "" if str(opts["--black"]).lower() in ("none", "off", "0") else str(opts["--black"])
@@ -2275,8 +2293,11 @@ def main(argv):
     print(f"scene built in {time.time() - t:.0f}s: {len(bpy.data.objects)} objects", flush=True)
     if opts.get("--blend"):
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out_dir, "scene.blend"))
+    ev_dusk = 3.0
+    if ENV.on("cam"):                       # --cam: the camera meters the light the world setup measured
+        ev_day, ev_dusk = ENV.metered_ev("day", ev_day), ENV.metered_ev("dusk", ev_dusk)
     modes = dict(day=dict(exposure=float(opts.get("--exposure", ev_day)), samples=samples),
-                 dusk=dict(exposure=float(opts.get("--dusk-exposure", 3.0)), samples=int(opts.get("--dusk-samples", samples)),
+                 dusk=dict(exposure=float(opts.get("--dusk-exposure", ev_dusk)), samples=int(opts.get("--dusk-samples", samples)),
                            led=float(opts.get("--led", 1.0)), glow=float(opts.get("--glow", 1.0))))
     render_views(D, out_dir, names, samples=samples, size=size, quick=quick, exposure=float(opts.get("--exposure", ev_day)),
                  modes=modes, default_mode=default_mode, spec=spec, date=when.split("T")[0])
