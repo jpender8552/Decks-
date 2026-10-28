@@ -152,7 +152,8 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                             + (", fascia skirts both sides stepped under each tread" if getattr(sl_, "skirts", False) else "") + ", closed risers" + (" (HardieTrim, ripped to height, pre-drilled, 316SS trim screws)" if s.extras.hardie_skirt else "") + ", treads Cortex 2 per stringer per board.")
         if any(getattr(ss_, "landing", "") == "grade" for ss_ in s.stairs):
             how_.append("Each stair lands on grade: 36\" of firm, level ground at the bottom, as wide as the stair (no pad in this scope).")
-        steps.append(dict(n=8, code="T-407", title="Stairs" + (" and the box step" if any(getattr(sl_, "build", "") == "box" for sl_ in L.stairs) else ""), still="yard",
+        steps.append(dict(n=8, code="T-407", title="Stairs" + ((" and the box steps" if sum(1 for sl_ in L.stairs if getattr(sl_, "build", "") == "box") > 1 else " and the box step")
+                                                             if any(getattr(sl_, "build", "") == "box" for sl_ in L.stairs) else ""), still="yard",
             goes_in=items(lambda l: (l.category == "Lumber" and any(k in (l.why or "") for k in ("stair", "box step")))
                           or (l.category == "Stairs" and "door step" not in l.item.lower()) or (l.category == "Hardware" and ("stair" in l.item.lower() or "box step" in l.item.lower())), 14),
             how=how_,

@@ -333,6 +333,7 @@ class Extras:
     under_deck_gravel: bool = False      # gravel over 6-mil poly under the deck (Louisville: decks 6' or less above grade)
     cover_post_species: str = "WRC"      # roof-cover posts: "WRC" (western red cedar) | "DF" (Douglas fir #1)
     labor_total: Optional[float] = None         # owner-set total labor for the job: owner-set lots stay, the rest scale to make it up
+    labor_adjust: Optional[float] = None        # owner's labor change for the job, $ (-1000 = cut $1,000): spread over the card lines in proportion
     cover_labor_total: Optional[float] = None   # owner-set labor for ALL roof covers together, roofing included (replaces the per-SF cover lines)
     demo_covers: bool = False            # tear off and haul the existing roof covers being replaced
     blinds_reinstall: bool = False       # take down, store and rehang the owner's roll-down blinds on the new cover beams

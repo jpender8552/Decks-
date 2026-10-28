@@ -205,9 +205,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"{fr_txt} — on {foot}{' with stone column bases' if s.extras.stone_bases else ''}. "
       f"{s.decking.brand} {s.decking.collection} {s.decking.color} decking"
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
-      + (f", {rail_words(s, rl.system)}" + ("" if lv and (rail_words(s, rl.system).endswith(" rail") or rail_words(s, rl.system) != rail_name(rl.system))
+      + (f", {rail_words(s, rl.system)}" + ("" if (rail_words(s, rl.system).endswith(" rail") or (lv and rail_words(s, rl.system) != rail_name(rl.system)))
                                             else f" {'cable ' if rl.system == 'IRX' else ''}rail")
-         + (f" with a {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
+         + (f" with {'an' if str(drink_words or '')[:1].lower() in 'aeiou' else 'a'} {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
       + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
@@ -284,7 +284,9 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     if lt["total"]:
         _tr = lt["transformer"].lower()
         _pl, _pw = post_light_terms(t)
-        w("| Lighting | " + " and ".join(x for x in ((f"{lt['riser']} LED riser lights (one in every riser)" if lt["riser"] else ""),
+        _rw = (__import__("decktakeoff.lighting", fromlist=["riser_where"]).riser_where(t.lighting)
+               if getattr(t, "lighting", None) is not None and t.lighting.n_riser else "one in every riser")
+        w("| Lighting | " + " and ".join(x for x in ((f"{lt['riser']} LED riser lights ({_rw})" if lt["riser"] else ""),
                                                     (f"{lt['post_cap']} LED {_pl} ({_pw})" if lt["post_cap"] else ""),
                                                     (f"{lt['other']} more LED lights" if lt["other"] else "")) if x)
           + (("; low voltage, on a transformer" + (" with a photocell and timer" if "photo" in _tr and "timer" in _tr else
@@ -646,9 +648,10 @@ def _schedule(t: Takeoff) -> List[str]:
     if L.rail:
         rd = max(1, round(L.rail.rail_lf / 40))
         _rn = rail_words(s, L.rail.system)
-        days.append(f"{_span(d+1, d+rd)} — {_rn}" + ("" if hasattr(L, "parts") and (_rn.endswith(" rail") or _rn != rail_name(L.rail.system)) else " rail") + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
+        days.append(f"{_span(d+1, d+rd)} — {_rn}" + ("" if (_rn.endswith(" rail") or (hasattr(L, "parts") and _rn != rail_name(L.rail.system))) else " rail") + (" and drink rail" if s.railing.drink_rail else "") + (". Owner's electrician and plumber finish the tub circuit" if s.extras.hot_tub else "") + "."); d += rd
     if L.stairs:
-        days.append(f"Day {d+1} — stairs" + (" and the box step" if any(getattr(st, 'build', '') == 'box' for st in L.stairs) and len(L.stairs) > 1 else "")
+        _nbox = sum(1 for st in L.stairs if getattr(st, 'build', '') == 'box')
+        days.append(f"Day {d+1} — stairs" + ((" and the box steps" if _nbox > 1 else " and the box step") if _nbox and len(L.stairs) > _nbox else "")
                     + (", the vertical boards on the face between the levels" if step_face_words(t) else "") + "."); d += 1
     lt = lights_of(t)
     if lt["total"]:

@@ -946,7 +946,7 @@ def build_scene(L) -> Scene:
             ov_ = 0.1 if skirt_ else 0.02            # treads run 1" past the skirt faces
             for k in range(1, n_r + 1):
                 ztop = z_top - k * rise
-                sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tone_=tone())
+                sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tag=f"riser {k} {tag_}", tone_=tone())
                 if k <= n_t:
                     sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - ov_, vb_ + ov_, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
             if skirt_:

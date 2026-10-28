@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -39,6 +40,8 @@ DEFAULTS = dict(
     stair_posts=True,           # ... the stair and landing-guard posts included, with the same light (False: the deck rail posts only)
     every=1,                    # 1 = every post, 2 = every other post (TimberTech: every post or alternate posts)
     per_riser=None,             # lights per riser; None -> one per 5' of stair width (one on a 4' stair)
+    riser_pick=None,            # which risers get lights: {stair side or name: [riser numbers, 1 = the top riser] | "all"}; a stair it
+                                #   doesn't name gets none (the owner: "just enough to show"). None -> every riser of every stair
     riser_sku="AZTDLRECRISERMB",
     cap_sku="AZTDL3X3LANCAPB",
     accent_sku="AZTIXLEDACCB",
@@ -126,6 +129,22 @@ def per_riser(cfg: dict, width_in: float) -> int:
     return int(cfg["per_riser"]) if cfg.get("per_riser") else max(1, int(math.ceil(width_in / 60.0 - 1e-9)))
 
 
+def picked_risers(cfg: dict, side: str, name: str, n_risers: int) -> List[int]:
+    """The risers of a stair that carry lights, 1 = the top riser: lights.riser_pick by the stair's side or name ([numbers] or
+    "all"); a stair it doesn't name gets none. Without riser_pick, every riser."""
+    pick = cfg.get("riser_pick")
+    if not n_risers:
+        return []
+    if not pick:
+        return list(range(1, n_risers + 1))
+    v = pick.get(side, pick.get(name)) if isinstance(pick, dict) else None
+    if v is None or v is False:
+        return []
+    if v is True or v == "all":
+        return list(range(1, n_risers + 1))
+    return sorted({int(k) for k in (v if isinstance(v, (list, tuple)) else [v]) if 1 <= int(k) <= n_risers})
+
+
 def post_fixture(spec, cfg: dict) -> str:
     """"cap" (a lantern cap light on each post) or "accent" (a small accent light on the post's deck side): the job's choice
     (extras.lights.post_light), else from the rail — a drink rail OVER the posts (railing.drink_rail_mount "over") leaves no
@@ -188,6 +207,13 @@ class LightPlan:
     notes: List[str] = field(default_factory=list)
     parts: List[str] = field(default_factory=list)
     post_kind: str = "cap"                        # "cap" | "accent" (post_fixture)
+    riser_total: Dict[str, int] = field(default_factory=dict)   # stair name -> its risers (lit or not), for the words
+
+    @property
+    def every_riser(self) -> bool:
+        """Every riser of every stair is lit (no riser_pick, or one that names them all)."""
+        return all(nr == self.riser_total.get(nm, nr) for nm, nr, k, _ in self.stairs) and \
+            all(any(nm == s_[0] and s_[1] for s_ in self.stairs) for nm in self.riser_total)
 
     @property
     def n_cap(self) -> int:
@@ -320,6 +346,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
     per_post = (lambda h: 2 * (h + 0.75)) if kind == "cap" else (lambda h: h + 1.0)
     parts = [(p.layout, p.placement, p.spec, p.name) for p in L.parts] if hasattr(L, "parts") else [(L, None, spec, "")]
     stairs, nodes, notes = [], [], []
+    riser_total: Dict[str, int] = {}
     n_riser = deck_posts = stair_posts = 0
     every = max(1, int(cfg.get("every") or 1))
     zone_boxes = []                         # job frame, feet: (x0, x1, y0, y1) per zone, for the outlet default
@@ -340,7 +367,10 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
                 nodes.append(Node(x, y, z_deck, cap_w, per_post(post_h), "post", pname))
         for st, ss in zip(Lp.stairs, list(sp.stairs) + [None] * len(Lp.stairs)):
             nm = stair_name(ss, st) if ss is not None else f"Stair ({st.side})"
-            nr = st.geo.risers if (cfg.get("riser") and st.riser_pieces) else 0
+            nr_all = st.geo.risers if (cfg.get("riser") and st.riser_pieces) else 0
+            if nr_all:
+                riser_total[nm] = nr_all
+            nr = len(picked_risers(cfg, st.side, nm, nr_all))          # the risers lit (lights.riser_pick, else all of them)
             k = per_riser(cfg, st.width) if nr else 0
             sposts = (st.stair_posts + st.landing_posts) if (cfg.get("post_cap") and cfg.get("stair_posts")) else 0
             sposts = int(math.ceil(sposts / every)) if sposts else 0
@@ -361,7 +391,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
                 nodes.append(Node(x, y, z_deck, w_st / n_sub, trunk * (i + 1) / n_sub + leads / n_sub, f"stair: {nm}" + (f" ({i + 1}/{n_sub})" if n_sub > 1 else ""), pname))
     if not nodes:
         return LightPlan(cfg, stairs, 0, 0, 0, riser_w, cap_w, [], [], 0.0, 0, (0.0, 0.0), 0, ["nothing to light: no closed risers and no rail posts"],
-                         post_kind=kind)
+                         post_kind=kind, riser_total=riser_total)
     # the outlet: the job's own point, else the house wall behind the middle of the lights
     if cfg.get("transformer_at"):
         ox, oy = float(cfg["transformer_at"][0]), float(cfg["transformer_at"][1])
@@ -389,7 +419,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
     wire_lf = int(cfg["wire_lf"]) if cfg.get("wire_lf") else int(math.ceil(wire_ft * 1.10 / 10.0) * 10)
     splices = n_riser + deck_posts + stair_posts + sum(1 for n in nodes if n.what.startswith("stair"))    # every fixture lead, every stair's tee
     plan = LightPlan(cfg, stairs, n_riser, deck_posts, stair_posts, riser_w, cap_w, [], runs, round(wire_ft, 1), wire_lf, (round(ox, 2), round(oy, 2)),
-                     splices, notes, [p[3] for p in parts if p[3]], post_kind=kind)
+                     splices, notes, [p[3] for p in parts if p[3]], post_kind=kind, riser_total=riser_total)
     plan.transformers = _choose_transformers(cfg, plan.load_w)
     for i, r in enumerate(runs):
         if r.drop_v > V_DROP_NOTE:
@@ -425,7 +455,8 @@ def lines_for(plan: LightPlan) -> list:
         p = product(cfg, cfg["riser_sku"])
         what = " · ".join(f"{nm} {nr} risers" + (f" x {k}" if k > 1 else "") for nm, nr, k, _ in plan.stairs if nr)
         one = all(k == 1 for _, nr, k, _ in plan.stairs if nr)
-        out.append(Line(CATEGORY, f"{p['desc']} — {'one in' if one else 'in'} every riser", plan.n_riser, plan.n_riser, "ea", f"exact  ({what})", p["each"], p["source"], p["sku"]))
+        where = "every riser" if plan.every_riser else "each riser listed"
+        out.append(Line(CATEGORY, f"{p['desc']} — {'one in' if one else 'in'} {where}", plan.n_riser, plan.n_riser, "ea", f"exact  ({what})", p["each"], p["source"], p["sku"]))
     accent = plan.post_kind == "accent"
     if plan.n_cap:
         p = product(cfg, cfg["accent_sku"] if accent else cfg["cap_sku"])
@@ -564,7 +595,7 @@ def allocation(t, mats, labsum, comp) -> list:
     if plan is None or not m:
         return []
     free = bool(plan.cfg.get("riser_free")) and plan.n_riser > 0
-    gift = [(f"{plan.n_riser} riser lights, one in every riser — included at no charge", 0)] if free else []
+    gift = [(f"{plan.n_riser} riser lights, {riser_where(plan)} — included at no charge", 0)] if free else []
     if plan.cfg.get("sell_each"):
         return [(short_words(plan), round(float(plan.cfg["sell_each"]) * (plan.fixtures - (plan.n_riser if free else 0))))] + gift
     if free:                                    # the post lights at the margin as if there were no riser lights; the riser lights at none
@@ -603,6 +634,27 @@ def _switching(plan: LightPlan) -> str:
             f"turns them off {off}")
 
 
+def _low(nm: str) -> str:
+    return nm[0].lower() + nm[1:] if nm else nm
+
+
+def _riser_phrase(plan: LightPlan, nm: str, nr: int, k: int) -> str:
+    """"a recessed LED light in each of the 3 risers of the center stair" / "... in 1 of the 2 risers of the ..." (customer words)."""
+    tot = plan.riser_total.get(nm, nr)
+    each = "a recessed LED light" if k == 1 else f"{NUM.get(k, k)} recessed LED lights"
+    if nr == tot:
+        return f"{each} in each of the {nr} risers of the {_low(nm)}" if nr > 1 else f"{each} in the riser of the {_low(nm)}"
+    return f"{each} in {nr} of the {tot} risers of the {_low(nm)}"
+
+
+def riser_where(plan: LightPlan) -> str:
+    """Where the riser lights are, short: "one in every riser" / "3 on the center stair, 2 on the left box step"."""
+    rs = [(nm, nr, k) for nm, nr, k, _ in plan.stairs if nr]
+    if plan.every_riser:
+        return "one in every riser" if all(k == 1 for _, _, k in rs) else "in every riser"
+    return ", ".join(f"{nr * k} on the {_low(nm)}" for nm, nr, k in rs)
+
+
 def short_words(plan: LightPlan) -> str:
     bits = []
     if plan.n_riser:
@@ -620,12 +672,10 @@ def words(plan: LightPlan) -> str:
     lit = []
     if plan.n_riser:
         rs = [(nm, nr, k) for nm, nr, k, _ in plan.stairs if nr]
-        low = lambda nm: nm[0].lower() + nm[1:]
-        if len(rs) == 1:
-            nm, nr, k = rs[0]
-            lit.append((f"{'a' if k == 1 else NUM.get(k, k)} recessed LED light{'s' if k > 1 else ''} in each of the {nr} risers of the {low(nm)}"))
+        if len(rs) == 1 or not plan.every_riser:
+            lit.append(" and ".join(_riser_phrase(plan, nm, nr, k) for nm, nr, k in rs))
         else:
-            lit.append("a recessed LED light in each stair riser (" + ", ".join(f"{nr * k} on the {low(nm)}" for nm, nr, k in rs) + ")")
+            lit.append("a recessed LED light in each stair riser (" + ", ".join(f"{nr * k} on the {_low(nm)}" for nm, nr, k in rs) + ")")
     if plan.n_cap and plan.post_kind == "accent":
         stair = f" (on the stair and landing posts, the side toward the stair)" if plan.stair_posts else ""
         lit.append((f"a small LED accent light on each of the {plan.n_cap} rail posts, on the deck side just below the drink rail" if cfg.get("every", 1) == 1
@@ -820,6 +870,58 @@ def _riser_face(b, risers, treads, decks) -> Optional[Tuple[str, int]]:
     return None
 
 
+_RISER_TAG = re.compile(r"^(?:(?P<part>[^:]+): )?riser (?P<k>\d+) (?P<side>.+?)(?: flight (?P<f>\d+))?$")
+
+
+def _lit_risers(risers: list, cfg: dict, spec) -> list:
+    """The riser boxes that carry lights: lights.riser_pick (a stair by its side or name; 1 = the top riser, counted down through
+    every flight), else every riser. A riser box without its "riser <k> <side>" tag is lit only without riser_pick."""
+    if not cfg.get("riser_pick"):
+        return list(risers)
+    names = {str(getattr(ss, "side", "")): (getattr(ss, "name", None) or "") for ss in (getattr(spec, "stairs", None) or [])}
+    tagged = []
+    for b in risers:
+        m = _RISER_TAG.match(b.tag or "")
+        if m:
+            tagged.append((b, m.group("part") or "", m.group("side"), int(m.group("f") or 1), int(m.group("k"))))
+    per_flight: Dict[Tuple[str, str, int], int] = {}
+    for b, part, side, f, k in tagged:
+        per_flight[(part, side, f)] = max(per_flight.get((part, side, f), 0), k)
+    out = []
+    for b, part, side, f, k in tagged:
+        mine = {f_: v for (p_, s_, f_), v in per_flight.items() if p_ == part and s_ == side}
+        g = sum(v for f_, v in mine.items() if f_ < f) + k
+        if g in picked_risers(cfg, side, names.get(side, ""), sum(mine.values())):
+            out.append(b)
+    return out
+
+
+def _turned_face(b, turned, treads) -> Optional[int]:
+    """+1 / -1 along a z-turned riser's own y (out of the side): the face that shows — toward the tread at its foot, else away
+    from the riser above it (the bottom riser of a box step stands on its base)."""
+    c, sn = math.cos(b.rot), math.sin(b.rot)
+    cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+    half_l = (b.x1 - b.x0) / 2
+    def loc(q):
+        qx, qy = (q.x0 + q.x1) / 2 - cx, (q.y0 + q.y1) / 2 - cy
+        return qx * c + qy * sn, -qx * sn + qy * c
+    def same(q):                            # a piece of the same step: turned the same way
+        return abs(((q.rot or 0.0) - b.rot + math.pi) % (2 * math.pi) - math.pi) < 1e-3
+    treads = [q for q in treads if same(q)]
+    turned = [q for q in turned if same(q)]
+    for q in treads:
+        if abs(q.z1 - b.z0) < 0.06:
+            a, d = loc(q)
+            if abs(a) < half_l and 0.05 < abs(d) < 2.5:
+                return 1 if d > 0 else -1
+    for q in turned:
+        if q is not b and abs(q.z0 - b.z1) < 0.08:
+            a, d = loc(q)
+            if abs(a) < half_l + 0.5 and 0.05 < abs(d) < 2.5:
+                return 1 if d < 0 else -1
+    return None
+
+
 def scene_lights(boxes: list, spec) -> list:
     """New boxes: on the showing face of every riser box, a matte-black faceplate with a warm lens (led_riser) centered on the
     riser below the nosing (one per riser on a 4'-wide stair); on every rail-post box, a lantern cap (collar and top in the
@@ -839,9 +941,32 @@ def scene_lights(boxes: list, spec) -> list:
         lw, lh = [v * IN for v in rp.get("lens_in", (3.25, 1.25))]
         proud, deep = rp.get("proud_in", 0.1875) * IN, rp.get("depth_in", 0.5) * IN
         risers = [b for b in boxes if b.kind == "riser" and not b.rot]
+        turned = [b for b in boxes if b.kind == "riser" and b.rot and b.rot_axis == "z"]     # steps on an angled side of the outline
         treads = [b for b in boxes if b.kind == "tread"]
         decks = [b for b in boxes if b.kind in ("board", "border", "tread")]
+        lit = set(map(id, _lit_risers(risers + turned, cfg, spec)))
+        for b in turned:
+            if id(b) not in lit:
+                continue
+            sg = _turned_face(b, turned, treads)
+            if sg is None:
+                continue
+            c, sn = math.cos(b.rot), math.sin(b.rot)
+            cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+            half_l, half_t = (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2      # the box in its own frame: x along the side, y out of it
+            zc = (b.z0 + b.z1 + 0.02 - bt) / 2
+            n = per_riser(cfg, 2 * half_l * 12)
+            for i in range(n):
+                a = -half_l + 2 * half_l * (i + 0.5) / n
+                for kind, mat, w_, h_, t0, t1, what in (("fixture", "led_housing", fw, fh, half_t - deep, half_t + proud, "riser light faceplate"),
+                                                         ("light", "led_riser", lw, lh, half_t - deep * 0.8, half_t + proud + 0.03 * IN, "riser light")):
+                    tm = sg * (t0 + t1) / 2                                 # the piece's middle, out of the riser's center (local y)
+                    wx, wy = cx + a * c - tm * sn, cy + a * sn + tm * c
+                    out.append(Box(kind, wx - w_ / 2, wx + w_ / 2, wy - (t1 - t0) / 2, wy + (t1 - t0) / 2, zc - h_ / 2, zc + h_ / 2, mat, b.phase or 6,
+                                   tag=f"{opt}: {what}", rot=b.rot, rot_axis="z"))
         for b in risers:
+            if id(b) not in lit:
+                continue
             f = _riser_face(b, risers, treads, decks)
             if f is None:
                 continue

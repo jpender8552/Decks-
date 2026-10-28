@@ -413,6 +413,13 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         k = max(0.0, float(s.extras.labor_total) - fixed) / others if others else 1.0
         lab = [(i, q, u, r if str(n).startswith("owner-set") else round(r * k, 4), n if str(n).startswith("owner-set") else f"{n} · scaled to the owner's ${s.extras.labor_total:,.0f} total")
                for i, q, u, r, n in lab]
+    if s.extras.labor_adjust:                 # the owner's labor change ($, negative cuts): owner-set lots stay, the card lines share it in proportion
+        adj = float(s.extras.labor_adjust)
+        others = sum(q * r for i, q, u, r, n in lab if not str(n).startswith("owner-set"))
+        k = max(0.0, others + adj) / others if others else 1.0
+        lab = [(i, q, u, r if str(n).startswith("owner-set") else round(r * k, 4), n if str(n).startswith("owner-set") else
+                f"{n} · {'less' if adj < 0 else 'plus'} the owner's ${abs(adj):,.0f} labor {'cut' if adj < 0 else 'add'} ({k - 1:+.1%} on every card line)")
+               for i, q, u, r, n in lab]
     labor_lines = [(i, q, u, r, round(q * r, 2)) for i, q, u, r, n in lab]
     labor = sum(x[4] for x in labor_lines)
     gc_lines, gc_base, gc_extras = gc_lines_for(t)
