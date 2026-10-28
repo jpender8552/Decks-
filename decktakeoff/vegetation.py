@@ -2,12 +2,12 @@
 (geometry.site_model.trees: type, at, height, radius, crown_base, stems, stem_r, lean, mats, name).
 
 landscape.py draws every crown as spheres and cones - fine for the plan viewer, topiary in a photograph. Here:
-- deciduous trees (maple, cottonwoods): a branch skeleton grown by space colonisation (Runions et al. 2007) into an
+- deciduous trees (maple, cottonwoods): a branch skeleton grown by space colonization (Runions et al. 2007) into an
   irregular, lobed crown envelope, the pipe model for the limb radii, leaf-cluster cards at the twig ends - an open,
   irregular crown with sky through it;
 - Colorado blue spruce: whorls of drooping branches on a narrow cone, needle sprays along every branch, a dark core;
 - pines: fewer, longer, upswept whorled limbs with needle tufts at their ends;
-- shrubs: multi-stem bushes (space colonisation in a mound); junipers: dense mounds of scale-leaf sprays.
+- shrubs: multi-stem bushes (space colonization in a mound); junipers: dense mounds of scale-leaf sprays.
 Everything is numpy arrays in the plan frame (x along the wall, y into the yard, z up, feet): per material key a list
 of (V (n,3), Q (m,4) quads wound by the right-hand rule outward, UV per loop (4m,2), COL per loop (4m,4)). The card
 textures (alpha cut-outs) are drawn here too. No bpy: cycles.py turns the arrays into meshes."""
@@ -144,7 +144,7 @@ def spray_tex(path: str, c1: str, c2: str, seed: int = 3, W: int = 512, H: int =
 
 def tuft_tex(path: str, c1: str, c2: str, seed: int = 5, S: int = 1024) -> str:
     """A pine needle tuft seen from the side (S x S, transparent): long needles fanning forward from a short twig end
-    at the left-centre, darker toward the twig."""
+    at the left-center, darker toward the twig."""
     if os.path.exists(path):
         return path
     rng = np.random.default_rng(seed)
@@ -200,7 +200,7 @@ def tubes(p0, p1, r0, r1, k: int, tint=(1.0, 1.0, 1.0, 1.0)) -> Part:
 
 
 def cards(C, N, T, w, h, tiles, tint) -> Part:
-    """Quads centred at C (n,3) facing N, long axis T (unit, normal to N), width w along T, height h; tiles (n,4) =
+    """Quads centered at C (n,3) facing N, long axis T (unit, normal to N), width w along T, height h; tiles (n,4) =
     (u0, v0, du, dv) of the texture each card shows; tint (n,4) per card."""
     C, N, T = (np.asarray(x, float) for x in (C, N, T))
     Bv = _unit(np.cross(N, T))
@@ -234,8 +234,8 @@ def _tints(n, rng, dark, spread=0.1, warm=0.04):
     return np.stack([v * (1 + h), v, v * (1 - h), np.ones(n)], 1)
 
 
-# ====================================================================== space colonisation
-def colonise(rng, trunks: List[np.ndarray], A: np.ndarray, D: float, di: float, dk: float, tropism=(0.0, 0.0, 0.1),
+# ====================================================================== space colonization
+def colonize(rng, trunks: List[np.ndarray], A: np.ndarray, D: float, di: float, dk: float, tropism=(0.0, 0.0, 0.1),
              grow_from_z: float = -1e9, max_iter: int = 160, max_nodes: int = 12000):
     """Grow a branch skeleton from the trunk polylines toward the attraction points A. Returns node positions P (n,3),
     parent index (n,) (-1 for a root) and a trunk flag (n,)."""
@@ -434,7 +434,7 @@ class Plants:
             tt = np.linspace(0, 1, n + 1)[:, None]
             bend = np.sin(math.pi * tt) * np.array([rng.uniform(-0.6, 0.6), rng.uniform(-0.6, 0.6), 0.0])
             trunks.append(bot + (top - bot) * tt + bend)
-        P, par, trk = colonise(rng, trunks, A, D, di=max(5.0, R * 0.55), dk=1.7 * D,
+        P, par, trk = colonize(rng, trunks, A, D, di=max(5.0, R * 0.55), dk=1.7 * D,
                                tropism=(0, 0, 0.18 if cotton else 0.1), grow_from_z=zc0 - 1.0)
         r = pipe_radii(par, 0.02)
         roots = np.nonzero(par < 0)[0]
@@ -663,7 +663,7 @@ class Plants:
             b1 = b0 + np.array([0.6 * math.cos(a), 0.6 * math.sin(a), h * 0.3])
             trunks.append(np.array([b0, (b0 + b1) / 2, b1]))
         D = max(0.35, r / 7)
-        P, par, trk = colonise(rng, trunks, A, D, di=max(1.5, r * 0.8), dk=1.6 * D, tropism=(0, 0, 0.15))
+        P, par, trk = colonize(rng, trunks, A, D, di=max(1.5, r * 0.8), dk=1.6 * D, tropism=(0, 0, 0.15))
         rr = pipe_radii(par, 0.012)
         rr = np.maximum(rr * (0.06 / max(1e-6, rr[par < 0].max())), 0.012)
         P = smooth_nodes(P, par, trk, 1)

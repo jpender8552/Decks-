@@ -360,7 +360,7 @@ def accumulate(Q_: Q, spec: DeckSpec, L: Layout, z: ZoneLayout, zi: int) -> None
         Q_.lumber += [(jsize, fr.joist_len, "field joist")] * n_field + [(jsize, fr.joist_len, "PF joist")] * n_pf
         Q_.cuts.append(CutPiece(f"Field joists{tag}", jsize, fr.joist_len, n_field, f"@ {fr.spacing:g}\" OC, crown up"))
         if n_pf:
-            Q_.cuts.append(CutPiece(f"Picture-frame joists{tag}", jsize, fr.joist_len, n_pf, f"centre {ftin(fr.pf_x[0])} from each frame face"))
+            Q_.cuts.append(CutPiece(f"Picture-frame joists{tag}", jsize, fr.joist_len, n_pf, f"center {ftin(fr.pf_x[0])} from each frame face"))
     else:
         sup = [rear_t] + [b.cl_y for b in flush_mid] + [z.D - fr.rim_plies * jb]
         bws = [0.0] + [b.width for b in flush_mid] + [0.0]
@@ -494,7 +494,7 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
                                 f"{len(lens)} pieces, {min(lens) / 12:.1f}'-{max(lens) / 12:.1f}' — each cut to the outline (bevel 45 at the angled rims), see the framing plan"))
     Q_.n_joists = len(OF.joists)
     Q_.joist_lf = sum(b - a for _, a, b, *_ in OF.joists) / 12.0
-    # rims: every ply its own mitred length
+    # rims: every ply its own mitered length
     rim_lf = 0.0
     for i, k, x0, y0, x1, y1 in OF.rims:
         ln = round(math.hypot(x1 - x0, y1 - y0), 2)
@@ -507,7 +507,7 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
                                     f"{len(lens)}-ply, ledger to the front rim, laminated RSS 2 rows @ 12\"; a double hanger each end; the stringers and both headers hang on it"))
             continue
         Q_.cuts.append(CutPiece(f"Rim side {i + 1} ({OF.side_kind[i]})", jsize, max(lens), len(lens),
-                                ("mitred both ends" if OF.side_kind[i] != "rim" else "square / mitred to the neighbours")
+                                ("mitered both ends" if OF.side_kind[i] != "rim" else "square / mitered to the neighbors")
                                 + (", 1/2\" off the bay face — no ledger on the cantilevered bay" if OF.side_kind[i] == "bay45" else "")
                                 + (", plies laminated RSS 2 rows @ 12\" staggered" if plies > 1 else "")))
     # ledger + ledger blocks
@@ -542,7 +542,7 @@ def _rims_from_outline(Q_: Q, spec: DeckSpec, L: Layout) -> None:
     poly_ = [(float(x) * 12, float(y) * 12) for x, y in spec.geometry.outline]
     Q_.bay_angles = " / ".join(sorted({f"{math.degrees(math.atan2(abs(poly_[(i + 1) % len(poly_)][1] - poly_[i][1]), abs(poly_[(i + 1) % len(poly_)][0] - poly_[i][0]))):.0f}°"
                                        for i, k_ in enumerate(OF.side_kind) if k_ == "ledger45"}))
-    # fascia: every open side, its own mitred length
+    # fascia: every open side, its own mitered length
     Q_.fascia_pieces = []
     if spec.decking.fascia:
         from .layout import step_skirt_layout
@@ -615,7 +615,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     cuts = Qz.cuts
     if Qz.front_flush:
         notes.append("front flush beam IS the front rim — joists hang into it, posts under it, no separate rim plies")
-    # ---- outline-laid plan: a border piece on every exposed edge (the curve as mitred segments), split at the breakers; the breakers
+    # ---- outline-laid plan: a border piece on every exposed edge (the curve as mitered segments), split at the breakers; the breakers
     if L.plan is not None and spec.geometry.picture_frame:
         edge = (dk0.fascia_t + NOSE) if spec.decking.fascia else OVERHANG_NO_FASCIA
         bw, gap = dk0.bw, dk0.gap
@@ -756,7 +756,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     if eps_ and not spec.framing.existing_posts:
         post_pieces += [(spec.framing.post_size, L.edge_post_len + 1.0, "edge post")] * len(eps_)
         cuts.append(CutPiece(f"Edge posts {eps_[0].label}-{eps_[-1].label} under the rims", spec.framing.post_size, L.edge_post_len, len(eps_),
-                             "field-measure each; centred under both rim ends at the corner, rims tied with A35Z"))
+                             "field-measure each; centered under both rim ends at the corner, rims tied with A35Z"))
     sp = spec.framing.beams[0].species if spec.framing.beams else "DF"
     df1_beam = sp == "DF#1" and not timber
     for (nom, st), (n, labels) in pack_lumber(beam_pieces, short_stock_ft=8 if df1_beam else 12).items():
@@ -1227,11 +1227,15 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             lines.append(Line("Decking", f"{brand} {bcoll} {bcolor} 1x6x{s_} Square Edge — {'borders & dividers' if L.divider_x else 'borders'}", len(boards), len(boards) + (1 if s_ == max(packed_b) else 0), "ea",
                               (f"+1  " if s_ == max(packed_b) else "exact  ") + f"({what})", uc, src))
         for name, Lb in Qz.border_pieces:
-            cuts.append(CutPiece(name.capitalize(), f"{bcoll} {bcolor} square", Lb, 1, "mitre at the corners; dividers on the doubled joist"))
+            cuts.append(CutPiece(name.capitalize(), f"{bcoll} {bcolor} square", Lb, 1, "miter at the corners; dividers on the doubled joist"))
     hardie_risers = []                              # (stair, width) riser pieces cut from HardieTrim when there is a Hardie skirt
+    from .scene import box_step_miters
+    miters_ = box_step_miters(spec, stairs)         # box steps that wrap a corner: their treads and risers run long to the miter
     for st in stairs:
         tl = min(deck_lengths(coll, "square"))        # the shortest square-edge stock the line is sold in (Vintage: 16')
-        per_board = max(1, int(math.floor(tl * 12 / (st.width + 0.25))))
+        m_ends, m_k = miters_.get(st.side, (0, 0.0))
+        cut_w = st.width + m_ends * m_k * (st.geo.treads * st.geo.tread_in + 1.0)      # the outer edge of the lowest tread / riser, to the miter
+        per_board = max(1, int(math.floor(tl * 12 / (cut_w + 0.25))))
         nb = int(math.ceil(st.tread_pieces / per_board))
         uc, src = _price("decking", f"{brand}|{coll}|{tl}|square")
         if uc == 0.0:
@@ -1239,18 +1243,19 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{tl} Square Edge — treads ({st.side} stair)", nb, nb + 1, "ea",
                           f"+1  ({st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
         if st.riser_pieces:
-            nr = int(math.ceil(st.riser_pieces / max(1, int(math.floor(144 / (st.width + 0.25))))))     # riser boards are 12' (not the tread stock)
+            nr = int(math.ceil(st.riser_pieces / max(1, int(math.floor(144 / (cut_w + 0.25))))))     # riser boards are 12' (not the tread stock)
             if spec.extras.hardie_skirt:                # a Hardie skirt: the risers match it, HardieTrim ripped to the riser height (packed below, all stairs together)
-                hardie_risers += [(f"{st.side} stair", st.width)] * st.riser_pieces
+                hardie_risers += [(f"{st.side} stair", cut_w)] * st.riser_pieces
             else:
                 uc, src = _price("decking", f"{brand}|{coll}|riser")
                 if uc == 0.0:
                     lf, src = _price("decking", "generic_riser_per_lf"); uc = round(lf * 12, 2)
                 lines.append(Line("Stairs", f"{brand} {coll} {color} riser board 7-1/4\" x 12' ({st.side} stair)", nr, nr, "ea",
                                   f"exact  ({st.geo.risers} risers @ {ftin(st.width)})", uc, src))
-        cuts.append(CutPiece(f"Stair treads ({st.side})", f"{coll} {color} square", st.width, st.tread_pieces, "2 boards per tread, nosing 3/4\" over the riser"))
+        mtxt_ = (f"; mitered at the corner{'s' if m_ends > 1 else ''} to the next box step (outer edge {ftin(cut_w)})" if m_ends else "")
+        cuts.append(CutPiece(f"Stair treads ({st.side})", f"{coll} {color} square", st.width, st.tread_pieces, "2 boards per tread, nosing 3/4\" over the riser" + mtxt_))
         if st.riser_pieces:
-            cuts.append(CutPiece(f"Stair risers ({st.side})", "HardieTrim" if spec.extras.hardie_skirt else "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness"))
+            cuts.append(CutPiece(f"Stair risers ({st.side})", "HardieTrim" if spec.extras.hardie_skirt else "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness" + mtxt_))
     # the step-face skirt: the decking fascia set vertically, cut to height (4 to a 12' board), fastened at every nailer
     if skirt:
         hs = sorted(skirt.panel_heights(), reverse=True)
@@ -1531,7 +1536,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         if spec.railing.drink_rail:
             dcoll = spec.railing.drink_rail_collection or bcoll
             dcolor = spec.railing.drink_rail_color or bcolor
-            # board pieces per rail run (mitred at every turn), packed into 16' boards
+            # board pieces per rail run (mitered at every turn), packed into 16' boards
             pieces = []
             for run_name, run_lf in Counter({s_.side: 0 for s_ in rl.sections}).items():
                 pass
@@ -1549,9 +1554,9 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             if uc == 0.0:                               # no 16' square-edge price on file for the line: its per-LF price x 16'
                 lf, src = _price("decking", f"{spec.decking.brand}|{dcoll}|per_lf"); uc = round(lf * 16, 2)
             on_ = ("on the drink-rail clips over the universal panel covers" if f"{sysn}|panel_cover|8" in PRICEBOOK["rail"] else "laid flat on the top rail")
-            lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge {on_}, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
+            lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge {on_}, {rl.rail_lf} LF, mitered at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
             if (spec.railing.drink_rail_mount or "between") == "over" and f"{sysn}|post_insert_8" in PRICEBOOK["rail"]:
-                # over the posts: posts cut level within 1/4" of the panel-cover tops, an insert in each, the board's seams on post centres
+                # over the posts: posts cut level within 1/4" of the panel-cover tops, an insert in each, the board's seams on post centers
                 n_ins = len(rl.posts)
                 pk_ = int(math.ceil(n_ins / 8))
                 d_, uc, src = _item("rail", f"{sysn}|post_insert_8")
@@ -1632,8 +1637,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                             else " surface-mounted on the decking over a 2x blocking pair between the rim plies and the PF joist at every post, (4) HeadLOK 6\" per post through the base" if sysd.get("surface")
                             else " inside the outer rim ply, inner ply pocketed 2\" wide, (2) 7/16\" x 4-1/2\" bolts per post")
                          + (((f"; drink rail board over the posts on the {rbrand} drink-rail clips" + (" and post inserts (posts cut level)" if f"{sysn}|post_insert_8" in PRICEBOOK["rail"] else "")
-                              + ", seams on post centres, mitred at every turn") if (spec.railing.drink_rail_mount or "between") == "over"
-                             else f"; drink rail board on {rbrand} drink-rail brackets, mitred at every turn") if spec.railing.drink_rail else ""))
+                              + ", seams on post centers, mitered at every turn") if (spec.railing.drink_rail_mount or "between") == "over"
+                             else f"; drink rail board on {rbrand} drink-rail brackets, mitered at every turn") if spec.railing.drink_rail else ""))
         for n in rl.notes:
             notes.append(n)
 
@@ -1827,7 +1832,7 @@ def shared_pier_loads(spec, L, c: dict) -> List[Tuple[float, float, float]]:
 
 
 def cover_posts_x(c: dict) -> List[float]:
-    """Post centres along the low beam (ft, plan x), ≤ 8'-6" OC, 6" in from each end — or the owner's positions."""
+    """Post centers along the low beam (ft, plan x), ≤ 8'-6" OC, 6" in from each end — or the owner's positions."""
     import math as _m
     if c.get("posts_x_ft"):
         return [float(v) for v in c["posts_x_ft"]]

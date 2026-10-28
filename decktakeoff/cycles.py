@@ -1,15 +1,15 @@
 """Photoreal stills with Blender Cycles from the same Scene the WebGL viewer draws: every Box and mesh becomes real
 geometry (merged per material), boards get TimberTech textures from the timbertech-boards renderer (full-length,
-several boards per colour, a random slice per board), the yard gets leaf-card canopies, spruce twigs and grass, and
+several boards per color, a random slice per board), the yard gets leaf-card canopies, spruce twigs and grass, and
 the light is a physical sky with the sun where it really is for the site, date and time.
 
 Run with a Python that has bpy (Blender as a module):
     python -m decktakeoff.cycles JOB.json OUT_DIR [view ...] [--samples 160] [--size 1400x900] [--quick]
         [--cameras=STATIONS.json] [--when=YYYY-MM-DDTHH:MM] [--dusk] [--dusk-when=...] [--dusk-exposure=3] [--led=1] [--glow=1]
-        [--foliage=summer]   (the deciduous canopy and shrubs in summer greens when the yard model carries autumn colours)
+        [--foliage=summer]   (the deciduous canopy and shrubs in summer greens when the yard model carries autumn colors)
         [--styling=0]        (leave out the styling furniture, geometry.furniture: it is drawn by default, never priced)
 --when puts the sun at another local time than spec.site.sun_when; --dusk renders the blue hour of that date (sun -5 deg, or
---dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" colour), real
+--dusk-when) with the LED lenses (material keys led_riser / led_cap, or any material dict with an "emission" color), real
 fixture lights and the rooms behind the windows lit. A station with "mode": "dusk" renders at dusk without the flag.
 
 Frames: the scene's plan feet (x along the wall, y into the yard, z up) map to Blender (x, -y, z); 1 Blender unit = 1 ft.
@@ -107,7 +107,7 @@ class Tex:
 
     def boards(self, collection: str, color: str, n: int = 4, length_in: float = 240, ppi: float = 28) -> List[str]:
         """Full-length TimberTech board textures from the skill renderer (deterministic per board), per the skill's deck
-        render fidelity rules: 240" at 28 ppi, 4 distinct boards per colour, the eased edges baked in. Beside each albedo,
+        render fidelity rules: 240" at 28 ppi, 4 distinct boards per color, the eased edges baked in. Beside each albedo,
         h_<name> is the same board's 16-bit relief (the renderer's own wire-brush field) for the bump and roughness."""
         out = []
         sys.path.insert(0, SKILL_BOARDS)
@@ -117,7 +117,7 @@ class Tex:
             sys.path.pop(0)
         from decktakeoff.catalog import BOARDS_PALETTE
         pal = BOARDS_PALETTE.get((collection, color))
-        if pal:   # the engine catalog's palette wins over the skill's synced copy: a skill re-sync cannot revert the boards' colour
+        if pal:   # the engine catalog's palette wins over the skill's synced copy: a skill re-sync cannot revert the boards' color
             TT.C.BOARDS = [(b[0], b[1], b[2], list(pal)) + tuple(b[4:]) if (b[0], b[1]) == (collection, color) else b for b in TT.C.BOARDS]
         tag = hashlib.md5(json.dumps([pal or [], ppi, "relief1"]).encode()).hexdigest()[:6]   # a cached texture never outlives its palette
         for k in range(n):
@@ -199,7 +199,7 @@ class Tex:
     def brick(self, hexc: str, mortar: str = "#c2b9a6", course_in: float = 8.0 / 3.0, brick_in: float = 8.0) -> Tuple[str, str, float]:
         """Running-bond face brick (house.py "hbrick"): 12 bricks x 36 courses per tile (8 ft wide, 36 courses tall), every
         brick its own tone (buff / tan / a few orange-flashed and darker ones, iron specks, a sandy face), struck mortar joints
-        recessed (height map). Returns (colour, height, tile height in ft) — the tile is 8 ft along the wall."""
+        recessed (height map). Returns (color, height, tile height in ft) — the tile is 8 ft along the wall."""
         nm = f"brick2_{hexc.strip('#')}_{mortar.strip('#')}_{course_in:.3f}_{brick_in:.2f}.png"
         th_ft = 36 * course_in / 12.0
         if self.path(nm):
@@ -262,7 +262,7 @@ class Tex:
         return self._save(nm, im), self._save("h_" + nm, hm), th_ft
 
     def rsawn(self, hexc: str) -> Tuple[str, str]:
-        """Rough-sawn plywood / cedar face (house.py siding_texture "rsawn"): fine vertical fibre streaks and saw texture in
+        """Rough-sawn plywood / cedar face (house.py siding_texture "rsawn"): fine vertical fiber streaks and saw texture in
         a solid stain, 8 ft tile (the grooves themselves are geometry)."""
         nm = f"rsawn_{hexc.strip('#')}.png"
         if self.path(nm):
@@ -270,7 +270,7 @@ class Tex:
         S = 1024
         rng = np.random.default_rng(17)
         base = np.array(_srgb255(hexc), float)
-        # vertical streaks: 1-D noise across x, stretched along y, plus fine fibres and a faint cross-saw pattern
+        # vertical streaks: 1-D noise across x, stretched along y, plus fine fibers and a faint cross-saw pattern
         streak = np.cumsum(rng.normal(0, 1, S)); streak = (streak - np.convolve(streak, np.ones(61) / 61, mode="same"))
         streak = streak / (np.abs(streak).max() + 1e-6)
         fib = rng.normal(0, 1, (S // 8, S))
@@ -288,7 +288,7 @@ class Tex:
             return self.path(nm), self.path("h_" + nm)
         S = 1024                                     # 4 ft tile
         rng = np.random.default_rng(5)
-        # irrigated Kentucky bluegrass / fescue: sRGB blade colours sampled from the owner's sunlit lawn (photo 2), not darker
+        # irrigated Kentucky bluegrass / fescue: sRGB blade colors sampled from the owner's sunlit lawn (photo 2), not darker
         im = Image.new("RGB", (S, S), (74, 98, 40))
         hm = Image.new("L", (S, S), 60)
         d = ImageDraw.Draw(im); dh = ImageDraw.Draw(hm)
@@ -419,7 +419,7 @@ class Mats:
         return b
 
     def _tint(self, nt, color_out, bsdf):
-        """Multiply by the per-box 'tint' colour attribute (board-to-board / block-to-block tone)."""
+        """Multiply by the per-box 'tint' color attribute (board-to-board / block-to-block tone)."""
         a = nt.nodes.new("ShaderNodeAttribute"); a.attribute_name = "tint"
         mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"
         sock = lambda coll, ident: next(x for x in coll if x.identifier == ident)
@@ -447,7 +447,7 @@ class Mats:
         path = imgs[k % len(imgs)]
         img = self._img(nt, path)
         self._tint(nt, img.outputs["Color"], bsdf)
-        # a matte cap (TimberTech: low-gloss): at the low angle of a yard view a glossier cap mirrors the sky and the brown goes grey
+        # a matte cap (TimberTech: low-gloss): at the low angle of a yard view a glossier cap mirrors the sky and the brown goes gray
         bsdf.inputs["Roughness"].default_value = 0.85
         bsdf.inputs["Specular IOR Level"].default_value = 0.25
         hp = os.path.join(os.path.dirname(path), "h_" + os.path.basename(path))
@@ -477,7 +477,7 @@ class Mats:
         m, nt, bsdf, out = self._new(key)
         col = _hex(md.get("color", "#999999"))
         if BLACK_PC and "powder" in (md.get("label") or "").lower() and _lum(col) < _lum(_hex(BLACK_PC)):
-            col = _hex(BLACK_PC)    # black powder coat at TimberTech's colour chip (~3.7 % reflectance, not 0.7 %): it shows its form
+            col = _hex(BLACK_PC)    # black powder coat at TimberTech's color chip (~3.7 % reflectance, not 0.7 %): it shows its form
         rough = float(md.get("rough", 0.8) if md.get("rough") is not None else 0.8)
         metal = float(md.get("metal", 0.0) or 0.0)
         bsdf.inputs["Roughness"].default_value = rough
@@ -543,14 +543,14 @@ class Mats:
             self._bump(nt, bsdf, hi.outputs["Color"], 0.75, 0.025)
             bsdf.inputs["Roughness"].default_value = 0.93
         elif pat == "rsawn":
-            # stained rough-sawn plywood / cedar (T1-11): fibre streaks + a saw texture; the grooves are geometry
+            # stained rough-sawn plywood / cedar (T1-11): fiber streaks + a saw texture; the grooves are geometry
             c, h = self.tex.rsawn(md["color"])
             img = self._img(nt, c); hi = self._img(nt, h, non_color=True)
             self._tint(nt, img.outputs["Color"], bsdf)
             self._bump(nt, bsdf, hi.outputs["Color"], 0.18, 0.006)
             bsdf.inputs["Roughness"].default_value = rough
         elif pat in ("lap", "batten", "brick", "stone", "seam", "gravel"):
-            # procedural: colour + noise (geometry carries the courses on the measured house)
+            # procedural: color + noise (geometry carries the courses on the measured house)
             nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 18.0; nz.inputs["Detail"].default_value = 6.0
             ramp = nt.nodes.new("ShaderNodeValToRGB")
             ramp.color_ramp.elements[0].color = tuple(c * 0.9 for c in col) + (1,)
@@ -618,7 +618,7 @@ class Mats:
             else:
                 self._tint(nt, rgb.outputs[0], bsdf)
                 if key.startswith(("siding", "nsiding", "htrim", "hsoffit", "trim", "shutter", "foundation", "concrete")):
-                    # painted fibre-cement / trim / concrete: a fine embossed texture, never a perfect CG plane
+                    # painted fiber-cement / trim / concrete: a fine embossed texture, never a perfect CG plane
                     nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 60.0 if not key.startswith(("foundation", "concrete")) else 25.0
                     nz.inputs["Detail"].default_value = 8.0
                     self._bump(nt, bsdf, nz.outputs["Fac"], 0.06 if key.startswith(("siding", "nsiding")) else 0.03, 0.004)
@@ -660,8 +660,8 @@ class Mats:
         return m
 
     def emitter(self, key: str, md: dict) -> bpy.types.Material:
-        """An LED lens (recessed riser step light, post-cap light): the fixture's housing colour with the light off by day
-        (photocell); set_mode("dusk") turns its emission on in the colour the material dict carries (else 3000 K)."""
+        """An LED lens (recessed riser step light, post-cap light): the fixture's housing color with the light off by day
+        (photocell); set_mode("dusk") turns its emission on in the color the material dict carries (else 3000 K)."""
         m, nt, bsdf, out = self._new(key)
         bsdf.inputs["Base Color"].default_value = _hex(md.get("color") or "#d8d2c4") + (1,)
         bsdf.inputs["Roughness"].default_value = 0.3
@@ -673,7 +673,7 @@ class Mats:
 
     def _rough_sawn(self, nt, bsdf, col):
         """Unfinished rough-sawn Douglas fir (8x8 columns, 6x10 beams): warm tan, matte, a low-contrast flat-sawn grain along
-        the member, faint band-saw marks across it, mill-to-mill tone mottling and fibre fuzz. The box UVs run along the
+        the member, faint band-saw marks across it, mill-to-mill tone mottling and fiber fuzz. The box UVs run along the
         member (U, in 20 ft) and across the face (V, 0..1), so the grain follows posts and beams alike."""
         tc = nt.nodes.new("ShaderNodeTexCoord")
         sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["UV"], sep.inputs[0])
@@ -694,7 +694,7 @@ class Mats:
         sm = nt.nodes.new("ShaderNodeTexWave"); sm.wave_type = "BANDS"; sm.bands_direction = "X"
         sm.inputs["Scale"].default_value = 10.0; sm.inputs["Distortion"].default_value = 1.5; sm.inputs["Detail"].default_value = 1.0
         nt.links.new(ft, sm.inputs["Vector"])
-        # mottling (board-to-board, end-to-end tone) and fibre fuzz
+        # mottling (board-to-board, end-to-end tone) and fiber fuzz
         mo = nt.nodes.new("ShaderNodeTexNoise"); mo.inputs["Scale"].default_value = 0.9; mo.inputs["Detail"].default_value = 3.0
         nt.links.new(ft, mo.inputs["Vector"])
         fz = nt.nodes.new("ShaderNodeTexNoise"); fz.inputs["Scale"].default_value = 140.0; fz.inputs["Detail"].default_value = 6.0
@@ -721,7 +721,7 @@ class Mats:
     def screen(self, key: str, md: dict) -> bpy.types.Material:
         """A motorized screen's fabric (Phifer PVC-coated polyester mesh / clear vinyl): `openness` of it is open weave
         (fraction, or %; else 1 - `alpha`, the louvered engine's photoreal alpha; else 1 - the viewer's `opacity`; default
-        20 % = SunTex 80) that sight and sun pass straight through, the rest matte yarn in the fabric colour. The panel is a
+        20 % = SunTex 80) that sight and sun pass straight through, the rest matte yarn in the fabric color. The panel is a
         thin box (two faces in every ray's path), so each face passes sqrt(openness)."""
         m, nt, bsdf, out = self._new(key)
         op = md.get("openness")
@@ -758,7 +758,7 @@ class Geo:
 
 
 def _rot_fn(b):
-    """Box local (centred) -> scene coordinates, honoring rot / rot_axis (the viewer's convention)."""
+    """Box local (centered) -> scene coordinates, honoring rot / rot_axis (the viewer's convention)."""
     cx, cy, cz = (b["x0"] + b["x1"]) / 2, (b["y0"] + b["y1"]) / 2, (b["z0"] + b["z1"]) / 2
     r = b.get("rot") or 0.0
     ax = b.get("rot_axis") or "y"
@@ -815,7 +815,7 @@ def add_box(g: Geo, b: dict, uv_mode: str, tile: float = 8.0, board_len: float =
 
 
 def add_quad_board(g: Geo, b: dict, board_len: float = 20.0, board_w: float = 5.36 * IN, u_off: float = 0.0, tint=(1, 1, 1, 1)):
-    """A mitred board: the prism over its plan quad (b["quad"], ft) from z0 to z1, the grain along its first edge."""
+    """A mitered board: the prism over its plan quad (b["quad"], ft) from z0 to z1, the grain along its first edge."""
     q = [(float(x), float(y)) for x, y in b["quad"]]
     z0, z1 = b["z0"], b["z1"]
     ox, oy = q[0]
@@ -903,12 +903,12 @@ def build_object(name: str, g: Geo, mat: bpy.types.Material, collection) -> Opti
 
 
 # ====================================================================== vegetation
-def _leaf_cloud(n, centre, radii, rng, shell=0.7):
+def _leaf_cloud(n, center, radii, rng, shell=0.7):
     """n points in an ellipsoid, biased toward the surface (leaves live on the outside of a crown)."""
     u = rng.normal(size=(n, 3)); u /= np.linalg.norm(u, axis=1, keepdims=True)
     r = shell + (1 - shell) * rng.random(n) ** 0.5
     r = np.where(rng.random(n) < 0.25, rng.random(n) ** (1 / 3), r)
-    return centre + u * r[:, None] * radii
+    return center + u * r[:, None] * radii
 
 
 def add_cards(g: Geo, P: np.ndarray, size: float, rng, up_bias=0.4, aspect=1.0, droop=False):
@@ -989,6 +989,8 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
             add_tris(G(mk), b["pts"], tile=tile, tint=tint)
         elif shape == "cyl":
             add_cyl(G(mk), b, tint=tint)
+        elif b.get("quad"):                     # a mitered piece (a box step's riser / frame / stone bed at a corner): its true prism
+            add_quad_board(G(mk), b, board_len=20.0 if sawn else tile, tint=tint)
         else:
             add_box(G(mk), b, "board" if sawn else ("tile" if (pat or md.get("grain")) else "none"), tile=tile, tint=tint,
                     u_off=float(rng.uniform(0, 0.9)) if sawn else 0.0)
@@ -1044,8 +1046,8 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
             # a summer date under an autumn yard model: the deciduous canopy and the shrubs in their summer greens
             c1, c2, nm = {"leaf": ("#5f7f2c", "#86a03a"), "leaf2": ("#6f9433", "#94ad45"), "shrub": ("#58702f", "#7d8f3a")}[base] + (f"{base}_summer",)
         elif mc and (base not in leaf_cols or base == "leaf2"):
-            # the yard model's own colour (a key with no stock pair - ivy, the pines - or the second canopy colour, e.g. the
-            # cottonwoods' autumn yellow): c2 a fifth lighter; the colour in the card's name so a cached texture never lies
+            # the yard model's own color (a key with no stock pair - ivy, the pines - or the second canopy color, e.g. the
+            # cottonwoods' autumn yellow): c2 a fifth lighter; the color in the card's name so a cached texture never lies
             c1, c2, nm = mc, lighter(mc), f"{base}_{mc.strip('#')}"
         else:
             c1, c2 = leaf_cols.get(base, ("#5f7f2c", "#86a03a"))
@@ -1065,7 +1067,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
 TREES3D = True       # build the yard model's trees from their entries (vegetation.py) instead of landscape.py's spheres / cones
 STYLING = True       # the styling furniture (geometry.furniture, scene layer "styling"); --styling=0 renders the deck without it
 PLANT_KEEPOUT: List[Tuple[float, float, float]] = []   # extra camera stations (--cameras) the plants keep 3 ft clear of
-PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colours)
+PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colors)
     "maple": ("#4c6827", "#718d38"), "cottonwood": ("#587b2c", "#86a244"), "broadleaf": ("#55702f", "#7c923c"),
     "spruce": ("#52777a", "#7a9fa5"), "pine": ("#405b2a", "#617d37"), "juniper": ("#4c6450", "#6d846f"),
     "shrub": ("#526d2d", "#788f3a"), "shrub2": ("#5a7830", "#81973d"), "sumac": ("#4c6829", "#6c8835"),
@@ -1130,7 +1132,7 @@ def _card_material(name: str, path: str, kind: str):
 
 
 def _bark_material(name: str = "bark3d"):
-    """Bark: a grey-brown with furrows (stretched noise along the stem, UV v runs along it) and the per-part tint."""
+    """Bark: a gray-brown with furrows (stretched noise along the stem, UV v runs along it) and the per-part tint."""
     m, nt, bsdf, out = Mats._new(name)
     a = nt.nodes.new("ShaderNodeAttribute"); a.attribute_name = "tint"
     uv = nt.nodes.new("ShaderNodeUVMap")
@@ -1153,7 +1155,7 @@ def _bark_material(name: str = "bark3d"):
 
 def build_plants(spec, D, col, out_dir: str, foliage: str = "", quick: bool = False) -> int:
     """The yard model's trees and shrubs as real plants (decktakeoff.vegetation): branch skeletons, leaf / needle cards,
-    in the season's colours. Detail falls off with distance from the deck (the backdrop cottonwoods get fewer, larger
+    in the season's colors. Detail falls off with distance from the deck (the backdrop cottonwoods get fewer, larger
     cards). Returns the number of quads."""
     from decktakeoff import vegetation as VG
     from decktakeoff.landscape import grade_at
@@ -1213,7 +1215,7 @@ def _cone(g: Geo, b, s=1.0, n=16):
         g.face([B(cx + r * math.cos(a0), cy + r * math.sin(a0), z0), B(cx, cy, z1), B(cx + r * math.cos(a1), cy + r * math.sin(a1), z0)], [(0, 0)] * 3)
 
 
-# ====================================================================== the lawn's colour (ground + blades)
+# ====================================================================== the lawn's color (ground + blades)
 LAWN = {   # sRGB albedo (green patch, the lawn, dry patch): Kentucky bluegrass in a Colorado June, a little dry and patchy
     "lawn": ("#4d5e2c", "#5b6836", "#7b7545"),
     "ground": ("#536130", "#606a39", "#7c7647"),
@@ -1223,9 +1225,9 @@ LAWN = {   # sRGB albedo (green patch, the lawn, dry patch): Kentucky bluegrass 
 
 
 def _lawn_nodes(nt, key: str, md: dict, relative: bool = False):
-    """The lawn's colour field in world coordinates, shared by the ground and the blades near the cameras: broad dry /
+    """The lawn's color field in world coordinates, shared by the ground and the blades near the cameras: broad dry /
     green patches (~25'), mottling (~4'), clumps (~1') and blade speckle. relative=True returns it as a multiplier about
-    1.0 (the blades keep their own colours and take the patches). Returns (colour socket, height socket for a bump)."""
+    1.0 (the blades keep their own colors and take the patches). Returns (color socket, height socket for a bump)."""
     if key in LAWN:
         green, base, dry = LAWN[key]
     else:
@@ -1276,13 +1278,13 @@ def _lawn_nodes(nt, key: str, md: dict, relative: bool = False):
 
 # ====================================================================== grass (real blades in the near field)
 def _grass_patch(name, rng, n_blades=650, size=1.0):
-    """A 1' x 1' patch of blades: a bent two-segment strip each, colour per vertex (darker at the root)."""
+    """A 1' x 1' patch of blades: a bent two-segment strip each, color per vertex (darker at the root)."""
     g = Geo()
     # olive bluegrass blade tips (a Colorado lawn in June, a little dry); the lawn's patch field multiplies them
     greens = [(86, 98, 50), (98, 108, 56), (110, 116, 62), (78, 90, 44), (120, 122, 68), (94, 104, 52), (104, 106, 60), (136, 130, 82)]
     lin = lambda c: tuple(((v / 255) / 12.92 if v / 255 <= 0.04045 else ((v / 255 + 0.055) / 1.055) ** 2.4) for v in c)
     for _ in range(n_blades):
-        x, y = rng.uniform(-size / 2, size / 2), rng.uniform(-size / 2, size / 2)      # centred: a turned patch stays on its cell
+        x, y = rng.uniform(-size / 2, size / 2), rng.uniform(-size / 2, size / 2)      # centered: a turned patch stays on its cell
         h = rng.uniform(0.16, 0.30)
         w = rng.uniform(0.010, 0.017)
         a = rng.uniform(0, 2 * math.pi)
@@ -1439,7 +1441,7 @@ def _sky_with_clouds(nt, sky_col, v):
     """The camera's sky: the sky model pulled toward a white haze (a third overall, most of the way at the horizon - the
     owner's photos show a pale, partly cloudy sky, not the model's saturated blue) with soft cumulus on a flat cloud deck
     (the noise is taken at direction.xy / direction.z, so clouds shrink toward the horizon). A cloud is lit on its sun side
-    (density sampled a step toward the sun) and greyer away from it; its brightness follows the sky's own luminance there."""
+    (density sampled a step toward the sun) and grayer away from it; its brightness follows the sky's own luminance there."""
     N = nt.nodes.new
     tc = N("ShaderNodeTexCoord")
     sep = N("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["Generated"], sep.inputs[0])
@@ -1515,7 +1517,7 @@ def _sky_with_clouds(nt, sky_col, v):
     cover = 0.64 - 0.16 * CLOUDS / 0.32
     dens = math_("MULTIPLY", mrange(n0, cover - 0.05, cover + 0.11, 0.0, 1.0, smooth=True), mrange(z, 0.03, 0.2, 0.0, 1.0, smooth=True))
     lit = mrange(math_("SUBTRACT", n0, n1), -0.045, 0.03, 0.0, 1.0, smooth=True)
-    c_lit, c_sh = scale(lum, 2.3), scale(lum, 1.05)          # luminance as grey: the cloud's lit top and its shaded side
+    c_lit, c_sh = scale(lum, 2.3), scale(lum, 1.05)          # luminance as gray: the cloud's lit top and its shaded side
     cl = mix(mix(c_sh, (0.92, 0.95, 1.02, 1.0), 0.0), c_lit, lit)
     tint = N("ShaderNodeMix"); tint.data_type = "RGBA"; tint.blend_type = "MULTIPLY"
     sock = lambda coll, ident: next(x for x in coll if x.identifier == ident)
@@ -1546,9 +1548,9 @@ def setup_world(D, spec, sky_strength=0.2, sun_strength=5.0, fill_strength=0.065
     sky.air_density = 1.0
     sky.aerosol_density = 1.0
     # Two skies. The camera sees the model's blue sky at sky_strength. Everything else is lit by the same sky, dimmer and pulled
-    # halfway to grey: measured on a white plane, the bare model at 0.2 gave R 0.26 / G 0.52 / B 1.03 against the sun's 1.00 /
+    # halfway to gray: measured on a white plane, the bare model at 0.2 gave R 0.26 / G 0.52 / B 1.03 against the sun's 1.00 /
     # 0.96 / 0.89 — half the light on a horizontal surface and four times bluer than the sun, so white trim in full sun came
-    # out blue and the deck brown went grey. A clear sky at ~5,850 ft is ~10-15% of the light on the ground (a daylight
+    # out blue and the deck brown went gray. A clear sky at ~5,850 ft is ~10-15% of the light on the ground (a daylight
     # white balance reads sunlit white as white); fill 0.065 at half saturation gives ~20% (G) and sunlit white neutral.
     # The camera's sky also gets haze and soft cumulus (_sky_with_clouds); the light on the scene stays the clear sky.
     bg = nt.nodes.new("ShaderNodeBackground"); bg.inputs["Strength"].default_value = sky_strength
@@ -1592,7 +1594,7 @@ def _lum(c) -> float:
 
 
 def _emit_hex(md: dict) -> str:
-    """The emission colour a material dict carries (the lighting agent's LED lenses), '' when none."""
+    """The emission color a material dict carries (the lighting agent's LED lenses), '' when none."""
     for k in ("emission", "emit", "emissive", "glow"):
         v = md.get(k)
         if isinstance(v, str) and v.startswith("#"):
@@ -1605,7 +1607,7 @@ def _emits(key: str, md: dict) -> bool:
 
 
 def _sun_rgb(el_deg: float) -> Tuple[float, float, float]:
-    """The direct sun's colour by its height: the late-summer midday sun above 30 deg, warming toward the horizon (longer air
+    """The direct sun's color by its height: the late-summer midday sun above 30 deg, warming toward the horizon (longer air
     path) — a 15 deg morning sun is ~(1.0, 0.89, 0.74), a 5 deg one ~(1.0, 0.80, 0.58)."""
     hi, lo = (1.0, 0.955, 0.89), (1.0, 0.78, 0.55)
     t = max(0.0, min(1.0, (30.0 - el_deg) / 27.0)) ** 1.5
@@ -1663,7 +1665,7 @@ def sun_caption(spec, when: str, v) -> str:
 
 
 def _box_frame(b):
-    """A box's centre and its local x / y / z unit axes in the plan frame (rot / rot_axis honoured), as numpy vectors."""
+    """A box's center and its local x / y / z unit axes in the plan frame (rot / rot_axis honored), as numpy vectors."""
     T = _rot_fn(b)
     c = np.array(T(0.0, 0.0, 0.0))
     return c, [np.array(T(*e)) - c for e in ((1.0, 0, 0), (0, 1.0, 0), (0, 0, 1.0))]
@@ -1955,7 +1957,7 @@ def render_views(D, out_dir, names, samples=160, size=(1400, 900), quick=False, 
     else:
         scn.render.image_settings.file_format = "JPEG"
         scn.render.image_settings.quality = 90
-    # Khronos PBR Neutral keeps a board's hue and saturation where AgX greys it (the deck colour is the point of the
+    # Khronos PBR Neutral keeps a board's hue and saturation where AgX grays it (the deck color is the point of the
     # picture); +0.75 EV is a photographer's exposure for a sunlit yard with the fill sky (the shade stays readable)
     scn.view_settings.view_transform = "Khronos PBR Neutral"
     scn.view_settings.look = "None"
@@ -2021,7 +2023,7 @@ def main(argv):
     names = args[2:] or ["yard", "corner", "ondeck"]
     os.makedirs(out_dir, exist_ok=True)
     quick = bool(opts.get("--quick"))
-    if opts.get("--black"):                 # --black=#hex sets the black powder-coat floor, --black=none renders the spec's colour as is
+    if opts.get("--black"):                 # --black=#hex sets the black powder-coat floor, --black=none renders the spec's color as is
         globals()["BLACK_PC"] = "" if str(opts["--black"]).lower() in ("none", "off", "0") else str(opts["--black"])
     if opts.get("--tonemap"):               # --tonemap=pbr: Blender's Khronos PBR Neutral straight to JPEG (the old path, +0.75 EV)
         globals()["TONEMAP"] = "pbr" if str(opts["--tonemap"]).lower().startswith("pbr") else "grade"

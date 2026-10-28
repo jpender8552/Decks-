@@ -111,7 +111,9 @@ def draw_plan_boxes(o, X, Y, sc, boxes: List[Box], kinds, stroke=INK, sw=0.4, da
         f = fill_for(b)
         if b.shape == "cyl":
             o.append(C(X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2), (b.x1 - b.x0) / 2 * sc, f, stroke, sw, dash))
-        elif b.rot and b.rot_axis == "z":     # a mitred piece along an angled edge: rotate about its centre in plan
+        elif getattr(b, "quad", None):        # a mitered piece: its true outline
+            o.append(PG([(X(px), Y(py)) for px, py in b.quad], f, stroke, sw))
+        elif b.rot and b.rot_axis == "z":     # a mitered piece along an angled edge: rotate about its center in plan
             cx, cy = X((b.x0 + b.x1) / 2), Y((b.y0 + b.y1) / 2)
             o.append(f'<g transform="rotate({math.degrees(b.rot):.2f} {cx:.1f} {cy:.1f})">' + R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, f, stroke, sw, f'stroke-dasharray="{dash}"' if dash else "") + "</g>")
         else:
@@ -130,7 +132,7 @@ def draw_elev_boxes(o, X, Z, sc, boxes: List[Box], kinds, stroke=INK, sw=0.4):
             zs = [q[2] for q in cs]
             o.append(R(X(b.x0), Z(max(zs)), (b.x1 - b.x0) * sc, (max(zs) - min(zs)) * sc, fill_for(b), stroke, sw))
         else:
-            thin = min((b.x1 - b.x0), (b.z1 - b.z0)) * sc < 1.8      # a baluster, a cable: a hairline edge, or the ink reads as its colour
+            thin = min((b.x1 - b.x0), (b.z1 - b.z0)) * sc < 1.8      # a baluster, a cable: a hairline edge, or the ink reads as its color
             o.append(R(X(b.x0), Z(b.z1), (b.x1 - b.x0) * sc, (b.z1 - b.z0) * sc, fill_for(b), "#8f8a80" if (thin and stroke != "none") else stroke, 0.2 if thin else sw))
 
 
@@ -529,7 +531,7 @@ def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
     house_outline(o, X, Y, sc, S)
     draw_plan_boxes(o, X, Y, sc, S.boxes, ("fascia",), "#777", 0.3)
     if L.plan is not None:       # the field: an end that butts a frame board or a breaker runs under it (the frame, drawn over it,
-        from .scene import Box   # reads as the mitred cut); an end at a house wall stops at its cut length
+        from .scene import Box   # reads as the mitered cut); an end at a house wall stops at its cut length
         P_ = L.plan
         bw_in = decking_facts(L.spec.decking.collection)["width"]
         def _seg_d(px, py, x0_, y0_, x1_, y1_):
@@ -741,7 +743,7 @@ def sheet_section(L: Layout, S: Scene, t, meta) -> str:
     o.append(TH(Yv(deep.wall_y * IN) + 12, Z(S.deck_top + 3.5), f"SECTION through zone {deep.name} at {ftin(deep.W / 2)} — looking toward the left end", 8.5, 800))
     # front elevation (x-z) in the right panel
     Xe, Ze, sce = elev_xform(-4.0, S.W + 4.0, -1.0, S.deck_top + 12.0, 620, 60, 370, 300)
-    el = []                                 # clipped to its own frame: a measured two-storey house is wider and taller than the deck
+    el = []                                 # clipped to its own frame: a measured two-story house is wider and taller than the deck
     draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("house", "wall", "privacy", "roof", "glass"), INK, 0.5)
     draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("footing", "stone", "stonecap", "base", "post", "brace", "cap", "beam", "rim", "fascia", "joist", "ledger", "cpost", "cbeam", "hardie", "ssroof"), INK, 0.35)
     draw_elev_boxes(el, Xe, Ze, sce, S.boxes, ("board", "border", "railpost", "toprail", "cable", "baluster", "botrail", "drink", "railcap"), "none", 0)
@@ -1089,7 +1091,7 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
             o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
     # stairs / landings
     for b in S.boxes:
-        if b.kind == "tread" and b.rot and b.rot_axis == "z":          # a step off an angled side: its true (turned) outline
+        if b.kind == "tread" and (getattr(b, "quad", None) or (b.rot and b.rot_axis == "z")):     # a step off an angled side or mitered at a corner: its true outline
             o.append(PG([(X(px), Y(py)) for px, py in _turned_corners(b)], FILL["concrete"], INK, 0.6))
         elif b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
@@ -1122,7 +1124,7 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
             ux, uy = X(q1[0]) - X(q0[0]), Y(q1[1]) - Y(q0[1])
             n_ = math.hypot(ux, uy) or 1.0
             o.append(TH(X(q0[0]) + ux / n_ * 16, Y(q0[1]) + uy / n_ * 16 - 3, f"{d:g}'", 7.2, 900, "start", col_))
-    # other work on the lot under its own permit (context): a grey outline with its label
+    # other work on the lot under its own permit (context): a gray outline with its label
     for oth in sp.get("others") or []:
         poly = [tuple(q) for q in oth["poly"]]
         o.append(PG([(X(x), Y(y)) for x, y in poly], "#d9d4c9", "#8b8478", 1.0).replace("/>", ' stroke-dasharray="4 3"/>', 1))
@@ -1510,7 +1512,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
                 dim_h(o, X, Y(by_) + 16, xa, xb, lab, 7, up=False)
             dim_v(o, Y, X(bxs[0]) + 10, 0, by_, inch(by_), 6.5, left=False)
             o.append(T((X(x_l) + X(x_r)) / 2, Y(by_) + 40, "BOX BAY (house) — deck runs around it", 7, 800, "middle", "#8a8172"))
-    # depths: the left end, the deepest corners, the centre front
+    # depths: the left end, the deepest corners, the center front
     def depth_at(xq):
         hits = [y for (x0_, y0_), (x1_, y1_) in zip(P, P[1:] + P[:1]) for y in [y0_, y1_] if False]
         return max((y for x, y in P if abs(x - xq) < 0.5), default=None)
@@ -1522,7 +1524,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
     right_pts = sorted(set(round(y, 2) for x, y in P if abs(x - max(xs)) < 0.5) | {0.0, round(max(ys), 2)})
     for (ya, yb_), lab in zip(zip(right_pts, right_pts[1:]), chain_labels(right_pts)):
         dim_v(o, Y, X(max(xs)) + 16, ya, yb_, lab, 7.5, left=False)
-    # the centre notch depth
+    # the center notch depth
     notch = [(x, y) for x, y in P if 0.5 < y < max(ys) - 0.5 and min(xs) + 1 < x < max(xs) - 1]
     if notch:
         ny_ = min(y for x, y in notch if y > Dp * 0.5) if any(y > Dp * 0.5 for x, y in notch) else None
@@ -1539,7 +1541,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(T(X(xi) + (-4 if k_ == 0 else 4), Y(y_end) - 10, f"divider {inch(xi)} from the left end", 7, 700, "end" if k_ == 0 else "start", "#9a7414"))
     # stairs and the box step: their footprints from the scene treads
     for b in S.boxes:
-        if b.kind == "tread" and b.rot and b.rot_axis == "z":          # a step off an angled side: its true (turned) outline
+        if b.kind == "tread" and (getattr(b, "quad", None) or (b.rot and b.rot_axis == "z")):     # a step off an angled side or mitered at a corner: its true outline
             o.append(PG([(X(px * 12), Y(py * 12)) for px, py in _turned_corners(b)], "#d7c3a0", INK, 0.6))
         elif b.kind == "tread":
             o.append(R(X(b.x0 * 12), Y(b.y0 * 12), (b.x1 - b.x0) * 12 * sc, (b.y1 - b.y0) * 12 * sc, "#d7c3a0", INK, 0.6))
@@ -1639,10 +1641,9 @@ NOT_ON_SHEETS = ("site", "louvered", "styling")     # scene layers the drawing s
 
 
 def _turned_corners(b) -> List[Tuple[float, float]]:
-    """The plan corners (feet) of a box turned about z (rot_axis "z"), e.g. a step off an angled outline side."""
-    cx, cy, hx, hy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2
-    c, s_ = math.cos(b.rot), math.sin(b.rot)
-    return [(cx + u * c - v * s_, cy + u * s_ + v * c) for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))]
+    """The plan corners (feet) of a box: its miter outline when it has one, else its rectangle turned about z."""
+    from .scene import box_plan_corners
+    return box_plan_corners(b)
 
 
 def _set_rail_fill(spec) -> None:
@@ -2356,7 +2357,7 @@ def sheet_details_wood_connections(L: Layout, S: Scene, t, meta) -> str:
             o.append(T(x + 20, yy, f"EDGE POSTS {eps_[0].label}-{eps_[-1].label} (under the rims)", 6.8, 700)); o.append(T(x + 170, yy, str(len(eps_)), 6.8, 600))
             o.append(T(x + 230, yy, inch(L.edge_post_len, 16) if L.edge_post_len < 24 else ftin(L.edge_post_len), 6.8, 700))
             yy += 16
-            for ln_ in textwrap.wrap("Edge post: centred under both rim ends at the corner, post top cut to the rim bottom, (2) Simpson A35Z per rim "
+            for ln_ in textwrap.wrap("Edge post: centered under both rim ends at the corner, post top cut to the rim bottom, (2) Simpson A35Z per rim "
                                      "to the post. The doubled rims span post to post as flush beams — nothing cantilevers past a flush beam.", 78):
                 o.append(T(x + 20, yy, ln_, 6.6, 600)); yy += 11
         if any(bl_.post_len < 8 for bl_ in (L.beam_lines or [])):
@@ -2433,7 +2434,7 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     for xx in (160, 186):
         o.append(LN(x + xx, y + 96, x + xx, y + 120, INK, 0.9))
     o.append(R(x + 128, y + 104, 4, 6, "#5b6166", INK, 0.4))
-    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitred, {pf_fast} 2 per bearing @ {L.spec.joist_spacing:g}\"")
+    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitered, {pf_fast} 2 per bearing @ {L.spec.joist_spacing:g}\"")
     _lead(o, x + 130, y + 106, x + 24, y + 60, f"{fsys} clip in every gap at every joist (3/16\" gap)")
     _lead(o, x + 193, y + 150, x + 236, y + 140, (f"HardieTrim {L.spec.extras.hardie_color or ''} skirt, pre-drilled, color-matched 316SS trim screws, 2 at each end then @ 12\"".replace("  ", " ") if hk_ else
                                                    f"{s.decking.collection} fascia, pre-drilled, 2 screws at each end then alternating @ 12\""))
@@ -2842,7 +2843,7 @@ def _cwindow(levels, S, pad=3.0, front_pad=4.0, back_pad=3.0, boxes=None):
 
 
 def _cxform(win, px0, py0, pw, ph, valign="top"):
-    """Plan transform centred across the box (x right, y toward the yard down the sheet)."""
+    """Plan transform centered across the box (x right, y toward the yard down the sheet)."""
     x0, x1, y0, y1 = win
     sc = min(pw / (x1 - x0), ph / (y1 - y0))
     ox = px0 + (pw - (x1 - x0) * sc) / 2
@@ -3730,8 +3731,8 @@ def sheet_rail_composite(CL, S, t, levels, steps, meta) -> str:
         if s.railing.drink_rail:
             over = str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over"
             items.append(f"Drink rail: {getattr(s.railing, 'drink_rail_collection', '') or s.decking.collection} {getattr(s.railing, 'drink_rail_color', '') or s.decking.color} "
-                         + ("board over the posts on the drink-rail clips (universal panel covers, post inserts), mitred at every turn." if over
-                            else "on drink-rail brackets, mitred at every turn."))
+                         + ("board over the posts on the drink-rail clips (universal panel covers, post inserts), mitered at every turn." if over
+                            else "on drink-rail brackets, mitered at every turn."))
     _notes_cols(o, 30, 470, 940, items, size=7.1, lh=9.4, cols=2)
     return sheet("A-201", "Railing plan + elevation", "Both levels: post IDs and types (E end · L line · C corner), the runs, the front at both heights", o,
                  "Plan above · elevation of the front below · not to scale", meta)
@@ -4316,7 +4317,7 @@ def sheet_details_frame_composite(CL, S, t, levels, steps, meta) -> str:
             o.append(C(x + xx, y + yy, 1.6, INK, "none", 0))
     _wood(o, x + 128, y + 120, 48, 166)
     _lead(o, x + 150, y + 112, x + 24, y + 150, f"Simpson {cap_mid or 'column cap'}" + (f" (SDS screws incl.); {cap_end} only where a beam ends flush on a column" if cap_end else " (SDS screws incl.)"))
-    _lead(o, x + 60, y + 80, x + 24, y + 36, f"{bsize} {bsp} drop beam, centred on the column; the beam overhangs its end columns")
+    _lead(o, x + 60, y + 80, x + 24, y + 36, f"{bsize} {bsp} drop beam, centered on the column; the beam overhangs its end columns")
     _lead(o, x + 152, y + 240, x + 210, y + 250, f"{psz} {pw} column, cut to the string line (post lengths on S-100)")
     # 5 the post base on the footing
     ft = s.framing.footing_type
@@ -4450,7 +4451,7 @@ def sheet_details_edge_composite(CL, S, t, levels, steps, meta) -> str:
         bt, x0_, x1_ = y + 64, x + 150, x + W3 - 16                          # the drawing on the right, the words on the left
         xm_ = (x0_ + x1_) / 2
         o.append(R(x0_ - 6, bt - 9, x1_ - x0_ + 12, 9, FILL["border"], INK, 0.6))   # the drink rail board (1x6 on its face)
-        o.append(LN(xm_, bt - 9, xm_, bt, "#fff", 1.0))                       # its seam on the post centre
+        o.append(LN(xm_, bt - 9, xm_, bt, "#fff", 1.0))                       # its seam on the post center
         for d_ in (-11, -6, 6, 11):
             o.append(C(xm_ + d_, bt - 4.5, 1.1, "#fff", "none", 0))
         o.append(R(xm_ - 10, bt, 20, 160, FILL["railmetal"], INK, 0.6))       # the post, cut level
@@ -4464,14 +4465,14 @@ def sheet_details_edge_composite(CL, S, t, levels, steps, meta) -> str:
             o.append(R(cx_ - 5, bt - 1, 10, 4, "#7b8186", INK, 0.4))           # clips under the board
         coll_ = getattr(s.railing, "drink_rail_collection", "") or s.decking.collection
         col_ = getattr(s.railing, "drink_rail_color", "") or s.decking.color
-        rows_ = [(x0_ + 40, bt - 6, f"Drink rail: {coll_} {col_} 1x6 board" + (" over the posts" if over else "") + ", mitred at every turn" + (f" ({int(drk.net)} boards)" if drk else "")),
+        rows_ = [(x0_ + 40, bt - 6, f"Drink rail: {coll_} {col_} 1x6 board" + (" over the posts" if over else "") + ", mitered at every turn" + (f" ({int(drk.net)} boards)" if drk else "")),
                  (xm_ - 4, bt + 5, ("A drink-rail 3\" post insert in each post: the post cut level, (3) 2-1/2\" screws each side of a seam" if (over and ins)
                                     else "Drink-rail bracket on each post")),
                  (x0_ + 22, bt + 1, ("Drink-rail clips on the panel covers: 6 per 8' bay, 4 per 6'" if clip else "Drink-rail brackets")),
                  (x0_ + 60, bt + 6, "Universal panel cover in place of the top rail, under the board")]
         for k_, (ax_, ay_, txt_) in enumerate(rows_):
             _lead(o, ax_, ay_, x + 14, y + 34 + k_ * 56, txt_)
-        o.append(T(x + 14, y + 278, "Seams on post centres, no butt joint between posts", 6.4, 700))
+        o.append(T(x + 14, y + 278, "Seams on post centers, no butt joint between posts", 6.4, 700))
     # 3 the deck edge: picture frame + fascia
     x, y = P[2]; _panel(o, x, y, W3, H2, "3", "DECK EDGE — PICTURE FRAME + FASCIA")
     _wood(o, x + 170, y + 110, 10, 60); _wood(o, x + 180, y + 110, 10, 60); _wood(o, x + 140, y + 110, 9, 60)
@@ -4480,7 +4481,7 @@ def sheet_details_edge_composite(CL, S, t, levels, steps, meta) -> str:
     o.append(R(x + 140, y + 108, 9, 2.5, "#111", "none", 0)); o.append(R(x + 170, y + 108, 20, 2.5, "#111", "none", 0))
     for xx in (160, 186):
         o.append(LN(x + xx, y + 96, x + xx, y + 120, INK, 0.9))
-    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk}, mitred, " + ("Cortex screws + color-matched plugs, 2 per bearing" if cortex_b else "face-screwed, 2 per bearing"))
+    _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk}, mitered, " + ("Cortex screws + color-matched plugs, 2 per bearing" if cortex_b else "face-screwed, 2 per bearing"))
     _lead(o, x + 80, y + 104, x + 24, y + 60, ("Field: Cortex face screws + color-matched plugs, 2 per board at every joist" if (s.decking.fastener_system or "").lower().startswith("cortex")
                                               else f"Field: {s.decking.fastener_system or 'hidden clips'}") + f", {ftin(s.deck_gap)} gaps")
     _lead(o, x + 193, y + 150, x + 236, y + 140, f"{s.decking.collection} fascia, " + ("TOPLoc fascia screws: 2 at each end, then alternate top / bottom every 12\", pre-drilled"

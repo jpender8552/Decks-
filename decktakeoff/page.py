@@ -1362,7 +1362,7 @@ _NUM_WORD = {"1": "One", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6"
 def _us_words(x: str) -> str:
     """The homeowner's spelling of an engine line: US spellings ("centers", "around"), and a line that would open on two
     numbers ("2 6x6 posts") opens on a word."""
-    x = re.sub(r"\bcentres\b", "centers", re.sub(r"\bcentre\b", "center", x))
+    x = re.sub(r"\bcenters\b", "centers", re.sub(r"\bcenter\b", "center", x))
     x = re.sub(r"\bround (every|each)\b", r"around \1", x)
     return re.sub(r"^([1-9]) (?=\d)", lambda m: _NUM_WORD[m.group(1)] + " ", x)
 

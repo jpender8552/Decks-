@@ -1380,7 +1380,7 @@ class Calc:
                     d = math.hypot(a["gx"] - b["gx"], a["gy"] - b["gy"]) * 12.0
                     if d < 36.0:
                         self.add(Check(f"F-sp-{a['id']}-{b['id']}", "Footings", f"Piers under {a['id']} and {b['id']}", "Pier spacing (3'-0\" min.)", 36.0, d, "in",
-                                       "ICC-ES ESR-1895; Pin Foundations installation manual", f"centre to centre {d:.1f}\" < 36\": merge the columns or move one (each closer pier loses about 13%)",
+                                       "ICC-ES ESR-1895; Pin Foundations installation manual", f"center to center {d:.1f}\" < 36\": merge the columns or move one (each closer pier loses about 13%)",
                                        status="FAIL"))
         cais = [q for q in fcols if q.get("ftype") in ("caisson", "existing", "concrete")]
         if cais:
@@ -1401,7 +1401,7 @@ class Calc:
                     lim = self.footing_info(a)["dia"] + self.footing_info(b)["dia"]
                     if d < lim:
                         self.add(Check(f"F-sp-{a['id']}-{b['id']}", "Footings", f"Caissons under {a['id']} and {b['id']}", "Shaft spacing (2 diameters)", lim, d, "in",
-                                       "drilled-shaft practice", f"centre to centre {d:.1f}\" < {lim:g}\": the holes run together — one footing under both or move a column",
+                                       "drilled-shaft practice", f"center to center {d:.1f}\" < {lim:g}\": the holes run together — one footing under both or move a column",
                                        status="REVIEW"))
 
 

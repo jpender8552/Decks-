@@ -102,7 +102,7 @@ def test_two_level_composite_package_and_options():
     base = DeckSpec.from_dict(TWO_LEVELS)
     pkg = calcs.run_calcs(base)
     tags = {c.id.split("-")[1][:1] for c in pkg.checks if c.id.startswith("J-")}
-    assert tags == {"L", "U"}                                   # both parts analysed, each zone's joists
+    assert tags == {"L", "U"}                                   # both parts analyzed, each zone's joists
     cols = [c for c in pkg.columns if c["kind"] == "beam"]
     assert cols and all(c["height_in"] > 0 for c in cols)
     up = [c for c in cols if c["part"] == "Upper level"]

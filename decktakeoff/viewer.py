@@ -77,7 +77,7 @@ function patternTex(kind, hex, seed, md) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 512; const g = c.getContext('2d'); let s = seed;
   const rnd = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
   g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
-  if (kind === 'stone') {          // ledgestone: courses of long thin stones in a few greys and tans
+  if (kind === 'stone') {          // ledgestone: courses of long thin stones in a few grays and tans
     const cols = [shade(hex, -0.28), shade(hex, -0.14), hex, shade(hex, 0.1), shade(hex, 0.2), '#a3907a', '#6f6a63'];
     let y = 0; while (y < 512) { const h = 22 + rnd() * 30; let x = -rnd() * 60; while (x < 512) { const w = 50 + rnd() * 120;
       g.fillStyle = cols[Math.floor(rnd() * cols.length)]; g.fillRect(x + 2, y + 2, w - 4, h - 4); x += w; } y += h; }
@@ -118,7 +118,7 @@ function patternTex(kind, hex, seed, md) {
       g.fillRect(c * bw + off + jt / 2, r * bh + jt / 2, bw - jt, bh - jt);
       g.globalAlpha = 0.25; g.fillStyle = shade(hex, 0.25); g.fillRect(c * bw + off + jt / 2 + rnd() * bw * 0.5, r * bh + jt / 2, bw * (0.2 + rnd() * 0.3), bh - jt); g.globalAlpha = 1; } }
     g.globalAlpha = 0.18; for (let i = 0; i < 6000; i++) { g.fillStyle = rnd() > 0.5 ? '#000' : '#fff'; g.fillRect(rnd() * 512, rnd() * 512, 1, 1); } g.globalAlpha = 1;
-  } else if (kind === 'rsawn') {   // stained rough-sawn plywood / cedar: faint vertical fibre streaks (the grooves are geometry)
+  } else if (kind === 'rsawn') {   // stained rough-sawn plywood / cedar: faint vertical fiber streaks (the grooves are geometry)
     for (let i = 0; i < 900; i++) { g.fillStyle = rnd() > 0.5 ? shade(hex, -0.09) : shade(hex, 0.07); g.globalAlpha = 0.25 + rnd() * 0.35;
       g.fillRect(rnd() * 512, rnd() * 512, 0.6 + rnd() * 1.6, 30 + rnd() * 160); } g.globalAlpha = 1;
   } else if (kind === 'gravel') {
@@ -161,6 +161,21 @@ function material(b) {
 }
 const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser', 'wblock']);
 const edgeMat = new THREE.LineBasicMaterial({color: 0x1a1612, transparent: true, opacity: 0.22});
+// a mitered piece: the prism over its 4-point plan outline (feet), centered on the outline's centroid
+function quadPrism(b) {
+  const q = b.quad, cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cz = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  const h2 = (b.z1 - b.z0) / 2, L = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) || 1;
+  const ux = (q[1][0] - q[0][0]) / L, uz = (q[1][1] - q[0][1]) / L;
+  const P = (k, top) => [q[k][0] - cx, top ? h2 : -h2, q[k][1] - cz];
+  const tris = [[P(0, 1), P(1, 1), P(2, 1)], [P(0, 1), P(2, 1), P(3, 1)], [P(0, 0), P(2, 0), P(1, 0)], [P(0, 0), P(3, 0), P(2, 0)]];
+  for (let k = 0; k < 4; k++) { const a = k, c = (k + 1) % 4; tris.push([P(a, 0), P(c, 0), P(c, 1)], [P(a, 0), P(c, 1), P(a, 1)]); }
+  const pos = [], uv = [];
+  tris.forEach(t => t.forEach(p => { pos.push(p[0], p[1], p[2]); const al = ((p[0] + cx - q[0][0]) * ux + (p[2] + cz - q[0][1]) * uz) / L; uv.push(al, (p[1] + h2) / Math.max(2 * h2, 0.05)); }));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals(); g.userData.c = [cx, cz];
+  return g;
+}
 // meshes
 const phased = [], ctx = [], FURN = [];
 for (const b of D.boxes) {
@@ -184,13 +199,15 @@ for (const b of D.boxes) {
     }
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
+  else if (b.quad && b.quad.length === 4) geo = quadPrism(b);     // a mitered piece: the prism over its plan outline
   else geo = new THREE.BoxGeometry(w, h, d);
   const mat_ = material(b);
-  if (b.shape === 'mesh') { mat_.side = THREE.DoubleSide; }
+  if (b.shape === 'mesh' || b.quad) { mat_.side = THREE.DoubleSide; }
   const mesh = new THREE.Mesh(geo, mat_);
-  if (b.shape === 'mesh') mesh.position.set(0, 0, 0); else
-  mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
-  if (b.rot) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
+  if (b.shape === 'mesh') mesh.position.set(0, 0, 0);
+  else if (b.quad && b.quad.length === 4) mesh.position.set(geo.userData.c[0], (b.z0 + b.z1) / 2, geo.userData.c[1]);
+  else mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
+  if (b.rot && !b.quad) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
   mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }

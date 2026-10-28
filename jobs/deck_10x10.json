@@ -33,12 +33,12 @@
         "left": "SIDE LOT LINE (WEST) \u2014 1685 Summit Point Ct",
         "right": "SIDE LOT LINE (EAST) \u2014 1665 Summit Point Ct"
       },
-      "house_label": "existing house, 1 storey (roof outline per City GIS) \u2014 no work",
+      "house_label": "existing house, 1 story (roof outline per City GIS) \u2014 no work",
       "info": [
         "Parcel 7311205063 \u00b7 16,961 SF (0.389 ac) \u00b7 City of Colorado Springs",
         "Zoning PDZ HS (dev. plan CPC P 85-68(HS)) \u00b7 overlays WUI-O + Hillside HS-O",
-        "House: 1 storey, ~3,989 SF roof outline (City GIS)",
-        "Street: Summit Point Ct (front, north) \u00b7 neighbours 1685 (W), 1665 (E), 1856 Oak Hills Dr (S)"
+        "House: 1 story, ~3,989 SF roof outline (City GIS)",
+        "Street: Summit Point Ct (front, north) \u00b7 neighbors 1685 (W), 1665 (E), 1856 Oak Hills Dr (S)"
       ],
       "setback_ref": {
         "rear": 25,

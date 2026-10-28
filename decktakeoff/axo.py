@@ -11,7 +11,7 @@ from .scene import Box, Scene
 GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23}      # the viewer's exploded lift per phase (ft)
 SKIP = {"ground", "gravel", "water", "glass", "trim_house"}
 # layered roof-cover parts paint after everything under them when the camera looks down (no z-fighting between slabs and rafters);
-# the same for the deck's own layers: grade, piers, posts, beams, joists, then everything on top. A long deck board's centre can sit
+# the same for the deck's own layers: grade, piers, posts, beams, joists, then everything on top. A long deck board's center can sit
 # behind a joist's, and depth alone would paint the joist over the decking.
 RANK = {"house": -2, "roof": -1, "gravel": -0.95, "stepbase": -0.95, "footing": -0.9, "base": -0.9, "post": -0.8, "brace": -0.8, "cap": -0.75,
         "beam": -0.7, "joist": -0.6, "block": -0.6, "ledger": -0.6, "rim": -0.55,
@@ -20,7 +20,7 @@ RANK = {"house": -2, "roof": -1, "gravel": -0.95, "stepbase": -0.95, "footing": 
 
 def _rank(b: Box) -> float:
     """Paint class when looking down. The parts of a measured house model (siding, trim, shutters...) paint after its walls
-    and before the deck: a siding course runs the width of the wall, so its centre can sit in front of a planter or bench."""
+    and before the deck: a siding course runs the width of the wall, so its center can sit in front of a planter or bench."""
     r = RANK.get(b.kind)
     if r is not None:
         return r
@@ -52,7 +52,12 @@ def _clip_z(poly, z0):
 
 
 def corners(b: Box, lift: float = 0.0) -> List[Tuple[float, float, float]]:
-    """The 8 corners in plan feet (x along the house, y to the yard, z up), with the box's rotation about its centre."""
+    """The 8 corners in plan feet (x along the house, y to the yard, z up), with the box's rotation about its center. A
+    piece with a miter outline (Box.quad, 4 plan points around) is its prism, in the same corner order."""
+    q = getattr(b, "quad", None)
+    if q and len(q) == 4:
+        pick = {(0, 0): q[0], (1, 0): q[1], (1, 1): q[2], (0, 1): q[3]}
+        return [(float(pick[(ix, iy)][0]), float(pick[(ix, iy)][1]), (b.z1 if iz else b.z0) + lift) for ix in (0, 1) for iy in (0, 1) for iz in (0, 1)]
     cx, cy, cz = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2
     hx, hy, hz = (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2, (b.z1 - b.z0) / 2
     out = []
@@ -129,9 +134,9 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
             ux, uy, uz = q1[0] - q0[0], q1[1] - q0[1], q1[2] - q0[2]
             vx, vy, vz = q2[0] - q0[0], q2[1] - q0[1], q2[2] - q0[2]
             nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
-            cxf = sum(cs[i][0] for i in f) / 4 - (b.x0 + b.x1) / 2
-            cyf = sum(cs[i][1] for i in f) / 4 - (b.y0 + b.y1) / 2
-            czf = sum(cs[i][2] for i in f) / 4 - (b.z0 + b.z1) / 2 - lift_of(b, explode, gaps)
+            cxf = sum(cs[i][0] for i in f) / 4 - sum(q[0] for q in cs) / 8          # out from the piece's own center (a miter
+            cyf = sum(cs[i][1] for i in f) / 4 - sum(q[1] for q in cs) / 8          # outline's prism is not centered on its box)
+            czf = sum(cs[i][2] for i in f) / 4 - sum(q[2] for q in cs) / 8
             if nx * cxf + ny * cyf + nz * czf < 0:          # make the normal point out of the box
                 nx, ny, nz = -nx, -ny, -nz
             if nx * view.d[0] + ny * view.d[1] + nz * view.d[2] <= 1e-9:
@@ -164,7 +169,7 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
         pts = " ".join(f"{q[0]:.1f},{q[1]:.1f}" for q in Q)
         area = abs(sum(Q[i][0] * Q[(i + 1) % len(Q)][1] - Q[(i + 1) % len(Q)][0] * Q[i][1] for i in range(len(Q)))) / 2
         per = sum(math.hypot(Q[(i + 1) % len(Q)][0] - Q[i][0], Q[(i + 1) % len(Q)][1] - Q[i][1]) for i in range(len(Q))) or 1.0
-        if 4 * area / per < 1.6:            # a hairline face (a baluster, a cable): edged in its own shade, or the ink outline reads as its colour
+        if 4 * area / per < 1.6:            # a hairline face (a baluster, a cable): edged in its own shade, or the ink outline reads as its color
             out.append(f'<polygon points="{pts}" fill="{col}" stroke="{_shade(col, 0.8)}" stroke-width="0.3" stroke-linejoin="round"/>')
         else:
             out.append(f'<polygon points="{pts}" fill="{col}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round"/>')
@@ -193,7 +198,7 @@ def anchor(boxes: Sequence[Box], pred: Callable[[Box], bool], explode: bool = Fa
 
 def callouts(items: List[Tuple[int, Tuple[float, float, float], str]], to_sheet, frame: Tuple[float, float, float, float], ink="#111", gold="#b8860b",
              size: float = 7.6, left_x: Optional[float] = None, right_x: Optional[float] = None) -> List[str]:
-    """Numbered tags on leaders: anchors left of the drawing's centre go to a column on the left, the rest on the right,
+    """Numbered tags on leaders: anchors left of the drawing's center go to a column on the left, the rest on the right,
     each column sorted top to bottom so the leaders do not cross. Returns svg strings."""
     fx, fy, fw, fh = frame
     lx = left_x if left_x is not None else fx + 14

@@ -2,7 +2,7 @@
 
 A roof is one dict in geometry.louvered_roofs, in the plan frame (feet: x along the house left to right as you face it
 from the yard, y from the house wall toward the yard) with heights in feet above grade (the scene's z). DEFAULTS lists
-every key. The frame is level: perimeter beams with the integrated gutter, motor-zone dividers, 8" blades on 8" centres
+every key. The frame is level: perimeter beams with the integrated gutter, motor-zone dividers, 8" blades on 8" centers
 turning about their own long axis, 6x6 posts base-plated on the deck, and on an attached roof a house-side beam on wall
 brackets at the soffit / roof line (no posts at the house).
 
@@ -36,8 +36,8 @@ SNAP_FT = 14.0 / 12             # a default post this close to the deck's rail c
 DIVIDER_CLEAR_IN = 24.0         # a breaker-line rail post closer than this to a roof post is dropped (the roof post is the post there)
 BRACKET_OC_FT = 2.0             # house-side beam wall brackets
 GUTTER_W, GUTTER_H = 2.5 * IN, 3.5 * IN
-RAIL_POST_INSET_FT = 2.5 * IN   # layout.RAIL_POST_INSET in feet (the post centre in from the frame face)
-HEX = {"black": "#141416", "linen": "#e9e3d3", "grey": "#6b6e70", "gray": "#6b6e70", "tan": "#b9a68a", "white": "#ecebe6",
+RAIL_POST_INSET_FT = 2.5 * IN   # layout.RAIL_POST_INSET in feet (the post center in from the frame face)
+HEX = {"black": "#141416", "linen": "#e9e3d3", "gray": "#6b6e70", "gray": "#6b6e70", "tan": "#b9a68a", "white": "#ecebe6",
        "mocha": "#5a4636", "bronze": "#4b3b2c"}
 
 DEFAULTS = dict(
@@ -60,12 +60,12 @@ DEFAULTS = dict(
     fascia_in=6.0,                          # soffit underside to the roof surface at the fascia face
     riser_in=2.0,                           # roof-line mount: the house beam's underside this far over the shingles at its up-slope face
     louver_dir=None,                        # blade long axis "x" (parallel to the house) | "y"; None -> "x" attached, the short side freestanding
-    blade_in=8.0, spacing_in=8.0,           # blade width and centre-to-centre spacing
+    blade_in=8.0, spacing_in=8.0,           # blade width and center-to-center spacing
     blade_t_in=1.5, motor_t_in=2.25,        # blade / motor-blade thickness
     pivot_drop_in=3.0,                      # blade pivots this far below the frame top
     angle_deg=45.0,                         # how open to draw them: 0 closed (flat) .. 90 on edge .. 140 (Suncoast max), the +x / +y edge rising
     zones=None,                             # motor zones (one motor blade each); None -> ceil(area / 150 SF)
-    posts=None,                             # [[x, y], ...] post centres (ft); None -> flush under the frame's outer corners (both ends of the front
+    posts=None,                             # [[x, y], ...] post centers (ft); None -> flush under the frame's outer corners (both ends of the front
                                             #   beam; all four freestanding)
     post_in=6.0, plate_in=10.0,             # 6x6 aluminum post, square base plate (~10" x 10" x 1/2", Suncoast to specify)
     edge_clear_in=2.0,                      # a post at the deck edge keeps its outer faces this far inside the edge (the plate on the framing);
@@ -228,7 +228,7 @@ def _pick_frame(q: dict, key: str, span: float) -> Tuple[str, float, float, floa
 
 def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     """Everything about one roof, in its frame (ft): the frame rectangle as built (edge clearance, corner snap), the beams,
-    motor zones, blades (pivot, length, zone), posts (centre, deck height, which rail lines run through them), heights and
+    motor zones, blades (pivot, length, zone), posts (center, deck height, which rail lines run through them), heights and
     clearances, the house brackets / stand-offs, the screens."""
     from .layout import RAIL_POST_INSET
     surfaces = surfaces or []
@@ -561,7 +561,7 @@ def materials(spec) -> Dict[str, dict]:
         fab = str(scr[0].get("fabric") or "mesh").lower()
         fab = fab if fab in FABRIC else "mesh"
         sc = str(scr[0].get("color") or ("clear" if fab == "vinyl" else "black")).lower()
-        hexc = "#dfe6e8" if fab == "vinyl" else {"black": "#1b1c1e", "grey": "#55585a", "gray": "#55585a", "white": "#e6e4de", "linen": "#d8cfbd",
+        hexc = "#dfe6e8" if fab == "vinyl" else {"black": "#1b1c1e", "gray": "#55585a", "gray": "#55585a", "white": "#e6e4de", "linen": "#d8cfbd",
                                                   "tan": "#a99677", "mocha": "#4d3d31"}.get(sc, "#1b1c1e")
         # openness: the open weave the photoreal pass lets sight and sun through (cycles Mats.screen); opacity: the WebGL viewer's
         dens = float(scr[0].get("density") or 80.0)
@@ -922,7 +922,7 @@ def scope_words(q: dict) -> List[str]:
     rail_posts = sum(1 for p in q["posts"] if p["on_rail"])
     W_, D_ = ftin(q["W_nom"] * 12), ftin(q["D_nom"] * 12)
     out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area_nom']:g} SF), {str(q['color']).lower()} powder-coated aluminum",
-           f"{n_bl} louver blades, {q['blade_w'] * 12:g}\" wide on {q['spacing'] * 12:g}\" centres, in {nz} motor zone{'s' if nz != 1 else ''} "
+           f"{n_bl} louver blades, {q['blade_w'] * 12:g}\" wide on {q['spacing'] * 12:g}\" centers, in {nz} motor zone{'s' if nz != 1 else ''} "
            f"(one Gaposa motor blade each); the blades turn from closed to {ANGLE_RANGE[1]:g} degrees open by remote or app",
            f"Aluminum frame with the integrated gutter round every zone: {q['beam_label']} front beam, {q['frame_label']} house, side" + (" and divider" if q["xs"] or q["ys"] else "") + " beams"
            + (f"; {len(q['xs']) + len(q['ys'])} zone divider beam{'s' if len(q['xs']) + len(q['ys']) != 1 else ''}" if (q['xs'] or q['ys']) else ""),
@@ -1189,7 +1189,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
         _lead(o, Xs(y0 + wb / 2), Zs(zbb - 0.12), Xs(y0 + 1.2), Zs(zb - 1.1),
               (f"house-side {q['frame_label']} beam on flashed riser brackets @ {BRACKET_OC_FT * 12:g}\" OC, lagged into the rafters (roof-line mount)"
                if mount == "roof" else f"house-side {q['frame_label']} beam on wall brackets @ {BRACKET_OC_FT * 12:g}\" OC into the wall framing"), 6.2)
-    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 3.3), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centres, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
+    _lead(o, Xs((y0 + y1) / 2), Zs(q["z_pivot"] - 0.1), Xs(y0 + 2.4), Zs(zb - 3.3), f"{q['blade_w'] * 12:g}\" blades on {q['spacing'] * 12:g}\" centers, drawn {q['angle_deg']:g}° open (0 to {ANGLE_RANGE[1]:g}°)", 6.2)
     _lead(o, Xs(py), Zs(zd + 3.6), Xs(y0 + 3.4), Zs(zd + 3.5), f"{p * 12:g}x{p * 12:g} aluminum post, {ins_txt} inside the frame face: the rail post, downspout inside", 6.2)
     _lead(o, Xs(yr - 0.11), Zs(zd + rh - 0.06), Xs(y0 + 3.4), Zs(zd + 1.3), "rail (cut) ends into the post on wall-mount brackets", 6.2)
     _lead(o, Xs(py), Zs(zd - 1.6), Xs(y0 + 3.4), Zs(zd - 1.7), "deck column + caisson under the roof post (framing plan)", 6.2)
@@ -1231,12 +1231,12 @@ def sheet(L, S, t, meta) -> Optional[str]:
     _lead(o, EX(0.5), EZ(zbase + 3.2), EX(10), EZ(zbase + 15.5), "downspout outlet (it runs inside the post)", 5.8)
     _lead(o, EX(-pl_in / 2 + 0.6), EZ(zbase + 0.3), EX(-27), EZ(zbase + 13.0), f"{pl_in:g}\" base plate + base cover", 5.8)
     _lead(o, EX(-2.5), EZ(-1.0), EX(10), EZ(-0.5), "column / beam under the post (framing plan)", 5.8)
-    # (b) section through the deck edge: the post centre on the rail line, the plate over solid blocking
+    # (b) section through the deck edge: the post center on the rail line, the plate over solid blocking
     sx, sz = 952, 584
     def SX(v): return sx + v * k_
     def SZ(v): return sz - v * k_
     rp_in = rp * 12
-    pc_in = (ins + p / 2) * 12                    # the post centre, in from the frame face
+    pc_in = (ins + p / 2) * 12                    # the post center, in from the frame face
     o.append(T(SX(-30), 380, "SECTION", 6.6, 900, fill=MUTE))
     o.append(R(SX(-30), SZ(jd_in), 24.0 * k_, jd_in * k_, FILL["timber"], INK, 0.5, 'fill-opacity="0.55"'))
     o.append(R(SX(-6.0), SZ(jd_in), 3.0 * k_, jd_in * k_, FILL["timber_dk"], INK, 0.6))

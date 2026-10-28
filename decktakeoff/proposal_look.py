@@ -19,7 +19,7 @@ FONT = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sa
 # CVD separation >= 8.4, normal vision >= 19.3, every slot >= 3:1 against #050608
 WHEEL = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 
-RAIL_HEX = {"black": "#141414", "white": "#f1f0ea", "bronze": "#5a4632", "gray": "#7a7c7e", "grey": "#7a7c7e"}
+RAIL_HEX = {"black": "#141414", "white": "#f1f0ea", "bronze": "#5a4632", "gray": "#7a7c7e", "gray": "#7a7c7e"}
 
 CSS = """<style>
 /* Launch manifest: the photoreal deck full-bleed over deep black, a condensed wide-tracked display face, the GS gold
@@ -527,7 +527,7 @@ def wheel(spec, p, options_html: str, next_html: str) -> str:
         items = items[:len(WHEEL) - 1] + [("Everything else", rest)]
     total = sum(v for _, v in items) or 1.0
     cx = cy = 120
-    r, gap = 92, 1.4                       # the ring's centre line; a 2px surface gap between wedges
+    r, gap = 92, 1.4                       # the ring's center line; a 2px surface gap between wedges
     a, paths, rows = -90.0, [], []
     for i, (k, v) in enumerate(items):
         sweep = 360.0 * v / total

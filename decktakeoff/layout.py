@@ -12,13 +12,13 @@ from .catalog import (rail_system_for, DECKING, FASCIA, NOSE, RAIL_SYSTEMS, RISE
 from .spec import DeckSpec, RailOpening
 from .units import ftin
 
-PF_INSET = 5.25       # picture-frame joist centre from the frame face for 2x framing (1-1/2" gap inboard of a double rim)
+PF_INSET = 5.25       # picture-frame joist center from the frame face for 2x framing (1-1/2" gap inboard of a double rim)
 RIM_PLY = 1.5
 CAISSON_STANDOFF = 7.0  # caisson 6" above grade + 1" standoff base (Eagle's Nest: post = 96 - 1 - 9.25 - 11.5 - 7 = 67.25")
 OVERHANG_NO_FASCIA = 1.5   # boards overhang the exposed rim 1-1/2" when there is no fascia (Eagle's Nest)
 BLOCK_MAX_SPACING = 48.0   # timber frames: a blocking row so no unblocked joist run between supports exceeds 4' 
 LEDGER_T = 1.5
-RAIL_POST_INSET = 2.5 # 2" Fulton post against the inside of the OUTER rim ply -> centre 2.5" in from the frame face
+RAIL_POST_INSET = 2.5 # 2" Fulton post against the inside of the OUTER rim ply -> center 2.5" in from the frame face
 BEAM_HOLD_IN = 0.5    # drop beam held 1/2" inside the rim faces
 POST_END_OVERHANG = 12.0   # beam overhang past the end posts
 DP_STANDOFF = 4.5     # pier head + ABA66Z above grade
@@ -33,7 +33,7 @@ class BeamLayout:
     plies: int
     width: float
     depth: float
-    cl_y: float                # centreline from the house face
+    cl_y: float                # centerline from the house face
     length: float
     x0: float
     posts_x: List[float]
@@ -514,7 +514,7 @@ def frame_layout(spec: DeckSpec, W: float, D: float, hot_tub: Optional[bool] = N
         if b.kind == "flush" and not (b.setback_in or 0) and b.position_in is None and (not zone or not b.zones or zone in b.zones):
             front_t = max(front_t, parse_beam(b.size)[2])
     joist_len = D - rear_t - front_t
-    # resolve centrelines
+    # resolve centerlines
     cls = []
     engineered = spec.extras.engineered
     for b in declared:
@@ -768,7 +768,7 @@ def rail_layout(spec: DeckSpec, W: float, D: float, extra_openings: List[RailOpe
         if end > cur + 1:
             segs.append((cur, end))
         for si, (a, b) in enumerate(segs):
-            # post centres at the segment ends, inset RP from the frame face at run ends and at openings
+            # post centers at the segment ends, inset RP from the frame face at run ends and at openings
             p0, p1 = a + RP, b - RP          # post pocket sits inside the rail section, never in the opening
             p0 = max(RP, min(p0, end - RP)); p1 = max(RP, min(p1, end - RP))
             # louvered-roof posts on this run's post line (louvered.rail_points): fixed rail posts; one within 14" of an end takes it
@@ -840,7 +840,7 @@ def rail_layout_edges(spec: DeckSpec, edges: List[Edge], stair_openings: List[Ra
         missing = set(r.edges) - {e.name for e in exposed}
     else:
         sel, missing = exposed, set()
-    # collinear neighbours (a zone front continuing straight into the next) are one run
+    # collinear neighbors (a zone front continuing straight into the next) are one run
     runs: List[Edge] = []
     for e in sel:
         if runs:
@@ -1003,10 +1003,10 @@ class OutlineFrame:
     """The frame of a polygon-outline deck as one continuous field (inches, plan frame): what the drawings show and
     what the takeoff counts. End supports: ledger | beam | rim | rim45 | bay45 (a 45-degree rim takes a skewed hanger)."""
     joists: List[Tuple[float, float, float, str, str, str]] = field(default_factory=list)    # (x, y_a, y_b, end_a, end_b, label)
-    rims: List[Tuple[int, int, float, float, float, float]] = field(default_factory=list)     # (side index, ply, x0, y0, x1, y1) ply centrelines
-    ledgers: List[Tuple[float, float, float, float]] = field(default_factory=list)            # ledger centrelines on the main wall
+    rims: List[Tuple[int, int, float, float, float, float]] = field(default_factory=list)     # (side index, ply, x0, y0, x1, y1) ply centerlines
+    ledgers: List[Tuple[float, float, float, float]] = field(default_factory=list)            # ledger centerlines on the main wall
     ledger_blocks: List[Tuple[float, float, float, float]] = field(default_factory=list)
-    blocks: List[Tuple[float, float, float, float, str]] = field(default_factory=list)        # blocking centrelines
+    blocks: List[Tuple[float, float, float, float, str]] = field(default_factory=list)        # blocking centerlines
     side_kind: List[str] = field(default_factory=list)                                        # per outline side
     notes: List[str] = field(default_factory=list)
     rim_to_ledger: int = 0                                                                     # doubled rim ends hung on a ledger
@@ -1059,7 +1059,7 @@ def outline_side_faces(spec: DeckSpec, edges: List["Edge"], rim_t: float, jb: fl
 def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
     """One continuous joist field under a polygon outline: joists at each zone's layout positions (picture-frame joists
     only along the deck's own side edges, a pair of joists either side of every divider line), clipped to the outline
-    inset by the rims / ledger, split at the flush beam lines; 2-ply mitred rims on every open side and 1/2" off any
+    inset by the rims / ledger, split at the flush beam lines; 2-ply mitered rims on every open side and 1/2" off any
     angled house face that cannot take a ledger (a cantilevered bay); the ledger on the straight main wall only; a ledger
     block where an angled rim dies into the main wall; blocking under every 45-degree picture-frame border."""
     if not getattr(L, "outline_edges", None) or not spec.geometry.outline:
@@ -1100,7 +1100,7 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
             for (a, ea), (b, eb) in zip(ends[0::2], ends[1::2]):
                 if b - a >= 4.0:
                     of.joists.append((X, a, b, ea, eb, lab))
-    # rims: ply centrelines along every open side and every angled bay face (mitred: each ply its own inset polygon)
+    # rims: ply centerlines along every open side and every angled bay face (mitered: each ply its own inset polygon)
     for k in range(plies):
         off = {"rim": (k + 0.5) * jb, "rim45": (k + 0.5) * jb, "bay45": 0.5 + (k + 0.5) * jb, "ledger": 0.0, "ledger45": 0.0, "bayfront": 0.0}
         q = _inset_inward(poly, [off[t] for t in of.side_kind])
@@ -1108,7 +1108,7 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
             if of.side_kind[i] in ("rim", "rim45", "bay45"):
                 (x0, y0), (x1, y1) = q[i], q[(i + 1) % n]
                 of.rims.append((i, k, x0, y0, x1, y1))
-    # ledger: centreline on the main wall between the neighbouring rims' faces
+    # ledger: centerline on the main wall between the neighboring rims' faces
     qL = _inset_inward(poly, [(jb / 2 if t in ("ledger", "ledger45") else face[t]) for t in of.side_kind])
     for i in range(n):
         if of.side_kind[i] in ("ledger", "ledger45"):
@@ -1192,7 +1192,7 @@ def inset_notch(spec: DeckSpec, side: str) -> Optional[dict]:
     else:
         return None
     if abs(pa[c] - a[c]) > 0.5 or abs(nb[c] - b[c]) > 0.5 or abs(pa[k] - nb[k]) > 0.5:
-        return None                  # the neighbours are not two parallel cheeks ending on one face line
+        return None                  # the neighbors are not two parallel cheeks ending on one face line
     face, out = a[k], pa[k]
     if abs(face - out) < 6.0:
         return None
@@ -1282,7 +1282,7 @@ class SkirtFace:
     a1: float
     panels: List[List[Tuple[float, float, float]]] = field(default_factory=list)   # per panel, its pieces (a, b, z_bottom): one, or one per tread it steps over
     studs: List[Tuple[float, float]] = field(default_factory=list)                 # (position along the side, z_bottom): 2x4 nailers hung from the rim, behind the panels
-    rows: List[Tuple[float, float, float]] = field(default_factory=list)           # (a, b, z_centre): 2x4 blocking rows between the studs, the panels' mid and bottom nailers
+    rows: List[Tuple[float, float, float]] = field(default_factory=list)           # (a, b, z_center): 2x4 blocking rows between the studs, the panels' mid and bottom nailers
     cheek: bool = False
 
 
@@ -1584,7 +1584,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
             # header / rim corners. No new footings (the walk-out slab is below).
             pb, pd = actual(NOTCH_POST)
             jd_ = actual(spec.framing.joist_size)[1]
-            a_c = nt["out"] + nt["sgn"] * pb / 2                                 # the posts' centre line, on the base ledger
+            a_c = nt["out"] + nt["sgn"] * pb / 2                                 # the posts' center line, on the base ledger
             sl.inset, sl.notch_posts, sl.notch_post_len = True, 2, round(rise - jd_, 2)    # base ledger top (lower joist tops) to the header bottom
             sl.notch = dict(nt, post_size=NOTCH_POST, post_line=a_c, posts=[notch_pt(nt, a_c, nt["lo"] - pd / 2), notch_pt(nt, a_c, nt["hi"] + pd / 2)],
                             skirt_t=skirt_t, riser_t=r_t, run=geo.tread_in, ledger_lo=nt["lo"] - 6.0, ledger_hi=nt["hi"] + 6.0,
@@ -1620,7 +1620,7 @@ def _place_posts_line(x0: float, x1: float, boundaries: List[float], allow_by_se
 @dataclass
 class EdgePost:
     """A post under the doubled rim at an outline corner (or mid-side): the rim spans post to post as a flush beam."""
-    x: float              # plan inches, post centre
+    x: float              # plan inches, post center
     y: float
     zone: str
     load: float           # lb, tributary
@@ -1629,7 +1629,7 @@ class EdgePost:
 
 
 def build_edge_posts(spec: DeckSpec, zl: List[ZoneLayout], lines: List[BeamLine]) -> Tuple[List[EdgePost], float, List[str]]:
-    """Posts under the rims at the owner's outline points. Each sits under both rim ends at a corner (centre half a post in
+    """Posts under the rims at the owner's outline points. Each sits under both rim ends at a corner (center half a post in
     from each side line); its load is half the rim to the next support each way (posts, or the house where a rim dies
     into it) times half the joist span ending on that rim. Every rim run between supports is checked as a doubled flush beam."""
     pts = spec.framing.edge_posts_ft or []
@@ -1873,7 +1873,7 @@ def _poly_orient(poly: List[Tuple[float, float]]) -> float:
 
 
 def _inset_polygon(poly: List[Tuple[float, float]], d: List[float]) -> List[Tuple[float, float]]:
-    """Offset every edge inward by its own distance and re-intersect the neighbours (a simple polygon)."""
+    """Offset every edge inward by its own distance and re-intersect the neighbors (a simple polygon)."""
     n = len(poly)
     sgn = _poly_orient(poly)
     lines = []

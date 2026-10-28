@@ -107,7 +107,7 @@ class Geometry:
     cover: Optional[List[float]] = None                                 # porch cover: [x0, x1, y0, y1, slope] (feet), drawn as a shed roof on posts
     planters: List[dict] = field(default_factory=list) # built-in planter boxes: {name, path: [[x, y], [x, y]] (ft, the deck edge it sits on, run like the outline), width_in 17, height_in 17}
     house_model: Optional[dict] = None   # the house behind the deck as measured (house.py): walls + openings, roofs, gutters, downspouts, bays
-    site_model: Optional[dict] = None    # the yard as measured (landscape.py): graded lawn, beds, block walls, pavers, plants, fences, neighbours
+    site_model: Optional[dict] = None    # the yard as measured (landscape.py): graded lawn, beds, block walls, pavers, plants, fences, neighbors
     door_step: Optional[dict] = None   # a box step at the door on top of the deck: {x0, x1 (ft, plan frame), depth_in, rise_in}
     benches: List[dict] = field(default_factory=list)  # built-in benches: {name, path: [[x, y], ...] (ft, the deck edge the bench backs onto, run like the outline
                                                        #   so the deck is on the left-hand normal), depth_in 18, seat_in 18 (seat top above the deck), back True, back_in 34}
@@ -123,15 +123,15 @@ class Geometry:
                                          # inset stair's notch cheeks), "drop_in": 36 (deck surface to the lower level's surface), "gap_in": 0.125
                                          # (between panels), "stud_oc_in": 16} — layout.step_skirt_layout reads it
     outline: List[List[float]] = field(default_factory=list)            # the deck's true outline as a polygon [[x, y], ...] (feet, plan frame) when it is not a union of rectangles:
-                                                                        # deck pieces outside it are clipped, and mitred rim / fascia pieces are added along every angled edge
+                                                                        # deck pieces outside it are clipped, and mitered rim / fascia pieces are added along every angled edge
     house_walls: List[List[float]] = field(default_factory=list)        # angled house walls to draw: [x0, y0, x1, y1] segments (feet)
     overhead: List[List[float]] = field(default_factory=list)           # a deck / roof above this one, drawn: [x0, x1, y0, y1, z_under_ft, z_top_ft] (feet, grade = 0)
     through_columns: List[List[float]] = field(default_factory=list)    # existing columns that pass through the deck to the structure above: [x_ft, y_ft, size_ft]
     house_finish: str = "lap"            # how the house is drawn: "lap" siding | "stucco" | "brick"
     house_color: Optional[str] = None    # the siding color to draw (hex), from the photos — the finish's default otherwise
     furniture: List[dict] = field(default_factory=list)  # STYLING ONLY (the 3D views): never priced, ordered or drawn on a sheet. Pieces in
-                                         # the global plan frame (feet): {type, model, x, y (the piece's centre), rot_deg, level "lower" | "upper"
-                                         # (or z_ft: the floor it stands on), frame / top / cushion / canopy colours} — types and keys in scene.FURNITURE
+                                         # the global plan frame (feet): {type, model, x, y (the piece's center), rot_deg, level "lower" | "upper"
+                                         # (or z_ft: the floor it stands on), frame / top / cushion / canopy colors} — types and keys in scene.FURNITURE
 
 
 @dataclass
@@ -256,7 +256,7 @@ class Stair:
     flight_rails: List[int] = field(default_factory=list)   # rail sides per flight ([1, 2]); [] -> `rails` on every flight
     landing_guard_lf: Optional[float] = None   # LF of guard on the landings' open sides (None -> each landing's perimeter less the stair widths in and out)
     build: str = "stringers"             # "stringers" (cut 2x12) | "box": a framed 2x6 box step on a compacted base — no stringers, fascia-wrapped (a step or two at grade)
-    name: Optional[str] = None           # how the stair reads in client documents ("Centre stair", "Left-side box step"); None -> from the side
+    name: Optional[str] = None           # how the stair reads in client documents ("Center stair", "Left-side box step"); None -> from the side
     skirts: bool = False                 # fascia skirts on both open sides, stepped under each tread — no stringer or framing shows
     inset: bool = False                  # recessed into the deck: leaves the inner face of a notch in the outline (side "edge:N") and runs out
                                          # to the face the notch is cut in, its bottom riser flush with that face's skirt; the notch is framed

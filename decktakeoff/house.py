@@ -24,7 +24,7 @@ IN = 1 / 12.0
 
 DEFAULT_COLORS = dict(siding="#c9c3a4", trim="#f3f1ea", fascia="#2e463b", roof="#6b655e", door="#ece9df", storm="#141414",
                       foundation="#a9a59c", interior="#3b3632", shutter="#f1efe8", glass="#b4c4cf", gutter="#2e463b", metal="#8f959b")
-# colours only the newer features use (painted fields, brick, vinyl frames, screens, blinds, chimney caps)
+# colors only the newer features use (painted fields, brick, vinyl frames, screens, blinds, chimney caps)
 EXTRA_COLORS = dict(accent="#5c3833", brick="#b8945f", mortar="#c2b9a6", frame="#e6e2d6", screen="#26282a", blind="#ece6d6",
                     cap="#8a8680", soil="#3f3328")
 
@@ -166,7 +166,7 @@ class _Builder:
         ax, ay, ux, uy, nx, ny, L = self.frame(w)
         z1 = float(w.get("z1", 9.0))
         P = lambda u, z, d=0.0: [ax + ux * u + nx * d, ay + uy * u + ny * d, z]
-        # the triangle as a mesh just proud of the wall face, siding coloured; lap lines as thin strips
+        # the triangle as a mesh just proud of the wall face, siding colored; lap lines as thin strips
         tri = [P(0.0, z1, 0.01), P(L, z1, 0.01), P(at, zp, 0.01)]
         self.mesh("house", tri, "siding", tag="gable end")
         zc = z1 + self.exp
@@ -423,7 +423,7 @@ class _Builder:
             zc -= 0.085
 
     def slider(self, w, o):
-        """A sliding patio door (u0..u1 frame outside, z0 = sill bottom, z1 = head top): a vinyl / aluminium frame, n panels
+        """A sliding patio door (u0..u1 frame outside, z0 = sill bottom, z1 = head top): a vinyl / aluminum frame, n panels
         ("ops": X = sliding on the inner track, O = fixed on the outer track), stiles and rails, glass, a pull on the sliding
         panel, an insect screen on the outermost track over the sliding panel, the casing around it, the room behind."""
         u0, u1, z0, z1 = o["u0"], o["u1"], o["z0"], o["z1"]
@@ -506,7 +506,7 @@ class _Builder:
                     zc += lv
 
     def arch_window(self, w, o):
-        """A half-round window: centre u, base z, radius r (ft)."""
+        """A half-round window: center u, base z, radius r (ft)."""
         uc, zb, r = o["u"], o["z0"], o["r"]
         ax, ay, ux, uy, nx, ny, L = self.frame(w)
         P = lambda u, z, d: [ax + ux * u + nx * d, ay + uy * u + ny * d, z]

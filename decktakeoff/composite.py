@@ -143,7 +143,7 @@ def _sub_spec(spec: DeckSpec, part: dict) -> DeckSpec:
 
 
 def _stair_foot(p: "Part", st) -> Optional[Tuple[float, float]]:
-    """Where a single-flight stair of part p lands: a plan point (global feet) 6" past its bottom riser, centred on its width."""
+    """Where a single-flight stair of part p lands: a plan point (global feet) 6" past its bottom riser, centered on its width."""
     L = p.layout
     run = st.geo.total_run_in
     if getattr(st, "inset", False) and st.notch:

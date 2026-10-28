@@ -370,7 +370,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
         oy = zb[2]
         ox = min(max(ox, zb[0]), zb[1])
     outlet = Node(ox, oy, float(cfg.get("outlet_z_ft", 1.5)), 0.0, 0.0, "outlet")
-    # the runs: per deck level, a nearest-neighbour chain from the light closest to the outlet, cut into runs of at most run_max_w
+    # the runs: per deck level, a nearest-neighbor chain from the light closest to the outlet, cut into runs of at most run_max_w
     runs: List[Run] = []
     for pname in dict.fromkeys(n.part for n in nodes):
         todo = [n for n in nodes if n.part == pname]
@@ -666,7 +666,7 @@ def stair_addon(base_spec, with_stair_spec, **cfg) -> dict:
 
 # ================================================================== 3D: fixture boxes on the finished stair and rail boxes
 def _kelvin_hex(k: float) -> str:
-    """Black-body colour (Tanner Helland's fit), sRGB hex."""
+    """Black-body color (Tanner Helland's fit), sRGB hex."""
     t = k / 100.0
     r = 255.0 if t <= 66 else 329.698727446 * (t - 60) ** -0.1332047592
     g = 99.4708025861 * math.log(t) - 161.1195681661 if t <= 66 else 288.1221695283 * (t - 60) ** -0.0755148492
@@ -676,7 +676,7 @@ def _kelvin_hex(k: float) -> str:
 
 
 def materials(spec) -> Dict[str, dict]:
-    """led_riser / led_cap / led_accent: the lenses — `color` is the daylight lens colour (the WebGL viewer), `emission` +
+    """led_riser / led_cap / led_accent: the lenses — `color` is the daylight lens color (the WebGL viewer), `emission` +
     `emission_strength` (W/m², a physical estimate to tune at render) and `lumens` light them at night; led_housing: the riser
     faceplates (the post-cap collar and top and the accent light's housing use the rail's own railmetal: they come in the rail's
     finish). Only the post light the job uses is listed (led_cap or led_accent)."""
@@ -701,7 +701,7 @@ def materials(spec) -> Dict[str, dict]:
 
 
 def _covers(q, x: float, y: float) -> bool:
-    """The box's plan footprint holds the point (a box turned in plan about its centre, rot_axis "z", included)."""
+    """The box's plan footprint holds the point (a box turned in plan about its center, rot_axis "z", included)."""
     if q.rot and q.rot_axis == "z":
         cx, cy = (q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2
         c, s = math.cos(-q.rot), math.sin(-q.rot)
@@ -781,7 +781,7 @@ def _riser_face(b, risers, treads, decks) -> Optional[Tuple[str, int]]:
 
 
 def scene_lights(boxes: list, spec) -> list:
-    """New boxes: on the showing face of every riser box, a matte-black faceplate with a warm lens (led_riser) centred on the
+    """New boxes: on the showing face of every riser box, a matte-black faceplate with a warm lens (led_riser) centered on the
     riser below the nosing (one per riser on a 4'-wide stair); on every rail-post box, a lantern cap (collar and top in the
     rail's finish, a lens band led_cap between) on whatever caps the post — its flat cap, or the drink-rail board where the
     rail carries one (the drink rail runs between the posts when they carry cap lights). Two posts drawn at one spot take one."""

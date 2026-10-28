@@ -30,7 +30,7 @@ The sun: scene.sun_vector's NOAA approximation, ported to the page, with the sit
 like cycles.sun_at (a -6 / -7 offset is -6 from the 2nd Sunday of March to the 1st Sunday of November) — the page and
 the Cycles renders put the sun in the same place for the same local date and time. The page opens at site.sun_when.
 
-Lights: every LED lens (material keys led_riser / led_cap, or any material carrying an "emission" / "emit" colour, like
+Lights: every LED lens (material keys led_riser / led_cap, or any material carrying an "emission" / "emit" color, like
 the roof's LED strip) glows from dusk (the photocell) and lights its surroundings through a small shader add-on in every
 material (a riser light is a spot out of the riser 50 deg down at the tread below, as in the Cycles pass; a post-cap
 light lights down and out; an LED strip lights the deck under it) — no per-light three.js lights, so it stays fast on a
@@ -40,7 +40,7 @@ Views: Yard / Upper deck / Lower deck from the measured site's camera stations w
 sees the most of the deck), else from the layout; Aerial from the layout. The yard's trees can be hidden (Trees), and a
 crown between the camera and what it looks at is cut away so the deck stays in sight.
 
-Speed: boxes merge by material and option mask into a few dozen meshes (vertex-coloured board tones, world-mapped
+Speed: boxes merge by material and option mask into a few dozen meshes (vertex-colored board tones, world-mapped
 textures), the blades are instanced, the shadow map fits the deck and the shadows it throws and re-renders only when the
 sun, an option, the louvers or the screens change, the sky and the far ground draw last, and the page renders only when
 something changes.
@@ -79,7 +79,7 @@ _DEL = "\x00delete"
 
 # ================================================================== spec patches
 def _load(spec) -> dict:
-    """A DeckSpec, a dict or a path -> a normalised spec dict (DeckSpec round trip, so defaults never read as changes)."""
+    """A DeckSpec, a dict or a path -> a normalized spec dict (DeckSpec round trip, so defaults never read as changes)."""
     from .spec import DeckSpec
     if isinstance(spec, (str, Path)):
         spec = json.loads(Path(spec).read_text())
@@ -256,7 +256,7 @@ def _parts_of(L) -> List[dict]:
 
 def _occluders(boxes) -> list:
     """Axis-aligned bounds of what blocks a view in the yard: tree crowns and trunks (shrunk a little: crowns are not solid
-    boxes), neighbouring houses and walls of the site layer."""
+    boxes), neighboring houses and walls of the site layer."""
     out = []
     for b in boxes:
         if (b.layer or "") != "site" or b.kind not in ("tree", "house", "wall"):
@@ -1356,7 +1356,7 @@ function applySun() {
   skyU.uSunCol.value.copy(lerpC(C('#ffd2a0'), C('#fff6e6'), sstep(2, 30, el)));
   skyU.uGlow.value = sstep(-10, -1, el) * (0.55 + 0.6 * (1 - sstep(4, 35, el)));
   skyU.uDisc.value = sstep(-1.5, 0.5, el) * 1.4;
-  scene.fog.color.copy(ks[1]);         // r128 mixes the fog in after the tone mapping and the sRGB encoding: the sky's own horizon colour
+  scene.fog.color.copy(ks[1]);         // r128 mixes the fog in after the tone mapping and the sRGB encoding: the sky's own horizon color
   var day = sstep(-1.0, 6.0, el), high = sstep(4, 40, el);
   sun.intensity = day * (1.05 + 0.6 * high);
   sun.color.copy(sunRGB(el));

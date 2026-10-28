@@ -67,7 +67,7 @@ BEAM_ALIAS = {"6x10": "(3)2x10", "6x12": "(3)2x12", "6x8": "(3)2x8", "3x10": "(2
 # ------------------------------------------------------------- posts: Table R507.4 (max height, in)
 POST_MAX_HEIGHT = {"4x4": 81, "4x6": 96, "6x6": 168, "8x8": 168}
 
-# ------------------------------------------------------------- ledger: Table R507.9.1.3(1) on-centre spacing (in) by joist span (ft)
+# ------------------------------------------------------------- ledger: Table R507.9.1.3(1) on-center spacing (in) by joist span (ft)
 LEDGER_LAG_SPACING = {  # 1/2" lag screws
     6: 30, 8: 23, 10: 18, 12: 15, 14: 13, 16: 11, 18: 10}
 LEDGER_BOLT_SPACING = {  # 1/2" through-bolts

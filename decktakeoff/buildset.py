@@ -108,7 +108,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                 + items(lambda l: l.category in ("Hardware", "Flashing & waterproofing") and any(k in l.item for k in ("hanger", "LedgerLOK", "H2.5", "Vycor", "flashing", "G-Tape", "membrane", "DTT1Z"))
                         or (l.category == "Hardware" and l.item.startswith("GRK RSS") and "100 ct" in l.item), 14),
         how=[t.schedule.get("Ledger", "Ledger per the schedule.")]
-            + ([f"Doubled rims first: laminate the plies with GRK RSS 3-1/8\", 2 rows @ 12\" staggered, set them on the edge posts crown up and mitred at every corner, "
+            + ([f"Doubled rims first: laminate the plies with GRK RSS 3-1/8\", 2 rows @ 12\" staggered, set them on the edge posts crown up and mitered at every corner, "
                 f"(2) A35Z per rim at each post — the rims span post to post as flush beams. Then the joists hang between the ledger and the rims."]
                if (getattr(L, "edge_posts", None) and not L.beam_lines) else [])
             + ["; ".join(f"{z.name}: {len(z.frame.joist_x)} joists @ {z.frame.spacing:g}\" OC x {ftin(z.frame.joist_len)}" for z in L.zones) + ". Crown up, hangers at the ledger" + (", both faces of the flush beam" if any(b.kind == "flush" for b in L.beam_lines) else "") + ".",
@@ -133,7 +133,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
         check=[f"{ftin(s.deck_gap)} gaps held", "No cut end shows at the outer edge", "Color: every board from the same run"]))
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
         goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
-        how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."] if s.railing.drink_rail else []),
+        how=[t.schedule.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitered at every turn, plugs color-matched."] if s.railing.drink_rail else []),
         check=[f"Top of rail {L.rail.height:g}\" above the decking; posts plumb" if L.rail else "—",
                "Cables tensioned, no 4\" sphere passes" if RAIL_SYSTEMS.get(s.railing.system, {}).get("cable") else "Balusters under 4\" clear"]))
     # stairs and the box step (their own crew day), then the built-ins — the order lines that go in with each
@@ -372,7 +372,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
     rl = L.rail
     steps.append(dict(n=7, code="T-406", title="Rail", still="step7",
         goes_in=items(lambda l: l.category == "Rail", 10) + items(lambda l: l.category == "Hardware" and ("rail posts" in (l.why or "") or "HeadLOK" in l.item)),
-        how=[ms.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitred at every turn, plugs color-matched."]
+        how=[ms.get("Rail", "")] + (["Drink rail on TimberTech drink-rail brackets, mitered at every turn, plugs color-matched."]
                                     if (s.railing.drink_rail and "drink rail" not in ms.get("Rail", "").lower()) else [])
             + ([f"The step between the levels is guarded along the {lw(hi)}'s edge except at the stair opening."] if (faces and rl) else []),
         check=[f"Top of rail {rl.height:g}\" above each level's decking; posts plumb" if rl else "—",

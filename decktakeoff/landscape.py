@@ -1,13 +1,13 @@
 """The yard around the deck, built from a measured site model (geometry.site_model): a graded lawn (a heightfield
 interpolated from spot grades), raised beds behind a segmental retaining wall, single-course block edging, brick paver
-borders, flagstones, trees, shrubs, cedar privacy fences on the lot lines and the neighbours' houses as massing. Box and
+borders, flagstones, trees, shrubs, cedar privacy fences on the lot lines and the neighbors' houses as massing. Box and
 mesh geometry only, so the WebGL viewer and the photoreal renderer draw the same yard.
 
 Opt-in pieces (a model without the key draws exactly as before): ground areas of their own material inside the graded
 extent (native grass on a creek bank, the creek) and polygon holes (the house); a bed drawn as a concrete slab (a level
 top, its exposed edge down to the lawn, sawcut joints) or as ground cover (low leafy mounds over the soil); split-rail
 fences with welded-wire mesh and spaced-picket fences, any fence in its own wood; pines; a deciduous crown in its own
-leaf materials; a neighbour house turned to its own axis, with a brick base.
+leaf materials; a neighbor house turned to its own axis, with a brick base.
 
 Frame: the deck's plan frame in feet (x along the rear wall from the deck's left end, y out into the yard, z up from the
 reference grade at the main stair; the deck top is the spec height)."""
@@ -303,7 +303,7 @@ class _Site:
     def lawn_far(self, far: dict, inner):
         """Coarse ground beyond the graded extent (the valley, the next yards) so the yard never ends at a cliff: cells of
         `res` over far.extent that are not wholly inside the inner (fine) extent, `drop` below the grade so the fine lawn
-        covers the seam; each cell in the first of far.areas its centre falls in, else far.mat."""
+        covers the seam; each cell in the first of far.areas its center falls in, else far.mat."""
         fx0, fx1, fy0, fy1 = (float(v) for v in far["extent"])
         res, drop = float(far.get("res", 20.0)), float(far.get("drop", 0.1))
         ix0, ix1, iy0, iy1 = inner
@@ -466,7 +466,7 @@ class _Site:
             wd = float(p.get("width_in", 16)) * IN
             side = 1.0 if p.get("side", "left") == "left" else -1.0
             lift = float(p.get("lift", 0.03))
-            # offset polyline (mitred) for the outer edge
+            # offset polyline (mitered) for the outer edge
             def nrm(a, b):
                 L = math.hypot(b[0] - a[0], b[1] - a[1]); return (-(b[1] - a[1]) / L * side, (b[0] - a[0]) / L * side)
             outer = []
@@ -539,7 +539,7 @@ class _Site:
             tops.append((tx, ty, tz))
         n_blob = int(t.get("blobs", 9))
         cz = zc + (H - (zc - z0)) * 0.5
-        lx, ly = (float(v) for v in t.get("lean", [0.0, 0.0]))     # the crown's centre off the trunk (a tree leaning off a wall)
+        lx, ly = (float(v) for v in t.get("lean", [0.0, 0.0]))     # the crown's center off the trunk (a tree leaning off a wall)
         for i in range(n_blob):
             a = 2 * math.pi * i / n_blob + self.rng.uniform(-0.3, 0.3)
             rr = R * self.rng.uniform(0.45, 0.75)
@@ -719,13 +719,13 @@ class _Site:
             if points:
                 self.mesh("fence", points, mat, tag=f"{nm}: picket points")
 
-    # ---------------------------------------------------------- neighbours (massing)
-    def neighbour_turned(self, nb: dict):
-        """A neighbour house turned `rot` degrees (counter-clockwise in plan) about the centre of its `rect`, with an
+    # ---------------------------------------------------------- neighbors (massing)
+    def neighbor_turned(self, nb: dict):
+        """A neighbor house turned `rot` degrees (counter-clockwise in plan) about the center of its `rect`, with an
         optional brick `base` {z1, color} below the siding, windows on its faces (face_windows: [[face, u0, u1, z0, z1]], face
         "y0" | "y1" | "x0" | "x1" of the unturned rect, u from that face's low corner), a gable roof along `axis`, and
         `boxes` (a deck, a shed: [[x0, x1, y0, y1, z0, z1, mat]] in the plan frame). Heights (eave, ridge, base z1, window
-        z0/z1, boxes) are in the plan frame, as in neighbours(); `z` is the ground under the house."""
+        z0/z1, boxes) are in the plan frame, as in neighbors(); `z` is the ground under the house."""
         x0, x1, y0, y1 = (float(v) for v in nb["rect"])
         cx, cy, hx, hy = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
         th = math.radians(float(nb.get("rot", 0.0)))
@@ -734,7 +734,7 @@ class _Site:
         ze, zr = float(nb.get("eave", 19.0)), float(nb.get("ridge", 26.0))
         zg = float(nb.get("z", self.g(cx, cy)))
         mat, tmat, rmat = nb.get("mat", "nsiding"), nb.get("trim_mat", "ntrim"), nb.get("roof_mat", "nroof")
-        name = nb.get("name", "neighbour house")
+        name = nb.get("name", "neighbor house")
         (ax, ay), (bx, by) = T(-hx, 0.0), T(hx, 0.0)
         self.rot("house", ax, ay, bx, by, zg - 0.5, ze, mat, 0, 2 * hy, tag=name)
         if nb.get("base"):
@@ -771,42 +771,42 @@ class _Site:
             bx0, bx1, by0, by1, bz0, bz1 = (float(v) for v in bx_[:6])
             self.add("house", bx0, bx1, by0, by1, bz0, bz1, bx_[6] if len(bx_) > 6 else tmat, 0, tag=f"{name} (deck / shed)")
 
-    def neighbours(self):
-        for nb in self.m.get("neighbours", []):
+    def neighbors(self):
+        for nb in (self.m.get("neighbors") or self.m.get("neighbours") or []):          # older job files spell the key the British way
             if nb.get("rot") is not None or nb.get("base") or nb.get("face_windows") or nb.get("boxes"):
-                self.neighbour_turned(nb)
+                self.neighbor_turned(nb)
                 continue
             x0, x1, y0, y1 = nb["rect"]
             ze, zr = float(nb.get("eave", 19.0)), float(nb.get("ridge", 26.0))
             zg = float(nb.get("z", self.g((x0 + x1) / 2, (y0 + y1) / 2)))
             mat = nb.get("mat", "nsiding")
-            self.add("house", x0, x1, y0, y1, zg - 0.5, ze, mat, 0, tag=nb.get("name", "neighbour house"))
+            self.add("house", x0, x1, y0, y1, zg - 0.5, ze, mat, 0, tag=nb.get("name", "neighbor house"))
             # windows on the face toward the deck: dark glass in white trim
             for w in nb.get("windows", []):
                 fx0, fx1, fy0, fy1, wz0, wz1 = w
-                self.add("trim", fx0 - 0.25, fx1 + 0.25, fy0 - 0.02, fy1 + 0.02, wz0 - 0.25, wz1 + 0.25, nb.get("trim_mat", "ntrim"), 0, tag="neighbour window trim")
-                self.add("glass", fx0, fx1, fy0 - 0.05, fy1 + 0.05, wz0, wz1, "nglass", 0, tag="neighbour window")
+                self.add("trim", fx0 - 0.25, fx1 + 0.25, fy0 - 0.02, fy1 + 0.02, wz0 - 0.25, wz1 + 0.25, nb.get("trim_mat", "ntrim"), 0, tag="neighbor window trim")
+                self.add("glass", fx0, fx1, fy0 - 0.05, fy1 + 0.05, wz0, wz1, "nglass", 0, tag="neighbor window")
             ax = nb.get("axis", "x")
             th = 0.4
             if ax == "x":                       # ridge along x at the middle of y
                 ym = (y0 + y1) / 2
                 for ya, yb, za, zb in ((y0 - 1.2, ym, ze - 0.4, zr), (ym, y1 + 1.2, zr, ze - 0.4)):
                     quad = [[x0 - 1.2, ya, za + th], [x1 + 1.2, ya, za + th], [x1 + 1.2, yb, zb + th], [x0 - 1.2, ya, za + th], [x1 + 1.2, yb, zb + th], [x0 - 1.2, yb, zb + th]]
-                    self.mesh("roof", quad, nb.get("roof_mat", "nroof"), tag="neighbour roof")
+                    self.mesh("roof", quad, nb.get("roof_mat", "nroof"), tag="neighbor roof")
                 for xe in (x0, x1):
-                    self.mesh("house", [[xe, y0, ze], [xe, y1, ze], [xe, ym, zr]], mat, tag="neighbour gable")
+                    self.mesh("house", [[xe, y0, ze], [xe, y1, ze], [xe, ym, zr]], mat, tag="neighbor gable")
             else:
                 xm = (x0 + x1) / 2
                 for xa, xb, za, zb in ((x0 - 1.2, xm, ze - 0.4, zr), (xm, x1 + 1.2, zr, ze - 0.4)):
                     quad = [[xa, y0 - 1.2, za + th], [xb, y0 - 1.2, zb + th], [xb, y1 + 1.2, zb + th], [xa, y0 - 1.2, za + th], [xb, y1 + 1.2, zb + th], [xa, y1 + 1.2, za + th]]
-                    self.mesh("roof", quad, nb.get("roof_mat", "nroof"), tag="neighbour roof")
+                    self.mesh("roof", quad, nb.get("roof_mat", "nroof"), tag="neighbor roof")
                 for ye in (y0, y1):
-                    self.mesh("house", [[x0, ye, ze], [x1, ye, ze], [xm, ye, zr]], mat, tag="neighbour gable")
+                    self.mesh("house", [[x0, ye, ze], [x1, ye, ze], [xm, ye, zr]], mat, tag="neighbor gable")
 
 
-def neighbour_materials(model: dict) -> Dict[str, dict]:
+def neighbor_materials(model: dict) -> Dict[str, dict]:
     out = {}
-    for i, nb in enumerate(model.get("neighbours", [])):
+    for i, nb in enumerate(model.get("neighbors") or model.get("neighbours") or []):
         out[nb.get("mat", "nsiding")] = dict(color=nb.get("siding", "#8a8f96"), pattern="lap", rough=0.9)
         out[nb.get("roof_mat", "nroof")] = dict(color=nb.get("roof", "#5d5853"), pattern="shingle", rough=0.95)
         out[nb.get("trim_mat", "ntrim")] = dict(color=nb.get("trim", "#efece4"), rough=0.7)
@@ -825,7 +825,7 @@ def build_site(model: dict, add: Callable, rot_box: Callable, add_mesh: Callable
     s.flagstones()
     s.plants()
     s.fences()
-    s.neighbours()
+    s.neighbors()
 
 
 def grade_at(model: dict, x: float, y: float) -> float:
