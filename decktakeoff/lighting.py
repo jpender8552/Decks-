@@ -67,8 +67,12 @@ DEFAULTS = dict(
 # Lumbermens list eff. 1 Jun 2026); 12/2 cable from a retail listing. No lighting is on a D&D quote yet: every price is an estimate.
 PRODUCTS: Dict[str, dict] = {
     "AZTDLRECRISERMB": dict(desc="TimberTech Recessed LED Riser Light, Matte Black, 12V, 2700K, 6' lead", each=88.24, watts=2.0,
-                            face_in=(5.75, 2.75), lens_in=(3.25, 1.25), proud_in=0.1875, depth_in=0.5,
+                            face_in=(5.75, 2.75), lens_in=(3.25, 1.25), proud_in=0.1875, depth_in=0.5, housing="#141416", finish="matte black",
                             source="EST — Lumbermens list eff. 1 Jun 2026 (The Deck Store $94.99); not on a D&D quote"),
+    "AZTDLRECRISERMW": dict(desc="TimberTech Recessed LED Riser Light, Matte White, 12V, 2700K, 6' lead", each=88.24, watts=2.0,
+                            face_in=(5.75, 2.75), lens_in=(3.25, 1.25), proud_in=0.1875, depth_in=0.5, housing="#ecebe5", finish="matte white",
+                            source="EST — Lumbermens list eff. 1 Jun 2026, every finish the same price (Dunn $82.88, 28 Oct 2026); TimberTech 2026 "
+                                   "Product Guide p.38 (MB / MW / ME); 1/2\" deep, 3/16\" proud; not on a D&D quote"),
     "AZTDL3X3LANCAPB": dict(desc="TimberTech 3\" LED Lantern Post Cap Light for Impression Rail Express, Black, 12V, 2700K", each=136.0, watts=3.0,
                             source="EST — TimberTech 3\" LED Lantern Post Cap (IRX); Lumbermens list 4\" lantern $135.69 eff. 1 Jun 2026; not on a D&D quote; "
                                    "3 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
@@ -79,8 +83,9 @@ PRODUCTS: Dict[str, dict] = {
                          size_in=(1.625, 0.75, 4.25), lens_in=(1.0, 1.25),
                          source="EST — The Deck Store $58.99 (Small Accent Light, TimberTech / AZEK), 27 Oct 2026; not on a D&D quote; SKU per the "
                                 "TimberTech 2026 Product Guide (materials.md); 1 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
-    "AZTDL3X3LEDCAP": dict(desc="TimberTech Impression Rail Express Post Cap Light (LED lens between the post and its cap), 12V", each=78.99, watts=4.0,
-                           source="EST — The Deck Store $78.99 (AZTDL3X3LEDCAP); not on a D&D quote"),
+    "AZTDL3X3LEDCAP": dict(desc="TimberTech 3\" Post Cap Light for Impression Rail Express (LED lens band under the post kit's own cap), 12V, 4 W, 2700K", each=70.99, watts=4.0,
+                           source="EST — Schillings $70.99 in stock, 28 Oct 2026 (Dunn $65.88, The Deck Store $78.99); one color-neutral SKU: the "
+                                  "rail's own post cap sits on it (TimberTech 2026 Product Guide p.38); 3-1/4\" x 3-1/4\" x 2-1/2\"; not on a D&D quote"),
     "AZTDL100TRAN": dict(desc="TimberTech 100W 12V transformer with photocell + timer", each=135.15, watts=100.0, watts_max=90.0,
                          photocell=True, timer=True, dimmer=False,
                          source="EST — Lumbermens list eff. 1 Jun 2026 (The Deck Store $137.99); 90 W max load, 60 W max per run (TimberTech metal-rail guide)"),
@@ -120,7 +125,8 @@ def product(cfg: dict, sku: str) -> dict:
     p = dict(PRODUCTS.get(sku) or {"desc": sku, "each": 0.0, "source": "no price on file"})
     p.update(PRICEBOOK.get("lighting", {}).get(sku) or {})
     if sku in (cfg.get("prices") or {}):
-        p["each"], p["source"] = float(cfg["prices"][sku]), "job price"
+        v = cfg["prices"][sku]                     # a number, or {"each": $, "source": "where the price is from"}
+        p["each"], p["source"] = (float(v["each"]), str(v.get("source") or "job price")) if isinstance(v, dict) else (float(v), "job price")
     p["sku"] = sku
     return p
 
@@ -779,7 +785,8 @@ def materials(spec) -> Dict[str, dict]:
     out = dict(
         led_riser=dict(color="#fff0d8", rough=0.25, emission=glow, emission_strength=60.0, kelvin=k, watts=rp.get("watts", 2.0), lumens=50,
                        light="riser", label=f"{rp['desc']} — lens"),
-        led_housing=dict(color="#141416", metal=0.55, rough=0.5, label="matte black powder-coat (riser light faceplates)"),
+        led_housing=dict(color=rp.get("housing", "#141416"), metal=0.55 if rp.get("housing", "#141416") == "#141416" else 0.2, rough=0.5,
+                         label=f"{rp.get('finish', 'matte black')} powder-coat (riser light faceplates)"),
     )
     if post_fixture(spec, cfg) == "accent":       # a 1 W accent light washing down the post face onto the deck
         out["led_accent"] = dict(color="#fff2de", rough=0.3, emission=glow, emission_strength=40.0, kelvin=k, watts=pp.get("watts", 1.0), lumens=30,
