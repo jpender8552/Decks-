@@ -88,6 +88,61 @@ def _bake_board_edges(rgb, rel, grain, ppi, fall_in=0.25, depth=0.28, ridge=0.05
 
 
 BOARD_RELIEF_FT = 0.0012      # the wire-brushed cap's relief, full range (~0.35 mm): the bump depth of the h_ board maps
+BOARD_RELIEF_X = {"Reserve": 2.0}   # a deeper finish than the h_ maps' default depth: Reserve's heavy wire-brush (the drink rail)
+BOARD_SPREAD_MAX = 1.8        # the most _swatch_tone stretches a board's tone toward its swatch's spread
+BOARD_ROUGH = (0.84, 0.12, 0.06, 0.04, 0.03)   # the r_ map: base, ridge-top gloss (-), groove matte (+), grain-line matte (+), patches (+-)
+BOARD_TINT = (0.04, 0.012, 0.03)               # board to board (one production lot): lightness, warm / cool, roughness (all +-)
+BEVEL_FT = {"board": 0.012, "rail": 0.008, "trim": 0.004}   # rounded arrises (ft) of the boards, the IRX rail, the HardieTrim; {} = off
+# The face p5-p95 luminance spread (sRGB levels, gaps masked) of the manufacturer's own swatch photo, sampled 28 Oct 2026 from
+# shop.timbertech.com (Terrain+ Dark Oak product swatch, median #75644c; Reserve Antique Leather order-samples detail swatch,
+# median #907151). _swatch_tone matches it. Only boards measured here are re-toned: the others keep the renderer's own tone
+# (Vintage English Walnut, e.g., was calibrated to its swatch inside its palette on 27 Oct and must not be stretched again).
+SWATCH_SPREAD = {("Terrain+", "Dark Oak"): 25.5, ("Reserve", "Antique Leather"): 44.0}
+# James Hardie's published ColorPlus chip (the jameshardie.com "statement" swatch, sampled 28 Oct 2026) over the engine's design
+# hex (scene.HARDIE_HEX "#ecebe4", ~12 % brighter): the photoreal skirt and risers take the manufacturer's value.
+HARDIE_CHIP = {"arctic white": "#e0e0d8"}
+
+
+def _swatch_tone(rgb, pal, ppi, target_spread):
+    """A rendered board's tone calibrated to its swatch (the palette, dark -> light, its middle the swatch median). The skill
+    renderer's boards carry about half a real swatch's tonal spread (Terrain+ Dark Oak, face p5-p95 luminance 12.9 levels
+    vs 25.5 on TimberTech's product swatch, median #75644c, sampled 28 Oct 2026) and read as flat plastic. The face
+    luminance is stretched (or eased) about its median toward the swatch's measured spread (SWATCH_SPREAD; x0.85: the
+    bump's own shading adds the rest; x0.85..BOARD_SPREAD_MAX), hue and saturation kept, and the median pulled onto the
+    palette's middle entry, scene.materials_for's color for the board (+-3 % at most)."""
+    Wl = np.array([0.2126, 0.7152, 0.0722], np.float32)
+    rgb = np.asarray(rgb, np.float32)
+    h = rgb.shape[0]
+    e = max(1, int(round(0.3 * ppi)))                    # the face: clear of the eased edges
+    q5, m, q95 = (float(v) for v in np.percentile((rgb[e:h - e] @ Wl).ravel(), [5, 50, 95]))
+    cols = np.array([_srgb255(c) for c in pal], np.float32) @ Wl
+    spread = float(np.clip(0.85 * float(target_spread) / max(q95 - q5, 1.0), 0.85, BOARD_SPREAD_MAX))
+    gain = float(np.clip(cols[len(cols) // 2] / max(m, 1.0), 0.97, 1.03))      # the middle entry: scene.materials_for's color
+    L = rgb @ Wl
+    k = (m + (L - m) * spread) / np.maximum(L, 1.0) * gain
+    return np.clip(rgb * k[..., None], 0.0, 255.0)
+
+
+def _smooth_field(h, w, cells_y, cells_x, rng):
+    """A smooth random field (-1..1), bicubic over a coarse grid of cells_y x cells_x control values."""
+    g = rng.normal(0.0, 1.0, (max(2, int(cells_y)), max(2, int(cells_x)))).astype(np.float32)
+    f = np.asarray(Image.fromarray(g).resize((w, h), Image.BICUBIC), np.float32)          # float32 -> mode "F"
+    return f / (float(np.abs(f).max()) or 1.0)
+
+
+def _board_roughness(rel, grain, ppi, seed, fall_in=0.25):
+    """The cap's roughness map (8-bit gray, 0..255 = roughness 0..1), from the finish, never from the albedo: the wire-brush
+    ridge tops a little glossier, its grooves and the embossed grain lines matte, slow patches of sheen along the board (a
+    cap never reflects evenly) and the eased edges a touch glossier (rolled smooth). BOARD_ROUGH sets the amounts."""
+    base, ridge, groove, gline, patch = BOARD_ROUGH
+    h, w = rel.shape
+    z = rel / (3.0 * (float(rel.std()) or 1.0))           # the finish in units of 3 sigma: ridge tops +1, grooves -1
+    r = base - ridge * np.clip(z, 0.0, 1.0) + groove * np.clip(-z, 0.0, 1.0) + gline * np.clip(grain, 0.0, 1.0)
+    rng = np.random.default_rng(seed)
+    r = r + patch * _smooth_field(h, w, 4, w / (6.0 * ppi) + 3, rng)         # ~6" patches along, ~1.5" across
+    d = (np.minimum(np.arange(h) + 0.5, h - np.arange(h) - 0.5) / ppi)[:, None]
+    r = r - 0.04 * np.clip(1.0 - d / fall_in, 0.0, 1.0)
+    return (np.clip(r, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
 
 
 # ====================================================================== textures (generated, cached in OUT/_tex)
@@ -119,15 +174,20 @@ class Tex:
         pal = BOARDS_PALETTE.get((collection, color))
         if pal:   # the engine catalog's palette wins over the skill's synced copy: a skill re-sync cannot revert the boards' color
             TT.C.BOARDS = [(b[0], b[1], b[2], list(pal)) + tuple(b[4:]) if (b[0], b[1]) == (collection, color) else b for b in TT.C.BOARDS]
-        tag = hashlib.md5(json.dumps([pal or [], ppi, "relief1"]).encode()).hexdigest()[:6]   # a cached texture never outlives its palette
+        swatch = list(pal) if pal else next((list(b[3]) for b in TT.C.BOARDS if (b[0], b[1]) == (collection, color)), [])
+        tag = hashlib.md5(json.dumps([pal or [], ppi, "relief2", BOARD_SPREAD_MAX, BOARD_ROUGH, SWATCH_SPREAD.get((collection, color))]).encode()).hexdigest()[:6]   # a cached texture never outlives its palette
         for k in range(n):
             nm = f"board_{collection}_{color}_{tag}_{k}.png".replace(" ", "_").replace("+", "plus")
             p = self.path(nm)
-            if not p or not self.path("h_" + nm):
+            if not p or not self.path("h_" + nm) or not self.path("r_" + nm):
                 im, rel, gr = _board_with_relief(TT, collection, color, length_in, ppi, 100 + k)
-                alb, hgt = _bake_board_edges(np.asarray(im, np.float32), rel, gr, ppi)
+                rgb = np.asarray(im, np.float32)
+                if swatch and (collection, color) in SWATCH_SPREAD:          # measured boards only (see SWATCH_SPREAD)
+                    rgb = _swatch_tone(rgb, swatch, ppi, SWATCH_SPREAD[(collection, color)])
+                alb, hgt = _bake_board_edges(rgb, rel, gr, ppi)
                 p = self._save(nm, Image.fromarray(alb, "RGB"))
                 self._save("h_" + nm, Image.fromarray(hgt))
+                self._save("r_" + nm, Image.fromarray(_board_roughness(rel, gr, ppi, 7919 * (k + 1) + len(nm))))   # 8-bit gray
             out.append(p)
         return out
 
@@ -171,29 +231,48 @@ class Tex:
         return self._save(nm, Image.fromarray(col)), self._save("h_" + nm, Image.fromarray(hgt))
 
     def pavers(self, hexc: str) -> Tuple[str, str]:
-        nm = f"paver_{hexc.strip('#')}.png"
+        """Clay brick pavers in a basket weave (pairs of 4x8s, alternating), an 8 ft tile at 192 px / ft. Every paver its own
+        tone (a few dark-flashed, a few pale), weathered: a dusty bloom pulls each part way to its own gray (the owner's
+        border reads dusty rose; the new-brick orange-red rendered at saturation 0.52 against ~0.3 in the photos), a soft
+        cloud inside each paver, worn rounded arrises in the height, 1/4" sand joints darkened by dirt."""
+        nm = f"paver3_{hexc.strip('#')}.png"
         if self.path(nm):
             return self.path(nm), self.path("h_" + nm)
-        S = 1536                                     # 8 ft tile: 192 px / ft, 4" = 64 px
-        u = 64
+        S, u, jt = 1536, 64, 2                       # 8 ft tile: 192 px / ft, 4" = 64 px; a 2 px half-joint
         rng = np.random.default_rng(3)
         base = np.array(_srgb255(hexc), float)
-        col = np.zeros((S, S, 3)) + np.array([118, 104, 92.0])        # sand joints
-        hgt = np.zeros((S, S))
+        Wl = np.array([0.2126, 0.7152, 0.0722])
+        col = np.zeros((S, S, 3)) + np.array([104, 94, 84.0])         # dirty sand joints
+        hgt = np.zeros((S, S)) + 0.05
         for i in range(S // (2 * u)):
             for j in range(S // (2 * u)):
                 for k in range(2):
-                    c = np.clip(base * (1 + rng.normal(0, 0.09)) + rng.normal(0, 4, 3), 0, 255)
                     if (i + j) % 2:
                         x0, y0, w, h = i * 2 * u, j * 2 * u + k * u, 2 * u, u
                     else:
                         x0, y0, w, h = i * 2 * u + k * u, j * 2 * u, u, 2 * u
-                    col[y0 + 3:y0 + h - 3, x0 + 3:x0 + w - 3] = c
-                    hgt[y0 + 3:y0 + h - 3, x0 + 3:x0 + w - 3] = 1.0
+                    c = base * (1 + rng.normal(0, 0.07)) + rng.normal(0, 3, 3)
+                    v = rng.random()
+                    if v < 0.10:
+                        c = c * np.array([0.80, 0.74, 0.74])           # dark, flashed
+                    elif v < 0.22:
+                        c = c * np.array([1.07, 1.09, 1.10])           # pale
+                    wv = rng.uniform(0.28, 0.48)                       # weathering: a dusty bloom toward its own gray
+                    c = c * (1 - wv) + float(c @ Wl) * 1.04 * wv
+                    hh, ww = h - 2 * jt, w - 2 * jt
+                    mot = np.zeros((hh, ww))
+                    for _ in range(int(rng.integers(2, 4))):
+                        cy_, cx_ = rng.uniform(0, hh), rng.uniform(0, ww)
+                        sy_, sx_ = rng.uniform(0.3, 0.8) * hh, rng.uniform(0.3, 0.8) * ww
+                        mot += rng.uniform(-1, 1) * np.exp(-(((np.arange(hh)[:, None] - cy_) / sy_) ** 2 + ((np.arange(ww)[None, :] - cx_) / sx_) ** 2))
+                    ey = np.minimum(np.arange(hh), hh - 1 - np.arange(hh)); ex = np.minimum(np.arange(ww), ww - 1 - np.arange(ww))
+                    e = np.minimum.outer(ey, ex)                       # px to the paver's edge: worn, rounded arrises
+                    col[y0 + jt:y0 + h - jt, x0 + jt:x0 + w - jt] = c * (1 + 0.07 * np.clip(mot, -1, 1))[..., None]
+                    hgt[y0 + jt:y0 + h - jt, x0 + jt:x0 + w - jt] = np.clip(0.5 + e / 8.0, 0, 1.0)
         g = rng.normal(0, 1, (S, S))
-        col *= (1 + 0.06 * g[..., None])
+        col *= (1 + 0.05 * g[..., None])
         im = Image.fromarray(np.clip(col, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
-        hm = Image.fromarray((np.clip(hgt * 0.85 + 0.15 * (g * 0.1 + 0.5), 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))
+        hm = Image.fromarray((np.clip(hgt * 0.85 + 0.15 * (g * 0.1 + 0.5), 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.0))
         return self._save(nm, im), self._save("h_" + nm, hm)
 
     def brick(self, hexc: str, mortar: str = "#c2b9a6", course_in: float = 8.0 / 3.0, brick_in: float = 8.0) -> Tuple[str, str, float]:
@@ -384,6 +463,7 @@ class Mats:
         self.spec = spec
         self.cache: Dict[str, bpy.types.Material] = {}
         self.board_imgs: Dict[str, List[str]] = {}
+        self.board_coll: Dict[str, str] = {}
 
     # ---- node helpers
     @staticmethod
@@ -418,6 +498,24 @@ class Mats:
         nt.links.new(b.outputs["Normal"], bsdf.inputs["Normal"])
         return b
 
+    @staticmethod
+    def _bevel(nt, into, radius):
+        """Rounded arrises: a Bevel node's normal into `into` (a Bump node, else the BSDF). `radius` is ft or a socket (a
+        texture-driven radius); 0 / None leaves the edge sharp. Cycles rounds the edges of each merged mesh's own boxes."""
+        if not radius:
+            return None
+        bv = nt.nodes.new("ShaderNodeBevel")
+        try:
+            bv.samples = 4
+        except Exception:
+            pass
+        if isinstance(radius, (int, float)):
+            bv.inputs["Radius"].default_value = float(radius)
+        else:
+            nt.links.new(radius, bv.inputs["Radius"])
+        nt.links.new(bv.outputs["Normal"], into.inputs["Normal"])
+        return bv
+
     def _tint(self, nt, color_out, bsdf):
         """Multiply by the per-box 'tint' color attribute (board-to-board / block-to-block tone)."""
         a = nt.nodes.new("ShaderNodeAttribute"); a.attribute_name = "tint"
@@ -431,7 +529,8 @@ class Mats:
         """A TimberTech board material: the k-th full-length texture (eased edges baked in) on a low-gloss cap. The board's
         relief map (h_<texture>: the renderer's wire-brush field) drives the bump - a grazing sun shows the brushing - and
         the roughness: the brushed ridge tops a little glossier than the grooves. Deck, border, fascia (risers, step faces)
-        and drink rail all come here."""
+        and drink rail all come here. The roughness is the r_ map (_board_roughness: the finish's own field, never the albedo)
+        plus the board's sheen offset (its tint alpha - 1, see build()); the arrises are rounded (BEVEL_FT["board"])."""
         name = f"{key}#{k}"
         if name in self.cache:
             return self.cache[name]
@@ -441,8 +540,16 @@ class Mats:
             coll, color = dk.collection, dk.color
             if key == "border":
                 coll, color = dk.border_collection or dk.collection, dk.border_color or dk.color
+            elif key == "drink":
+                # the drink rail is its own board (railing.drink_rail_*: Reserve Antique Leather at Prentice), with the same
+                # fallbacks scene.materials_for colors it with - it used to take the field board's texture
+                rl = self.spec.railing
+                coll = getattr(rl, "drink_rail_collection", "") or dk.border_collection or dk.collection
+                color = getattr(rl, "drink_rail_color", "") or dk.border_color or dk.color
             imgs = self.tex.boards(coll, color)
             self.board_imgs[key] = imgs
+            self.board_coll[key] = coll
+        relief = BOARD_RELIEF_FT * BOARD_RELIEF_X.get(self.board_coll.get(key, ""), 1.0)
         m, nt, bsdf, out = self._new(name)
         path = imgs[k % len(imgs)]
         img = self._img(nt, path)
@@ -451,14 +558,25 @@ class Mats:
         bsdf.inputs["Roughness"].default_value = 0.85
         bsdf.inputs["Specular IOR Level"].default_value = 0.25
         hp = os.path.join(os.path.dirname(path), "h_" + os.path.basename(path))
+        rp = os.path.join(os.path.dirname(path), "r_" + os.path.basename(path))
         if os.path.exists(hp):
             hi = self._img(nt, hp, non_color=True)
-            rm = nt.nodes.new("ShaderNodeMapRange")
-            for nm_, v in (("From Min", 0.45), ("From Max", 0.85), ("To Min", 0.90), ("To Max", 0.68)):
-                rm.inputs[nm_].default_value = v
-            nt.links.new(hi.outputs["Color"], rm.inputs["Value"])
-            nt.links.new(rm.outputs["Result"], bsdf.inputs["Roughness"])
-            self._bump(nt, bsdf, hi.outputs["Color"], strength=1.0, distance=BOARD_RELIEF_FT)
+            if os.path.exists(rp):
+                ri = self._img(nt, rp, non_color=True)
+                at = nt.nodes.new("ShaderNodeAttribute"); at.attribute_name = "tint"
+                off = nt.nodes.new("ShaderNodeMath"); off.operation = "SUBTRACT"
+                nt.links.new(at.outputs["Alpha"], off.inputs[0]); off.inputs[1].default_value = 1.0
+                add = nt.nodes.new("ShaderNodeMath"); add.operation = "ADD"; add.use_clamp = True
+                nt.links.new(ri.outputs["Color"], add.inputs[0]); nt.links.new(off.outputs[0], add.inputs[1])
+                nt.links.new(add.outputs[0], bsdf.inputs["Roughness"])
+            else:
+                rm = nt.nodes.new("ShaderNodeMapRange")
+                for nm_, v in (("From Min", 0.45), ("From Max", 0.85), ("To Min", 0.90), ("To Max", 0.68)):
+                    rm.inputs[nm_].default_value = v
+                nt.links.new(hi.outputs["Color"], rm.inputs["Value"])
+                nt.links.new(rm.outputs["Result"], bsdf.inputs["Roughness"])
+            b = self._bump(nt, bsdf, hi.outputs["Color"], strength=1.0, distance=relief)
+            self._bevel(nt, b, BEVEL_FT.get("board"))
         else:
             bw = nt.nodes.new("ShaderNodeRGBToBW")
             nt.links.new(img.outputs["Color"], bw.inputs[0])
@@ -549,6 +667,8 @@ class Mats:
             self._tint(nt, img.outputs["Color"], bsdf)
             self._bump(nt, bsdf, hi.outputs["Color"], 0.18, 0.006)
             bsdf.inputs["Roughness"].default_value = rough
+        elif pat == "lap" and key in ("fascia", "hardie") and "hardie" in (md.get("label") or "").lower():
+            self._hardie(nt, bsdf, col, md)      # HardieTrim skirt / risers, Hardie cover trim: ColorPlus, not field paint
         elif pat in ("lap", "batten", "brick", "stone", "seam", "gravel"):
             # procedural: color + noise (geometry carries the courses on the measured house)
             nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 18.0; nz.inputs["Detail"].default_value = 6.0
@@ -625,9 +745,11 @@ class Mats:
                 if key in ("railmetal", "steel", "storm") or "powder" in (md.get("label") or "").lower():
                     # textured powder coat (Fulton, Impression Rail Express): a dielectric with a dull sheen, not metal.
                     # Only the coated metal: siding, trim and concrete keep their own roughness and no clear coat.
-                    bsdf.inputs["Roughness"].default_value = 0.55
+                    # a "matte" finish (the riser lights' matte white / matte black faceplates) is rougher than the satin rail
+                    bsdf.inputs["Roughness"].default_value = 0.68 if "matte" in (md.get("label") or "").lower() else 0.55
                     bsdf.inputs["Metallic"].default_value = 0.0
                     bsdf.inputs["Coat Weight"].default_value = 0.05
+                    self._powder_coat(nt, bsdf, bevel=key in ("railmetal", "steel"))
             if key in ("hmetal", "galv", "cable", "well"):
                 bsdf.inputs["Metallic"].default_value = 0.9; bsdf.inputs["Roughness"].default_value = 0.38
         self.cache[key] = m
@@ -664,12 +786,80 @@ class Mats:
         (photocell); set_mode("dusk") turns its emission on in the color the material dict carries (else 3000 K)."""
         m, nt, bsdf, out = self._new(key)
         bsdf.inputs["Base Color"].default_value = _hex(md.get("color") or "#d8d2c4") + (1,)
-        bsdf.inputs["Roughness"].default_value = 0.3
+        # a molded, frosted polycarbonate lens: a milky diffuse body under a glossy molded skin (the coat), so by day it
+        # reads as a lens catching the sky, not as a painted block
+        bsdf.inputs["Roughness"].default_value = 0.45
+        try:
+            bsdf.inputs["Coat Weight"].default_value = 0.6
+            bsdf.inputs["Coat Roughness"].default_value = 0.06
+        except KeyError:
+            pass
         bsdf.inputs["Emission Color"].default_value = _hex(_emit_hex(md) or LED_HEX) + (1,)
         bsdf.inputs["Emission Strength"].default_value = 0.0
         LIGHTS["emitters"].append(bsdf)
         self.cache[key] = m
         return m
+
+    @staticmethod
+    def _noise(nt, tc, scale, detail, rough=0.55, dist=0.0):
+        """A Noise texture in object space (ft: the merged meshes sit at the origin, so object = world feet)."""
+        n = nt.nodes.new("ShaderNodeTexNoise")
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        n.inputs["Roughness"].default_value = rough
+        n.inputs["Distortion"].default_value = dist
+        nt.links.new(tc.outputs["Object"], n.inputs["Vector"])
+        return n.outputs["Fac"]
+
+    @staticmethod
+    def _range(nt, sock, a, b, lo, hi):
+        m = nt.nodes.new("ShaderNodeMapRange")
+        for k_, v in (("From Min", a), ("From Max", b), ("To Min", lo), ("To Max", hi)):
+            m.inputs[k_].default_value = v
+        nt.links.new(sock, m.inputs["Value"])
+        return m.outputs["Result"]
+
+    @staticmethod
+    def _math(nt, op, a, b):
+        m = nt.nodes.new("ShaderNodeMath"); m.operation = op
+        for i, s in enumerate((a, b)):
+            if isinstance(s, (int, float)):
+                m.inputs[i].default_value = float(s)
+            else:
+                nt.links.new(s, m.inputs[i])
+        return m.outputs[0]
+
+    def _hardie(self, nt, bsdf, col, md=None):
+        """James Hardie ColorPlus on HardieTrim (the deck skirt, the risers) and Hardie cover trim: a factory-baked low-sheen
+        coat in one even color. The generic 'lap' noise mottled it like field paint, and in Generated coordinates (stretched
+        over each merged mesh's bounding box) drew long streaks down the skirt. Here: the color as is with a +-1.5 % soft
+        cloud only a grazing light finds, a fine orange peel over the fiber-cement's faint tooth at their real size (object
+        space, ft), a satin sheen and slightly eased arrises (BEVEL_FT["trim"]). A color James Hardie publishes a chip for
+        (HARDIE_CHIP, named in the label) takes the chip's value."""
+        lab = ((md or {}).get("label") or "").lower()
+        col = next((_hex(hx) for nm_, hx in HARDIE_CHIP.items() if nm_ in lab), col)
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        ramp = nt.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.elements[0].color = tuple(c * 0.985 for c in col) + (1,)
+        ramp.color_ramp.elements[1].color = tuple(min(1.0, c * 1.015) for c in col) + (1,)
+        nt.links.new(self._noise(nt, tc, 0.6, 2.0), ramp.inputs["Fac"])
+        self._tint(nt, ramp.outputs["Color"], bsdf)
+        h = self._math(nt, "ADD", self._math(nt, "MULTIPLY", self._noise(nt, tc, 140.0, 3.0), 0.5), self._noise(nt, tc, 25.0, 4.0, 0.6))
+        b = self._bump(nt, bsdf, h, 0.05, 0.0015)
+        self._bevel(nt, b, BEVEL_FT.get("trim"))
+        bsdf.inputs["Roughness"].default_value = 0.66
+        bsdf.inputs["Specular IOR Level"].default_value = 0.5
+
+    def _powder_coat(self, nt, bsdf, bevel=False):
+        """Powder-coated aluminum (IRX rail, sleeves, caps, the light collars): the coat's roughness (set by the caller) varied
+        +-0.04 in soft patches, a fine orange peel at its real size (object space, ~1/16" cells), and - for the rail - the
+        extrusions' rounded arrises (BEVEL_FT["rail"]): a sunlit edge catches a thin highlight as the real profile does."""
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        r0 = float(bsdf.inputs["Roughness"].default_value)
+        nt.links.new(self._range(nt, self._noise(nt, tc, 3.0, 2.0), 0.3, 0.7, r0 - 0.04, r0 + 0.04), bsdf.inputs["Roughness"])
+        b = self._bump(nt, bsdf, self._noise(nt, tc, 180.0, 3.0), 0.06, 0.0008)
+        if bevel:
+            self._bevel(nt, b, BEVEL_FT.get("rail"))
 
     def _rough_sawn(self, nt, bsdf, col):
         """Unfinished rough-sawn Douglas fir (8x8 columns, 6x10 beams): warm tan, matte, a low-contrast flat-sawn grain along
@@ -946,6 +1136,7 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
     tex = Tex(out_dir)
     mats = Mats(D["materials"], tex, spec)
     rng = np.random.default_rng(21)
+    brng = np.random.default_rng(1729)      # board-to-board micro-variation: its own stream, so the yard keeps its draws
     groups: Dict[str, Geo] = {}
     def G(key):
         if key not in groups:
@@ -969,13 +1160,18 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
             k = int(rng.integers(0, 6))
             L = max(b["x1"] - b["x0"], b["y1"] - b["y0"], b["z1"] - b["z0"])
             u_off = float(rng.uniform(0, max(0.0, 1.0 - L / 20.0)))
-            t = 1.0 + 0.05 * tone
+            # board to board (BOARD_TINT, one production lot): its lightness (the scene's tone), a hair warmer or cooler, and
+            # its own sheen - the tint's alpha - 1 is added to the roughness map (Mats.board)
+            dl, dw, dr = BOARD_TINT
+            t = 1.0 + dl * tone
+            w_ = dw * float(brng.uniform(-1.0, 1.0))
+            bt = (t * (1.0 + w_), t, t * (1.0 - w_), 1.0 + dr * float(brng.uniform(-1.0, 1.0)))
             if shape == "mesh":
-                add_tris(G(f"{mk}#{k}"), b["pts"], tile=20.0, tint=(t, t, t, 1))
+                add_tris(G(f"{mk}#{k}"), b["pts"], tile=20.0, tint=bt)
             elif b.get("quad"):
-                add_quad_board(G(f"{mk}#{k}"), b, u_off=u_off, tint=(t, t, t, 1))
+                add_quad_board(G(f"{mk}#{k}"), b, u_off=u_off, tint=bt)
             else:
-                add_box(G(f"{mk}#{k}"), b, "board", u_off=u_off, tint=(t, t, t, 1))
+                add_box(G(f"{mk}#{k}"), b, "board", u_off=u_off, tint=bt)
             continue
         pat = md.get("pattern")
         tile = 1.0 if mk.startswith("furn_") else TILE.get(pat, 8.0)      # styling furniture: its grain / weave at furniture scale
