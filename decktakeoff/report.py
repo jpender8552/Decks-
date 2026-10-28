@@ -207,7 +207,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
       + (f" with a {s.decking.border_color} border" if s.decking.border_color and s.decking.border_color != s.decking.color else "")
       + (f", {rail_words(s, rl.system)}" + ("" if (rail_words(s, rl.system).endswith(" rail") or (lv and rail_words(s, rl.system) != rail_name(rl.system)))
                                             else f" {'cable ' if rl.system == 'IRX' else ''}rail")
-         + (f" with {'an' if str(drink_words or '')[:1].lower() in 'aeiou' else 'a'} {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
+         + (f" with {'an' if str(drink_words or 'x')[0].lower() in 'aeiou' else 'a'} {drink_words} drink rail" if s.railing.drink_rail else "") if rl else "")
       + (", hot-tub bay" + (f" in zone {s.extras.hot_tub_zone}" if s.extras.hot_tub_zone else "") if s.extras.hot_tub else "")
       + (lambda n: f", {n} lean-to roof cover{'s' if n > 1 else ''} with a {(s.extras.cover_roof_color + ' ') if s.extras.cover_roof_color else ''}{'standing seam' if s.extras.cover_roof.lower().startswith('standing') else 'shingle'} roof" if n else "")(len(__import__('decktakeoff.spec', fromlist=['covers_of']).covers_of(s))) + ".")
     w("")
