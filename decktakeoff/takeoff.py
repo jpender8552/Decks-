@@ -1345,7 +1345,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         packed_h = pack_boards([(n, w_ + 0.25) for n, w_ in hardie_risers], stocks=(12,), kerf=0.125)
         nh = sum(len(b) for b in packed_h.values())
         what = " · ".join(f"{sum(1 for n, _ in hardie_risers if n == k)} @ {ftin(max(w_ for n, w_ in hardie_risers if n == k))} ({k})" for k in dict.fromkeys(n for n, _ in hardie_risers))
-        lines.append(Line("Stairs", f"HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} — every riser (stairs + door step), ripped to height", nh, nh, "ea",
+        lines.append(Line("Stairs", f"HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} — every riser (stairs" + (" + door step" if ds else "") + "), ripped to height", nh, nh, "ea",
                           f"exact  ({len(hardie_risers)} risers: {what})", hd["each"], hd["source"]))
     psegs = planter_segments(spec)
     if psegs:
