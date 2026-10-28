@@ -390,11 +390,9 @@ LEVELS_CSS = """<style>
 </style>"""
 
 
-def _reads_lite(t, L, sm):
-    """The homeowner's at-a-glance: what it is, not how it is framed."""
+def _reads_rows(t, L, sm):
+    """The homeowner's at-a-glance rows for a deck on one level: [(label, text)]."""
     s = t.spec
-    if hasattr(L, "parts"):
-        return _reads_levels(t, L, sm)
     from .catalog import decking_facts
     fsys = s.decking.fastener_system or "hidden"
     deck = f"{sm['deck_sf']:g} SF · {sm['height']} above grade · {sm['finished_deck']}"
@@ -429,8 +427,14 @@ def _reads_lite(t, L, sm):
                  f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on center"
                  + (f", {beam_words(beams, beam_species_words(s.framing.beams), len(s.framing.beams))}" if beams else "") + f"; {sm['posts']}"
                  + ("; joist tape on every member" if s.framing.joist_tape else ""))
-    reads = [("Deck", deck), ("Decking", decking), ("Rail", rail)] + stairs + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
-    return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
+    return [("Deck", deck), ("Decking", decking), ("Rail", rail)] + stairs + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
+
+
+def _reads_lite(t, L, sm):
+    """The homeowner's at-a-glance: what it is, not how it is framed."""
+    if hasattr(L, "parts"):
+        return _reads_levels(t, L, sm)
+    return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in _reads_rows(t, L, sm)) + "</dl>"
 
 
 def _added_facts(t0, t1) -> list:
@@ -898,50 +902,59 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w('<h2 class="kicker">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
         w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     elif proposal:
+        # the photo-led proposal (proposal_look): one deliberate page per section, the photoreal renders large, the views
+        # placed by name (PL.plan_views), the price after the pictures; the cover and the back cover go on in the page shell
         opts = [(lab, run(sp_)[2]) for lab, sp_ in (o_ for o_ in (options or []) if not isinstance(o_, dict))]
         blocks = [o_ for o_ in (options or []) if isinstance(o_, dict)]
-        w('<h2 class="kicker" id="g-reads">At a glance</h2>')
-        w(_gallery(key, ["yard", "iso2"], have))
-        w(_reads_lite(t, L, sm))
-        w('<h2 class="kicker" id="g-what">What it is <span class="tag">included in the price</span></h2>')
+        V = PL.plan_views(have, hero, PL.photoreal_names(rd, have))
+        foot = PL.brand_footer(spec)
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
         frame_lite = (f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams, beam_species_words(spec.framing.beams), len(spec.framing.beams))}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams")
                       + (("; joist tape on every joist, rim and beam" if L.beam_lines else "; joist tape on every joist and rim") if spec.framing.joist_tape else "") + ".")
         if not hasattr(L, "parts"):           # a deck on two levels already reads its frame level by level, in the homeowner's words
             inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
-        w(md_to_html(inc))
-        w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
-        w(_gallery(key, ["corner", "corner2", "ondeck", "detail", "facade", "isolow", "under"], have))
-        w(_dusk_html(key, have))
-        w(alt_html)
-        w(sun_html)
-        w('<h2 class="kicker" id="g-iso">Isometrics <span class="tag">the model from above</span></h2>')
-        w(_gallery(key, ["iso", "iso2", "underiso", "plan"], have))
-        w('<h2 class="kicker" id="g-exploded">Exploded views <span class="tag">every layer pulled apart</span></h2>')
-        w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
-        w('<h2 class="kicker" id="g-structure">Under the deck <span class="tag">footings, posts, ' + ("beams, " if L.beam_lines else "") + 'frame</span></h2>')
-        w(_gallery(key, ["structure-underiso", "frame-iso2"], have))
+        inc_rows = PL.md_rows(inc)
+        light_note = next((r[1] for r in inc_rows if len(r) >= 2 and r[0].strip().lower() == "lighting"), "")
+        w(PL.pp_overview(spec, L, key, V["overview"], CAP, lede, n_piers, t=t, foot=foot))
+        for i, names in enumerate(V["day"]):
+            w(PL.pp_photos(key, names, CAP, "By day", foot=foot, sid="g-renders" if i == 0 else ""))
+        if alt_html:
+            w(f'<section class="pg pp-flow flow"><div class="pin">{alt_html}</div></section>')
+        w(PL.pp_above(key, V["aerial"], V["plan"], V["sun"], CAP, ("the real sun at this address · " + sun_tag) if V["sun"] else "", foot=foot))
+        w(PL.pp_more(key, V["more"], CAP, foot=foot))
+        w(PL.pp_included(key, V["detail"], CAP, inc_rows, foot=foot))
+        big = next((n for n in ("exploded", "exploded-corner", "exploded2", "exploded-low") if n in have), None)
+        small = [n for n in ("frame-iso2", "structure-underiso", "exploded-corner", "exploded2", "under", "underiso") if n in have and n != big][:2]
+        reads = (_reads_levels(t, L, sm) if hasattr(L, "parts") else
+                 '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in _reads_rows(t, L, sm) if k not in ("Decking", "Rail")) + "</dl>")
+        w(PL.pp_built(key, big, small, CAP, reads, foot=foot))
         ob = _option_blocks(spec, t, p, blocks, key, rd, files) if blocks else None
         if ob:
-            w(ob["html"])
+            w(f'<section class="pg pp-flow flow"><div class="pin">{ob["html"]}</div></section>')
         tl = timeline_of(spec)
         if tl:                               # the job's own timeline (a schedule model); a job without one shows none, as before
-            w(_timeline(tl, _option_timelines(spec, tl, blocks)))
+            w(f'<section class="pg pp-flow flow"><div class="pin">{_timeline(tl, _option_timelines(spec, tl, blocks))}</div></section>')
+        for i, names in enumerate(V["night"]):     # after dark: the last pictures before the price
+            w(PL.pp_photos(key, names, CAP, "After dark", night=True, note=light_note if i == 0 else "", foot=foot, sid="g-dusk" if i == 0 else ""))
         opt_html = _options_table(p, opts) + (_options_summary(ob) if ob else "")
+        nxt = md_to_html(re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):]))
         if spec.extras.price_breakdown:
-            nxt = re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):])
-            w(PL.wheel(spec, p, opt_html, md_to_html(nxt)).replace('<section class="invest"', '<section class="invest" id="g-investment"', 1))
+            w(PL.pp_invest(spec, p, opt_html, nxt, foot=foot))
         else:
-            w('<h2 class="kicker pb" id="g-investment">Investment</h2>')
             q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
-            w('<div class="quote" style="break-before:auto;page-break-before:auto">' + md_to_html(q2) + opt_html + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div>")
-        w(_confirm_box(spec))                # the client's "Still to confirm" box (extras.confirm), outside the scope and the price
+            w('<section class="pg pp-flow flow" id="g-investment"><div class="pin"><h2 class="kicker">Investment</h2><div class="quote" style="break-before:auto;page-break-before:auto">'
+              + md_to_html(q2) + opt_html + md_to_html(qmd[qmd.index("## NEXT STEP"):]) + "</div></div></section>")
+        cb = _confirm_box(spec)              # the client's "Still to confirm" box (extras.confirm), outside the scope and the price
+        if cb:
+            w(f'<section class="pg pp-flow flow"><div class="pin">{cb}</div></section>')
         if viewer_url is not None:           # the interactive 3D page instead of the embedded viewer (PDF-first documents)
-            w(_viewer_link(viewer_url, viewer_note))
-        else:
-            w('<h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
-            w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
+            if viewer_url:
+                w(f'<section class="pg pp-flow pp-3d"><div class="pin">{_viewer_link(viewer_url, viewer_note)}</div></section>')
+        else:                                # the live viewer on the web page; print leaves it out (the back cover points to it)
+            w('<section class="pg pp-flow pp-3d"><div class="pin"><h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>'
+              + viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}") + "</div></section>")
+        w(PL.pp_back(spec, key, V["back"], CAP, today, viewer_url or None, "Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days."))
     elif customer:
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
@@ -1041,7 +1054,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
                  '<div><span class="sl">Gross profit</span><span class="sv">%s</span></div><div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div>'
                  '<div><span class="sl">Financed</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
                  % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gm, money(p.retail), L.deck_sf))
-    if customer:
+    if proposal:
+        who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
+        head = PL.pp_cover(spec, key, V["cover"], CAP, name, who, today)
+        body = head + '<main class="pdoc">' + section + "</main>"
+        title = f"{name} — Proposal"
+    elif customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
         head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=t)
         body = head + '<main class="wrap">' + section + f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
@@ -1082,10 +1100,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
-            + (PL.FONT + PL.CSS + PL.brand_css(spec) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
+            + ((("" if proposal else PL.FONT) + PL.CSS + PL.brand_css(spec)) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
             + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
             + (PL.TIMELINE_CSS if proposal and timeline_of(spec) else "") + (PL.CONFIRM_CSS if proposal and getattr(spec.extras, "confirm", None) else "")
-            + "</head>" + ('<body class="proposal">' if customer else "<body>")
+            + (PL.PP_CSS if proposal else "")
+            + "</head>" + ('<body class="proposal pp">' if proposal else '<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
     # the viewer inlines its own CDN tag: keep one, hoist the viewer script after it
     page = page.replace(CDN, "", 1)
@@ -1454,7 +1473,7 @@ def render_pdf(page: str, files: Dict[str, str], pdf_path: str, key: str, hero: 
     p = re.sub(r"<script.*?</script>", "", page, flags=re.S).replace(' loading="lazy"', "")
     p = re.sub(r'<nav class="nav">.*?</nav>', "", p, flags=re.S)
     m = re.search(r'<h2 class="kicker"[^>]*>3D model.*?(?=<footer)', p, flags=re.S)
-    if m:
+    if m and 'class="proposal pp"' not in p:
         p = p[:m.start()] + f'<h2 class="kicker">3D model</h2><figure><img src="r/{key}-{hero}.jpg" alt="3D"><figcaption>The interactive 3D model lives at the online version of this document.</figcaption></figure>' + p[m.end():]
     p = p.replace("<details", "<details open").replace("</head>", PRINT_CSS + PL.PRINT_CSS + "</head>")
     (out / "_print.html").write_text(p)
@@ -1463,6 +1482,8 @@ def render_pdf(page: str, files: Dict[str, str], pdf_path: str, key: str, hero: 
         pg = b.new_page(viewport={"width": 1000, "height": 1300})
         pg.goto("file://" + str(out / "_print.html")); pg.wait_for_timeout(3000)
         pg.emulate_media(media="print")
+        if 'class="proposal pp"' in p:       # the photo-led proposal: a page that runs long takes its tighter classes first
+            pg.evaluate(PL.FIT_JS)
         pg.pdf(path=pdf_path, format="Letter", print_background=True, prefer_css_page_size=True)
         b.close()
     return pdf_path

@@ -558,3 +558,774 @@ def wheel(spec, p, options_html: str, next_html: str) -> str:
             + terms
             + (f'<div class="opts"><h4>Options</h4>{options_html}</div>' if options_html else "")
             + (f'<div><h4>Next step</h4>{next_html}</div>' if next_html else "") + "</section>")
+
+
+# ================================================================== the photo-led proposal (render_page mode="proposal")
+# One deliberate Letter page per section, the photoreal renders large: cover (one image, the address, the date — no price),
+# your deck (the overview: image, the lede, the numbers, the materials), the day views as full-bleed spreads, an after-dark
+# spread of the dusk views, the views from above with the plan and the sun study, what's included, how it's built, the
+# investment (two ways to pay, then where every dollar goes) and a back cover. The slots fill themselves from the view
+# names in the renders folder (plan_views), so a new shoot (left, leftfront, stairfront, ..._dusk) lands without edits.
+# Everything is scoped to body.pp; the customer page, the add-on document and the combined document keep their look.
+
+PP_HERO_POS = {                      # object-position for the crops of the known views (the deck sits low in most frames)
+    "yard": "50% 74%", "yard_dusk": "50% 72%", "corner": "70% 70%", "corner_dusk": "74% 70%", "corner2": "50% 66%",
+    "ondeck": "50% 72%", "ondeck_dusk": "50% 72%", "facade": "50% 82%", "isolow": "50% 70%", "detail": "50% 0%",
+    "iso": "50% 60%", "iso2": "50% 62%", "left": "50% 66%", "leftfront": "50% 66%", "leftlow": "50% 66%",
+    "stairfront": "50% 70%", "ondeck_left": "50% 72%", "door": "50% 66%", "aerial_left": "50% 60%",
+}
+PP_TECH_PREFIX = ("exploded", "frame-", "structure-", "rail-", "step", "sun-", "alt-")
+PP_TECH_NAMES = {"plan", "under", "underiso"}
+PP_DAY = ["yard", "left", "corner", "corner2", "leftfront", "stairfront", "ondeck", "ondeck_left", "door", "facade", "leftlow", "isolow"]
+PP_AERIAL = ["aerial_left", "iso2", "iso", "aerial", "aerial_right"]
+PP_DUSK = ["corner_dusk", "yard_dusk", "left_dusk", "leftfront_dusk", "stairfront_dusk", "ondeck_dusk", "ondeck_left_dusk",
+           "door_dusk", "corner2_dusk", "facade_dusk", "leftlow_dusk", "aerial_left_dusk", "detail_dusk"]
+PP_CAPS = {                          # fallback captions for the shoot's station names (a job's captions.json wins)
+    "left": "From the left side of the yard", "leftfront": "From the front left of the yard", "leftlow": "Low view from the left",
+    "stairfront": "In front of the center stair", "ondeck_left": "Standing on the deck, the left side", "door": "From the back door",
+    "aerial_left": "From above, the left side", "detail": "Up close", "facade": "The whole back of the house",
+    "corner2": "From the left corner of the yard",
+}
+# the price wheel on black: one gold hue, brightest for the largest share (validated as an ordinal ramp on #050608:
+# monotone lightness, adjacent steps >= 0.06 L apart, the darkest step 2.35:1 against the panel)
+PP_WHEEL = ["#fddb6f", "#ecc24e", "#dcaa26", "#c99200", "#b47c00", "#9e6600", "#895200", "#743e00"]
+HARDIE_HEX = {"arctic white": "#f1f0ea", "timber bark": "#5d4b3c", "iron gray": "#53565a", "cobble stone": "#a59c8b",
+              "navajo beige": "#c9b99b", "khaki brown": "#8a7660", "monterey taupe": "#8f8574", "aged pewter": "#6f6e69"}
+
+
+def jpeg_size(path) -> tuple:
+    """(width, height) of a JPEG from its SOF marker, or None — no imaging library needed."""
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(2) != b"\xff\xd8":
+                return None
+            while True:
+                b = fh.read(1)
+                while b and b != b"\xff":
+                    b = fh.read(1)
+                while b == b"\xff":
+                    b = fh.read(1)
+                if not b:
+                    return None
+                m = b[0]
+                if m in (0xD8, 0xD9) or 0xD0 <= m <= 0xD7:
+                    continue
+                ln = int.from_bytes(fh.read(2), "big")
+                if m in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                    d = fh.read(5)
+                    return int.from_bytes(d[3:5], "big"), int.from_bytes(d[1:3], "big")
+                fh.seek(ln - 2, 1)
+    except OSError:
+        return None
+
+
+def photoreal_names(rd, have) -> set:
+    """The stills in the renders folder that are photoreal (Cycles): the names its renders.json lists when the folder has
+    one, else every still that is not a WebGL viewer still (a viewer name at the viewer's 1400 x 900)."""
+    import json as _json
+    rd = Path(rd)
+    if (rd / "renders.json").exists():
+        try:
+            return {k[:-4] if k.endswith(".jpg") else k for k in _json.load(open(rd / "renders.json"))} & set(have)
+        except Exception:
+            pass
+    from .render import STILLS
+    webgl = {n for n, _ in STILLS}
+    return {n for n in have if not (n in webgl and jpeg_size(rd / f"{n}.jpg") == (1400, 900)) and not n.startswith("sun-")}
+
+
+def _kind(n: str) -> str:
+    if n.startswith(PP_TECH_PREFIX) or n in PP_TECH_NAMES:
+        return "tech"
+    if n.endswith(("_dusk", "_night")):
+        return "dusk"
+    if n.startswith("detail"):
+        return "detail"
+    if n.startswith("aerial") or (n.startswith("iso") and not n.startswith("isolow")):
+        return "aerial"
+    return "day"
+
+
+def _ordered(names, pref) -> list:
+    names = list(dict.fromkeys(names))
+    return [n for n in dict.fromkeys(pref) if n in names] + sorted(n for n in names if n not in pref)
+
+
+def _chunks(xs: list, max_pages: int) -> tuple:
+    """Spread pages: two, three, two images ... (a lone last image gets a page of its own); the rest left over."""
+    out, i, pat = [], 0, [2, 3]
+    while i < len(xs) and len(out) < max_pages:
+        rem, k = len(xs) - i, pat[len(out) % 2]
+        if rem <= 3 and rem != k:
+            k = rem
+        if rem == 4 and k == 3:
+            k = 2
+        out.append(xs[i:i + k])
+        i += k
+    return out, xs[i:]
+
+
+def plan_views(have, hero: str, photo: set) -> dict:
+    """Which still goes where. have = the still names in the renders folder, photo = the photoreal ones (the big slots take
+    only those when there are any). The cover takes the hero's dusk view when the shoot has three or more dusk views (else
+    the hero by day); the overview the view from the yard; then the day spreads (2, 3, 2 images), the after-dark spreads
+    (2, 3), the back cover the next dusk view, the views from above, a close-up for what's included, and the rest (up to
+    six) on a page of more views."""
+    use = (lambda n: n in photo) if photo else (lambda n: True)
+    pool = {k: [] for k in ("day", "dusk", "detail", "aerial", "tech")}
+    for n in have:
+        pool[_kind(n)].append(n)
+    day = _ordered([n for n in pool["day"] if use(n)], [hero] + PP_DAY)
+    dusk = _ordered([n for n in pool["dusk"] if use(n)], [f"{hero}_dusk"] + PP_DUSK)
+    hd = f"{hero}_dusk"
+    if hd in dusk and len(dusk) >= 3:
+        cover = hd
+    else:
+        cover = hero if hero in day else (day[0] if day else (dusk[0] if dusk else None))
+    day = [n for n in day if n != cover]
+    dusk = [n for n in dusk if n != cover]
+    over = next((n for n in ["yard", hero] + day if n in day), None)
+    day = [n for n in day if n != over]
+    aer = _ordered([n for n in pool["aerial"] if use(n)] or pool["aerial"], PP_AERIAL)
+    det = _ordered([n for n in pool["detail"] if use(n)], ["detail"])
+    detail = det[0] if det else None
+    day_pages, day_rest = _chunks(day, 3)
+    night_pages, night_rest = _chunks(dusk, 2)
+    back = night_rest[0] if night_rest else None
+    more = (day_rest + night_rest[1:] + det[1:] + aer[3:])[:6]
+    return dict(cover=cover, overview=over, day=day_pages, night=night_pages, back=back, aerial=aer[:3], detail=detail,
+                more=more if len(more) >= 2 else [], plan="plan" if "plan" in have else None,
+                sun=sorted(n for n in have if n.startswith("sun-")))
+
+
+def pp_caption(n: str, caps: dict) -> str:
+    if n in caps:
+        return caps[n]
+    if n.endswith("_dusk"):
+        base = caps.get(n[:-5]) or PP_CAPS.get(n[:-5])
+        return f"At dusk, {base[0].lower() + base[1:]}" if base else "At dusk"
+    return PP_CAPS.get(n, n.replace("_", " ").replace("-", " ").capitalize())
+
+
+def _img(key: str, n: str, caps: dict, cls: str = "", pos: str = "") -> str:
+    p = pos or PP_HERO_POS.get(n, "50% 62%")
+    return (f'<img class="{cls}" src="r/{key}-{n}.jpg" alt="{E(pp_caption(n, caps))}" loading="lazy" '
+            f'style="object-position:{p}">')
+
+
+def _fig(key: str, n: str, caps: dict, cls: str = "") -> str:
+    return f'<figure class="ph {cls}">{_img(key, n, caps)}<figcaption>{E(pp_caption(n, caps))}</figcaption></figure>'
+
+
+def _folio(left: str, right: str = "") -> str:
+    return f'<div class="folio"><span>{E(left)}</span><span>{E(right)}</span></div>'
+
+
+_SWATCH = {}
+
+
+def board_swatch(collection: str, color: str, boards: int = 1) -> str:
+    """A small rendered swatch of a TimberTech board (the timbertech-boards renderer, seeded by the board's name, so the
+    same board looks the same in every document) as a data URI; "" when the renderer is not on this machine."""
+    k = (collection, color, boards)
+    if k in _SWATCH:
+        return _SWATCH[k]
+    uri = ""
+    try:
+        import base64, io, os, sys
+        skill = os.environ.get("TT_BOARDS_SKILL", "/root/.claude/skills/synced/607fe818-1870-48a4-acf4-521f29c0bf01_8ba838c8-b3cb-4abb-8652-1992d2c2ba58/timbertech-boards/scripts")
+        if os.path.isdir(skill):
+            sys.path.insert(0, skill)
+            try:
+                import render as TT              # the timbertech-boards renderer
+            finally:
+                sys.path.pop(0)
+            from PIL import Image
+            pal = BOARDS_PALETTE.get((collection, color))
+            if pal:                              # the engine catalog's palette wins over the skill's copy (as in cycles.py)
+                TT.C.BOARDS = [(b[0], b[1], b[2], list(pal)) + tuple(b[4:]) if (b[0], b[1]) == (collection, color) else b for b in TT.C.BOARDS]
+            ims = [TT.render_board(collection, color, length_in=18, ppi=20, seed_offset=100 + i).convert("RGB") for i in range(boards)]
+            w, h, gap = ims[0].width, ims[0].height, 3
+            out = Image.new("RGB", (w, h * boards + gap * (boards - 1)), (20, 18, 16))
+            for i, im in enumerate(ims):
+                out.paste(im, (0, i * (h + gap)))
+            buf = io.BytesIO()
+            out.save(buf, "JPEG", quality=86)
+            uri = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        uri = ""
+    _SWATCH[k] = uri
+    return uri
+
+
+def materials(spec, L) -> list:
+    """The overview's materials: [(label, name, css background)] — decking (a rendered board strip), picture frame, rail,
+    drink rail, the HardieTrim skirt."""
+    from .report import rail_words
+    rows = []
+    d = spec.decking
+
+    def bg(coll, color, boards=1):
+        uri = board_swatch(coll, color, boards)
+        pal = BOARDS_PALETTE.get((coll, color))
+        flat = pal[len(pal) // 2] if pal else "#73624a"
+        return f"url({uri}) center/cover, {flat}" if uri else flat
+    rows.append(("Decking", f"{d.brand} {d.collection} · {d.color}", bg(d.collection, d.color, 3)))
+    if d.border_color and d.border_color != d.color:
+        rows.append(("Picture frame", f"{d.border_collection or d.collection} · {d.border_color}", bg(d.border_collection or d.collection, d.border_color)))
+    rl = L.rail
+    if rl:
+        rows.append(("Rail", f"{d.brand} {rail_words(spec, rl.system)} · {rl.color}", RAIL_HEX.get(rl.color.lower(), "#141414")))
+        if spec.railing.drink_rail:
+            dc = spec.railing.drink_rail_collection or d.collection
+            dcol = spec.railing.drink_rail_color or d.color
+            rows.append(("Drink rail", f"{d.brand} {dc} · {dcol}", bg(dc, dcol)))
+    hs = getattr(spec.extras, "hardie_skirt", None)
+    if hs:
+        hc = getattr(spec.extras, "hardie_color", "") or re.sub(r"^[\d/ x.\"']+", "", hs).strip() or "Timber Bark"
+        rows.append(("Fascia", f"James Hardie HardieTrim · {hc}", HARDIE_HEX.get(hc.lower(), "#cfc8bb")))
+    return rows
+
+
+def telemetry(spec, L, n_piers, t=None) -> list:
+    """The deck's numbers for the overview strip: [(value, label)]."""
+    fr = L.zones[0].frame
+    flush = all(b.kind == "flush" for b in (L.beam_lines or []))
+    tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
+            (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush and L.beam_lines else "")),
+            (str(n_piers), {"diamond_pier": "Diamond Piers", "caisson": "caissons", "concrete": "concrete piers"}.get(spec.framing.footing_type, "existing caissons"))]
+    if hasattr(L, "parts") and t is not None:
+        return _levels_tele(spec, L, t, n_piers)
+    if L.rail:
+        tele.append((f"{L.rail.rail_lf:g}'", f"{L.rail.color.lower()} rail"))
+    elif L.stairs:
+        tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
+    return tele
+
+
+def _split_lede(lede: str) -> tuple:
+    """(standfirst, body): the lede's first sentence set large, the rest as the body."""
+    lede = (lede or "").strip()
+    m = re.search(r"(?<=[.!?])\s+(?=[A-Z0-9\"'])", lede)
+    if m and 40 <= m.start() <= 220:
+        return lede[:m.start()], lede[m.end():]
+    return (lede, "") if len(lede) <= 220 else ("", lede)
+
+
+# Run by page.render_pdf in the print layout before the PDF is made: a page section that runs past its Letter page takes
+# the tighter classes it names in data-fit, one at a time, until it fits (the overview's "tight", the investment's "dense").
+FIT_JS = """() => { var H = 11 * 96 + 1, n = 0;
+  document.querySelectorAll('[data-fit]').forEach(function (el) {
+    var steps = el.getAttribute('data-fit').split(' ');
+    for (var i = 0; i < steps.length; i++) {
+      if (Math.max(el.scrollHeight, el.getBoundingClientRect().height) <= H) break;
+      el.classList.add(steps[i]); n++;
+    }
+  });
+  return n; }"""
+
+
+def pp_cover(spec, key, img, caps, name, who, today) -> str:
+    """Page 1: one full-bleed image, the logo and the date, the address. No price on the cover."""
+    title, eyebrow = _title_parts(name, spec.site.address)
+    place = ", ".join(x for x in (spec.site.city, spec.site.state) if x)
+    eyebrow = " · ".join(x for x in (eyebrow, place) if x)
+    br = brand_of(spec)
+    mission = brand_mission(br, today, "Deck Division · Proposal" if br["key"] == "gs" else (br.get("mission") or "Proposal"))
+    pic = _img(key, img, caps, "pc-img") if img else ""
+    return ('<header class="pp-cover pg" id="g-cover"><div class="pc-hero">' + pic + '<div class="pc-shade"></div>'
+            f'<div class="pc-top">{brand_logo(br)}<span class="mission">{mission}</span></div></div>'
+            '<div class="pc-title">' + (f'<span class="eyebrow">{E(eyebrow)}</span>' if eyebrow else "")
+            + f'<h1>{E(title)}</h1><p class="who">{E(who)}</p></div>'
+            + f'<div class="pc-foot"><span>{E(brand_footer(spec))}</span><span>{E(pp_caption(img, caps)) if img else ""}</span></div></header>')
+
+
+def pp_overview(spec, L, key, img, caps, lede, n_piers, t=None, foot="") -> str:
+    """Page 2, your deck: the view from the yard, the lede (its first sentence large), the numbers, the materials."""
+    stand, body = _split_lede(lede)
+    tele = telemetry(spec, L, n_piers, t)
+    mats = materials(spec, L)
+    h = [f'<section class="pg pp-over flow{"" if (stand or body) else " nolede"}" data-fit="tight tighter" id="g-reads" aria-label="The project">']
+    if img:
+        h.append(f'<figure class="po-fig">{_img(key, img, caps)}<figcaption>{E(pp_caption(img, caps))}</figcaption></figure>')
+    h.append('<div class="pin"><span class="eyebrow">The project</span>')
+    if stand:
+        h.append(f'<p class="stand">{E(stand)}</p>')
+    h.append('<div class="stats">' + "".join(f'<div><span class="sv">{E(v)}</span><span class="sl">{E(k)}</span></div>' for v, k in tele) + "</div>")
+    h.append('<div class="po-cols">' + (f'<div class="po-lede"><p>{E(body)}</p></div>' if body else "")
+             + '<div class="po-mat"><h3>Materials</h3><ul>'
+             + "".join(f'<li><i style="background:{c}"></i><span><b>{E(k)}</b>{E(v)}</span></li>' for k, v, c in mats) + "</ul></div></div>")
+    h.append("</div>" + _folio(foot, "The project") + "</section>")
+    return "".join(h)
+
+
+def pp_photos(key, names, caps, label: str, night: bool = False, note: str = "", foot: str = "", sid: str = "") -> str:
+    """A spread: one image (solo), two stacked at full width (duo) or three wide strips (trio), edge to edge; the section
+    label and a line of facts over the first image."""
+    kind = {1: "solo", 2: "duo"}.get(len(names), "trio")
+    h = [f'<section class="pg pp-photo {kind}{" night" if night else ""}"' + (f' id="{sid}"' if sid else "") + f' aria-label="{E(label)}">']
+    for i, n in enumerate(names):
+        h.append(_fig(key, n, caps, f"ph-{i}"))
+    h.append(f'<div class="ph-label"><span class="eyebrow">{E(label)}</span>' + (f"<p>{E(note)}</p>" if note else "") + "</div>")
+    h.append(_folio(foot, label) + "</section>")
+    return "".join(h)
+
+
+def _sheet(eyebrow: str, title: str, tag: str = "", cls: str = "", sid: str = "", label: str = "") -> str:
+    return (f'<section class="pg pp-sheet {cls}"' + (f' id="{sid}"' if sid else "") + f' aria-label="{E(label or eyebrow)}"><div class="pin">'
+            f'<header class="sh"><span class="eyebrow">{E(eyebrow)}</span><h2>{E(title)}</h2>' + (f'<p class="tag">{E(tag)}</p>' if tag else "") + "</header>")
+
+
+def pp_above(key, aerial, plan, suns, caps, sun_tag: str, foot: str = "") -> str:
+    """The views from above (up to three) with the plan, then the sun study in one row."""
+    cells = list(aerial) + ([plan] if plan else [])
+    if not cells and not suns:
+        return ""
+    h = [_sheet("The site", "From above", cls="pp-above", sid="g-iso")]
+    if cells:
+        if len(cells) >= 3:
+            h.append(_fig(key, cells[0], caps, "big") + f'<div class="grid g{len(cells) - 1}">' + "".join(_fig(key, n, caps) for n in cells[1:]) + "</div>")
+        else:
+            h.append(f'<div class="grid g{len(cells)}">' + "".join(_fig(key, n, caps) for n in cells) + "</div>")
+    if suns:
+        h.append(f'<div class="sun"><h3>Sun and shade <span>{E(sun_tag)}</span></h3><div class="sunrow n{min(len(suns), 5)}">'
+                 + "".join(_fig(key, n, caps) for n in suns[:5]) + "</div></div>")
+    h.append("</div>" + _folio(foot, "From above") + "</section>")
+    return "".join(h)
+
+
+def md_rows(md: str) -> list:
+    """A markdown table's body rows: [[cell, ...]] (the header and the rule dropped)."""
+    rows = []
+    for ln in md.splitlines():
+        if ln.startswith("|"):
+            cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+            if not all(set(c) <= set("-: ") for c in cells):
+                rows.append(cells)
+    return rows[1:]
+
+
+def _inline(s: str) -> str:
+    s = E(s)
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+
+
+def pp_included(key, img, caps, rows, foot: str = "") -> str:
+    """What's included: a close-up across the top, then every row of the price's scope as a card."""
+    n = len([r for r in rows if len(r) >= 2])
+    h = [f'<section class="pg pp-sheet pp-inc flow {"rows-s" if n <= 8 else "rows-m" if n <= 10 else "rows-l"}{"" if img else " noimg"}" data-fit="rows-m rows-l" id="g-what" aria-label="What\'s included">']
+    if img:
+        h.append(f'<figure class="pi-fig">{_img(key, img, caps)}<figcaption>{E(pp_caption(img, caps))}</figcaption></figure>')
+    h.append('<div class="pin"><header class="sh"><span class="eyebrow">What\'s included</span><h2>Included in the price</h2></header>'
+             '<div class="cards">' + "".join(f'<div class="card"><h3>{_inline(r[0])}</h3><p>{_inline(r[1])}</p></div>' for r in rows if len(r) >= 2) + "</div>")
+    h.append("</div>" + _folio(foot, "What's included") + "</section>")
+    return "".join(h)
+
+
+def pp_built(key, big, small, caps, reads_html: str, foot: str = "") -> str:
+    """How it's built: the exploded view large, two views of the frame, the deck's reads."""
+    if not big and not small and not reads_html:
+        return ""
+    long_ = reads_html.count("<dt>") > 7
+    if long_:
+        small = []
+    h = [_sheet("How it's built", "Every layer, pulled apart", cls="pp-built flow" + (" long" if long_ else ""), sid="g-exploded").replace('<section ', '<section data-fit="long" ', 1)]
+    if big:
+        h.append(_fig(key, big, caps, "big"))
+    if small:
+        h.append(f'<div class="grid g{len(small)}">' + "".join(_fig(key, n, caps) for n in small) + "</div>")
+    if reads_html:
+        h.append(f'<div class="reads-box">{reads_html}</div>')
+    h.append("</div>" + _folio(foot, "How it's built") + "</section>")
+    return "".join(h)
+
+
+def pp_more(key, names, caps, foot: str = "") -> str:
+    if not names:
+        return ""
+    return (_sheet("Renders", "More views", cls="pp-more", sid="g-more") + '<div class="grid g6">' + "".join(_fig(key, n, caps) for n in names)
+            + "</div></div>" + _folio(foot, "More views") + "</section>")
+
+
+def _label_split(k: str) -> tuple:
+    """A price line as (head, qualifier): "Lighting — 9 post-cap lights, ..." -> ("Lighting", "9 post-cap lights, ..."); a line
+    that joins several items with "+" stays whole."""
+    if " — " in k and "+" not in k:
+        head, _, sub = k.rpartition(" — ")
+        return head, sub
+    return k, ""
+
+
+def pp_invest(spec, p, options_html: str, next_html: str, foot: str = "") -> str:
+    """Investment on black: the two ways to pay, then where every dollar goes (a gold wheel, largest share brightest, the
+    legend with each part's dollars and share; what is included at no charge listed with it), the options, the next step."""
+    show_fin = spec.extras.show_financing
+    if show_fin:
+        ways = ('<div class="ways">'
+                f'<div class="way lead"><span class="wl">Check or ACH</span><span class="wv">{money(p.sell)}</span>'
+                f'<span class="ws">{(1 - p.sell / p.retail) * 100:.0f}% below the financed price</span></div>'
+                f'<div class="way"><span class="wl">Financed · no money down</span><span class="wv">{money(p.retail)}</span>'
+                f'<span class="ws">About <b>{money(p.monthly)}/month</b> at 6.99% for 10 years</span>'
+                '<span class="ws">Or 12 or 18 months with no payments, no down payment</span></div></div>')
+        title = "Two ways to pay"
+    else:
+        ways = f'<div class="ways one"><div class="way lead"><span class="wl">Price · check or ACH</span><span class="wv">{money(p.sell)}</span></div></div>'
+        title = "The price"
+    paid = sorted(((k, v) for k, v in p.allocation if v > 0), key=lambda kv: -kv[1])
+    free = [k for k, v in p.allocation if v <= 0]
+    if len(paid) > len(PP_WHEEL):
+        rest = sum(v for _, v in paid[len(PP_WHEEL) - 1:])
+        paid = paid[:len(PP_WHEEL) - 1] + [("Everything else", rest)]
+    total = sum(v for _, v in paid) or 1.0
+    cx = cy = 120
+    r, gap = 96, 1.6
+    a, paths, rows = -90.0, [], []
+    for i, (k, v) in enumerate(paid):
+        sweep = 360.0 * v / total
+        a0, a1 = a + gap / 2, a + sweep - gap / 2
+        if a1 - a0 < 0.6:
+            a1 = a0 + 0.6
+        share = f"{100 * v / total:.0f}%" if v / total >= 0.01 else "<1%"
+        head, sub = _label_split(k)
+        paths.append(f'<path d="{_arc(cx, cy, r, a0, a1)}" stroke="{PP_WHEEL[i]}" data-k="{i}"><title>{E(k)}: {money(v)} ({share})</title></path>')
+        rows.append(f'<li data-k="{i}" data-v="{money(v)}" data-s="{E(share)} of the price" tabindex="0"><i style="background:{PP_WHEEL[i]}"></i>'
+                    f'<span class="ll">{E(head)}' + (f'<em>{E(sub)}</em>' if sub else "") + f'</span><span class="lv">{money(v)}</span><span class="lp">{share}</span></li>')
+        a += sweep
+    for k in free:                            # a part at $0 (the riser lights): listed, no wedge
+        head, sub = _label_split(k)
+        rows.append(f'<li class="free"><i></i><span class="ll">{E(head)}' + (f'<em>{E(sub)}</em>' if sub else "") + '</span><span class="lv">$0</span><span class="lp"></span></li>')
+    rows.append(f'<li class="total"><i></i><span class="ll">Total, check or ACH</span><span class="lv">{money(p.sell)}</span><span class="lp">100%</span></li>')
+    svg = (f'<svg viewBox="0 0 240 240" role="img" aria-label="Price wheel: {E(", ".join(f"{k} {money(v)}" for k, v in paid))}">'
+           + "".join(paths)
+           + f'<text class="wc-v" x="{cx}" y="{cy + 7}" text-anchor="middle">{money(p.sell)}</text>'
+           + f'<text class="wc-l" x="{cx}" y="{cy + 28}" text-anchor="middle">CHECK OR ACH</text></svg>')
+    return (f'<section class="pg pp-invest flow{" has-opts" if options_html else ""}" data-fit="dense" id="g-investment" aria-labelledby="inv-h"><div class="pin">'
+            f'<header class="sh"><span class="eyebrow">Investment</span><h2 id="inv-h">{title}</h2></header>' + ways
+            + '<div class="where"><h3>Where every dollar goes</h3>'
+            + f'<div class="inv-grid"><figure class="wheel">{svg}</figure><ol class="legend">' + "".join(rows) + "</ol></div></div>"
+            + (f'<div class="opts"><h3>Options</h3>{options_html}</div>' if options_html else "")
+            + (f'<div class="next"><h3>Next step</h3>{next_html}</div>' if next_html else "")
+            + "</div>" + _folio(foot, "Investment") + "</section>")
+
+
+def pp_back(spec, key, img, caps, today, viewer_url=None, foot_note: str = "") -> str:
+    """The back cover: a dusk view when one is left, the logo, the fine print."""
+    br = brand_of(spec)
+    online = (f'The interactive 3D model: <a href="{E(viewer_url)}">{E(viewer_url)}</a>' if viewer_url else
+              "The interactive 3D model lives at the online version of this document.")
+    return (f'<footer class="pg pp-back{"" if img else " bare"}" aria-label="Back cover">' + (f'<div class="pb-hero">{_img(key, img, caps, "pb-img")}<div class="pc-shade"></div></div>' if img else "")
+            + f'<div class="pb-in">{brand_logo(br)}<p class="pb-name">{E(brand_footer(spec))}</p>'
+            + f'<p class="pb-fine">{E(foot_note)}</p><p class="pb-fine">{online}</p></div></footer>')
+
+
+PP_CSS = """<style>
+/* The photo-led proposal: black, cream and GS gold, Nunito Sans throughout; one deliberate page per section in print. */
+body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black:#050608; --pp-cream:#f7f3ea;
+  --pp-gold:#d49e1b; --pp-gold-hi:#ffe28d; --pp-gold-text:#e9b23c; --pp-mute-dk:#a9a69e; --pp-line-dk:rgba(244,242,236,.16);
+  margin:0; background:var(--ground); }
+.pp main.pdoc { display:block; }
+.pp .pg { position:relative; display:block; }
+.pp .pg.flow, .pp .pp-flow { display:flow-root; }
+.pp .pin { max-width:980px; margin:0 auto; padding:0 16px; }
+.pp .eyebrow { display:block; font-family:var(--display); font-weight:800; font-size:12px; letter-spacing:.3em; text-transform:uppercase; color:var(--gold-ink); }
+.pp .sh { display:flex; flex-direction:column; gap:6px; margin:0 0 18px; }
+.pp .sh h2 { font-family:var(--display); font-weight:900; font-size:clamp(28px, 4.4vw, 40px); line-height:1.02; letter-spacing:-.015em; margin:0; color:var(--ink); }
+.pp .sh .tag { margin:0; color:var(--ink-3); font-size:14px; }
+.pp figure { margin:0; }
+.pp .ph { position:relative; overflow:hidden; }
+.pp .ph img, .pp .po-fig img, .pp .pi-fig img { display:block; width:100%; height:auto; object-fit:cover; border:0; }
+.pp figcaption { font-size:12.5px; color:var(--ink-3); margin-top:6px; }
+.pp .folio { display:none; }
+/* cover */
+.pp-cover { background:var(--pp-black); color:#f4f2ec; position:relative; overflow:hidden; }
+.pp-cover .pc-hero { position:relative; }
+.pp-cover .pc-img { display:block; width:100%; aspect-ratio:8.5/8.7; max-height:94vh; object-fit:cover; }
+.pp .pc-shade { position:absolute; inset:0; background:linear-gradient(180deg, rgba(5,6,8,.8) 0%, rgba(5,6,8,0) 20%, rgba(5,6,8,0) 62%, rgba(5,6,8,.72) 86%, #050608 100%); }
+.pp-cover .pc-top { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:22px max(16px, 4vw); }
+.pp-cover .gslogo, .pp-back .gslogo { display:block; height:56px; width:auto; }
+.pp-cover .mission { font-family:var(--display); font-weight:700; font-size:11px; letter-spacing:.3em; text-transform:uppercase; color:#f4f2ec; text-align:right; line-height:1.8; }
+.pp-cover .pc-title { position:relative; margin-top:-22vw; padding:0 max(16px, 4vw) 28px; display:flex; flex-direction:column; gap:12px; }
+.pp-cover .eyebrow { color:var(--pp-gold-hi); }
+.pp-cover h1 { font-family:var(--display); font-weight:900; font-size:clamp(40px, 8.4vw, 84px); line-height:.94; letter-spacing:-.02em; margin:0; color:#fff; text-wrap:balance; }
+.pp-cover .who { margin:0; color:var(--pp-mute-dk); font-size:15px; }
+.pp-cover .pc-foot { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:14px max(16px, 4vw) 22px; border-top:1px solid var(--pp-line-dk); margin:0 max(16px, 4vw); padding-left:0; padding-right:0;
+  font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--pp-mute-dk); }
+/* overview */
+.pp-over { background:var(--ground); padding-bottom:40px; }
+.pp-over .po-fig { position:relative; }
+.pp-over .po-fig img { aspect-ratio:8.5/5.1; max-height:78vh; }
+.pp .po-fig figcaption, .pp .pi-fig figcaption, .pp .ph figcaption { position:absolute; left:0; right:0; bottom:0; margin:0; padding:40px max(16px, 4vw) 14px;
+  color:#fff; font-size:12.5px; font-weight:600; letter-spacing:.02em; background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.55)); }
+.pp-over .pin { padding-top:30px; display:flex; flex-direction:column; gap:20px; }
+.pp-over .stand { margin:0; font-family:var(--display); font-weight:700; font-size:clamp(19px, 2.6vw, 24px); line-height:1.32; color:var(--ink); max-width:46ch; text-wrap:pretty; }
+.pp .stats { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); border-top:2px solid var(--pp-gold); }
+.pp .stats > div { display:flex; flex-direction:column; gap:4px; padding:12px 10px 0 0; min-width:0; }
+.pp .stats > div + div { padding-left:12px; border-left:1px solid var(--line); }
+.pp .stats .sv { font-family:var(--display); font-weight:900; font-size:clamp(20px, 2.8vw, 28px); line-height:1; color:var(--ink); white-space:nowrap; }
+.pp .stats .sl { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:800; line-height:1.35; }
+.pp-over .po-cols { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(0, 1fr); gap:28px; align-items:start; }
+.pp-over .po-lede p { margin:0; font-size:15px; line-height:1.6; color:var(--ink-2); font-weight:400; }
+.pp-over .po-mat h3 { margin:0 0 10px; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold-ink); font-weight:800; }
+.pp-over .po-mat ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.pp-over .po-mat li { display:grid; grid-template-columns:64px minmax(0, 1fr); gap:12px; align-items:center; }
+.pp-over .po-mat i { display:block; width:64px; height:40px; border-radius:2px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.18); }
+.pp-over .po-mat span { display:flex; flex-direction:column; gap:1px; font-size:14px; line-height:1.3; color:var(--ink); font-weight:600; }
+.pp-over .po-mat b { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink-3); font-weight:800; }
+/* spreads */
+.pp-photo { background:var(--ground); display:flex !important; flex-direction:column; gap:6px; }
+.pp-photo.night { background:var(--pp-black); }
+.pp-photo .ph img { aspect-ratio:1500/965; }
+.pp-photo.trio .ph img { aspect-ratio:8.5/3.6; }
+.pp-photo.solo .ph img { aspect-ratio:8.5/6.6; }
+.pp-photo .ph-label { position:absolute; top:0; left:0; right:0; padding:22px max(16px, 4vw) 60px; background:linear-gradient(180deg, rgba(5,6,8,.62), rgba(5,6,8,0)); }
+.pp-photo.night .ph-label { background:linear-gradient(180deg, rgba(5,6,8,.8) 0%, rgba(5,6,8,.45) 60%, rgba(5,6,8,0) 100%); }
+.pp-photo .ph-label .eyebrow { color:#fff; }
+.pp-photo .ph-label p { margin:8px 0 0; max-width:62ch; color:#f4f2ec; font-size:14px; line-height:1.45; font-weight:600; }
+/* sheets (cream pages with a header) */
+.pp-sheet { background:var(--ground); padding:56px 0 48px; }
+.pp .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; }
+.pp .grid.g1 { grid-template-columns:1fr; }
+.pp .grid .ph img { aspect-ratio:1500/965; }
+.pp-sheet .ph figcaption { position:static; background:none; padding:0; margin-top:6px; color:var(--ink-3); font-size:12px; font-weight:600; letter-spacing:0; }
+.pp .sun { margin-top:26px; }
+.pp .sun h3, .pp .where h3, .pp .opts h3, .pp .next h3 { margin:0 0 10px; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold-ink); font-weight:800; }
+.pp .sun h3 span { letter-spacing:.02em; text-transform:none; color:var(--ink-3); font-weight:600; margin-left:8px; }
+.pp .sunrow { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:8px; }
+.pp .sunrow.n4 { grid-template-columns:repeat(4, minmax(0, 1fr)); } .pp .sunrow.n3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.pp .sunrow.n2 { grid-template-columns:repeat(2, minmax(0, 1fr)); } .pp .sunrow.n1 { grid-template-columns:minmax(0, 1fr); }
+.pp-sheet .big img { aspect-ratio:1500/965; }
+.pp-above .big + .grid { margin-top:14px; }
+.pp .grid.g3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.pp .sunrow .ph img { aspect-ratio:1400/900; }
+.pp-inc { padding-top:0; }
+.pp-inc .pi-fig { position:relative; margin-bottom:30px; }
+.pp-inc .pi-fig img { aspect-ratio:8.5/4.4; max-height:64vh; }
+.pp .cards { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
+.pp .card { background:var(--paper); border-top:3px solid var(--pp-gold); padding:14px 16px 16px; }
+.pp .card h3 { margin:0 0 6px; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-ink); font-weight:800; }
+.pp .card p { margin:0; font-size:14px; line-height:1.5; color:var(--ink); }
+.pp-built .big img { aspect-ratio:1400/900; }
+.pp-built .grid { margin-top:14px; }
+.pp-built .reads-box { margin-top:22px; border-top:2px solid var(--pp-gold); padding-top:14px; }
+.pp-built .reads-box .reads { grid-template-columns:150px 1fr; font-size:14px; }
+/* investment */
+.pp-invest { background:var(--pp-black); color:#f4f2ec; padding:56px 0 48px; margin:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.pp-invest .eyebrow { color:var(--pp-gold-hi); }
+.pp-invest .sh h2 { color:#fff; }
+.pp-invest .ways { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); gap:14px; margin-bottom:34px; }
+.pp-invest .ways.one { grid-template-columns:minmax(0, 1fr); }
+.pp-invest .way { border:1px solid var(--pp-line-dk); padding:20px 22px; display:flex; flex-direction:column; gap:6px; }
+.pp-invest .way.lead { border-color:var(--pp-gold); box-shadow:inset 0 3px 0 var(--pp-gold); }
+.pp-invest .wl { font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--pp-mute-dk); font-weight:800; }
+.pp-invest .wv { font-family:var(--display); font-weight:900; font-size:clamp(38px, 6vw, 56px); line-height:1; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; margin:4px 0 6px; }
+.pp-invest .way.lead .wv { color:var(--pp-gold-text); }
+.pp .opt-prices .lead .pv, .pp .prices .lead .pv, .pp .terms .lead .tv { background:none; -webkit-text-fill-color:currentColor; color:var(--pp-gold-text); }
+.pp-invest .ws { font-size:14px; color:#d9d6ce; line-height:1.45; }
+.pp-invest .ws b { color:#fff; font-weight:800; }
+.pp-invest h3 { color:var(--pp-gold-hi) !important; }
+.pp-invest .inv-grid { display:grid; grid-template-columns:minmax(0, 260px) minmax(0, 1fr); gap:34px; align-items:center; }
+.pp-invest .wheel svg { display:block; width:100%; max-width:260px; height:auto; margin:0 auto; }
+.pp-invest .wheel path { fill:none; stroke-width:24; }
+.pp-invest .wheel .wc-v { font-family:var(--display); font-weight:900; font-size:30px; fill:#ffffff; }
+.pp-invest .wheel .wc-l { font-family:"Nunito Sans", system-ui, sans-serif; font-weight:800; font-size:9.5px; letter-spacing:.24em; fill:#a9a69e; }
+.pp-invest .inv-grid.hover .wheel path:not(.on) { opacity:.3; }
+.pp-invest .inv-grid .wheel path.on { stroke-width:30; }
+.pp-invest .legend { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; min-width:0; }
+.pp-invest .legend li { display:grid; grid-template-columns:12px minmax(0, 1fr) auto 44px; gap:12px; align-items:baseline; padding:9px 4px; border-bottom:1px solid var(--pp-line-dk); font-size:14.5px; color:#f4f2ec; }
+.pp-invest .legend li i { width:12px; height:12px; border-radius:2px; display:block; align-self:center; }
+.pp-invest .legend .ll { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.pp-invest .legend .ll em { font-style:normal; font-size:12.5px; color:var(--pp-mute-dk); }
+.pp-invest .legend .lv { font-family:var(--display); font-weight:800; font-size:16px; font-variant-numeric:tabular-nums; text-align:right; }
+.pp-invest .legend .lp { color:var(--pp-mute-dk); text-align:right; font-size:13px; font-variant-numeric:tabular-nums; }
+.pp-invest .legend li.on { background:rgba(244,242,236,.07); }
+.pp-invest .legend li[tabindex]:focus-visible { outline:2px solid var(--pp-gold-hi); outline-offset:-2px; }
+.pp-invest .legend li.free i { background:transparent; box-shadow:inset 0 0 0 1px var(--pp-gold); }
+.pp-invest .legend li.total { border-bottom:0; border-top:1px solid rgba(244,242,236,.5); font-weight:800; padding-top:12px; }
+.pp-invest .legend li.total .lv { font-size:20px; color:var(--pp-gold-text); }
+.pp-invest .opts, .pp-invest .next { margin-top:30px; }
+.pp-invest .next { border-top:1px solid var(--pp-line-dk); padding-top:16px; }
+.pp-invest .next p, .pp-invest .opts p { margin:0 0 6px; max-width:72ch; color:#d9d6ce; font-size:15px; line-height:1.55; }
+.pp-invest .opts table { color:#f4f2ec; }
+.pp-invest .opts th { color:var(--pp-mute-dk); border-bottom-color:rgba(244,242,236,.4); }
+.pp-invest .opts td { border-bottom-color:var(--pp-line-dk); }
+.pp-invest .opts .optsum .sub { color:var(--pp-mute-dk); font-size:.94em; }
+/* back cover */
+.pp-back { background:var(--pp-black); color:#f4f2ec; position:relative; overflow:hidden; margin:0; border:0; padding:0 0 48px; display:block; }
+.pp-back .pb-hero { position:relative; }
+.pp-back .pb-img { display:block; width:100%; aspect-ratio:8.5/6.4; max-height:80vh; object-fit:cover; }
+.pp-back .pb-in { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:36px 16px 0; }
+.pp-back.bare { padding:120px 0; }
+.pp-back .pb-name { margin:6px 0 0; font-family:var(--display); font-weight:800; font-size:13px; letter-spacing:.3em; text-transform:uppercase; color:#f4f2ec; }
+.pp-back .pb-fine { margin:0; font-size:12.5px; color:var(--pp-mute-dk); max-width:70ch; }
+.pp-back .pb-fine a { color:var(--pp-gold-hi); }
+/* the rest of the proposal's blocks (options, schedule, confirm, the option renders, 3D) sit on cream sheets */
+.pp .pp-flow { background:var(--ground); padding:48px 0 40px; }
+.pp .pp-flow .gal { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:760px) {
+  .pp .stats { grid-template-columns:repeat(3, minmax(0, 1fr)); row-gap:14px; }
+  .pp .stats > div:nth-child(4) { padding-left:0; border-left:0; }
+  .pp-over .po-cols, .pp-invest .ways, .pp-invest .inv-grid, .pp .cards { grid-template-columns:minmax(0, 1fr); }
+  .pp .grid, .pp .pp-flow .gal { grid-template-columns:minmax(0, 1fr); }
+  .pp .sunrow { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .pp-cover .pc-img { aspect-ratio:4/5; }
+  .pp-cover .pc-title { margin-top:-38vw; }
+  .pp-cover .gslogo { height:40px; }
+  .pp-cover .mission { letter-spacing:.18em; font-size:10px; }
+  .pp-photo.trio .ph img { aspect-ratio:16/9; }
+}
+@media print {
+  @page { size:Letter; margin:0; }
+  body.pp { background:var(--pp-cream); }
+  .pp .pg { width:8.5in; height:11in; overflow:hidden; break-after:page; page-break-after:always; break-inside:avoid; margin:0; }
+  .pp .pg.flow { height:auto; min-height:11in; overflow:visible; break-inside:auto; }
+  .pp .pg:last-child { break-after:auto; page-break-after:auto; }
+  .pp .pin { max-width:none; padding:0 0.6in; }
+  .pp .folio { display:flex; justify-content:space-between; position:absolute; left:0.6in; right:0.6in; bottom:0.32in; font-size:8px; letter-spacing:.2em;
+    text-transform:uppercase; color:#8a8172; font-weight:700; }
+  .pp .eyebrow { font-size:9.5px; }
+  .pp .sh { margin-bottom:0.16in; }
+  .pp .sh h2 { font-size:30px; }
+  .pp .sh .tag { font-size:11px; }
+  /* cover */
+  .pp-cover .pc-img { aspect-ratio:auto; height:8.7in; max-height:none; }
+  .pp-cover .pc-top { padding:0.42in 0.6in 0; }
+  .pp-cover .gslogo { height:0.66in; }
+  .pp-cover .mission { font-size:8.5px; }
+  .pp-cover .pc-title { position:absolute; left:0.6in; right:0.6in; bottom:1.0in; margin:0; padding:0; gap:0.1in; }
+  .pp-cover .eyebrow { font-size:10px; }
+  .pp-cover h1 { font-size:64px; }
+  .pp-cover .who { font-size:12.5px; }
+  .pp-cover .pc-foot { position:absolute; left:0.6in; right:0.6in; bottom:0.42in; margin:0; padding:0.12in 0 0; font-size:7.5px; }
+  /* overview */
+  .pp-over { padding:0 0 0.62in; }
+  .pp-over .po-fig img { aspect-ratio:auto; height:5.05in; max-height:none; }
+  .pp .po-fig figcaption, .pp .pi-fig figcaption, .pp .ph figcaption { padding:0.4in 0.6in 0.16in; font-size:9px; }
+  .pp-over .pin { padding-top:0.32in; gap:0.2in; }
+  .pp-over .stand { font-size:17px; line-height:1.34; max-width:none; }
+  .pp .stats > div { padding-top:0.1in; }
+  .pp .stats .sv { font-size:23px; }
+  .pp .stats .sl { font-size:7.5px; }
+  .pp-over .po-cols { gap:0.32in; }
+  .pp-over .po-lede p { font-size:11.2px; line-height:1.58; }
+  .pp-over .po-mat h3 { font-size:8.5px; margin-bottom:0.08in; }
+  .pp-over .po-mat ul { gap:0.09in; }
+  .pp-over .po-mat li { grid-template-columns:0.62in minmax(0, 1fr); gap:0.1in; }
+  .pp-over .po-mat i { width:0.62in; height:0.36in; }
+  .pp-over .po-mat span { font-size:10.5px; }
+  .pp-over .po-mat b { font-size:7px; }
+  .pp-over.tight .po-fig img { height:4.2in; }
+  .pp-over.nolede .po-fig img { height:6.3in; }
+  .pp-over.tighter .po-fig img { height:3.4in; }
+  .pp-over.tighter .po-lede p { font-size:9.6px; line-height:1.45; }
+  .pp-over.tighter .po-cols { grid-template-columns:minmax(0, 1.9fr) minmax(0, 1fr); }
+  .pp-over.tight .pin { padding-top:0.24in; gap:0.14in; }
+  .pp-over.tight .po-lede p { font-size:10.2px; line-height:1.5; }
+  .pp-over.tight .stand { font-size:15px; }
+  /* spreads */
+  .pp-photo { gap:0.06in; }
+  .pp-photo .ph img { aspect-ratio:auto; height:5.47in; }
+  .pp-photo.trio .ph img { height:3.62in; }
+  .pp-photo.solo .ph img { height:8.2in; }
+  .pp-photo .ph-label { padding:0.42in 0.6in 0.7in; }
+  .pp-photo .ph-label .eyebrow { font-size:10px; }
+  .pp-photo .ph-label p { font-size:11px; max-width:5.6in; }
+  .pp-photo .folio { color:rgba(255,255,255,.78); z-index:2; }
+  .pp-photo .ph figcaption { padding-bottom:0.2in; }
+  .pp-photo .ph:last-of-type figcaption { padding-bottom:0.55in; }
+  /* sheets */
+  .pp-sheet { padding:0.62in 0 0.7in; }
+  .pp .grid { gap:0.16in 0.14in; }
+  .pp .grid .ph figcaption, .pp-sheet .big figcaption, .pp .sunrow .ph figcaption { font-size:8.5px; margin-top:0.05in; }
+  .pp .sunrow .ph figcaption { font-size:7.5px; line-height:1.3; }
+  .pp-above .big img { aspect-ratio:auto; height:4.55in; }
+  .pp-above .big + .grid { margin-top:0.16in; }
+  .pp .sun { margin-top:0.26in; }
+  .pp .sun h3, .pp .where h3, .pp .opts h3, .pp .next h3 { font-size:8.5px; margin-bottom:0.08in; }
+  .pp .sun h3 span { font-size:8.5px; }
+  .pp .sunrow { gap:0.07in; }
+  .pp-inc { padding-top:0; }
+  .pp-inc.noimg { padding-top:0.62in; }
+  .pp-inc .pi-fig { margin-bottom:0.3in; }
+  .pp-inc .pi-fig img { aspect-ratio:auto; height:4.7in; max-height:none; }
+  .pp-inc.rows-m .pi-fig img { height:3.6in; } .pp-inc.rows-l .pi-fig img { height:2.6in; }
+  .pp .cards { gap:0.12in; }
+  .pp .card { padding:0.14in 0.17in 0.16in; break-inside:avoid; background:#fffdf8; }
+  .pp .card h3 { font-size:8.5px; margin-bottom:0.06in; }
+  .pp .card p { font-size:11px; line-height:1.48; }
+  .pp-built .reads-box { margin-top:0.2in; padding-top:0.12in; }
+  .pp-built.long .big img { aspect-ratio:auto; height:4.3in; object-fit:cover; }
+  .pp-built.long .grid { display:none; }
+  .pp-built .reads-box .reads { grid-template-columns:1.3in 1fr; gap:3px 12px; font-size:10px; }
+  .pp-built .reads-box .reads dt { font-size:8.5px; }
+  /* investment */
+  .pp-invest { padding:0.62in 0 0.75in; }
+  .pp-invest .ways { gap:0.14in; margin-bottom:0.42in; }
+  .pp-invest .way { padding:0.22in 0.24in 0.24in; }
+  .pp-invest .wl { font-size:8.5px; }
+  .pp-invest .wv { font-size:50px; }
+  .pp-invest .ws { font-size:11px; }
+  .pp-invest .inv-grid { grid-template-columns:2.7in minmax(0, 1fr); gap:0.36in; }
+  .pp-invest .wheel svg { max-width:2.7in; }
+  .pp-invest .legend li { font-size:11.2px; padding:0.085in 0.03in; gap:0.1in; grid-template-columns:9px minmax(0, 1fr) auto 0.36in; }
+  .pp-invest .legend li i { width:9px; height:9px; }
+  .pp-invest .legend .ll em { font-size:9.2px; }
+  .pp-invest .legend .lv { font-size:12.5px; }
+  .pp-invest .legend .lp { font-size:9.5px; }
+  .pp-invest .legend li.total .lv { font-size:15px; }
+  .pp-invest .opts, .pp-invest .next { margin-top:0.3in; }
+  .pp-invest .next p, .pp-invest .opts p { font-size:12px; }
+  .pp-invest .opts table { font-size:10px; }
+  .pp-invest .folio { color:#a9a69e; }
+  .pp-invest:not(.has-opts) .pin { display:flex; flex-direction:column; min-height:9.6in; }
+  .pp-invest:not(.has-opts) .next { margin-top:auto; padding-top:0.18in; }
+  .pp-invest.has-opts { padding-top:0.5in; }
+  .pp-invest.has-opts .sh { margin-bottom:0.12in; }
+  .pp-invest.has-opts .ways { margin-bottom:0.24in; }
+  .pp-invest.has-opts .way { padding:0.14in 0.2in 0.16in; }
+  .pp-invest.has-opts .wv { font-size:40px; }
+  .pp-invest.has-opts .inv-grid { grid-template-columns:2.1in minmax(0, 1fr); gap:0.3in; }
+  .pp-invest.has-opts .wheel svg { max-width:2.1in; }
+  .pp-invest.has-opts .legend li { padding:0.05in 0.03in; font-size:10.5px; }
+  .pp-invest.has-opts .opts, .pp-invest.has-opts .next { margin-top:0.2in; }
+  .pp-invest.has-opts .next p, .pp-invest.has-opts .opts p { font-size:10.5px; line-height:1.45; }
+  .pp-invest.has-opts .opts td, .pp-invest.has-opts .opts th { padding-top:3px; padding-bottom:3px; font-size:10px; }
+  .pp-invest.dense { padding-top:0.42in; padding-bottom:0.5in; }
+  .pp-invest.dense .sh h2 { font-size:26px; }
+  .pp-invest.dense .ways { margin-bottom:0.16in; }
+  .pp-invest.dense .way { padding:0.1in 0.18in 0.12in; gap:3px; }
+  .pp-invest.dense .wv { font-size:34px; margin:2px 0 3px; }
+  .pp-invest.dense .ws { font-size:10px; }
+  .pp-invest.dense .inv-grid { grid-template-columns:1.8in minmax(0, 1fr); }
+  .pp-invest.dense .wheel svg { max-width:1.8in; }
+  .pp-invest.dense .legend li { padding:0.03in 0.03in; font-size:10px; }
+  .pp-invest.dense .legend .ll em { font-size:8.5px; }
+  .pp-invest.dense .opts, .pp-invest.dense .next { margin-top:0.14in; }
+  .pp-invest.dense .next p, .pp-invest.dense .opts p { font-size:10px; }
+  /* an option's head: the title across the top, its prices under it */
+  body.pp .opt-head { grid-template-columns:minmax(0, 1fr); gap:0.1in; align-items:start; }
+  body.pp .opt-head h3 { font-size:26px; }
+  body.pp .opt-prices { justify-self:start; }
+  /* back cover */
+  .pp-back { padding:0; }
+  .pp-back .pb-img { aspect-ratio:auto; height:6.6in; max-height:none; }
+  .pp-back .pb-in { position:absolute; left:0.6in; right:0.6in; bottom:0.9in; padding:0; gap:0.1in; }
+  .pp-back.bare .pb-in { bottom:auto; top:50%; transform:translateY(-50%); }
+  .pp-back .gslogo { height:0.9in; margin-bottom:0.12in; }
+  .pp-back .pb-name { font-size:10px; }
+  .pp-back .pb-fine { font-size:9px; }
+  /* the other blocks */
+  .pp .pp-flow { padding:0.62in 0 0.6in; }
+  .pp .pp-flow h2.kicker { break-before:auto; page-break-before:auto; margin-top:0; }
+  .pp .pp-flow .gal { display:grid; gap:0.14in; }
+  .pp .pp-flow .gal figure { width:auto; margin:0; display:block; }
+  .pp .pp-3d { display:none; }
+}
+</style>"""
+
+
+def _scope(css: str) -> str:
+    """Every .pp rule under body.pp, so it outranks the shared proposal styles (CSS, PRINT_CSS, OPTIONS_CSS)."""
+    return re.sub(r"(?m)(^\s*|,\s*)\.pp(?=[ -])", lambda m: m.group(1) + "body.pp" + ("" if css[m.end()] == " " else " .pp"), css)
+
+
+PP_CSS = _scope(PP_CSS)
