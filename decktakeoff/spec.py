@@ -307,6 +307,7 @@ class Extras:
     labor_rates: dict = field(default_factory=dict)   # per-job overrides of pricebook labor keys: {"rail_per_lf": 50, "cable_rail_addon_per_lf": 0}
     extra_beam_sets: Optional[int] = None             # override the "extra beam set" labor count (None -> beam lines minus one)
     builtin_sell: Optional[dict] = None               # built-ins sold at a set price per section: {"bench": 3000, "planter": 2500} — their materials + labor cost lands at 60% of it
+    drink_rail_sell: Optional[float] = None           # the drink rail sold at a fixed installed price (the whole run); None -> the job margin
     rail_sell_per_lf: Optional[float] = None          # rail sold at a fixed installed price per LF (None -> pricebook rail_sell_per_lf for the system, if any)
     sell_override: Optional[float] = None             # owner-set check/ACH price; the allocation scales to it
     sell_per_sf: Optional[float] = None               # owner-set check/ACH price per deck SF (or {"rate", "options_gm"}): sell = rate x deck SF, scaled like sell_override (pricing.sell_per_sf_rule)

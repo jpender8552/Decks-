@@ -833,6 +833,7 @@ def build_scene(L) -> Scene:
         return any(hx0 <= px <= hx1 and hy0 <= py <= hy1 for hx0, hx1, hy0, hy1 in house_rects)
     for st, ss in zip(L.stairs, spec.stairs):
         _n0 = len(B)                       # this stair's first box: an option stair's boxes carry the option's layer
+        diag_ = None                       # (x0, y0, tx, ty, nx, ny): a stair off an angled outline side, drawn locally then turned onto it
         if getattr(st, "inset", False) and st.notch:
             draw_inset_stair(st)
             for b_ in (B[_n0:] if getattr(st, "option", "") else []):
@@ -857,7 +858,16 @@ def build_scene(L) -> Scene:
         elif side.startswith("edge:"):
             # a side of the outline polygon (axis-aligned): the stair leaves it outward, the opening measured from the side's start
             e_ = next(q for q in L.outline_edges if q.name == side)
-            if abs(e_.y1 - e_.y0) < 0.5:
+            if abs(e_.y1 - e_.y0) >= 0.5 and abs(e_.x1 - e_.x0) >= 0.5:
+                # an angled side: drawn in a local frame (v along the side from its start, u out from it) and turned onto it below
+                el_ = math.hypot(e_.x1 - e_.x0, e_.y1 - e_.y0)
+                tx_, ty_ = (e_.x1 - e_.x0) / el_, (e_.y1 - e_.y0) / el_
+                op_ = [(float(px), float(py)) for px, py in spec.geometry.outline]
+                ar_ = sum(op_[i][0] * op_[(i + 1) % len(op_)][1] - op_[(i + 1) % len(op_)][0] * op_[i][1] for i in range(len(op_)))
+                nx_, ny_ = (ty_, -tx_) if ar_ > 0 else (-ty_, tx_)            # outward: the right-hand normal of a counter-clockwise outline
+                diag_ = (e_.x0 * IN, e_.y0 * IN, tx_, ty_, nx_, ny_)
+                direction = "+y"; u0 = edge; v_a = st.opening.start_in * IN
+            elif abs(e_.y1 - e_.y0) < 0.5:
                 direction = "+y" if e_.x1 > e_.x0 else "-y"
                 u0 = e_.y0 * IN + (edge if direction == "+y" else -edge)
                 v_a = (min(e_.x0, e_.x1) + (st.opening.start_in if e_.x1 > e_.x0 else abs(e_.x1 - e_.x0) - st.opening.start_in - st.width)) * IN
@@ -1170,6 +1180,16 @@ def build_scene(L) -> Scene:
             if st.landing_rail_lf and (frails[fi] or (fi + 1 < len(frails) and frails[fi + 1])):
                 landing_guard(rects, z_next, openings)
             z_cur = z_next
+        if diag_:
+            ox_, oy_, tx_, ty_, nx_, ny_ = diag_
+            phi_ = math.atan2(ty_, tx_)
+            for b_ in B[_n0:]:
+                cv, cu = (b_.x0 + b_.x1) / 2, (b_.y0 + b_.y1) / 2          # local: x along the side, y out from it
+                hv, hu = (b_.x1 - b_.x0) / 2, (b_.y1 - b_.y0) / 2
+                wx, wy = ox_ + cv * tx_ + cu * nx_, oy_ + cv * ty_ + cu * ny_
+                b_.x0, b_.x1, b_.y0, b_.y1 = wx - hv, wx + hv, wy - hu, wy + hu
+                if not b_.rot:
+                    b_.rot, b_.rot_axis = phi_, "z"
         if getattr(st, "option", ""):
             # an option stair: every box it drew carries layer "option:<name>"; the deck guard it opens is drawn across the
             # opening too, as layer "base:<name>" — a viewer shows one or the other

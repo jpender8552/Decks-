@@ -442,17 +442,23 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         builtin_work += sum(e for i, q, u, r_, e in labor_lines if i.startswith(label))
     # lights the owner prices per light, installed (extras.lights.sell_each): they sell at that price; their work comes off the margin base
     light_sell, light_work = __import__("decktakeoff.lighting", fromlist=["fixed_sell"]).fixed_sell(t, labor_lines, factor, rate)
-    margin_work = work - rail_work - builtin_work - light_work
+    # the drink rail at the owner's installed price (extras.drink_rail_sell): it sells at that price; its work comes off the margin base
+    drink_sell, drink_work = 0.0, 0.0
+    if s.extras.drink_rail_sell and s.railing.drink_rail and L.rail:
+        drink_sell = float(s.extras.drink_rail_sell)
+        drink_work = (sum(l.ext for l in t.lines if l.category != "Site" and ("rink rail" in l.item or "drink-rail" in l.item)) * factor * (1 + rate)
+                      + sum(e for i, q, u, r_, e in labor_lines if i.startswith("Drink rail")))
+    margin_work = work - rail_work - builtin_work - light_work - drink_work
     # stairs the owner prices per riser (extras.stair_rule): they sell at that price; their work comes off the margin base
     stair_sell, stair_work, stair_note = (0.0, 0.0, "") if _stairless else stair_rule(t, gm, rate, rate_lf, margin_work)
-    sell = round((margin_work - stair_work) / (1 - gm) + rail_sell + builtin_sell + light_sell + stair_sell + gc)
-    sell_floor = round((margin_work - stair_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + light_sell + stair_sell + gc)
+    sell = round((margin_work - stair_work) / (1 - gm) + rail_sell + builtin_sell + light_sell + stair_sell + drink_sell + gc)
+    sell_floor = round((margin_work - stair_work) / (1 - pb["gm_floor"]) + rail_sell + builtin_sell + light_sell + stair_sell + drink_sell + gc)
     gm_base = gm
     # an owner-set sell: sell_override (the price), else extras.sell_per_sf (the price per deck SF x the deck's SF); either way the
     # allocation scales to it and the margin is what that price carries
     psf = None if s.extras.sell_override else sell_per_sf_rule(s)
     set_sell = s.extras.sell_override or (round(psf[0] * L.deck_sf) if psf else None)
-    if (rail_sell or builtin_sell or light_sell or stair_sell) and not set_sell:
+    if (rail_sell or builtin_sell or light_sell or stair_sell or drink_sell) and not set_sell:
         gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
     if set_sell:
         sell = round(float(set_sell))
@@ -470,7 +476,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or stair_sell) and not set_sell else gm))
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or stair_sell or drink_sell) and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
@@ -485,7 +491,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
         parts.append(((f"Drink rail — {s.railing.drink_rail_collection or ''} {s.railing.drink_rail_color or ''}".replace("  ", " ").strip() if hasattr(L, "parts") else   # two-level jobs read the board
-                       f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip()), round(comp(drink_m, labsum("Drink rail")))))
+                       f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip()), round(drink_sell) if drink_sell and not set_sell else round(comp(drink_m, labsum("Drink rail")))))
     if covers_of(s):
         cover_m = mats(lambda l: l.category == "Porch cover")
         n_cv = len(covers_of(s))
