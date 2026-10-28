@@ -55,6 +55,7 @@ DEFAULTS = dict(
     option="Lighting",          # the option name in the 3D tags ("Lighting option: riser light")
     wire_lf=None,               # owner / field count of 12/2 (overrides the estimate)
     prices={},                  # per-job unit costs by SKU: {"AZTDL3X3LANCAPB": 129.99}
+    riser_free=False,           # True: the riser lights are the owner's gift — their cost stays in the job, they add $0 to the price
     sell_each=None,             # the owner's installed sell per light (riser or post), margin included: the lights sell at
                                 #   sell_each x lights and the rest of the job keeps its margin (None -> cost + the job margin)
 )
@@ -515,12 +516,45 @@ def fixed_sell(t, labor_lines, factor: float, rate: float) -> Tuple[float, float
     labor — pricing.price takes the work off the margin base and adds the sell, so the rest of the job keeps its margin and the
     cost stack still shows what the lights cost. (0, 0) without a set price or without lights."""
     plan = getattr(t, "lighting", None)
-    each = (plan.cfg.get("sell_each") if plan is not None else None)
-    if not each or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
+    if plan is None or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
+        return 0.0, 0.0
+    each = plan.cfg.get("sell_each")
+    free = bool(plan.cfg.get("riser_free")) and plan.n_riser > 0
+    if not each and not free:
         return 0.0, 0.0
     m = sum(l.ext for l in t.lines if l.category == CATEGORY)
     lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
-    return round(float(each) * plan.fixtures, 2), m * factor * (1 + rate) + lab
+    if each:                                    # every light at the set price (the free riser lights at none)
+        return round(float(each) * (plan.fixtures - (plan.n_riser if free else 0)), 2), m * factor * (1 + rate) + lab
+    w_r = riser_work(t, labor_lines, factor, rate)
+    return 0.0, w_r                             # the riser lights free: their work leaves the margin base, $0 added
+
+
+def _without_risers(t):
+    """The same lights with no riser lights: (plan, its material $) — what the job's lighting would be without the risers."""
+    cfg2 = dict(t.lighting.cfg, riser=False)
+    plan2 = light_plan(t.spec, t.layout, cfg2)
+    return plan2, sum(l.ext for l in lines_for(plan2))
+
+
+def _lab_without_risers(plan, plan2, fix_lab: float, tr_lab: float) -> float:
+    """The lighting labor without the riser lights: the fixture labor for plan2's fixtures, the transformer labor scaled."""
+    per = fix_lab / plan.fixtures if plan.fixtures else 0.0
+    return per * plan2.fixtures + (tr_lab * len(plan2.transformers) / len(plan.transformers) if plan.transformers else 0.0)
+
+
+def riser_work(t, labor_lines, factor: float, rate: float) -> float:
+    """What the riser lights add to the job, exactly: the lighting's materials (x the material factor + tax) and labor
+    with them, less the same without them (fewer fixtures, maybe a smaller transformer, shorter runs)."""
+    plan = getattr(t, "lighting", None)
+    if plan is None or not plan.n_riser or not plan.fixtures:
+        return 0.0
+    plan2, m2 = _without_risers(t)
+    m = sum(l.ext for l in t.lines if l.category == CATEGORY)
+    fix_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — install"))
+    tr_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — mount"))
+    lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
+    return (m - m2) * factor * (1 + rate) + (lab - _lab_without_risers(plan, plan2, fix_lab, tr_lab))
 
 
 def allocation(t, mats, labsum, comp) -> list:
@@ -529,8 +563,14 @@ def allocation(t, mats, labsum, comp) -> list:
     m = mats(lambda l: l.category == CATEGORY)
     if plan is None or not m:
         return []
+    free = bool(plan.cfg.get("riser_free")) and plan.n_riser > 0
+    gift = [(f"{plan.n_riser} riser lights, one in every riser — included at no charge", 0)] if free else []
     if plan.cfg.get("sell_each"):
-        return [(short_words(plan), round(float(plan.cfg["sell_each"]) * plan.fixtures))]
+        return [(short_words(plan), round(float(plan.cfg["sell_each"]) * (plan.fixtures - (plan.n_riser if free else 0))))] + gift
+    if free:                                    # the post lights at the margin as if there were no riser lights; the riser lights at none
+        plan2, m2 = _without_risers(t)
+        lab2 = _lab_without_risers(plan, plan2, labsum("Lighting — install"), labsum("Lighting — mount"))
+        return [(short_words(plan).replace(f"{plan.n_riser} riser lights and ", ""), round(comp(m2, lab2)))] + gift
     return [(short_words(plan), round(comp(m, labsum("Lighting"))))]
 
 

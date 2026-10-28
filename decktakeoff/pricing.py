@@ -458,8 +458,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     # allocation scales to it and the margin is what that price carries
     psf = None if s.extras.sell_override else sell_per_sf_rule(s)
     set_sell = s.extras.sell_override or (round(psf[0] * L.deck_sf) if psf else None)
-    if (rail_sell or builtin_sell or light_sell or stair_sell or drink_sell) and not set_sell:
-        gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries
+    if (rail_sell or builtin_sell or light_sell or light_work or stair_sell or drink_sell) and not set_sell:
+        gm = 1 - work / max(sell - gc, 1)          # the blended margin the job carries (free lights included)
     if set_sell:
         sell = round(float(set_sell))
         gm = 1 - work / max(sell - gc, 1)          # the margin the override actually carries
@@ -476,13 +476,13 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     def mats(pred):
         return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
     def comp(m, l_):
-        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or stair_sell or drink_sell) and not set_sell else gm))
+        return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or light_work or stair_sell or drink_sell) and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
     drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
     alloc = []
     if s.extras.demo_existing and not s.is_timber:
-        alloc.append(("Demolition & haul-off", round(labsum("Demolition") / (1 - gm))))
+        alloc.append(("Demolition & haul-off", round(labsum("Demolition") / (1 - (gm if set_sell else gm_base)))))
     rest = sell - gc - sum(a[1] for a in alloc)
     parts = []
     if s.extras.stone_bases:
@@ -567,6 +567,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         _lp = t.lighting
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"{_lp.fixtures} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "
                         f"their cost ${light_work:,.0f}, {1 - light_work / light_sell:.0%} margin)" + ("" if rail_sell else f", everything else at {gm_base:.1%} GM"))
+    if light_work and not light_sell and not set_sell:      # the riser lights as a gift: their cost in the job, nothing in the price
+        _lp = t.lighting
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + f"{_lp.n_riser} riser lights free (their cost ${light_work:,.0f})"
     if drink_sell and not set_sell:
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"drink rail at ${drink_sell:,.0f} installed (its cost ${drink_work:,.0f}, "
                         f"{1 - drink_work / drink_sell:.0%} margin)")
