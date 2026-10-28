@@ -903,6 +903,17 @@ def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Call
                             + (" and the stamped set." if s.extras.engineered else "'s installation notes."))
     else:
         note(680, 360, 290, t.schedule.get("Blocking", "Blocking one row over the beam, staggered up and down so every block can be end-nailed."))
+        # plan: joists at their spacing, a row of 2x blocks between them, staggered so every block end can be fastened
+        jx = [700 + k * 52 for k in range(6)]
+        for k_, x_ in enumerate(jx):
+            o.append(R(x_, 430, 6, 140, FILL["timber"], INK, 0.6))
+            if k_ < len(jx) - 1:
+                yb_ = 494 + (8 if k_ % 2 else -8)
+                o.append(R(x_ + 6, yb_, 46, 6, FILL["timber_dk"], INK, 0.6))
+        dim_h(o, lambda v: v, 584, jx[0] + 3, jx[1] + 3, f"{L.spec.joist_spacing:g}\" OC", 6.6, up=False)
+        o.append(TH(jx[-1] + 12, 470, "joists", 6.6, 700, halo="#fff"))
+        o.append(TH(jx[-1] + 12, 500, "blocks, staggered", 6.6, 700, halo="#fff"))
+        o.append(TH(jx[-1] + 12, 509, "(3) screws each end", 6.6, 700, halo="#fff"))
     return sheet("D-501", "Details", "Ledger · " + ("post / rim / ties" if edge_only else "post / beam / cap") + " · footing · rail post · deck edge · the job's special condition", o, "Schematic details, not to scale", meta)
 
 
@@ -1596,7 +1607,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         x0d, x1d = float(ds["x0"]) * 12, float(ds["x1"]) * 12
         dd = float(ds.get("depth_in", 21))
         o.append(R(X(x0d), Y(0), (x1d - x0d) * sc, dd * sc, "#e0cfae", INK, 0.6))
-        o.append(T(X((x0d + x1d) / 2), Y(dd / 2) + 3, f"DOOR STEP {inch(x1d - x0d)} x {inch(dd)} · {inch(float(ds.get('rise_in', 7)))} up", 6.5, 800, "middle", "#4a3a20"))
+        o.append(T(X((x0d + x1d) / 2), Y(dd / 2) + 3, f"DOOR STEP {inch(x1d - x0d)} x {inch(dd)} · {inch(float(ds.get('rise_in', 7)))} up", 5.8, 800, "middle", "#4a3a20"))
     # the side table
     tx0 = 752
     o.append(T(tx0, 24, "EVERY SIDE — INCHES", 9, 800, fill=GOLD))
