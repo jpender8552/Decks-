@@ -267,7 +267,7 @@ def quote_markdown(t: Takeoff, p: Pricing) -> str:
     w(f"| Decking | {s.decking.brand} {f['material']} {s.decking.collection}, {s.decking.color}"
       + (f"; picture frame{' and dividers' if s.decking.dividers else ''} in {s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "")
       + (f"; picture frame{' and breaker boards' if _brk else ''} in the same {s.decking.color}" if lv and s.geometry.picture_frame and not s.decking.border_color else "")
-      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('a HardieTrim skirt around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('a HardieTrim skirt around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {(f['fire'] + '; ') if (s.site.wui_fire_zone or f.get('wui')) else ''}{f['warranty']}. |")
+      + f". {'Square-shoulder' if s.decking.profile == 'square' else 'Grooved'} boards, {ftin(s.deck_gap)} gaps, {'no fascia' if not s.decking.fascia else ('HardieTrim fascia around the frame (' + s.extras.hardie_color + ')' if (s.extras.hardie_skirt and s.extras.hardie_color) else ('HardieTrim fascia around the frame' if s.extras.hardie_skirt else 'matching fascia'))}. {(f['fire'] + '; ') if (s.site.wui_fire_zone or f.get('wui')) else ''}{f['warranty']}. |")
     if s.railing.existing_parapet and s.railing.parapet_note:
         w(f"| Railing | {s.railing.parapet_note} |")
     elif rl and s.railing.existing_parapet:

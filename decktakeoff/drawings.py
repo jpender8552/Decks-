@@ -1790,7 +1790,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
         (("Steel blocking at the breaker / picture-frame joists" if steel else f"{fr.joist_size} blocking — picture frame + divider rows"), lambda b: b.kind == "block", (0.5, 0.5, 1.0), "mid"),
         (f"{dk} field decking, hidden fasteners", lambda b: b.kind == "board" and not (b.tag or "").startswith(_BUILT_IN), (0.35, 0.5, 1.0), "mid"),
         (f"Picture frame + breaker boards — {dk}", lambda b: b.kind == "border", (0.5, 0.5, 1.0), "last"),
-        ((f"HardieTrim skirt {hc}".strip() if s.extras.hardie_skirt else
+        ((f"HardieTrim fascia {hc}, over the rim".strip() if s.extras.hardie_skirt else
           f"{s.decking.brand} {s.decking.collection} fascia, {s.decking.fascia_color or s.decking.color}, over the rim" if s.decking.fascia else "Fascia"),
          lambda b: b.kind == "fascia", (0.5, 0.5, 0.5), "last"),
         (f"Stair — steel stringers, {s.decking.collection} treads, closed risers, lands on grade" if steel else stair_lab, lambda b: b.kind in ("tread", "stringer"), (0.5, 0.5, 1.0), "first"),
@@ -2436,7 +2436,7 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
     o.append(R(x + 128, y + 104, 4, 6, "#5b6166", INK, 0.4))
     _lead(o, x + 165, y + 100, x + 150, y + 40, f"Picture-frame border, {dk} square edge, mitered, {pf_fast} 2 per bearing @ {L.spec.joist_spacing:g}\"")
     _lead(o, x + 130, y + 106, x + 24, y + 60, f"{fsys} clip in every gap at every joist (3/16\" gap)")
-    _lead(o, x + 193, y + 150, x + 236, y + 140, (f"HardieTrim {L.spec.extras.hardie_color or ''} skirt, pre-drilled, color-matched 316SS trim screws, 2 at each end then @ 12\"".replace("  ", " ") if hk_ else
+    _lead(o, x + 193, y + 150, x + 236, y + 140, (f"HardieTrim {L.spec.extras.hardie_color or ''} fascia, pre-drilled, color-matched 316SS trim screws, 2 at each end then @ 12\"".replace("  ", " ") if hk_ else
                                                    f"{s.decking.collection} fascia, pre-drilled, 2 screws at each end then alternating @ 12\""))
     _lead(o, x + 145, y + 140, x + 24, y + 200, "PF joist 1-1/2\" inboard of the rim carries the border's inside edge")
     _lead(o, x + 180, y + 110, x + 236, y + 210, "G-Tape 4\" on the rim tops, 2\" on the joists")

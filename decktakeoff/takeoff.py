@@ -1400,7 +1400,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         why = "+1  (" + " · ".join(f"{n} {ftin(Lf)}" for n, Lf in Qz.fascia_pieces) + ")"
         if spec.extras.hardie_skirt:
             hd = PRICEBOOK["cover"]["hardie_trim_4_4x12_12ft"]
-            lines.append(Line("Fascia", f"Deck skirt — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
+            lines.append(Line("Fascia", f"Deck fascia — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
             scr = int(-(-nf * 12 * 2 // 12)) * 2 + 20 + len(hardie_risers) * 12     # 2 screws per bearing point @ 12" plus corners; ~12 per riser
             hcol = _hardie_words(spec)
             sc_ = PRICEBOOK["cover"]["hardie_trim_screws_100"]

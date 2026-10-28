@@ -2163,7 +2163,7 @@
    {
     "severity": "CHECK",
     "topic": "fascia",
-    "text": "Sides 1-3 (open left side): rip the HardieTrim skirt to 11\" so it holds 1/2\" off the regraded brick border (a full 11-1/4\" board would sit in the grade).",
+    "text": "Sides 1-3 (open left side): rip the HardieTrim fascia to 11\" so it holds 1/2\" off the regraded brick border (a full 11-1/4\" board would sit in the grade).",
     "ref": "field"
    },
    {
@@ -2187,7 +2187,7 @@
    {
     "severity": "CHECK",
     "topic": "hardie",
-    "text": "HardieTrim skirt and risers near grade: confirm James Hardie's clearance-to-grade and end-sealing rules for trim used as a deck skirt before ordering (the left side sits ~1/2\" off the brick). Seal every field cut with the ColorPlus touch-up; Camo 316SS white trim screws, pre-drilled.",
+    "text": "HardieTrim fascia and risers near grade: confirm James Hardie's clearance-to-grade and end-sealing rules for trim used as a deck fascia before ordering (the left side sits ~1/2\" off the brick). Seal every field cut with the ColorPlus touch-up; Camo 316SS white trim screws, pre-drilled.",
     "ref": "field"
    }
   ],
