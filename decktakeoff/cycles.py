@@ -592,6 +592,8 @@ class Mats:
         if key in self.cache:
             return self.cache[key]
         md = self.M.get(key, {"color": "#999999"})
+        from decktakeoff import cycles_site; m = cycles_site.material(self, key, md)   # yard hardscape + house (cycles_site.py)
+        if m is not None: return m
         if "screen" in key or "fabric" in key or md.get("openness") is not None or md.get("alpha") is not None:
             return self.screen(key, md)          # a motorized screen's fabric (louvered roof option): a see-through weave
         if _emits(key, md):                     # an LED lens (riser / post-cap light): dark by day, glowing at dusk
