@@ -160,8 +160,14 @@ def draw(boxes: Sequence[Box], colors: Dict[str, str], view: View, frame: Tuple[
     T = lambda p: (ox + p[0] * sc, oy - p[1] * sc)
     out = []
     for _, _, P, col in sorted(polys, key=lambda t: (t[0], t[1])):
-        pts = " ".join(f"{T(p)[0]:.1f},{T(p)[1]:.1f}" for p in P)
-        out.append(f'<polygon points="{pts}" fill="{col}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round"/>')
+        Q = [T(p) for p in P]
+        pts = " ".join(f"{q[0]:.1f},{q[1]:.1f}" for q in Q)
+        area = abs(sum(Q[i][0] * Q[(i + 1) % len(Q)][1] - Q[(i + 1) % len(Q)][0] * Q[i][1] for i in range(len(Q)))) / 2
+        per = sum(math.hypot(Q[(i + 1) % len(Q)][0] - Q[i][0], Q[(i + 1) % len(Q)][1] - Q[i][1]) for i in range(len(Q))) or 1.0
+        if 4 * area / per < 1.6:            # a hairline face (a baluster, a cable): edged in its own shade, or the ink outline reads as its colour
+            out.append(f'<polygon points="{pts}" fill="{col}" stroke="{_shade(col, 0.8)}" stroke-width="0.3" stroke-linejoin="round"/>')
+        else:
+            out.append(f'<polygon points="{pts}" fill="{col}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round"/>')
     to_sheet = lambda q: T(view.p(q))
     return out, to_sheet, sc
 

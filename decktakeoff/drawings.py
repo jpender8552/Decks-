@@ -30,9 +30,9 @@ def esc(t): return _html.escape(str(t), quote=True)
 def T(x, y, s, size=11, w=600, anchor="start", fill=INK, rot=0):
     tr = f' transform="rotate({rot} {x:.1f} {y:.1f})"' if rot else ""
     return f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" font-weight="{w}" text-anchor="{anchor}" fill="{fill}"{tr}>{esc(s)}</text>'
-def TH(*a, halo=CREAM, **k):
+def TH(*a, halo=CREAM, hw=2.4, **k):
     """T() with a paper-colored halo, for a label that crosses linework."""
-    return T(*a, **k).replace("<text ", f'<text stroke="{halo}" stroke-width="2.4" stroke-linejoin="round" paint-order="stroke" ', 1)
+    return T(*a, **k).replace("<text ", f'<text stroke="{halo}" stroke-width="{hw}" stroke-linejoin="round" paint-order="stroke" ', 1)
 def R(x, y, w, h, fill, stroke=INK, sw=0.8, extra=""):
     return f'<rect x="{x:.1f}" y="{y:.1f}" width="{max(w, 0):.1f}" height="{max(h, 0):.1f}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>'
 def LN(x0, y0, x1, y1, stroke=INK, sw=0.8, dash=""):
@@ -58,6 +58,7 @@ def _job_head(job: str, n: int = 72) -> str:
 
 def sheet(num: str, title: str, sub: str, body: List[str], scale_note: str, meta: dict) -> str:
     body = list(body) + _panel_labels()              # callouts still pending from the last detail panel
+    _PANEL["r"] = 10000.0                            # no panel carries over into the next sheet
     hdr = [R(0, 0, W_, 46, INK, "none", 0), T(18, 30, num, 22, 900, fill=GOLD), T(110, 22, title.upper(), 15, 900, fill="#f3ead9"),
            T(110, 39, textwrap.shorten(sub, 110, placeholder="…"), 9.5, 400, fill="#d8cfbf"),
            T(W_ - 18, 20, _job_head(meta["job_line"]), 9.5, 700, "end", "#d8cfbf"),
@@ -135,12 +136,12 @@ def draw_elev_boxes(o, X, Z, sc, boxes: List[Box], kinds, stroke=INK, sw=0.4):
 
 def dim_h(o, X, y, xa, xb, lab, size=8.5, up=True):
     o.append(LN(X(xa), y, X(xb), y, INK, 0.8)); o.append(LN(X(xa), y - 4, X(xa), y + 4)); o.append(LN(X(xb), y - 4, X(xb), y + 4))
-    o.append(T((X(xa) + X(xb)) / 2, y - 4 if up else y + 11, lab, size, 700, "middle"))
+    o.append(TH((X(xa) + X(xb)) / 2, y - 4 if up else y + 11, lab, size, 700, "middle"))
 
 
 def dim_v(o, Y, x, ya, yb, lab, size=8.5, left=True):
     o.append(LN(x, Y(ya), x, Y(yb), INK, 0.8)); o.append(LN(x - 4, Y(ya), x + 4, Y(ya))); o.append(LN(x - 4, Y(yb), x + 4, Y(yb)))
-    o.append(T(x - 5 if left else x + 13, (Y(ya) + Y(yb)) / 2, lab, size, 700, "middle", rot=-90))
+    o.append(TH(x - 5 if left else x + 13, (Y(ya) + Y(yb)) / 2, lab, size, 700, "middle", rot=-90))
 
 
 def house_outline(o, X, Y, sc, S: Scene):
@@ -518,7 +519,7 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
         for ln in textwrap.wrap(n, 40)[:5]:
             o.append(T(nx, yy, ln, 7.6, 400)); yy += 10.5
         yy += 3
-    return sheet("S-101", "Framing plan", "Ledger, joists, rims, blocking" + (", beams" if L.beam_lines else ", edge posts" if getattr(L, "edge_posts", None) else "") + "; every member in the model — the cut list is on T-600", o, "Plan · not to scale · house at the top · dimensions govern", meta)
+    return sheet("S-101", "Framing plan", "Ledger, joists, rims, blocking" + (", beams" if L.beam_lines else ", edge posts" if getattr(L, "edge_posts", None) else "") + "; every member in the model", o, "Plan · not to scale · house at the top · dimensions govern", meta)
 
 
 def sheet_decking(L: Layout, S: Scene, t, meta) -> str:
@@ -772,11 +773,16 @@ def sheet_details(L: Layout, S: Scene, t, meta, panel6: Optional[Tuple[str, Call
     timber = s.is_timber
     jb, jd = L.frame.joist_size, None
     def frame_(x, y, w, h, num, title):
+        _PANEL["r"] = x + w                  # callouts wrap inside this detail's frame
         o.append(R(x, y, w, h, "#fff", INK, 0.8)); o.append(R(x, y, w, 18, INK, "none", 0)); o.append(T(x + 8, y + 13, f"{num}  {title}", 9, 800, fill=GOLD))
-    def note(x, y, w, txt):
-        yy = y
-        for ln in textwrap.wrap(txt, int(w / 4.6)):
-            o.append(TH(x, yy, ln, 7.2, 400, halo="#fff")); yy += 9.5
+    def note(x, y, w, txt, room=40.0):
+        """A detail's note under its drawing, fitted to the room left in the panel (smaller type, then started higher)."""
+        size, lh, lines = 7.2, 9.5, textwrap.wrap(txt, int(w / 4.6))
+        if len(lines) * lh > room:
+            size, lh, lines = 6.6, 8.4, textwrap.wrap(txt, int(w / 4.2))
+        yy = y - max(0.0, len(lines) * lh - room)
+        for ln in lines:
+            o.append(TH(x, yy, ln, size, 400, halo="#fff")); yy += lh
         return yy
     # 1 ledger
     frame_(20, 20, 300, 290, "1", "LEDGER AT THE HOUSE")
@@ -907,6 +913,7 @@ def sheet_details_steel(L: Layout, S: Scene, t, meta) -> str:
     s = L.spec
     G = "#a7adb2"
     def frame_(x, y, w, h, num, title):
+        _PANEL["r"] = x + w                  # callouts wrap inside this detail's frame
         o.append(R(x, y, w, h, "#fff", INK, 0.8)); o.append(R(x, y, w, 18, INK, "none", 0)); o.append(T(x + 8, y + 13, f"{num}  {title}", 9, 800, fill=GOLD))
     def note(x, y, w, txt):
         yy = y
@@ -1530,9 +1537,11 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
             continue
         Le = math.hypot(e.x1 - e.x0, e.y1 - e.y0)
         p0 = float(st.position_in or 0.0); p1 = p0 + float(st.width_in)
-        if abs(e.y1 - e.y0) < 0.5:          # a front side: chain under it
+        if abs(e.y1 - e.y0) < 0.5:          # a front side: chain under it, clear of the stair's treads
             xa_, xb_ = min(e.x0, e.x1), max(e.x0, e.x1)
-            yy_ = Y(e.y0) + 14
+            sl_ = next((q for q_, q in zip(s.stairs, L.stairs) if q_ is st), None)
+            proj_ = (sl_.geo.treads * sl_.geo.tread_in + 1.0) if sl_ is not None else 0.0
+            yy_ = Y(e.y0) + proj_ * sc + 12
             pts_ = [xa_] + [v for v in (xa_ + p0, xa_ + p1) if xa_ + 0.5 < v < xb_ - 0.5] + [xb_]
             for (a_, b_), lab in zip(zip(pts_, pts_[1:]), chain_labels(pts_)):
                 dim_h(o, X, yy_, a_, b_, lab, 7, up=False)
@@ -1550,7 +1559,8 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         if e is not None:
             mx = (e.x0 + e.x1) / 2; my = (e.y0 + e.y1) / 2
             if abs(e.y1 - e.y0) < 0.5:
-                o.append(T(X(mx), Y(my) + 52, lab, 7.5, 800, "middle", "#5a4520"))
+                proj_ = g.treads * g.tread_in + 1.0
+                o.append(T(X(mx), Y(my) + proj_ * sc + 30, lab, 7.5, 800, "middle", "#5a4520"))
             elif abs(e.x1 - e.x0) >= 0.5:      # an angled side: the label below-left of the deck, clear of the side chains
                 o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 88, lab, 7.2, 800, "start", "#5a4520"))
             else:
@@ -1963,7 +1973,7 @@ def _lead(o, ax, ay, tx, ty, txt, size=6.6, anchor_="start", w_=600):
     """A leader from (ax, ay) to a label at (tx, ty); the label wraps to stay inside the current detail panel. The panel's
     callouts are laid out together when it closes (_panel_labels): a label that would land on another slides down clear
     of it and its leader follows."""
-    room = max(14, min(34, int((_PANEL["r"] - 6 - tx) / (size * 0.52))))
+    room = max(14, min(34, int((_PANEL["r"] - 8 - tx) / (size * 0.58))))
     _PANEL.setdefault("items", []).append(dict(ax=ax, ay=ay, tx=tx, ty=ty, lines=textwrap.wrap(txt, room) or [""], size=size, w=w_, anchor=anchor_))
 
 
@@ -1983,7 +1993,7 @@ def _panel_labels() -> List[str]:
         placed.append((x0, x0 + wid, it["ty"] - it["size"], it["ty"] + 8 * (len(it["lines"]) - 1) + 2))
         out.append(LN(it["ax"], it["ay"], it["tx"], it["ty"] - 2, INK, 0.5)); out.append(C(it["ax"], it["ay"], 1.3, INK, "none", 0))
         for j, ln in enumerate(it["lines"]):
-            words.append(TH(it["tx"] + (2 if it["anchor"] == "start" else -2), it["ty"] + j * 8, ln, it["size"], it["w"], it["anchor"], halo="#fff"))
+            words.append(TH(it["tx"] + (2 if it["anchor"] == "start" else -2), it["ty"] + j * 8, ln, it["size"], it["w"], it["anchor"], halo="#fff", hw=3.4))
     return out + words + _PANEL.pop("labels", [])
 
 
@@ -2437,8 +2447,8 @@ def sheet_details_edge_rail(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(T(x + 24, y + 286, "(IRC Table R301.5) — submit the rail code report", 6.4, 700))
     # 4 lateral tie plan
     x, y = P[3]; _panel(o, x, y, W3, H2, "4", "LATERAL LOAD — DTT1Z TIES (PLAN)")
-    o.append(R(x + 20, y + 40, W3 - 40, 110, FILL["house"], INK, 0.6)); o.append(T(x + 30, y + 54, "house floor framing (joists run ⟂ or ∥ — engineer)" if s.extras.engineered
-                                                                                    else "house floor framing — a floor joist, or blocking where ∥", 6.4, 700, fill=MUTE))
+    o.append(R(x + 20, y + 40, W3 - 40, 110, FILL["house"], INK, 0.6)); o.append(T(x + 30, y + 54, "house floor framing (joists ⟂ or ∥ — engineer)" if s.extras.engineered
+                                                                                    else "house floor framing: a joist, or blocking", 6.4, 700, fill=MUTE))
     for k in range(5):
         o.append(R(x + 40 + k * 56, y + 60, 5, 90, FILL["timber_dk"], INK, 0.4))
     _wood(o, x + 20, y + 150, W3 - 40, 8, dark=True)

@@ -198,6 +198,8 @@ body{background:#f7f3ea;} .wrap{max-width:none;padding:0 0.5in 0.4in;} .band{pad
 .kicker{break-after:avoid;page-break-after:avoid;margin-top:26px;} figure{break-inside:avoid;page-break-inside:avoid;} .gal{gap:10px;}
 .step{break-inside:avoid;page-break-inside:avoid;} .sheets .sheet{break-inside:avoid;page-break-inside:avoid;} .sheets summary{list-style:none;} .sheets summary::-webkit-details-marker{display:none;}
 table{font-size:11.5px;} tr{break-inside:avoid;page-break-inside:avoid;} .quote{break-before:page;page-break-before:always;}
+h2.kicker:has(+ .quote){break-before:page;page-break-before:always;} h2.kicker + .quote{break-before:auto;page-break-before:auto;}
+.gal{display:block;} .gal figure{display:inline-block;width:calc(50% - 6px);vertical-align:top;margin:0 0 10px;} .gal figure:nth-child(odd){margin-right:8px;}
 h2.pb{break-before:page;page-break-before:always;} footer{padding-bottom:0.4in;} .strip{break-inside:avoid;}
 @page sheet{size:Letter landscape;margin:0.3in 0.2in;}
 .sheets{page:sheet;} h2.kicker:has(+ .sheets){page:sheet;} .sheets .sheet{break-before:page;page-break-before:always;margin:0;border:0;}

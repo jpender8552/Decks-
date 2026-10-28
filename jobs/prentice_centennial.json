@@ -257,7 +257,7 @@
    ],
    "source": "Arapahoe County GIS (address point layer 2, parcel layer 279, 2022 roof prints layer 66, 2016-2024 orthos), City of Centennial GIS (NC6 zoning, permit history), assessor record and sketch; the deck placed by a least-squares fit of the field outline to the existing rails in the orthos (rms 0.09-0.22 ft). GIS lines are not a survey — an ILC governs.",
    "deck_label_inside": true,
-   "rear_label_t": 0.82
+   "rear_label_t": 0.9
   },
   "side_setback_required_ft": 5.0
  },
