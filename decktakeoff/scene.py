@@ -1645,6 +1645,8 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t, add_rim
     for b in boxes:
         if getattr(b, "layer", "").startswith("option:"):
             out.append(b); continue          # an option stair and its landing sit outside the outline: their fascia and skirts stay whole
+        if b.tag and (b.tag.startswith(("landing", "tread", "riser", "box step")) or "stair" in b.tag):
+            out.append(b); continue          # stairs, box steps and landings sit outside the outline: their skirts, frames and risers stay whole
         if b.kind == "fascia" and not b.rot:
             # fascia hangs outside the outline by its own thickness: clip it along a line just inside its face, and only where
             # the outline cuts it well short (a zone rectangle's fascia past an angled corner); drop what is left of a sliver
@@ -1666,8 +1668,8 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t, add_rim
             out.append(b); continue
         if b.kind not in DECK_KINDS or b.rot:
             out.append(b); continue
-        if b.tag and (b.tag.startswith("landing") or b.tag.startswith("tread") or "stair" in b.tag or b.tag.startswith("pf ") or b.tag.startswith("breaker")):
-            out.append(b); continue          # stairs and landings sit outside the outline; plan-laid boards and borders are already cut to it
+        if b.tag and (b.tag.startswith("pf ") or b.tag.startswith("breaker")):
+            out.append(b); continue          # plan-laid boards and borders are already cut to it
         cx, cy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
         along_x = (b.x1 - b.x0) >= (b.y1 - b.y0)
         if along_x:
