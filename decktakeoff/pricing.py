@@ -214,6 +214,9 @@ def labor_lines_for(t: Takeoff) -> List[Tuple[str, float, str, float, str]]:
     else:
         lab.append(("Concrete piers (dig, form, pour)", n_posts, "pier", lr["concrete_footing_each"], "rate card"))
     lab.append(("Frame", sf, "SF", lr["frame_per_sf"], "base rate" + (" — no larger-timber / 12\" OC up-charge (owner 7 Sep 2026)" if timber else "")))
+    if s.extras.under_3ft_credit and s.geometry.height_in < 36 and lr.get("under_3ft_credit_per_sf"):
+        lab.append((f"Frame — under-3' credit (the deck is {ftin(s.geometry.height_in)} above grade)", sf, "SF", float(lr["under_3ft_credit_per_sf"]),
+                    "rate card add-on (credit), owner-asked"))
     lab.append((f"Decking{' (no fascia)' if not s.decking.fascia else ' & fascia'}", sf, "SF", lr["decking_fascia_per_sf"], "base rate" + (" — no PVC up-charge" if s.decking.collection in ("Vintage", "Landmark", "Harvest+", "Harvest") else "")))
     if L.rail:
         cable = RAIL_SYSTEMS.get(L.rail.system, {}).get("cable", False)
@@ -415,11 +418,11 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
                for i, q, u, r, n in lab]
     if s.extras.labor_adjust:                 # the owner's labor change ($, negative cuts): owner-set lots stay, the card lines share it in proportion
         adj = float(s.extras.labor_adjust)
-        others = sum(q * r for i, q, u, r, n in lab if not str(n).startswith("owner-set"))
+        scal = lambda r, n: r > 0 and not str(n).startswith("owner-set")        # credits stay at the card's rate
+        others = sum(q * r for i, q, u, r, n in lab if scal(r, n))
         k = max(0.0, others + adj) / others if others else 1.0
-        lab = [(i, q, u, r if str(n).startswith("owner-set") else round(r * k, 4), n if str(n).startswith("owner-set") else
-                f"{n} · {'less' if adj < 0 else 'plus'} the owner's ${abs(adj):,.0f} labor {'cut' if adj < 0 else 'add'} ({k - 1:+.1%} on every card line)")
-               for i, q, u, r, n in lab]
+        lab = [(i, q, u, round(r * k, 4), f"{n} · {'less' if adj < 0 else 'plus'} the owner's ${abs(adj):,.2f} labor {'cut' if adj < 0 else 'add'} ({k - 1:+.1%} on every card line)")
+               if scal(r, n) else (i, q, u, r, n) for i, q, u, r, n in lab]
     labor_lines = [(i, q, u, r, round(q * r, 2)) for i, q, u, r, n in lab]
     labor = sum(x[4] for x in labor_lines)
     gc_lines, gc_base, gc_extras = gc_lines_for(t)
