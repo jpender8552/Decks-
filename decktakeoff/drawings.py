@@ -252,7 +252,10 @@ def sheet_notes(L: Layout, S: Scene, t, flags, meta, index: Optional[List[Tuple[
     if flags is not None:
         o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
         for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
-            o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
+            o.append(T(x2, yy, f.severity, 7.5, 800, fill="#b3261e" if f.severity == "STOP" else GOLD))
+            for w_ in textwrap.wrap(f.text, 70)[:4]:               # the whole flag, wrapped (never cut mid-sentence)
+                o.append(T(x2 + 62, yy, w_, 7.8, 400)); yy += 10.5
+            yy += 2
     return sheet("G-001", "General notes · design criteria", "Loads, codes, structure summary, sheet index, site — the permit-set cover", o, "No scale", meta)
 
 
@@ -492,7 +495,10 @@ def sheet_framing(L: Layout, S: Scene, t, meta) -> str:
     jlab = L.spec.framing.steel_joist if L.spec.framing.system == "steel" else L.frame.joist_size
     for zl, z in zip(L.zones, zs):
         fr = zl.frame
-        o.append(TH(X(z["x0"] + z["W"] / 2), Y(z["front"]) - 10, f"{z['name']}: {len(fr.joist_x)} field + {len(fr.pf_x)} PF {jlab} @ {fr.spacing:g}\" OC · {ftin(fr.joist_len)}", 7.5, 800, "middle"))
+        lab_ = f"{z['name']}: {len(fr.joist_x)} field + {len(fr.pf_x)} PF {jlab} @ {fr.spacing:g}\" OC · {ftin(fr.joist_len)}"
+        wl_ = len(lab_) * 7.5 * 0.55 + 8                     # a paper tag under the words, so no joist runs through them
+        o.append(R(X(z["x0"] + z["W"] / 2) - wl_ / 2, Y(z["front"]) - 19, wl_, 12, CREAM, "#b9ad97", 0.4))
+        o.append(T(X(z["x0"] + z["W"] / 2), Y(z["front"]) - 10, lab_, 7.5, 800, "middle"))
     for dx, Ld, lab in L.divider_x:
         o.append(T(X(dx * IN), Y(S.y_front) + 8, f"doubled joist · {lab}", 6.5, 700, "middle", MUTE))
     dim_h(o, X, Y(S.y_front) + 22, zs[0]["x0"], zs[-1]["x0"] + zs[-1]["W"], ftin(S.W * 12), up=False)
@@ -1546,7 +1552,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
             if abs(e.y1 - e.y0) < 0.5:
                 o.append(T(X(mx), Y(my) + 52, lab, 7.5, 800, "middle", "#5a4520"))
             elif abs(e.x1 - e.x0) >= 0.5:      # an angled side: the label below-left of the deck, clear of the side chains
-                o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 70, lab, 7.2, 800, "start", "#5a4520"))
+                o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 88, lab, 7.2, 800, "start", "#5a4520"))
             else:
                 o.append(T(X(mx) - 62, Y(my), lab, 7.2, 800, "middle", "#5a4520", rot=-90))
     # built-ins: benches and the planter as 17" strips inside their sides
@@ -3093,7 +3099,10 @@ def sheet_notes_composite(CL, S, t, flags, meta, levels, steps, index) -> str:
     if flags is not None:
         o.append(T(x2, yy + 12, "FLAGS (INTERNAL — remove before the permit submittal)", 9, 800, fill=GOLD)); yy += 28
         for f in [f for f in flags if f.severity in ("STOP", "ENGINEER", "CODE")][:14]:
-            o.append(T(x2, yy, f.severity, 7.5, 800, fill=RED if f.severity == "STOP" else GOLD)); o.append(T(x2 + 62, yy, textwrap.shorten(f.text, 66, placeholder="…"), 7.8, 400)); yy += 11.5
+            o.append(T(x2, yy, f.severity, 7.5, 800, fill=RED if f.severity == "STOP" else GOLD))
+            for w_ in textwrap.wrap(f.text, 70)[:4]:               # the whole flag, wrapped (never cut mid-sentence)
+                o.append(T(x2 + 62, yy, w_, 7.8, 400)); yy += 10.5
+            yy += 2
     return sheet("G-001", "General notes · design criteria", "Loads, codes, the structure of both levels, sheet index, site — the permit-set cover", o, "No scale", meta)
 
 

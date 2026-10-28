@@ -1027,7 +1027,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         strip = ('<div class="strip"><div><span class="sl">Sold · check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Cost</span><span class="sv">%s</span></div>'
                  '<div><span class="sl">Gross profit</span><span class="sv">%s</span></div><div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div>'
                  '<div><span class="sl">Financed</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
-                 % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gp / p.sell, money(p.retail), L.deck_sf))
+                 % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gm, money(p.retail), L.deck_sf))
     if customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
         head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=t)
@@ -1045,7 +1045,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         strip = ('<div class="strip"><div><span class="sl">Check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Financed</span><span class="sv">%s</span></div>'
                  '<div><span class="sl">Cost</span><span class="sv">%s</span></div><div><span class="sl">Gross profit</span><span class="sv">%s</span></div>'
                  '<div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
-                 % (money(p.sell), money(p.retail), money(p.cost), money(p.gp), 100 * p.gp / p.sell, L.deck_sf))
+                 % (money(p.sell), money(p.retail), money(p.cost), money(p.gp), 100 * p.gm, L.deck_sf))
         head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
                 f'<p>{E(sub or addr)}</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Cost stack: materials at the order x {p.material_factor:g}, tax, labor at the rate card, site services at cost; {p.gm:.1%} GM on the work. Internal — not for the homeowner.</span></footer></main>'
