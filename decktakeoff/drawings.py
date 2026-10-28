@@ -1426,7 +1426,11 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
         o.append(T(X(xi) + (-4 if k_ == 0 else 4), Y(y_end) - 10, f"divider {inch(xi)} from the left end", 7, 700, "end" if k_ == 0 else "start", "#9a7414"))
     # stairs and the box step: their footprints from the scene treads
     for b in S.boxes:
-        if b.kind == "tread":
+        if b.kind == "tread" and b.rot and b.rot_axis == "z":          # a step off an angled side: its true (turned) outline
+            cx_, cy_, hx_, hy_ = (b.x0 + b.x1) / 2 * 12, (b.y0 + b.y1) / 2 * 12, (b.x1 - b.x0) / 2 * 12, (b.y1 - b.y0) / 2 * 12
+            c_, s_ = math.cos(b.rot), math.sin(b.rot)
+            o.append(PG([(X(cx_ + u * c_ - v * s_), Y(cy_ + u * s_ + v * c_)) for u, v in ((-hx_, -hy_), (hx_, -hy_), (hx_, hy_), (-hx_, hy_))], "#d7c3a0", INK, 0.6))
+        elif b.kind == "tread":
             o.append(R(X(b.x0 * 12), Y(b.y0 * 12), (b.x1 - b.x0) * 12 * sc, (b.y1 - b.y0) * 12 * sc, "#d7c3a0", INK, 0.6))
     for st in s.stairs:
         e = kinds.get(st.side)
@@ -1455,6 +1459,8 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
             mx = (e.x0 + e.x1) / 2; my = (e.y0 + e.y1) / 2
             if abs(e.y1 - e.y0) < 0.5:
                 o.append(T(X(mx), Y(my) + 52, lab, 7.5, 800, "middle", "#5a4520"))
+            elif abs(e.x1 - e.x0) >= 0.5:      # an angled side: the label below-left of the deck, clear of the side chains
+                o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 40, lab, 7.2, 800, "start", "#5a4520"))
             else:
                 o.append(T(X(mx) - 62, Y(my), lab, 7.2, 800, "middle", "#5a4520", rot=-90))
     # built-ins: benches and the planter as 17" strips inside their sides

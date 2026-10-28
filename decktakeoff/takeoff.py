@@ -668,7 +668,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                 continue            # a single riser down onto a landing: the landing frame takes the riser, no stringers
             Qz.lumber += [("2x12", fg.stringer_len_in, "stair stringer")] * st.stringers
             cuts.append(CutPiece(f"Stair stringers ({st.side}" + (f", flight {fi + 1}" if multi else "") + ")", "2x12", fg.stringer_len_in, st.stringers,
-                                 f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers {eng.STRINGER_OC_COMPOSITE:g}\" OC"))
+                                 f"{fg.risers} risers @ {st.geo.riser_in:.3f}\" · {fg.treads} treads @ {st.geo.tread_in:.2f}\" · stringers @ {st.width / max(1, st.stringers - 1):.0f}\" OC (max {eng.STRINGER_OC_COMPOSITE:g}\")"))
             Qz.lumber += [("2x6", st.width + 3, "stair kicker/hanger board")] * 2
         if getattr(st, "inset", False) and st.notch:
             # the inset stair's foot (structure.md §5.2): a doubled PT 2x6 base ledger through-bolted to the lower level's rim, the
