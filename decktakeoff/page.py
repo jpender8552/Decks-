@@ -1376,12 +1376,27 @@ def _roof_scope(q, rp: Optional[dict] = None) -> list:
 
 
 _NUM_WORD = {"1": "One", "2": "Two", "3": "Three", "4": "Four", "5": "Five", "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine"}
+# British spellings a job's own words (a color, a name, a note) can carry in, and the homeowner's American ones
+_US_SPELL = {"centre": "center", "centres": "centers", "centred": "centered", "centring": "centering", "centreline": "centerline",
+             "centrelines": "centerlines", "colour": "color", "colours": "colors", "coloured": "colored", "grey": "gray", "greys": "grays",
+             "greyer": "grayer", "neighbour": "neighbor", "neighbours": "neighbors", "neighbouring": "neighboring", "metre": "meter",
+             "metres": "meters", "litre": "liter", "litres": "liters", "mitre": "miter", "mitres": "miters", "mitred": "mitered",
+             "mitring": "mitering", "aluminium": "aluminum", "fibre": "fiber", "fibres": "fibers", "storey": "story", "storeys": "stories",
+             "towards": "toward"}
+_US_RE = re.compile(r"\b(" + "|".join(_US_SPELL) + r")\b", re.I)
+
+
+def _us_spell(m) -> str:
+    """One British word in American spelling, its case kept ("Centre" -> "Center", "GREY" -> "GRAY")."""
+    w = m.group(0)
+    us = _US_SPELL[w.lower()]
+    return us.upper() if w.isupper() else us.capitalize() if w[0].isupper() else us
 
 
 def _us_words(x: str) -> str:
-    """The homeowner's spelling of an engine line: US spellings ("centers", "around"), and a line that would open on two
-    numbers ("2 6x6 posts") opens on a word."""
-    x = re.sub(r"\bcenters\b", "centers", re.sub(r"\bcenter\b", "center", x))
+    """The homeowner's spelling of an engine line: US spellings ("centres" -> "centers", "grey" -> "gray", "round every" ->
+    "around every"), and a line that would open on two numbers ("2 6x6 posts") opens on a word."""
+    x = _US_RE.sub(_us_spell, x)
     x = re.sub(r"\bround (every|each)\b", r"around \1", x)
     return re.sub(r"^([1-9]) (?=\d)", lambda m: _NUM_WORD[m.group(1)] + " ", x)
 

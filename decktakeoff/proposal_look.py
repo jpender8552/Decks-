@@ -19,7 +19,13 @@ FONT = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sa
 # CVD separation >= 8.4, normal vision >= 19.3, every slot >= 3:1 against #050608
 WHEEL = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 
-RAIL_HEX = {"black": "#141414", "white": "#f1f0ea", "bronze": "#5a4632", "gray": "#7a7c7e", "gray": "#7a7c7e"}
+RAIL_HEX = {"black": "#141414", "white": "#f1f0ea", "bronze": "#5a4632", "gray": "#7a7c7e"}
+
+
+def _color_key(c) -> str:
+    """A rail / trim color as the chip tables spell it: lower case, American ("Grey" -> "gray", "Iron Grey" -> "iron gray")."""
+    return re.sub(r"\bgrey\b", "gray", str(c or "").strip().lower())
+
 
 CSS = """<style>
 /* Launch manifest: the photoreal deck full-bleed over deep black, a condensed wide-tracked display face, the GS gold
@@ -358,7 +364,7 @@ def _levels_tele(spec, L, t, n_piers) -> list:
     tele = [(f"{L.deck_sf:,.0f}", "square feet")] + [(ftin(v["height_in"]), v["name"].lower()) for v in levels_of(t)]    # each level's height above grade
     tele.append((str(columns_of(t)), f"{spec.framing.post_size} columns"))
     if L.rail:
-        tele.append((f"{L.rail.rail_lf:g}'", f"{L.rail.color.lower()} rail"))
+        tele.append((f"{L.rail.rail_lf:g}'", f"{_color_key(L.rail.color)} rail"))
     lt = lights_of(t)
     if lt["total"]:
         tele.append((str(lt["total"]), "LED lights"))
@@ -382,7 +388,7 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
     if hasattr(L, "parts") and t is not None:      # two levels: each level's height, the columns, the rail, the lights
         tele = _levels_tele(spec, L, t, n_piers)
     elif rl:
-        tele.append((f"{rl.rail_lf:g}'", f"{rl.color.lower()} rail"))
+        tele.append((f"{rl.rail_lf:g}'", f"{_color_key(rl.color)} rail"))
     elif L.stairs:
         tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
     pal = BOARDS_PALETTE.get((spec.decking.collection, spec.decking.color))
@@ -392,7 +398,7 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
         chips.append((bp[len(bp) // 2] if bp else "#5a4632", "Picture frame", f"{spec.decking.border_collection or spec.decking.collection} · {spec.decking.border_color}"))
     if rl:
         from .report import rail_words
-        chips.append((RAIL_HEX.get(rl.color.lower(), "#141414"), "Rail", f"{spec.decking.brand} {rail_words(spec, rl.system)} · {rl.color}"))
+        chips.append((RAIL_HEX.get(_color_key(rl.color), "#141414"), "Rail", f"{spec.decking.brand} {rail_words(spec, rl.system)} · {rl.color}"))
     if rl and spec.railing.drink_rail and hasattr(L, "parts"):
         dc = spec.railing.drink_rail_collection or spec.decking.collection
         dp = BOARDS_PALETTE.get((dc, spec.railing.drink_rail_color or spec.decking.color))
@@ -775,7 +781,7 @@ def materials(spec, L) -> list:
         rows.append(("Picture frame", f"{d.border_collection or d.collection} · {d.border_color}", bg(d.border_collection or d.collection, d.border_color)))
     rl = L.rail
     if rl:
-        rows.append(("Rail", f"{d.brand} {rail_words(spec, rl.system)} · {rl.color}", RAIL_HEX.get(rl.color.lower(), "#141414")))
+        rows.append(("Rail", f"{d.brand} {rail_words(spec, rl.system)} · {rl.color}", RAIL_HEX.get(_color_key(rl.color), "#141414")))
         if spec.railing.drink_rail:
             dc = spec.railing.drink_rail_collection or d.collection
             dcol = spec.railing.drink_rail_color or d.color
@@ -783,7 +789,7 @@ def materials(spec, L) -> list:
     hs = getattr(spec.extras, "hardie_skirt", None)
     if hs:
         hc = getattr(spec.extras, "hardie_color", "") or re.sub(r"^[\d/ x.\"']+", "", hs).strip() or "Timber Bark"
-        rows.append(("Fascia", f"James Hardie HardieTrim · {hc}", HARDIE_HEX.get(hc.lower(), "#cfc8bb")))
+        rows.append(("Fascia", f"James Hardie HardieTrim · {hc}", HARDIE_HEX.get(_color_key(hc), "#cfc8bb")))
     return rows
 
 
@@ -797,7 +803,7 @@ def telemetry(spec, L, n_piers, t=None) -> list:
     if hasattr(L, "parts") and t is not None:
         return _levels_tele(spec, L, t, n_piers)
     if L.rail:
-        tele.append((f"{L.rail.rail_lf:g}'", f"{L.rail.color.lower()} rail"))
+        tele.append((f"{L.rail.rail_lf:g}'", f"{_color_key(L.rail.color)} rail"))
     elif L.stairs:
         tele.append((str(sum(st.geo.risers for st in L.stairs)), "risers"))
     return tele

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 from typing import Dict, List, Optional, Tuple
 
 from .units import ftin
@@ -37,8 +38,14 @@ DIVIDER_CLEAR_IN = 24.0         # a breaker-line rail post closer than this to a
 BRACKET_OC_FT = 2.0             # house-side beam wall brackets
 GUTTER_W, GUTTER_H = 2.5 * IN, 3.5 * IN
 RAIL_POST_INSET_FT = 2.5 * IN   # layout.RAIL_POST_INSET in feet (the post center in from the frame face)
-HEX = {"black": "#141416", "linen": "#e9e3d3", "gray": "#6b6e70", "gray": "#6b6e70", "tan": "#b9a68a", "white": "#ecebe6",
+HEX = {"black": "#141416", "linen": "#e9e3d3", "gray": "#6b6e70", "tan": "#b9a68a", "white": "#ecebe6",
        "mocha": "#5a4636", "bronze": "#4b3b2c"}
+
+
+def _color_key(c) -> str:
+    """A finish name as the color tables spell it: lower case, American ("Grey" / "grey" -> "gray")."""
+    return re.sub(r"\bgrey\b", "gray", str(c or "").strip().lower())
+
 
 DEFAULTS = dict(
     name="Louvered roof", brand="Suncoast", product="Louvered Roof", color="black",
@@ -403,7 +410,7 @@ def resolve(r: dict, surfaces: Optional[List[dict]] = None) -> dict:
     hc = q.get("house_clear_ft")
     hc = float(hc) if hc is not None else ((eave["y_lip"] + 2.0 * IN) if (eave is not None and mount in ("roof", "fascia")) else
                                            y0 + 1.4 if (house and mount in ("roof", "fascia")) else y0 + w_b)
-    res = dict(src=r, name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], hex=HEX.get(str(q["color"]).lower(), "#141416"),
+    res = dict(src=r, name=q["name"], brand=q["brand"], product=q["product"], color=q["color"], hex=HEX.get(_color_key(q["color"]), "#141416"),
                x0=x0, x1=x1, y0=y0, y1=y1, W=W, D=D, area=round(area, 2), shift=shift, attach="house" if house else "freestanding",
                house_mount=mount if house else None, W_nom=W_nom, D_nom=D_nom, area_nom=round(W_nom * D_nom, 2),
                beam_label=flabel, frame_label=blabel, w_f=w_f, h_f=h_f, w_b=w_b, h_b=h_b, span_ft=round(span, 2), span_max_ft=flim,
@@ -553,15 +560,15 @@ def materials(spec) -> Dict[str, dict]:
     roofs = [r for r in roofs_of(spec) + [r for r in (getattr(spec.geometry, "louvered_roofs", None) or []) if r.get("_global")] if built(r)]
     if not roofs:
         return {}
-    col = str(roofs[0].get("color") or "black")
-    out = {MAT: dict(color=HEX.get(col.lower(), "#141416"), metal=0.55, rough=0.5, label=f"Suncoast {col.lower()} powder-coat aluminum"),
+    col = _color_key(roofs[0].get("color") or "black")
+    out = {MAT: dict(color=HEX.get(col, "#141416"), metal=0.55, rough=0.5, label=f"Suncoast {col} powder-coat aluminum"),
            LED_MAT: dict(color="#f3eadb", rough=0.4, label="LED light strip in the gutter's light track (warm white)", emit="#ffd8a8")}
     scr = [s_ for r in roofs for s_ in (r.get("screens") or [])]
     if scr:
         fab = str(scr[0].get("fabric") or "mesh").lower()
         fab = fab if fab in FABRIC else "mesh"
-        sc = str(scr[0].get("color") or ("clear" if fab == "vinyl" else "black")).lower()
-        hexc = "#dfe6e8" if fab == "vinyl" else {"black": "#1b1c1e", "gray": "#55585a", "gray": "#55585a", "white": "#e6e4de", "linen": "#d8cfbd",
+        sc = _color_key(scr[0].get("color") or ("clear" if fab == "vinyl" else "black"))
+        hexc = "#dfe6e8" if fab == "vinyl" else {"black": "#1b1c1e", "gray": "#55585a", "white": "#e6e4de", "linen": "#d8cfbd",
                                                   "tan": "#a99677", "mocha": "#4d3d31"}.get(sc, "#1b1c1e")
         # openness: the open weave the photoreal pass lets sight and sun through (cycles Mats.screen); opacity: the WebGL viewer's
         dens = float(scr[0].get("density") or 80.0)
@@ -921,7 +928,7 @@ def scope_words(q: dict) -> List[str]:
     n_bl = len(q["blades"])
     rail_posts = sum(1 for p in q["posts"] if p["on_rail"])
     W_, D_ = ftin(q["W_nom"] * 12), ftin(q["D_nom"] * 12)
-    out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area_nom']:g} SF), {str(q['color']).lower()} powder-coated aluminum",
+    out = [f"{q['brand']} {q['product']}, motorized, {W_} x {D_} ({q['area_nom']:g} SF), {_color_key(q['color'])} powder-coated aluminum",
            f"{n_bl} louver blades, {q['blade_w'] * 12:g}\" wide on {q['spacing'] * 12:g}\" centers, in {nz} motor zone{'s' if nz != 1 else ''} "
            f"(one Gaposa motor blade each); the blades turn from closed to {ANGLE_RANGE[1]:g} degrees open by remote or app",
            f"Aluminum frame with the integrated gutter round every zone: {q['beam_label']} front beam, {q['frame_label']} house, side" + (" and divider" if q["xs"] or q["ys"] else "") + " beams"
@@ -975,7 +982,7 @@ def roof_pricing(spec, L=None) -> dict:
 
 
 def option_name(q: dict) -> str:
-    return q.get("option_name") or f"{q['brand']} louvered roof — {ftin(q['W_nom'] * 12)} x {ftin(q['D_nom'] * 12)}, motorized, {str(q['color']).lower()}"
+    return q.get("option_name") or f"{q['brand']} louvered roof — {ftin(q['W_nom'] * 12)} x {ftin(q['D_nom'] * 12)}, motorized, {_color_key(q['color'])}"
 
 
 def option_prices(spec, gm: float) -> list:

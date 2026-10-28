@@ -43,8 +43,9 @@ def main(argv):
     out.mkdir(parents=True, exist_ok=True)
     pals = json.load(open(HERE / "palettes.json"))
     base = json.load(open(job))
-    print(f"job: {job} ({len(base['geometry'].get('furniture') or [])} furniture pieces, "
-          f"{len((base['geometry'].get('site_model') or {}).get('neighbours') or [])} neighbour houses, "
+    sm = base["geometry"].get("site_model") or {}
+    nbs = sm.get("neighbors") or sm.get("neighbours") or []          # older job files spell the key the British way
+    print(f"job: {job} ({len(base['geometry'].get('furniture') or [])} furniture pieces, {len(nbs)} neighbor houses, "
           f"drink rail: {base['railing'].get('drink_rail')})")
     for nm, p in pals.items():
         d = copy.deepcopy(base)
