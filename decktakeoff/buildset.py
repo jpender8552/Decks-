@@ -149,7 +149,7 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
                 oc_ = sl_.width / max(1, sl_.stringers - 1)
                 how_.append(f"{nm_}: {g_.risers} risers @ {inches_frac(g_.riser_in)}, {g_.treads} tread{'s' if g_.treads != 1 else ''} @ {inches_frac(g_.tread_in)} — "
                             f"{sl_.stringers} 2x12 stringers @ {oc_:.0f}\" OC on LSCZ connectors at the rim"
-                            + (", fascia skirts both sides stepped under each tread" if getattr(sl_, "skirts", False) else "") + ", closed risers, treads Cortex 2 per stringer per board.")
+                            + (", fascia skirts both sides stepped under each tread" if getattr(sl_, "skirts", False) else "") + ", closed risers" + (" (HardieTrim, ripped to height, pre-drilled, 316SS trim screws)" if s.extras.hardie_skirt else "") + ", treads Cortex 2 per stringer per board.")
         if any(getattr(ss_, "landing", "") == "grade" for ss_ in s.stairs):
             how_.append("Each stair lands on grade: 36\" of firm, level ground at the bottom, as wide as the stair (no pad in this scope).")
         steps.append(dict(n=8, code="T-407", title="Stairs" + (" and the box step" if any(getattr(sl_, "build", "") == "box" for sl_ in L.stairs) else ""), still="yard",
@@ -169,12 +169,15 @@ def step_sheets(t: Takeoff, L: Layout) -> List[dict]:
             how_.append(f"{np_ if 'planter' in np_.lower() else ('Planter, ' + np_ if np_ else 'Planter')}: {pl.get('width_in', 17):g}\" x {pl.get('height_in', 17):g}\" — treated 2x4 walls (studs 12\" OC, top and bottom plates), 7/16\" OSB, "
                         "6-mil liner over a drainage mat, deck-board skin on every side, picture-frame cap; Cortex.")
         if getattr(s.geometry, "door_step", None):
-            how_.append("Door step: the framed 2x6 box on the deck at the door, decked, riser board and returns.")
+            how_.append("Door step: the framed 2x6 box on the deck at the door, decked, " + ("HardieTrim riser" if s.extras.hardie_skirt else "riser board") + " and returns.")
         steps.append(dict(n=9, code="T-408", title="Built-ins — " + ", ".join(w for w, on in (("benches", s.geometry.benches), ("planter" + ("s" if len(s.geometry.planters or []) > 1 else ""), s.geometry.planters),
                                                                                             ("door step", getattr(s.geometry, "door_step", None))) if on), still="corner",
             goes_in=items(lambda l: l.category in ("Benches", "Planters") or "door step" in l.item.lower(), 14),
             how=how_,
-            check=["Bench seats level at the seat height, backs plumb, posts tight to the rim", "Planter liner lapped and drained before any soil", "No screw head showing; plugs flush"]))
+            check=(["Bench seats level at the seat height, backs plumb, posts tight to the rim"] if s.geometry.benches else [])
+                  + (["Planter liner lapped and drained before any soil"] if s.geometry.planters else [])
+                  + (["Door step level, tight to the threshold, riser plumb"] if getattr(s.geometry, "door_step", None) else [])
+                  + ["No screw head showing; plugs flush"]))
     if s.geometry.cover or s.geometry.covers:
         from .takeoff import cover_size
         along, out, area = cover_size(s)
@@ -387,7 +390,7 @@ def composite_step_sheets(t: Takeoff, L) -> List[dict]:
             oc_ = sl.width / max(1, sl.stringers - 1)
             shw.append(f"{nm}: {g.risers} risers @ {inches_frac(g.riser_in)}, {g.treads} tread{'s' if g.treads != 1 else ''} @ {inches_frac(g.tread_in)} — {sl.stringers} 2x12 stringers @ {oc_:.0f}\" OC"
                        + (f" hung from the notch header in the {p.name.lower()}, the bottom riser at the step face, the feet on the {lw(lo)} deck" if (inset and sl.landing == "deck") else " on LSCZ connectors at the rim")
-                       + (", fascia skirts both sides stepped under each tread" if getattr(sl, "skirts", False) else "") + ", closed risers, treads Cortex 2 per stringer per board.")
+                       + (", fascia skirts both sides stepped under each tread" if getattr(sl, "skirts", False) else "") + ", closed risers" + (" (HardieTrim, ripped to height, pre-drilled, 316SS trim screws)" if s.extras.hardie_skirt else "") + ", treads Cortex 2 per stringer per board.")
         if faces:
             sk = skirt or {}
             rule = next((p.takeoff.schedule["Step skirt"] for p in L.parts if (getattr(p.takeoff, "schedule", None) or {}).get("Step skirt")), "")   # the order's own rule

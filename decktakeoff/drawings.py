@@ -1637,7 +1637,7 @@ def member_key(L: Layout, S: Scene, t) -> List[Tuple[str, Callable[[Box], bool],
         else:
             oc = f" @ {st.width / max(1, st.stringers - 1):.0f}\" OC" if st.stringers > 1 else ""
             sts.append(f"{nm or 'stair'}: {st.geo.risers} risers, {getattr(ss, 'stringer_size', '') or '2x12'} stringers{oc}")
-    stair_lab = ("; ".join(sts) + f"; {s.decking.collection} treads, closed risers") if sts else "Stair"
+    stair_lab = ("; ".join(sts) + f"; {s.decking.collection} treads, closed risers" + (f" (HardieTrim {hc})".replace(" )", ")") if s.extras.hardie_skirt else "")) if sts else "Stair"
     from .spec import covers_of
     _cv0 = (covers_of(s) or [{}])[0]
     ks = [

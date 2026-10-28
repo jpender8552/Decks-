@@ -79,6 +79,11 @@ class Takeoff:
 
 
 # ------------------------------------------------------------------ helpers
+def _hardie_words(spec) -> str:
+    """The Hardie color named in extras.hardie_skirt ("4/4 x 12 Arctic White" -> "Arctic White")."""
+    w = (spec.extras.hardie_skirt or "").split()
+    return " ".join(w[-2:]) if len(w) > 1 else (spec.extras.hardie_skirt or "")
+
 def _price(section: str, key: str):
     d = PRICEBOOK.get(section, {}).get(key)
     if not d:
@@ -1211,6 +1216,7 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                               (f"+1  " if s_ == max(packed_b) else "exact  ") + f"({what})", uc, src))
         for name, Lb in Qz.border_pieces:
             cuts.append(CutPiece(name.capitalize(), f"{bcoll} {bcolor} square", Lb, 1, "mitre at the corners; dividers on the doubled joist"))
+    hardie_risers = []                              # (stair, width) riser pieces cut from HardieTrim when there is a Hardie skirt
     for st in stairs:
         tl = min(deck_lengths(coll, "square"))        # the shortest square-edge stock the line is sold in (Vintage: 16')
         per_board = max(1, int(math.floor(tl * 12 / (st.width + 0.25))))
@@ -1222,14 +1228,17 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
                           f"+1  ({st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} x 2 boards @ {ftin(st.width)}, {per_board} per board)", uc, src))
         if st.riser_pieces:
             nr = int(math.ceil(st.riser_pieces / max(1, int(math.floor(144 / (st.width + 0.25))))))     # riser boards are 12' (not the tread stock)
-            uc, src = _price("decking", f"{brand}|{coll}|riser")
-            if uc == 0.0:
-                lf, src = _price("decking", "generic_riser_per_lf"); uc = round(lf * 12, 2)
-            lines.append(Line("Stairs", f"{brand} {coll} {color} riser board 7-1/4\" x 12' ({st.side} stair)", nr, nr, "ea",
-                              f"exact  ({st.geo.risers} risers @ {ftin(st.width)})", uc, src))
+            if spec.extras.hardie_skirt:                # a Hardie skirt: the risers match it, HardieTrim ripped to the riser height (packed below, all stairs together)
+                hardie_risers += [(f"{st.side} stair", st.width)] * st.riser_pieces
+            else:
+                uc, src = _price("decking", f"{brand}|{coll}|riser")
+                if uc == 0.0:
+                    lf, src = _price("decking", "generic_riser_per_lf"); uc = round(lf * 12, 2)
+                lines.append(Line("Stairs", f"{brand} {coll} {color} riser board 7-1/4\" x 12' ({st.side} stair)", nr, nr, "ea",
+                                  f"exact  ({st.geo.risers} risers @ {ftin(st.width)})", uc, src))
         cuts.append(CutPiece(f"Stair treads ({st.side})", f"{coll} {color} square", st.width, st.tread_pieces, "2 boards per tread, nosing 3/4\" over the riser"))
         if st.riser_pieces:
-            cuts.append(CutPiece(f"Stair risers ({st.side})", "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness"))
+            cuts.append(CutPiece(f"Stair risers ({st.side})", "HardieTrim" if spec.extras.hardie_skirt else "riser board", st.width, st.riser_pieces, f"rip to {st.geo.riser_in:.2f}\" less tread thickness"))
     # the step-face skirt: the decking fascia set vertically, cut to height (4 to a 12' board), fastened at every nailer
     if skirt:
         hs = sorted(skirt.panel_heights(), reverse=True)
@@ -1310,12 +1319,22 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
     if ds:
         wd = (float(ds["x1"]) - float(ds["x0"])) * 12; dd = float(ds.get("depth_in", 21)); rr = float(ds.get("rise_in", 7))
         rows = int(math.ceil(dd / 5.55))
-        nb = sum(len(v) for v in pack_boards([("tread", wd + 1)] * rows + [("riser", wd + 1)] + [("end", dd + 1)] * 2, stocks=(bl,)).values())
-        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{bl} Square Edge — door step tread rows, riser and returns ({ftin(wd)} x {dd:g}\", {rr:g}\" rise)", nb, nb + 1, "ea", "+1", uc12, src12))
+        hr = bool(spec.extras.hardie_skirt)            # a Hardie skirt: the door-step riser is HardieTrim too
+        nb = sum(len(v) for v in pack_boards([("tread", wd + 1)] * rows + ([] if hr else [("riser", wd + 1)]) + [("end", dd + 1)] * 2, stocks=(bl,)).values())
+        lines.append(Line("Stairs", f"{brand} {coll} {color} 1x6x{bl} Square Edge — door step tread rows{'' if hr else ', riser'} and returns ({ftin(wd)} x {dd:g}\", {rr:g}\" rise)", nb, nb + 1, "ea", "+1", uc12, src12))
+        if hr:
+            hardie_risers.append(("door step", wd + 1))
         n26 = int(math.ceil((2 * wd + (int(math.ceil(wd / 16)) + 1) * dd) * 1.1 / (12 * 12)))
         uc26, src26 = _lumber_price("2x6", 12)
         lines.append(Line("Stairs", f"2x6x12 #1 True Frame — door step box (rim + joists at 16\"), on the deck", n26, n26 + 1, "ea", "+1", uc26, src26))
         notes.append(f"door step: the existing step at the door rebuilt as a box step {ftin(wd)} x {dd:g}\" deep, {rr:g}\" up to the threshold")
+    if hardie_risers:                                  # every riser out of 12' HardieTrim, first fit across the stairs (a 73" and a 68" riser share a board)
+        hd = PRICEBOOK["cover"]["hardie_trim_4_4x12_12ft"]
+        packed_h = pack_boards([(n, w_ + 0.25) for n, w_ in hardie_risers], stocks=(12,), kerf=0.125)
+        nh = sum(len(b) for b in packed_h.values())
+        what = " · ".join(f"{sum(1 for n, _ in hardie_risers if n == k)} @ {ftin(max(w_ for n, w_ in hardie_risers if n == k))} ({k})" for k in dict.fromkeys(n for n, _ in hardie_risers))
+        lines.append(Line("Stairs", f"HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} — every riser (stairs + door step), ripped to height", nh, nh, "ea",
+                          f"exact  ({len(hardie_risers)} risers: {what})", hd["each"], hd["source"]))
     psegs = planter_segments(spec)
     if psegs:
         plf = sum(math.hypot(x1 - x0, y1 - y0) for x0, y0, x1, y1, *_ in psegs)
@@ -1364,11 +1383,11 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
         why = "+1  (" + " · ".join(f"{n} {ftin(Lf)}" for n, Lf in Qz.fascia_pieces) + ")"
         if spec.extras.hardie_skirt:
             hd = PRICEBOOK["cover"]["hardie_trim_4_4x12_12ft"]
-            lines.append(Line("Fascia", f"Deck skirt — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {spec.extras.hardie_skirt.split()[-2] + ' ' + spec.extras.hardie_skirt.split()[-1] if len(spec.extras.hardie_skirt.split()) > 1 else spec.extras.hardie_skirt} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
-            scr = int(-(-nf * 12 * 2 // 12)) * 2 + 20     # 2 screws per bearing point @ 12" plus corners
-            hcol = " ".join(spec.extras.hardie_skirt.split()[-2:]) if len(spec.extras.hardie_skirt.split()) > 1 else spec.extras.hardie_skirt
+            lines.append(Line("Fascia", f"Deck skirt — HardieTrim 4/4 x 12 x 12' smooth ColorPlus {_hardie_words(spec)} (wraps the double rim, in place of the composite fascia)", nf, nf + 1, "ea", why, hd["each"], hd["source"]))
+            scr = int(-(-nf * 12 * 2 // 12)) * 2 + 20 + len(hardie_risers) * 12     # 2 screws per bearing point @ 12" plus corners; ~12 per riser
+            hcol = _hardie_words(spec)
             sc_ = PRICEBOOK["cover"]["hardie_trim_screws_100"]
-            lines.append(Line("Fascia", sc_["desc"].replace("Timber Bark", hcol), -(-scr // 100), -(-scr // 100), "box", f"{scr} color-matched screws, pre-drilled, 2 per joist line", sc_["each"], sc_["source"]))
+            lines.append(Line("Fascia", sc_["desc"].replace("Timber Bark", hcol), -(-scr // 100), -(-scr // 100), "box", f"{scr} color-matched screws, pre-drilled, 2 per joist line" + (f" + the {len(hardie_risers)} risers" if hardie_risers else ""), sc_["each"], sc_["source"]))
             tu = PRICEBOOK["cover"]["hardie_touchup"]
             lines.append(Line("Fascia", tu["desc"].replace("Timber Bark", hcol), 1, 1, "kit", "cut ends", tu["each"], tu["source"]))
         else:
@@ -1511,6 +1530,8 @@ def build_takeoff(spec: DeckSpec) -> Takeoff:
             packed_d = pack_boards(pieces, stocks=(16,))
             nb = sum(len(v) for v in packed_d.values())
             uc, src = _price("decking", f"{spec.decking.brand}|{dcoll}|16|square")
+            if uc == 0.0:                               # no 16' square-edge price on file for the line: its per-LF price x 16'
+                lf, src = _price("decking", f"{spec.decking.brand}|{dcoll}|per_lf"); uc = round(lf * 16, 2)
             on_ = ("on the drink-rail clips over the universal panel covers" if f"{sysn}|panel_cover|8" in PRICEBOOK["rail"] else "laid flat on the top rail")
             lines.append(Line("Rail", f"Drink rail — {spec.decking.brand} {dcoll} {dcolor} 1x6x16 Square Edge {on_}, {rl.rail_lf} LF, mitred at every turn", nb, nb + 1, "ea", "+1  (full-board line only, never scalloped)", uc, src))
             if (spec.railing.drink_rail_mount or "between") == "over" and f"{sysn}|post_insert_8" in PRICEBOOK["rail"]:

@@ -1302,8 +1302,8 @@
       "desc": "6x6 Western red cedar post, per LF"
     },
     "hardie_trim_4_4x12_12ft": {
-      "each": 62.0,
-      "source": "est. — confirm D&D",
+      "each": 61.74,
+      "source": "D&D quote 990599 (GSEXT1) 16 Oct 2026 — HAR44112512AW",
       "desc": "HardieTrim 4/4 x 12 (11-1/4\") x 12' smooth ColorPlus Timber Bark"
     },
     "hardie_trim_4_4x7_25_rustic_12ft": {
@@ -1322,13 +1322,13 @@
       "desc": "HardieSoffit 4' x 10' cedarmill ColorPlus Timber Bark, vented"
     },
     "hardie_trim_screws_100": {
-      "each": 48.0,
-      "source": "est.",
-      "desc": "Color-matched trim screws for HardieTrim, 100 ct (Timber Bark)"
+      "each": 24.2,
+      "source": "D&D quote 990599 (GSEXT1) 16 Oct 2026 — 0353000W (white)",
+      "desc": "Camo 1-5/8\" #8 trim screw, 316SS, color-matched, 100 ct (Timber Bark)"
     },
     "hardie_touchup": {
       "each": 22.0,
-      "source": "est.",
+      "source": "est. — not on quote 990599; confirm D&D",
       "desc": "ColorPlus touch-up kit, Timber Bark"
     },
     "hardie_soffit_nails_lb": {

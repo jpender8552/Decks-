@@ -68,6 +68,9 @@ PRODUCTS: Dict[str, dict] = {
     "AZTDL3X3LANCAPB": dict(desc="TimberTech 3\" LED Lantern Post Cap Light for Impression Rail Express, Black, 12V, 2700K", each=136.0, watts=3.0,
                             source="EST — TimberTech 3\" LED Lantern Post Cap (IRX); Lumbermens list 4\" lantern $135.69 eff. 1 Jun 2026; not on a D&D quote; "
                                    "3 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
+    "AZTDL3X3LANCAPW": dict(desc="TimberTech 3\" LED Lantern Post Cap Light for Impression Rail Express, White, 12V, 2700K", each=136.0, watts=3.0,
+                            source="EST — the White finish of the 3\" Lantern Post Cap (IRX), priced as the Black; SKU read from the Black part number — "
+                                   "confirm the White part with D&D; 3 W (TimberTech Metal Railing Lighting Installation Guide 10.24)"),
     "AZTIXLEDACCB": dict(desc="TimberTech Small Accent Light for Impression Rail Express, Black, 12V AC, 1-5/8\" x 3/4\" x 4-1/4\"", each=58.99, watts=1.0,
                          size_in=(1.625, 0.75, 4.25), lens_in=(1.0, 1.25),
                          source="EST — The Deck Store $58.99 (Small Accent Light, TimberTech / AZEK), 27 Oct 2026; not on a D&D quote; SKU per the "
