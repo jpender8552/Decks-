@@ -1256,12 +1256,16 @@ def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
         build_object("crown_core", core, cm, col)
     if TREES3D and plant_tags:
         build_plants(spec, D, col, out_dir, foliage, quick)
+    if LEAVES > 0 and foliage != "summer":     # fallen autumn leaves on the deck, steps, beds and lawn (cycles_leaves.py)
+        from decktakeoff.cycles_leaves import add_leaves
+        add_leaves(D, spec, col, tex.dir, rng_seed=29, density=LEAVES)
     return spec, sc, D
 
 
 # ====================================================================== trees and shrubs (decktakeoff.vegetation)
 TREES3D = True       # build the yard model's trees from their entries (vegetation.py) instead of landscape.py's spheres / cones
 STYLING = True       # the styling furniture (geometry.furniture, scene layer "styling"); --styling=0 renders the deck without it
+LEAVES = 1.0         # fallen leaves (decktakeoff.cycles_leaves): --leaves=0 leaves them out, --leaves=N is N x the density
 PLANT_KEEPOUT: List[Tuple[float, float, float]] = []   # extra camera stations (--cameras) the plants keep 3 ft clear of
 PLANT_COLS = {   # sRGB (c1, c2) per foliage kind in a June yard (--foliage=summer, or a yard model already in summer colors)
     "maple": ("#4c6827", "#718d38"), "cottonwood": ("#587b2c", "#86a244"), "broadleaf": ("#55702f", "#7c923c"),
@@ -2229,6 +2233,8 @@ def main(argv):
         globals()["TREES3D"] = False
     if str(opts.get("--styling", "1")).lower() in ("0", "off", "no", "false"):  # --styling=0: no styling furniture (a permit view)
         globals()["STYLING"] = False
+    lv = str(opts.get("--leaves", "1")).lower()                                 # --leaves=0: no fallen leaves; --leaves=1.5: more
+    globals()["LEAVES"] = 0.0 if lv in ("0", "off", "no", "false") else (1.0 if lv in ("1", "on", "yes", "true") else float(lv))
     if opts.get("--cameras"):               # the stations, before the build: no branch within 3 ft of a lens
         try:
             cj0 = json.load(open(opts["--cameras"]))
