@@ -979,7 +979,9 @@ def sheet_site(L: Layout, S: Scene, t, meta, outlines: Optional[List[tuple]] = N
             o.append(T(X(z["x0"] + z["W"] / 2), (Y((z["wall_y"] + z["front"]) / 2) + 3) if deep else Y(z["front"]) + 10, f"DECK {z['name']}", 7, 900, "middle", "#f3ead9" if deep else INK))
     # stairs / landings
     for b in S.boxes:
-        if b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
+        if b.kind == "tread" and b.rot and b.rot_axis == "z":          # a step off an angled side: its true (turned) outline
+            o.append(PG([(X(px), Y(py)) for px, py in _turned_corners(b)], FILL["concrete"], INK, 0.6))
+        elif b.kind in ("tread",) or (b.tag and b.tag.startswith("landing pad")) or b.mat == "concrete" and b.kind == "pad":
             o.append(R(X(b.x0), Y(b.y0), (b.x1 - b.x0) * sc, (b.y1 - b.y0) * sc, FILL["concrete"], INK, 0.6))
     treads_ = [(X(b.x0), X(b.x1), Y(b.y0), Y(b.y1)) for b in S.boxes if b.kind == "tread"] if comp else []
     for e in (outs if comp else []):                               # a composite: each level named on it, at its label point
@@ -1427,9 +1429,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
     # stairs and the box step: their footprints from the scene treads
     for b in S.boxes:
         if b.kind == "tread" and b.rot and b.rot_axis == "z":          # a step off an angled side: its true (turned) outline
-            cx_, cy_, hx_, hy_ = (b.x0 + b.x1) / 2 * 12, (b.y0 + b.y1) / 2 * 12, (b.x1 - b.x0) / 2 * 12, (b.y1 - b.y0) / 2 * 12
-            c_, s_ = math.cos(b.rot), math.sin(b.rot)
-            o.append(PG([(X(cx_ + u * c_ - v * s_), Y(cy_ + u * s_ + v * c_)) for u, v in ((-hx_, -hy_), (hx_, -hy_), (hx_, hy_), (-hx_, hy_))], "#d7c3a0", INK, 0.6))
+            o.append(PG([(X(px * 12), Y(py * 12)) for px, py in _turned_corners(b)], "#d7c3a0", INK, 0.6))
         elif b.kind == "tread":
             o.append(R(X(b.x0 * 12), Y(b.y0 * 12), (b.x1 - b.x0) * 12 * sc, (b.y1 - b.y0) * 12 * sc, "#d7c3a0", INK, 0.6))
     for st in s.stairs:
@@ -1460,7 +1460,7 @@ def sheet_dimensions(L: Layout, S: Scene, t, meta) -> Optional[str]:
             if abs(e.y1 - e.y0) < 0.5:
                 o.append(T(X(mx), Y(my) + 52, lab, 7.5, 800, "middle", "#5a4520"))
             elif abs(e.x1 - e.x0) >= 0.5:      # an angled side: the label below-left of the deck, clear of the side chains
-                o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 40, lab, 7.2, 800, "start", "#5a4520"))
+                o.append(T(X(min(e.x0, e.x1)) - 10, Y(max(e.y0, e.y1)) + 70, lab, 7.2, 800, "start", "#5a4520"))
             else:
                 o.append(T(X(mx) - 62, Y(my), lab, 7.2, 800, "middle", "#5a4520", rot=-90))
     # built-ins: benches and the planter as 17" strips inside their sides
@@ -1524,10 +1524,24 @@ def _poly_area_in(P) -> float:
 NOT_ON_SHEETS = ("site", "louvered", "styling")     # scene layers the drawing sheets leave out: the yard, a louvered roof (A-403 draws it), styling furniture
 
 
+def _turned_corners(b) -> List[Tuple[float, float]]:
+    """The plan corners (feet) of a box turned about z (rot_axis "z"), e.g. a step off an angled outline side."""
+    cx, cy, hx, hy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2
+    c, s_ = math.cos(b.rot), math.sin(b.rot)
+    return [(cx + u * c - v * s_, cy + u * s_ + v * c) for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))]
+
+
+def _set_rail_fill(spec) -> None:
+    """The rail metal on the sheets in the rail's own finish: a white rail draws light (outlined), anything else dark."""
+    col = (getattr(spec.railing, "color", "") or "").lower()
+    FILL["railmetal"] = "#dedbd3" if ("white" in col or "arctic" in col) else "#2b2621"
+
+
 def all_sheets(L: Layout, t, flags, scene: Optional[Scene] = None, customer: bool = False) -> List[Tuple[str, str, str]]:
     """[(num, title, svg)] — everything except A-001 (renders) and T-400 (build steps), which the build set adds.
     customer=True leaves the internal flags block off G-001. A composite deck (two levels, a wrap) gets whole-deck sheets
     in the global frame (composite_sheets)."""
+    _set_rail_fill(L.spec)
     if hasattr(L, "parts"):
         return composite_sheets(L, t, flags, scene, customer=customer)
     if customer:
@@ -4428,6 +4442,7 @@ def _site_marks(S0) -> list:
 def composite_sheets(CL, t, flags, scene: Optional[Scene] = None, customer: bool = False, only=None) -> List[Tuple[str, str, str]]:
     """[(num, title, svg)] for a composite (multi-level) deck: whole-deck sheets in the global frame."""
     import dataclasses as _dc
+    _set_rail_fill(CL.spec)
     if customer:
         flags = None
     S0 = scene or build_scene(CL)
