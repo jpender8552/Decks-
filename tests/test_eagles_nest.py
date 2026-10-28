@@ -63,7 +63,7 @@ def test_timber_frame_and_caissons(result):
     assert line(t, "CCQ68").net == 4 and line(t, "ECCQ68").net == 4
     assert line(t, "LUS410Z").net >= 80 and line(t, "H2.5AZ").net >= 60
     assert line(t, "LedgerLOK 6\"").net == 3 and "107 needed" in line(t, "LedgerLOK 6\"").why
-    assert line(t, "Vycor").net == 2 and line(t, "L-flashing").net == 8 and line(t, "26 ga").net == 8
+    assert line(t, "Vycor").net == 2 and line(t, "L-flashing").net == 10 and line(t, "26 ga").net == 8    # D&D's L-flashing is 8', lapped 3" (71 LF -> 10)
     assert line(t, "8x8x8").net == 8
     assert sum(l.net for l in t.lines if "Coastline 1x6x" in l.item) == 96      # 94 field + 2 rip boards
     assert line(t, "Dark Hickory 1x6x16").net == 4 and line(t, "Dark Hickory 1x6x20").net == 2

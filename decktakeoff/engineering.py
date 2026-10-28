@@ -83,8 +83,30 @@ GUARD_TRIGGER_HEIGHT = 30.0      # R312.1.1: guards where the walking surface is
 GUARD_HEIGHT_RES = 36.0
 GUARD_HEIGHT_COMM = 42.0
 STRINGER_MAX_SPAN_CUT = 72.0     # DCA6: cut 2x12 stringers, 6'-0" max horizontal span between supports
-STRINGER_OC_COMPOSITE = 12.0     # TimberTech: stair treads need 12" OC max stringer spacing (composite & PVC)
+# what carries a stair tread (stringers, box-step cross members, door-step joists): max center to center by tread line, the strictest
+# of TimberTech's own documents — the Composite Decking Installation Guide REV 09/23 p.8 stringer chart (Premier / Premier+ 9"; Legacy /
+# Reserve / Terrain+ / Prime / Prime+ 10"; Terrain 8"), the TimberTech FAQ (timbertech.com/resources/faqs, read 28 Oct 2026: "For TimberTech
+# Composite Decking, the maximum spacing is 9 inches on center", Advanced PVC 12"), Intertek CCRR-0128 Table 1
+# (Terrain / Terrain+ solid 8" — 16" only with the Figure 10 2x6 blocking, as for Prime / Prime+; Legacy, Reserve 10"; Premier 9") and,
+# for the Advanced PVC 1x6 lines, CCRR-0101 Table 2 + the Advanced PVC Installation Guide p.17 (10"; 17-1/4" / 24" only with added 2x supports)
+_TT_CHART10 = "TimberTech FAQ (timbertech.com/resources/faqs: composite 9\"); the install guide's p.8 chart says 10\""
+_PVC10 = "CCRR-0101 Table 2 and the Advanced PVC install guide p.17 (the FAQ says 12\")"
+TREAD_SPAN_MAX = {"Terrain": (8.0, "TimberTech install guide p.8 chart and CCRR-0128 Table 1"),
+                  "Terrain+": (8.0, "CCRR-0128 Table 1, 16\" only with its Figure 10 2x6 blocking; the install guide's p.8 chart says 10\""),
+                  "Premier": (9.0, "TimberTech install guide p.8 chart, CCRR-0128 Table 1, TimberTech FAQ"), "Premier+": (9.0, "TimberTech install guide p.8 chart, CCRR-0128 Table 1, TimberTech FAQ"),
+                  "Legacy": (9.0, _TT_CHART10 + ", CCRR-0128 10\""), "Reserve": (9.0, _TT_CHART10 + ", CCRR-0128 10\""),
+                  "Prime": (9.0, _TT_CHART10), "Prime+": (9.0, _TT_CHART10),
+                  "Vintage": (10.0, _PVC10), "Landmark": (10.0, _PVC10), "Harvest+": (10.0, _PVC10), "Harvest": (10.0, _PVC10)}
+STRINGER_OC_COMPOSITE = 10.0     # no tread line given: the install guide chart's and CCRR-0101's 10" — every line in TREAD_SPAN_MAX is at or under it
 STRINGER_OC_WOOD = 16.0
+
+
+def tread_support_oc(collection: str, wood: bool = False) -> Tuple[float, str]:
+    """Max center-to-center spacing (in) of the stringers / box-step cross members / door-step joists under a tread of this
+    decking line, and the document it comes from."""
+    if collection in TREAD_SPAN_MAX:
+        return TREAD_SPAN_MAX[collection]
+    return (STRINGER_OC_WOOD, "wood treads") if wood else (STRINGER_OC_COMPOSITE, "the install guide's p.8 chart (no tread line given)")
 
 
 def _interp_table(x: float, xs: List[float], ys: List[float]) -> float:
@@ -268,8 +290,8 @@ def stair_geometry(total_rise_in: float, width_in: float, composite_treads: bool
     riser = total_rise_in / risers
     treads = risers - len(flights)            # the top tread of every flight is the deck or the landing
     run = treads * tread_in
-    oc = stringer_oc or (STRINGER_OC_COMPOSITE if composite_treads else STRINGER_OC_WOOD)
-    stringers = int(math.ceil(width_in / oc - 1e-9)) + 1
+    oc = stringer_oc or (STRINGER_OC_COMPOSITE if composite_treads else STRINGER_OC_WOOD)    # the layout passes the tread line's own max (tread_support_oc)
+    stringers = int(math.ceil(width_in / oc - 1e-9)) + 1          # the outer two at the stair's edges, every space at or under oc
     fl = []
     for nr in flights:
         nt = nr - 1

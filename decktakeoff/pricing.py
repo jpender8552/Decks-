@@ -13,7 +13,7 @@ from .units import ftin
 import json
 import math
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dc_replace
 from typing import Dict, List, Optional, Tuple
 
 from .catalog import PRICEBOOK, RAIL_SYSTEMS, tax_rate_for
@@ -64,6 +64,12 @@ class Pricing:
 BUILTIN_AT_GM = 0.40          # the owner's built-in section prices carry 40%: materials (factored, taxed) + labor = 60% of the sell
 
 
+def drink_rail_line(l) -> bool:
+    """A line of the drink rail itself: the Rail lines for its board, clips or brackets, post inserts and the panel covers under
+    it — not the accent light "just below the drink rail" (a Lighting line)."""
+    return l.category == "Rail" and ("rink rail" in l.item or "drink-rail" in l.item)
+
+
 def _factor_rate(s) -> Tuple[float, float]:
     pb = PRICEBOOK
     factor = s.extras.material_factor if s.extras.material_factor is not None else pb.get("material_factor", 1.0)
@@ -94,15 +100,36 @@ def _monthly(retail: float) -> float:
     return retail * r / (1 - (1 + r) ** -n)
 
 
+def _financed(p: "Pricing", sell: float) -> float:
+    """Financed for a check price, the way p's price gets it: x (1 + extras.retail_markup) when the job sets one, else / 0.93."""
+    mk = getattr(p, "retail_markup", None)
+    return round(sell * (1 + mk)) if mk is not None else round(sell / PRICEBOOK["retail_factor"])
+
+
+def gift_excess(base: "Pricing", other: "Pricing") -> Tuple[float, float]:
+    """(sell, work) of the lights `other` carries past the base job's free riser lights (extras.lights.riser_free): the gift is
+    the base's own riser lights, so riser lights an option adds pay their way — at the set price each (lights.sell_each), else
+    their work at the option margin (lighting.past_gift). (0, 0) when the base gives none or nothing is past it (an option
+    that brings its own free riser lights keeps them: the lighting option against the deck without lights)."""
+    g, f = getattr(base, "light_gift", None), getattr(other, "past_gift", None)
+    return f(g) if (g and f) else (0.0, 0.0)
+
+
 def option_delta(base: "Pricing", other: "Pricing") -> Tuple[float, float, float]:
     """An option against a proposal: the whole installed difference (check, financed, monthly) — normally the two prices'
     difference. Against a deck sold per SF the rate prices only deck area (a stair to the yard would come out at $0), so the
     option is priced from the engine's cost math instead — work delta / (1 - the job margin), financed / 0.93 — the same
-    way price_options prices extras.options on that deck."""
+    way price_options prices extras.options on that deck. Riser lights the option adds don't ride the base's free riser
+    lights (gift_excess): at the set price each, or their work at the option margin."""
+    xs, xw = gift_excess(base, other)
     if not getattr(base, "per_sf", 0.0):
-        return other.sell - base.sell, other.retail - base.retail, other.monthly - base.monthly
-    ls_ = getattr(other, "light_sell", 0.0) - getattr(base, "light_sell", 0.0)          # lights at their set price each (extras.lights.sell_each)
-    lw_ = getattr(other, "light_work", 0.0) - getattr(base, "light_work", 0.0)
+        if not (xs or xw):
+            return other.sell - base.sell, other.retail - base.retail, other.monthly - base.monthly
+        s2 = round(other.sell + xs + xw / (1 - base.options_gm))          # the option's deck with its own riser lights paid for
+        r2 = _financed(other, s2)
+        return s2 - base.sell, r2 - base.retail, _monthly(r2) - base.monthly
+    ls_ = getattr(other, "light_sell", 0.0) - getattr(base, "light_sell", 0.0) + xs     # lights at their set price each (extras.lights.sell_each)
+    lw_ = getattr(other, "light_work", 0.0) - getattr(base, "light_work", 0.0) - xw
     check = round((other.work - base.work - lw_) / (1 - base.options_gm) + ls_)
     retail = round(check / PRICEBOOK["retail_factor"])
     return check, retail, _monthly(retail)
@@ -392,7 +419,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if _r0 and L.rail and not getattr(t, "_rail_cost_set", False):
         own = (float(_r0["cost"]) if _fixed else float(_r0) * (1 - _rule.get("_at_gm", 0.40))) * L.rail.rail_lf
         r_lab = sum(q * r_ for i, q, u, r_, n in labor_lines_for(t) if i.startswith(("Railing", "Cable rail")))
-        r_lines = [l for l in t.lines if l.category == "Rail" and not ("rink rail" in l.item or "drink-rail" in l.item)]
+        r_lines = [l for l in t.lines if l.category == "Rail" and not drink_rail_line(l)]
         r_mat = sum(l.ext for l in r_lines) * factor * (1 + rate)
         if r_mat > 0 and own > r_lab:
             k = (own - r_lab) / r_mat
@@ -405,7 +432,8 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     for ln in t.lines:
         if ln.category == "Site":
             continue
-        cats[ln.category] = cats.get(ln.category, 0.0) + ln.ext
+        for c_, w_ in (getattr(ln, "split", None) or {ln.category: 1.0}).items():     # a line two parts share (the HardieTrim nails): by its parts
+            cats[c_] = cats.get(c_, 0.0) + ln.ext * w_
         mat += ln.ext
     mat_f = mat * factor
     tax = float(s.quoted_tax) if (s.quoted_order and s.quoted_tax is not None) else mat_f * rate
@@ -441,7 +469,7 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     rail_work = 0.0
     if rail_sell:
         _lr = sum(e for i, q, u, r_, e in labor_lines if i.startswith(("Railing", "Cable rail")))
-        _rm = sum(l.ext for l in t.lines if l.category == "Rail" and not ("rink rail" in l.item or "drink-rail" in l.item))
+        _rm = sum(l.ext for l in t.lines if l.category == "Rail" and not drink_rail_line(l))
         rail_work = _rm * factor * (1 + rate) + _lr
     # built-ins the owner prices per section: they sell at that price; their materials + labor come off the margin base
     bsell = builtin_sells(s)
@@ -450,13 +478,15 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     for cat, label, n, sv in bsell:
         builtin_work += sum(l.ext for l in t.lines if l.category == cat) * factor * (1 + rate)
         builtin_work += sum(e for i, q, u, r_, e in labor_lines if i.startswith(label))
-    # lights the owner prices per light, installed (extras.lights.sell_each): they sell at that price; their work comes off the margin base
-    light_sell, light_work = __import__("decktakeoff.lighting", fromlist=["fixed_sell"]).fixed_sell(t, labor_lines, factor, rate)
+    # lights the owner prices per light, installed (extras.lights.sell_each): they sell at that price; their work comes off the margin
+    # base — free riser lights (extras.lights.riser_free) too, at $0; light_free is their part of light_work
+    _lt = __import__("decktakeoff.lighting", fromlist=["fixed_sell"])
+    light_sell, light_work, light_free = _lt.fixed_sell(t, labor_lines, factor, rate)
     # the drink rail at the owner's installed price (extras.drink_rail_sell): it sells at that price; its work comes off the margin base
     drink_sell, drink_work = 0.0, 0.0
     if s.extras.drink_rail_sell and s.railing.drink_rail and L.rail:
         drink_sell = float(s.extras.drink_rail_sell)
-        drink_work = (sum(l.ext for l in t.lines if l.category != "Site" and ("rink rail" in l.item or "drink-rail" in l.item)) * factor * (1 + rate)
+        drink_work = (sum(l.ext for l in t.lines if drink_rail_line(l)) * factor * (1 + rate)
                       + sum(e for i, q, u, r_, e in labor_lines if i.startswith("Drink rail")))
     margin_work = work - rail_work - builtin_work - light_work - drink_work
     # stairs the owner prices per riser (extras.stair_rule): they sell at that price; their work comes off the margin base
@@ -483,12 +513,13 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     ld = {i: e for i, q, u, rt, e in labor_lines}
     def labsum(*prefixes):
         return sum(v for k, v in ld.items() if any(k.startswith(p) for p in prefixes))
-    def mats(pred):
-        return sum(l.ext for l in t.lines if l.category != "Site" and pred(l))
+    def mats(pred):                  # a line two parts share (the deck's and the covers' HardieTrim nails, one box): each part its share
+        return sum(l.ext * w_ for l in t.lines if l.category != "Site"
+                   for c_, w_ in (getattr(l, "split", None) or {l.category: 1.0}).items() if pred(l if c_ == l.category else _dc_replace(l, category=c_)))
     def comp(m, l_):
         return (m * factor * (1 + rate) + l_) / (1 - (gm_base if (rail_sell or light_sell or light_work or stair_sell or drink_sell) and not set_sell else gm))
     stone_m = mats(lambda l: "Stone veneer column base" in l.item)
-    drink_m = mats(lambda l: "rink rail" in l.item or "drink-rail" in l.item)
+    drink_m = mats(drink_rail_line)
     oil_m = mats(lambda l: l.category == "Finish" and ("oil" in l.item.lower() or "Sprayer" in l.item))
     alloc = []
     if s.extras.demo_existing and not s.is_timber:
@@ -501,7 +532,10 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         parts.append(("Dark walnut oil finish, two coats, every timber", round(comp(oil_m, labsum("Timber oil")) - PRICEBOOK["labor"]["seal_cut_ends_lot"] / (1 - gm))))
     if s.railing.drink_rail and L.rail:
         parts.append(((f"Drink rail — {s.railing.drink_rail_collection or ''} {s.railing.drink_rail_color or ''}".replace("  ", " ").strip() if hasattr(L, "parts") else   # two-level jobs read the board
-                       f"{s.railing.drink_rail_color or ''} drink rail on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail".strip()), round(drink_sell) if drink_sell and not set_sell else round(comp(drink_m, labsum("Drink rail")))))
+                       f"{s.railing.drink_rail_color or ''} drink rail " + ((("on top of the posts" if str(getattr(s.railing, "drink_rail_mount", "") or "").lower() == "over" else "between the posts")
+                                                                            if str(L.rail.system or "").startswith(("IRX", "Impression")) else
+                                                                            f"on the {'cable ' if RAIL_SYSTEMS.get(L.rail.system, {}).get('cable') else ''}rail")).strip()),   # where the board sits (report.drink_rail_words)
+                      round(drink_sell) if drink_sell and not set_sell else round(comp(drink_m, labsum("Drink rail")))))
     if covers_of(s):
         cover_m = mats(lambda l: l.category == "Porch cover")
         n_cv = len(covers_of(s))
@@ -559,8 +593,11 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     pr.gm_job = gm_base
     # the options' margin: on a per-SF deck the per-SF price says nothing about an option (a stair adds no deck SF), so an option
     # prices from the engine's cost math at the job margin (gm_base) unless sell_per_sf names options_gm ("effective" = the margin
-    # the per-SF price carries); otherwise the margin the price carries, as always
-    pr.options_gm = ((gm if psf[1] == "effective" else float(psf[1])) if psf[1] is not None else gm_base) if psf else gm
+    # the per-SF price carries); otherwise the margin the price carries, as always — but the job margin when the lights or the drink
+    # rail sell at their own price (free riser lights, extras.lights.sell_each, extras.drink_rail_sell): the blend they make is the
+    # base job's, and an option shares none of it
+    pr.options_gm = (((gm if psf[1] == "effective" else float(psf[1])) if psf[1] is not None else gm_base) if psf else
+                     gm_base if (light_sell or light_work or drink_sell) and not set_sell else gm)
     if psf:
         pr.rail_note = f"the owner's ${psf[0]:,.2f}/SF x {L.deck_sf:g} SF"
     if builtin_sell and not set_sell:
@@ -568,18 +605,23 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
     if rail_sell and not set_sell:
         pr.rail_note = f"blended — {L.rail.rail_lf:g} LF rail at ${float(rate_lf):,.2f}/LF (${rail_sell:,.0f})" + (" · " + pr.rail_note if getattr(pr, 'rail_note', '') else "") + f", everything else at {gm_base:.1%} GM"
     pr.light_sell, pr.light_work = light_sell, light_work      # attributes (option_delta, price_options): the lights at their set price
+    pr.light_free = light_free                                 # ... the free riser lights' part of light_work
+    pr.light_gift = _lt.gift_of(getattr(t, "lighting", None))  # ... the free riser lights an option's deck is measured against (gift_excess)
+    pr.past_gift = lambda gift: _lt.past_gift(t, gift, labor_lines, factor, rate)     # ... and what this deck's lights carry past them
+    pr.retail_markup = s.extras.retail_markup                  # the financed rule (option_delta)
     pr.margin_work = margin_work                               # the work that carries the job margin (before the owner's stair rule)
     pr.stair_sell, pr.stair_work = stair_sell, stair_work
     if stair_sell and not set_sell:
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"stairs at the owner's rule: {stair_note} (${stair_sell:,.0f}; their cost "
                         f"${stair_work:,.0f}, {1 - stair_work / stair_sell:.0%} margin)")
-    if light_sell and not set_sell:
+    if light_sell and not set_sell:      # the lights charged (free riser lights apart, below): their count, their own cost
+        _lp, _lw = t.lighting, light_work - light_free
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (
+            f"{_lt.paid_lights(_lp)} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "
+            f"their cost ${_lw:,.0f}, {1 - _lw / light_sell:.0%} margin)" + ("" if rail_sell else f", everything else at {gm_base:.1%} GM"))
+    if light_free and not set_sell:      # the riser lights as a gift: their cost in the job, nothing in the price
         _lp = t.lighting
-        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"{_lp.fixtures} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "
-                        f"their cost ${light_work:,.0f}, {1 - light_work / light_sell:.0%} margin)" + ("" if rail_sell else f", everything else at {gm_base:.1%} GM"))
-    if light_work and not light_sell and not set_sell:      # the riser lights as a gift: their cost in the job, nothing in the price
-        _lp = t.lighting
-        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + f"{_lp.n_riser} riser lights free (their cost ${light_work:,.0f})"
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + f"{_lp.n_riser} riser lights free (their cost ${light_free:,.0f})"
     if drink_sell and not set_sell:
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"drink rail at ${drink_sell:,.0f} installed (its cost ${drink_work:,.0f}, "
                         f"{1 - drink_work / drink_sell:.0%} margin)")
@@ -616,7 +658,9 @@ def price_options(t: Takeoff, base: Pricing, gm: float) -> List[OptionPrice]:
                 t2 = build_takeoff(sp2)
                 p2 = price(t2, gm=gm, tax_rate=base.tax_rate, with_options=False)
                 dcost += p2.work - base.work
-                lset = (getattr(p2, "light_sell", 0.0) - getattr(base, "light_sell", 0.0), getattr(p2, "light_work", 0.0) - getattr(base, "light_work", 0.0))
+                xs, xw = gift_excess(base, p2)       # riser lights the option adds: not the base's gift
+                lset = (getattr(p2, "light_sell", 0.0) - getattr(base, "light_sell", 0.0) + xs,
+                        getattr(p2, "light_work", 0.0) - getattr(base, "light_work", 0.0) - xw)
             except Exception as e:  # an option that can't be built is reported, never silently dropped
                 note = (note + "; " if note else "") + f"could not price change: {e}"
         if o.cost:

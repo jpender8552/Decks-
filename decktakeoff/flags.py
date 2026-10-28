@@ -4,10 +4,10 @@ INTERNAL: these never appear in client documents (GSX standard: no permit/AHJ wo
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import List
+from typing import List, Optional
 
 from . import engineering as eng
-from .catalog import decking_facts, actual
+from .catalog import decking_facts, actual, default_fastener_system
 from .layout import Layout
 from .units import ftin
 
@@ -20,6 +20,23 @@ class Flag:
     topic: str           # setback | engineering | snow | wind | fire | frost | guard | stairs | ledger | footing | product | geometry
     text: str
     ref: str = ""        # code section / source
+
+
+FIG10_LINES = ("Terrain", "Terrain+", "Prime", "Prime+", "Classic")     # CCRR-0128 Table 1 note 7: their 16" tread span needs the Figure 10 2x6 blocking
+
+
+def tread_oc_max(s, st=None) -> Optional[float]:
+    """The widest spacing of what carries a stair tread (stringers, box-step cross members) for the job's tread line: the stair
+    layout's own (support_oc), else engineering.tread_support_oc, else TimberTech composite's own numbers — Terrain / Terrain+ 8"
+    (CCRR-0128 Table 1), any other TimberTech composite line 9" (TimberTech FAQ). None for any other board."""
+    if getattr(st, "support_oc", 0):
+        return float(st.support_oc)
+    wood = decking_facts(s.decking.collection)["material"] == "Wood"
+    if hasattr(eng, "tread_support_oc"):
+        return float(eng.tread_support_oc(s.decking.collection, wood)[0])
+    if s.decking.brand != "TimberTech" or decking_facts(s.decking.collection)["material"] != "Composite":
+        return None
+    return 8.0 if (s.decking.collection or "").startswith("Terrain") else 9.0
 
 
 def run_flags(L: Layout) -> List[Flag]:
@@ -106,10 +123,11 @@ def run_flags(L: Layout) -> List[Flag]:
         add("CHECK", "geometry", f"shape '{g.shape}'{' with ' + str(len(g.notches)) + ' notch(es)' if g.notches else ''} — takeoff is on the bounding rectangle {ftin(L.finished_w)} x {ftin(L.finished_d)}; hand-adjust the deducts")
     if g.levels > 1:
         add("CHECK", "geometry", f"{g.levels} levels — this takeoff covers one level; run one spec per level and add the step-down framing")
-    if fr.footing_type == "diamond_pier" and fr.footing_load_lb > fr.footing_capacity_lb:
-        add("STOP", "footing", f"post load {fr.footing_load_lb:,.0f} lb exceeds {fr.footing_model} ({fr.footing_capacity_lb:,} lb) — more posts or concrete piers", "Pin Foundations chart")
+    ld_ = max([z.frame.footing_load_lb for z in (getattr(L, "zones", None) or []) if getattr(z, "frame", None) is not None] + [fr.footing_load_lb])   # the worst post on the deck (S-100's)
+    if fr.footing_type == "diamond_pier" and ld_ > fr.footing_capacity_lb:
+        add("STOP", "footing", f"post load {ld_:,.0f} lb exceeds {fr.footing_model} ({fr.footing_capacity_lb:,} lb) — more posts or concrete piers", "Pin Foundations chart")
     if fr.footing_type == "diamond_pier":
-        add("CHECK", "footing", f"Diamond Pier: pins 50\" — locate utilities (811) before driving; bearing {fr.footing_load_lb:,.0f} lb/post vs {fr.footing_capacity_lb:,} lb allowable (manufacturer chart, confirm)")
+        add("CHECK", "footing", f"Diamond Pier: pins 50\" — locate utilities (811) before driving; bearing {ld_:,.0f} lb/post vs {fr.footing_capacity_lb:,} lb allowable (manufacturer chart, confirm)")
     if fr.footing_type == "existing":
         _worst = max([max(bl.post_loads) for bl in L.beam_lines if bl.post_loads] + [fr.footing_load_lb])
         add("ENGINEER", "footing", f"existing caissons reused — the engineer verifies capacity for the new loads ({_worst:,.0f} lb worst post); core or probe if no record", "IRC R507.3")
@@ -137,7 +155,8 @@ def run_flags(L: Layout) -> List[Flag]:
         add("CHECK", "ledger", "verify the rim board behind the ledger is solid 2x/LVL/engineered rim (not I-joist web or a hollow band) before the ledger fasteners go in", "IRC R507.9.1.1")
         if not s.is_timber:
             add("INFO", "ledger", (f"lateral: {s.framing.lateral_ties} tension ties per ledger, steel-joist kit / engineer's detail, into the house floor framing" if s.framing.system == "steel"
-                                   else f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) into house floor framing"), "IRC R507.9.2")
+                                   else f"lateral: {s.framing.lateral_ties} x DTT1Z (750 lb each) spread evenly along the ledger, one within 24\" of each end, each on a 3/8\" lag 3\" min into the house floor framing"),
+                "IRC R507.9.2" if s.framing.system == "steel" else "IRC R507.9.2(2)")
 
     # ---------------- wind
     v = site.wind_speed_mph
@@ -192,7 +211,9 @@ def run_flags(L: Layout) -> List[Flag]:
             sev = "CODE" if "handrail" in n or "minimum" in n or "exceeds" in n else ("INFO" if n.startswith("flights:") else "CHECK")
             add(sev, "stairs", f"{st.side} stair: {n}", "IRC R311.7")
         add("INFO", "stairs", f"{st.side} stair: {st.geo.risers} risers @ {st.geo.riser_in:.2f}\" · {st.geo.treads} tread{'s' if st.geo.treads != 1 else ''} @ {st.geo.tread_in:.2f}\" · run {ftin(st.geo.total_run_in)} · "
-            + ("framed 2x6 box, no stringers" if getattr(st, "build", "") == "box" else f"stringers {st.stringers} @ 12\" OC (composite treads)")
+            + ((f"framed 2x6 box, no stringers, {st.cross_members} cross members a box @ {ftin((st.width - 1.5) / max(1, st.cross_members - 1))} OC" if getattr(st, "cross_members", 0) else "framed 2x6 box, no stringers")
+               if getattr(st, "build", "") == "box" else f"stringers {st.stringers} @ {st.width / max(1, st.stringers - 1):.0f}\" OC")
+            + (f" ({st.support_oc:g}\" max under {s.decking.collection} treads: {st.support_src})" if getattr(st, "support_oc", 0) else "")
             + ("  — " + " then ".join(f"{fg.risers} risers (run {ftin(fg.run_in)})" for fg in st.geo.flights) + " with a landing between" if len(st.geo.flights) > 1 else ""), "IRC R311.7.5 / TimberTech")
         if len(st.geo.flights) > 1:
             add("CODE", "stairs", f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair; guard on every open side over 30\" ({st.landing_rail_lf:g} LF counted)" if st.landing_rail_lf else f"{st.side} stair landing: 36\" min in the direction of travel and at least as wide as the stair", "IRC R311.7.6 / R312.1")
@@ -201,6 +222,13 @@ def run_flags(L: Layout) -> List[Flag]:
                 "firm and level (no pad in this scope); if the inspector wants a hard surface there, pavers are an add", "IRC R311.7.6")
         if st.geo.guard_required and st.stair_rail_sides == 0:
             add("STOP", "stairs", f"{st.side} stair: open side over 30\" — stair guard required", "IRC R312.1")
+        box_, mx_ = getattr(st, "build", "") == "box", tread_oc_max(s, st)      # what carries the treads vs the tread line's max (the stair layout's own)
+        n_ = getattr(st, "cross_members", 0) if box_ else st.stringers
+        oc_ = ((st.width - 1.5) if box_ else st.width) / (n_ - 1) if n_ > 1 else 0.0
+        if mx_ and oc_ > mx_ + 0.25:
+            add("CHECK", "stairs", f"{st.side} stair: {'cross members' if box_ else 'stringers'} @ {oc_:.0f}\" OC — over the {mx_:g}\" max for {s.decking.collection} treads: "
+                f"add {'cross members' if box_ else 'stringers'}" + (", or 2x6 blocking per CCRR-0128 Figure 10 for a 16\" span" if s.decking.collection in FIG10_LINES else ""),
+                "CCRR-0128 Table 1 / TimberTech")
 
     # ---------------- roof covers
     from .spec import covers_of
@@ -273,6 +301,19 @@ def run_flags(L: Layout) -> List[Flag]:
         add("CHECK", "product", f"'{s.decking.color}' is not a current {s.decking.collection} color — discontinued or a different line; confirm with D&D")
     if s.framing.rim_plies > 2:
         add("CHECK", "product", f"{s.framing.rim_plies}-ply rims — GSX standard is double rims; never add plies")
+    if s.decking.collection == "Terrain+" and "Cortex" in (s.decking.fastener_system or "", s.decking.border_fastener or ""):
+        add("CHECK", "product", "Cortex in Terrain+: TimberTech's install guide (REV 09/23) lists Terrain and Terrain+ under 'Restricted Cortex Uses' while the Terrain+ product page says "
+            "compatible — get TimberTech's written OK before ordering (877-275-2935); the fallback is TOPLoc face screws with a 5/32\" pre-drill", "TimberTech install guide p.12")
+    if ex.hardie_skirt:                  # TR1509 p.3: finish nails into a wood frame (ring shank when stainless), screws or ET&F pins into steel
+        add("CHECK", "hardie", f"get James Hardie Technical Services' written OK for HardieTrim as deck fascia{' and stair risers' if s.stairs else ''} (not a listed use) before ordering — 800-942-7343; "
+            "build to TR1509 (09/25): " + ("color-matched 316SS trim screws (or ET&F pins) into the steel furring / track, 3/4\" from the edges" if s.framing.system == "steel"
+                                          else "2-1/2\" 16-ga 316SS ring-shank finish nails, 1/2\" from the edges")
+            + f", 2\" over soil or mulch, 1/4\" over {'brick, pavers and treads' if s.stairs else 'brick or pavers'}, never caulked", "James Hardie TR1509")
+    if s.decking.brand == "TimberTech" and f["material"] == "Composite" and (s.decking.fastener_system or default_fastener_system(s.decking.collection, s.decking.profile)) == "CONCEALoc":
+        add("CHECK", "product", "first and last field rows: TimberTech's CONCEALoc instructions face-fasten them with TOPLoc for Composite (5/32\" pre-drill, 3/4\" from the edge; Cortex or the "
+            "L-Bracket also, except Terrain) — the GSX Cap-Tor xd is not named: get TimberTech's written OK for it (877-275-2935) or order TOPLoc", "TimberTech install guide p.9 / IRC R507.2.2")
+    if s.decking.brand == "TimberTech" and g.height_in <= 30:
+        add("CHECK", "ventilation", "at least 1-1/2\" between grade and the bottom of every joist and rim — the skirt or fascia, a brick border and mulch must not seal the underside", "TimberTech FAQ")
     if not (site.rear_setback_required_ft or site.side_setback_required_ft) and not site.address:
         add("INFO", "setback", "no address on the spec — tax rate and jurisdiction defaults used")
 

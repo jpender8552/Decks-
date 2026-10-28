@@ -69,10 +69,10 @@ def test_lumber_and_hardware(result):
     assert line(t, "HUCQ210-2").net == 4
     assert line(t, "H2.5AZ").net == 12
     assert line(t, "BC46Z").net == 3 and line(t, "ABA66Z").net == 3
-    assert "13 needed" in line(t, "LedgerLOK").why
+    assert "15 needed" in line(t, "LedgerLOK").why          # FastenMaster Table 1: 10" OC on the 13'-4" joist span (was 13 at 12")
     assert line(t, "DTT1Z").net == 4
-    assert "66 needed" in line(t, "SD10212").why
-    assert "120 needed" in line(t, 'nail 3"').why and "200 needed" in line(t, 'nail 1-1/2"').why
+    assert "54 needed" in line(t, "SD10212").why            # Simpson: an ABA66Z takes 8, not 12 (bases 24 + caps 30)
+    assert "200 needed" in line(t, 'nail 3"').why and "120 needed" in line(t, 'nail 1-1/2"').why    # LUS joist nails are 0.148 x 3 at 45 degrees
     assert line(t, "7/16").net == 12 and line(t, "7/16").order == 14
     assert line(t, 'G-Tape 3035 2"').order == 3 and line(t, 'G-Tape 3035 4"').order == 1
 

@@ -17,6 +17,8 @@ Nothing here draws a stair or a rail. Every piece works from what the engine has
     labor_lines(t, lr)          install labor (ESTIMATE: the GSX rate card has no lighting line)
     fixed_sell(...)             extras.lights.sell_each: the lights sell at a set price each, installed (the rest of the job keeps
                                 its margin; the cost stack still shows their real materials and labor)
+    gift_of / past_gift         extras.lights.riser_free: the job's free riser lights, and what an option's lights carry past
+                                them (the riser lights it adds pay their way: pricing.gift_excess)
     allocation(...)             "what the price includes": what is lit and how it switches, at its sell value
     option_price / stair_addon  the option, and the extra for the lights on another option (the yard stair), as engine deltas
 Every fixture box carries a tag naming the option ("Lighting option: riser light" / "... post-cap light" / "... accent light" /
@@ -47,7 +49,7 @@ DEFAULTS = dict(
     accent_sku="AZTIXLEDACCB",
     transformers=["AZTDL100TRAN", "AZTDL150PPR"],   # candidates; the cheapest installed set >= 1.2 x the load wins
     wire_skus=["LV12-2-250", "LV12-2-100"],          # 12/2 stock rolls; the cheapest mix that covers the estimate
-    connector_sku="wirenut_silicone_25",
+    connector_sku="DRYCONN62225",       # rated for the #12 run conductors (PRODUCTS)
     staple_sku="lv_staples_100",
     headroom=1.2,               # transformer capacity >= 1.2 x the connected load
     run_max_w=60.0,             # TimberTech: 60 W max on one run
@@ -99,6 +101,10 @@ PRODUCTS: Dict[str, dict] = {
     "AZTDLLEDWIRE": dict(desc="TimberTech 16/2 AWG low-voltage wire, 100'", each=112.13, lf=100,
                          source="EST — Lumbermens list eff. 1 Jun 2026"),
     "wirenut_silicone_25": dict(desc="Silicone-filled outdoor wire connectors (25 pk)", each=20.0, count=25, source="EST"),
+    "DRYCONN62225": dict(desc="King Innovation DryConn Aqua/Red (62225) silicone-filled wire connector, UL 486D, 1-3 #12 / 2 #12 w/1 #14, bag of 20", each=16.33, count=20,
+                         source="EST — HomElectrical $16.33 a bag of 20 (DK Hardware $15.65, Fleet Farm $17.49), 28 Oct 2026; not on a D&D quote; the 12/2 "
+                                "splices need it: the Aqua/Orange (62125) lists no #12 combination (King Innovation sheets 50100-01 / 50100-02); a tap is "
+                                "2 #12 + the 16 AWG fixture lead, not on 50100-02's selected list (1 #12 w/1-4 #16, 2 #12 w/1 #14 are) — confirm with King 800-633-0232"),
     "lv_staples_100": dict(desc="Insulated cable staples for the 12/2 along the framing (100 pk)", each=9.0, count=100, source="EST"),
 }
 
@@ -214,6 +220,7 @@ class LightPlan:
     parts: List[str] = field(default_factory=list)
     post_kind: str = "cap"                        # "cap" | "accent" (post_fixture)
     riser_total: Dict[str, int] = field(default_factory=dict)   # stair name -> its risers (lit or not), for the words
+    risers_lit: List[Tuple[str, str, List[int]]] = field(default_factory=list)   # (side, name, risers lit) per stair with risers (gift_of)
 
     @property
     def every_riser(self) -> bool:
@@ -351,7 +358,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
     # the deck (5/8" hole through the decking under the post)
     per_post = (lambda h: 2 * (h + 0.75)) if kind == "cap" else (lambda h: h + 1.0)
     parts = [(p.layout, p.placement, p.spec, p.name) for p in L.parts] if hasattr(L, "parts") else [(L, None, spec, "")]
-    stairs, nodes, notes = [], [], []
+    stairs, nodes, notes, risers_lit = [], [], [], []
     riser_total: Dict[str, int] = {}
     n_riser = deck_posts = stair_posts = 0
     every = max(1, int(cfg.get("every") or 1))
@@ -374,9 +381,11 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
         for st, ss in zip(Lp.stairs, list(sp.stairs) + [None] * len(Lp.stairs)):
             nm = stair_name(ss, st) if ss is not None else f"Stair ({st.side})"
             nr_all = st.geo.risers if (cfg.get("riser") and st.riser_pieces) else 0
+            pk = picked_risers(cfg, st.side, nm, nr_all)              # the risers lit (lights.riser_pick, else all of them)
             if nr_all:
                 riser_total[nm] = nr_all
-            nr = len(picked_risers(cfg, st.side, nm, nr_all))          # the risers lit (lights.riser_pick, else all of them)
+                risers_lit.append((st.side, nm, pk))
+            nr = len(pk)
             k = per_riser(cfg, st.width) if nr else 0
             sposts = (st.stair_posts + st.landing_posts) if (cfg.get("post_cap") and cfg.get("stair_posts")) else 0
             sposts = int(math.ceil(sposts / every)) if sposts else 0
@@ -397,7 +406,7 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
                 nodes.append(Node(x, y, z_deck, w_st / n_sub, trunk * (i + 1) / n_sub + leads / n_sub, f"stair: {nm}" + (f" ({i + 1}/{n_sub})" if n_sub > 1 else ""), pname))
     if not nodes:
         return LightPlan(cfg, stairs, 0, 0, 0, riser_w, cap_w, [], [], 0.0, 0, (0.0, 0.0), 0, ["nothing to light: no closed risers and no rail posts"],
-                         post_kind=kind, riser_total=riser_total)
+                         post_kind=kind, riser_total=riser_total, risers_lit=risers_lit)
     # the outlet: the job's own point, else the house wall behind the middle of the lights
     if cfg.get("transformer_at"):
         ox, oy = float(cfg["transformer_at"][0]), float(cfg["transformer_at"][1])
@@ -407,25 +416,28 @@ def light_plan(spec, L, cfg: Optional[dict] = None) -> Optional[LightPlan]:
         oy = zb[2]
         ox = min(max(ox, zb[0]), zb[1])
     outlet = Node(ox, oy, float(cfg.get("outlet_z_ft", 1.5)), 0.0, 0.0, "outlet")
-    # the runs: per deck level, a nearest-neighbor chain from the light closest to the outlet, cut into runs of at most run_max_w
+    # the runs: per deck level and per side of the outlet along the house (one chain past the outlet doubles back across the deck: on
+    # Prentice one 188' run of 46 W, ~1.3 V at the far end), a nearest-neighbor chain from the light closest to the outlet, cut into
+    # runs of at most run_max_w; the side whose first light is nearest the outlet is run 1
     runs: List[Run] = []
     for pname in dict.fromkeys(n.part for n in nodes):
-        todo = [n for n in nodes if n.part == pname]
-        chain = [min(todo, key=lambda n: _manhattan(outlet, n))]
-        todo.remove(chain[0])
-        while todo:
-            nxt = min(todo, key=lambda n: _manhattan(chain[-1], n))
-            chain.append(nxt); todo.remove(nxt)
-        groups = _split(chain, cfg["run_max_w"])
-        for g in groups:
-            home = _manhattan(outlet, g[0]) + 3.0                 # up the wall to the frame, across, 3' of slack at the transformer
-            chain_ft = sum(_manhattan(a, b) for a, b in zip(g, g[1:])) + sum(n.wire_ft for n in g) - (g[-1].wire_ft / 2 if g[-1].what == "post" else 0.0)
-            runs.append(Run(g, round(home, 1), round(chain_ft, 1)))
+        here = [n for n in nodes if n.part == pname]
+        sides = [q for q in ([n for n in here if n.x < ox], [n for n in here if n.x >= ox]) if q]
+        for todo in sorted(sides, key=lambda q: min(_manhattan(outlet, n) for n in q)):
+            chain = [min(todo, key=lambda n: _manhattan(outlet, n))]
+            todo.remove(chain[0])
+            while todo:
+                nxt = min(todo, key=lambda n: _manhattan(chain[-1], n))
+                chain.append(nxt); todo.remove(nxt)
+            for g in _split(chain, cfg["run_max_w"]):
+                home = _manhattan(outlet, g[0]) + 3.0                 # up the wall to the frame, across, 3' of slack at the transformer
+                chain_ft = sum(_manhattan(a, b) for a, b in zip(g, g[1:])) + sum(n.wire_ft for n in g) - (g[-1].wire_ft / 2 if g[-1].what == "post" else 0.0)
+                runs.append(Run(g, round(home, 1), round(chain_ft, 1)))
     wire_ft = sum(r.home_ft + r.chain_ft for r in runs)
     wire_lf = int(cfg["wire_lf"]) if cfg.get("wire_lf") else int(math.ceil(wire_ft * 1.10 / 10.0) * 10)
     splices = n_riser + deck_posts + stair_posts + sum(1 for n in nodes if n.what.startswith("stair"))    # every fixture lead, every stair's tee
     plan = LightPlan(cfg, stairs, n_riser, deck_posts, stair_posts, riser_w, cap_w, [], runs, round(wire_ft, 1), wire_lf, (round(ox, 2), round(oy, 2)),
-                     splices, notes, [p[3] for p in parts if p[3]], post_kind=kind, riser_total=riser_total)
+                     splices, notes, [p[3] for p in parts if p[3]], post_kind=kind, riser_total=riser_total, risers_lit=risers_lit)
     plan.transformers = _choose_transformers(cfg, plan.load_w)
     for i, r in enumerate(runs):
         if r.drop_v > V_DROP_NOTE:
@@ -475,8 +487,10 @@ def lines_for(plan: LightPlan) -> list:
     for sku in dict.fromkeys(plan.transformers):
         p = product(cfg, sku)
         n = plan.transformers.count(sku)
+        mx_ = sum(float(product(cfg, s).get("watts_max") or product(cfg, s)["watts"]) for s in plan.transformers)     # the maker's max load (TimberTech: 90 W on the 100 W unit)
         sizing = (f"{load:.0f} W connected ({plan.n_cap} post lights x {plan.cap_w:g} W + {plan.n_riser} risers x {plan.riser_w:g} W) x {cfg['headroom']:g} = "
-                  f"{cfg['headroom'] * load:.0f} W ≤ {sum(product(cfg, s)['watts'] for s in plan.transformers):.0f} W; {len(plan.runs)} run{'s' if len(plan.runs) != 1 else ''} ≤ {cfg['run_max_w']:g} W")
+                  f"{cfg['headroom'] * load:.0f} W ≤ {sum(product(cfg, s)['watts'] for s in plan.transformers):.0f} W nameplate, {load:.0f} W ≤ {mx_:g} W max load; "
+                  f"{len(plan.runs)} run{'s' if len(plan.runs) != 1 else ''} ≤ {cfg['run_max_w']:g} W")
         out.append(Line(CATEGORY, p["desc"], n, n, "ea", f"exact  ({sizing})", p["each"], p["source"], p["sku"]))
     if plan.wire_lf:
         home = sum(r.home_ft for r in plan.runs)
@@ -547,24 +561,31 @@ def labor_lines(t, lr: dict) -> list:
     return out
 
 
-def fixed_sell(t, labor_lines, factor: float, rate: float) -> Tuple[float, float]:
-    """(sell, work) of the lights when extras.lights.sell_each sets their installed price (the owner: "$200 per, installed, with
-    margin"): sell = sell_each x lights (risers + posts); work = their real materials (x the material factor, + tax) + their
-    labor — pricing.price takes the work off the margin base and adds the sell, so the rest of the job keeps its margin and the
-    cost stack still shows what the lights cost. (0, 0) without a set price or without lights."""
+def paid_lights(plan: "LightPlan") -> int:
+    """The lights the price charges for: every fixture, less the riser lights when they are the owner's gift (lights.riser_free)."""
+    return plan.fixtures - (plan.n_riser if plan.cfg.get("riser_free") else 0)
+
+
+def fixed_sell(t, labor_lines, factor: float, rate: float) -> Tuple[float, float, float]:
+    """(sell, work, free) of the lights when extras.lights.sell_each sets their installed price (the owner: "$200 per, installed,
+    with margin"): sell = sell_each x the lights charged (risers + posts, paid_lights); work = their real materials (x the material
+    factor, + tax) + their labor — pricing.price takes the work off the margin base and adds the sell, so the rest of the job keeps
+    its margin and the cost stack still shows what the lights cost. free = the part of work that is the free riser lights'
+    (lights.riser_free: riser_work), the job's gift — riser lights an option adds don't share it (past_gift).
+    (0, 0, 0) without a set price or free riser lights, or without lights."""
     plan = getattr(t, "lighting", None)
     if plan is None or not plan.fixtures or not any(l.category == CATEGORY for l in t.lines):
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
     each = plan.cfg.get("sell_each")
     free = bool(plan.cfg.get("riser_free")) and plan.n_riser > 0
     if not each and not free:
-        return 0.0, 0.0
-    m = sum(l.ext for l in t.lines if l.category == CATEGORY)
-    lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
-    if each:                                    # every light at the set price (the free riser lights at none)
-        return round(float(each) * (plan.fixtures - (plan.n_riser if free else 0)), 2), m * factor * (1 + rate) + lab
-    w_r = riser_work(t, labor_lines, factor, rate)
-    return 0.0, w_r                             # the riser lights free: their work leaves the margin base, $0 added
+        return 0.0, 0.0, 0.0
+    w_r = riser_work(t, labor_lines, factor, rate) if free else 0.0
+    if each:                                    # every light charged at the set price (the free riser lights at none)
+        m = sum(l.ext for l in t.lines if l.category == CATEGORY)
+        lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
+        return round(float(each) * paid_lights(plan), 2), m * factor * (1 + rate) + lab, w_r
+    return 0.0, w_r, w_r                        # the riser lights free: their work leaves the margin base, $0 added
 
 
 def _without_risers(t):
@@ -574,10 +595,23 @@ def _without_risers(t):
     return plan2, sum(l.ext for l in lines_for(plan2))
 
 
-def _lab_without_risers(plan, plan2, fix_lab: float, tr_lab: float) -> float:
-    """The lighting labor without the riser lights: the fixture labor for plan2's fixtures, the transformer labor scaled."""
+def _lab_of(plan, plan2, fix_lab: float, tr_lab: float) -> float:
+    """The lighting labor of plan2 (the job's lights re-planned: without the riser lights, say) at the job's own rates: the
+    fixture labor per fixture x plan2's fixtures, the transformer labor scaled."""
     per = fix_lab / plan.fixtures if plan.fixtures else 0.0
     return per * plan2.fixtures + (tr_lab * len(plan2.transformers) / len(plan.transformers) if plan.transformers else 0.0)
+
+
+def _work_less(t, labor_lines, factor: float, rate: float, **cfg) -> Tuple[float, LightPlan]:
+    """The lighting's materials (x the material factor + tax) and labor, less the same lights re-planned with cfg over the
+    job's settings (fewer fixtures, maybe a smaller transformer, shorter runs); and that plan."""
+    plan = t.lighting
+    plan2 = light_plan(t.spec, t.layout, dict(plan.cfg, **cfg))
+    m, m2 = sum(l.ext for l in t.lines if l.category == CATEGORY), sum(l.ext for l in lines_for(plan2))
+    fix_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — install"))
+    tr_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — mount"))
+    lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
+    return (m - m2) * factor * (1 + rate) + (lab - _lab_of(plan, plan2, fix_lab, tr_lab)), plan2
 
 
 def riser_work(t, labor_lines, factor: float, rate: float) -> float:
@@ -586,29 +620,57 @@ def riser_work(t, labor_lines, factor: float, rate: float) -> float:
     plan = getattr(t, "lighting", None)
     if plan is None or not plan.n_riser or not plan.fixtures:
         return 0.0
-    plan2, m2 = _without_risers(t)
-    m = sum(l.ext for l in t.lines if l.category == CATEGORY)
-    fix_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — install"))
-    tr_lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting — mount"))
-    lab = sum(e for i, q, u, r_, e in labor_lines if str(i).startswith("Lighting"))
-    return (m - m2) * factor * (1 + rate) + (lab - _lab_without_risers(plan, plan2, fix_lab, tr_lab))
+    return _work_less(t, labor_lines, factor, rate, riser=False)[0]
+
+
+def gift_of(plan: Optional[LightPlan]) -> Optional[dict]:
+    """The free riser lights (lights.riser_free) as lights settings that light only them on another deck: the risers lit, stair
+    by stair (by name; by side where two stairs share a name), the riser light at its price, the lights per riser — what an
+    option's riser lights are measured against (past_gift). None without free riser lights."""
+    if plan is None or not plan.cfg.get("riser_free") or not plan.n_riser:
+        return None
+    names = [nm for _, nm, _ in plan.risers_lit]
+    pick: Dict[str, List[int]] = {}
+    for side, nm, pk in plan.risers_lit:
+        k = nm if names.count(nm) == 1 else side
+        pick[k] = sorted(set(pick.get(k, [])) | set(pk))
+    sku = plan.cfg["riser_sku"]
+    return dict(riser=True, riser_pick={k: v for k, v in pick.items() if v}, riser_sku=sku, per_riser=plan.cfg.get("per_riser"),
+                prices={sku: product(plan.cfg, sku)["each"]})
+
+
+def past_gift(t, gift: Optional[dict], labor_lines, factor: float, rate: float) -> Tuple[float, float]:
+    """(sell, work) of the job's lights past another job's free riser lights (gift_of) when this job gives free riser lights
+    too: the gift is that job's own riser lights, so riser lights this one adds (or a pricier riser light, or more to a riser)
+    pay their way. sell = sell_each x the riser lights past the gift's (extras.lights.sell_each); else work = the lighting's
+    work less the same with only the gift's riser lights, for the margin. (0, 0) when nothing is past the gift."""
+    plan = getattr(t, "lighting", None)
+    if not gift or plan is None or not plan.cfg.get("riser_free") or not plan.n_riser:
+        return 0.0, 0.0
+    w, plan2 = _work_less(t, labor_lines, factor, rate, **dict(gift, prices=dict(plan.cfg.get("prices") or {}, **gift["prices"])))
+    each = plan.cfg.get("sell_each")
+    if each:
+        return float(each) * max(0, plan.n_riser - plan2.n_riser), 0.0
+    return 0.0, (w if w >= 0.005 else 0.0)              # under a cent: the same lights re-planned (float noise), or fewer
 
 
 def allocation(t, mats, labsum, comp) -> list:
-    """The lighting's line in "what the price includes" (sell value: sell_each x lights when set), or nothing."""
+    """The lighting's line in "what the price includes" (sell value: sell_each x the lights charged when set), or nothing. Free
+    riser lights (lights.riser_free) read once, on a line of their own at $0 — the paid line is the post lights (none without them)."""
     plan = getattr(t, "lighting", None)
     m = mats(lambda l: l.category == CATEGORY)
     if plan is None or not m:
         return []
     free = bool(plan.cfg.get("riser_free")) and plan.n_riser > 0
     gift = [(f"{plan.n_riser} riser lights, {riser_where(plan)} — included at no charge", 0)] if free else []
+    paid = short_words(plan, risers=not free) if (plan.n_cap or not free) else ""
     if plan.cfg.get("sell_each"):
-        return [(short_words(plan), round(float(plan.cfg["sell_each"]) * (plan.fixtures - (plan.n_riser if free else 0))))] + gift
+        return ([(paid, round(float(plan.cfg["sell_each"]) * paid_lights(plan)))] if paid else []) + gift
     if free:                                    # the post lights at the margin as if there were no riser lights; the riser lights at none
         plan2, m2 = _without_risers(t)
-        lab2 = _lab_without_risers(plan, plan2, labsum("Lighting — install"), labsum("Lighting — mount"))
-        return [(short_words(plan).replace(f"{plan.n_riser} riser lights and ", ""), round(comp(m2, lab2)))] + gift
-    return [(short_words(plan), round(comp(m, labsum("Lighting"))))]
+        lab2 = _lab_of(plan, plan2, labsum("Lighting — install"), labsum("Lighting — mount"))
+        return ([(paid, round(comp(m2, lab2)))] if paid else []) + gift
+    return [(paid, round(comp(m, labsum("Lighting"))))]
 
 
 def post_label(plan: "LightPlan", n: Optional[int] = None) -> str:
@@ -661,9 +723,10 @@ def riser_where(plan: LightPlan) -> str:
     return ", ".join(f"{nr * k} on the {_low(nm)}" for nm, nr, k in rs)
 
 
-def short_words(plan: LightPlan) -> str:
+def short_words(plan: LightPlan, risers: bool = True) -> str:
+    """"Lighting — 5 riser lights and 9 post-cap lights, LED, ..." (risers=False: the post lights only)."""
     bits = []
-    if plan.n_riser:
+    if plan.n_riser and risers:
         bits.append(f"{plan.n_riser} riser lights")
     if plan.n_cap:
         bits.append(post_label(plan, plan.n_cap))
@@ -722,7 +785,9 @@ def _terms(spec, check: float) -> Tuple[float, float, float]:
 def option_price(spec, **cfg) -> dict:
     """The lighting option on this spec: the whole installed difference of the spec with the lights against it without
     (check, financed, monthly; cost = the work delta). With extras.lights.sell_each the option sells at that price per light
-    (risers + posts), financed and monthly as usual; otherwise materials + labor at the job margin. Plus the counts."""
+    charged (risers + posts; free riser lights at none), financed and monthly as usual; otherwise materials + labor at the job
+    margin. Free riser lights (lights.riser_free) ride with the lights: free_work is their work. Plus the counts, and the
+    spec's quote with the lights (pricing)."""
     from . import run
     off = with_lights(spec, on=False)
     on = with_lights(spec, on=True, **cfg)
@@ -731,7 +796,7 @@ def option_price(spec, **cfg) -> dict:
     plan = getattr(t1, "lighting", None)
     each = plan.cfg.get("sell_each") if plan is not None else None
     if each:
-        check, retail, monthly = _terms(on, float(each) * plan.fixtures)
+        check, retail, monthly = _terms(on, float(each) * paid_lights(plan))
     else:
         try:
             from .pricing import option_delta
@@ -741,6 +806,7 @@ def option_price(spec, **cfg) -> dict:
     cost = round(p1.work - p0.work, 2)
     return dict(check=round(check), financed=round(retail), monthly=round(monthly, 2), cost=cost,
                 gm=round(1 - cost / check, 4) if check else 0.0, sell_each=each, fixtures=plan.fixtures if plan else 0,
+                free_work=round(getattr(p1, "light_free", 0.0), 2), pricing=p1,
                 materials=round(sum(l.ext for l in t1.lines if l.category == CATEGORY), 2),
                 labor=round(sum(e for i, q, u, r, e in p1.labor_lines if i.startswith("Lighting")), 2),
                 risers=plan.n_riser if plan else 0, caps=plan.n_cap if plan else 0, post_kind=plan.post_kind if plan else "",
@@ -750,10 +816,15 @@ def option_price(spec, **cfg) -> dict:
 
 def stair_addon(base_spec, with_stair_spec, **cfg) -> dict:
     """The extra for the lights when another option (the yard stair) is also chosen: the lighting option on the spec with
-    that option, less the lighting option on the base (with sell_each: sell_each x the stair's lights, financed as usual)."""
+    that option, less the lighting option on the base (with sell_each: sell_each x the stair's lights, financed as usual). Free
+    riser lights (lights.riser_free) are the base deck's: the stair's own riser lights pay their way (pricing.gift_excess)."""
+    from .pricing import gift_excess
     a, b = option_price(base_spec, **cfg), option_price(with_stair_spec, **cfg)
     out = {k: round(b[k] - a[k], 2) for k in ("check", "financed", "monthly", "cost", "materials", "labor", "risers", "caps", "fixtures", "load_w", "wire_lf")}
-    if a.get("sell_each") and b.get("sell_each"):
+    xs, xw = gift_excess(a["pricing"], b["pricing"])          # the stair's riser lights: at sell_each, else their work at the option margin
+    if xs or xw:
+        out["check"] = round(out["check"] + xs + xw / (1 - a["pricing"].options_gm))
+    if (a.get("sell_each") and b.get("sell_each")) or xs or xw:
         out["check"], out["financed"], out["monthly"] = _terms(with_lights(with_stair_spec, on=True, **cfg), out["check"])
         out["monthly"] = round(out["monthly"], 2)
     out["gm"] = round(1 - out["cost"] / out["check"], 4) if out["check"] else 0.0

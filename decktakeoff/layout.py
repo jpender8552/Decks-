@@ -216,6 +216,9 @@ class StairLayout:
     landing_footings: int = 0            # landing posts standing on the deck's own footings (Stair.landing_footing "deck"): 4 per landing
     landing_post_h: List[float] = field(default_factory=list)   # per landing: its frame bottom above the stair's foot (in)
     own_footings: int = 0                # posts on the stair's own 12" caissons (Stair.landing_footing "caisson12"): landing + carrier posts
+    support_oc: float = 0.0              # max center to center of what carries the treads, for the tread line (eng.tread_support_oc)
+    support_src: str = ""                # ... and the document that number comes from
+    cross_members: int = 0               # a box step: 2x6 cross members per box, front rim to back rim, every space <= support_oc
 
 
 @dataclass
@@ -327,6 +330,10 @@ class Layout:
 
     @property
     def outer_edge_lf(self) -> float:
+        """The deck's exposed edge (LF): a deck laid on a true outline, its open sides (Prentice's double octagon, sides 1-11);
+        else the zones' exposed edges."""
+        if self.outline_edges:
+            return round(sum(math.hypot(e.x1 - e.x0, e.y1 - e.y0) for e in self.outline_edges if e.exposed) / 12.0, 1)
         return round(sum(e.length for e in self.edges if e.exposed) / 12.0, 1)
 
     @property
@@ -347,6 +354,109 @@ def _stock_for(length_in: float, step_up_within: float = 2.0) -> int:
         if length_in <= s * 12 - step_up_within:
             return s
     return STOCK_LENGTHS_FT[-1]
+
+
+HARDIE_THICK = {"4/4": 0.75, "5/4": 1.0}     # James Hardie HardieTrim boards, actual thickness (in)
+
+
+def hardie_thick(spec: DeckSpec) -> Optional[float]:
+    """The HardieTrim board's real thickness when extras.hardie_skirt wraps the rim and makes the risers (4/4 = 3/4", 5/4 = 1"), else None."""
+    hs = spec.extras.hardie_skirt
+    if not hs or not spec.decking.fascia:
+        return None
+    return next((t for k, t in HARDIE_THICK.items() if str(hs).strip().startswith(k)), HARDIE_THICK["4/4"])
+
+
+def divider_joist_offset(dkl: "DeckingLayout", jb: float) -> float:
+    """A divider joist's center line off the breaker line: the field boards stop bw/2 + gap off the line, so the joist's inside
+    face sits there and every board end bears the joist's full width."""
+    return dkl.bw / 2 + dkl.gap + jb / 2
+
+
+def breaker_board_end(L, dx: float) -> Optional[float]:
+    """Where the breaker on line dx really ends at the front (plan y, in): the plan runs it to the frame face, but its board butts
+    the front border level with the field rows beside it (at a mitered corner the lower side's top row; past a step in the front
+    the deeper side's). None without a picture frame."""
+    if not L.spec.geometry.picture_frame:
+        return None
+    dk = L.zones[0].decking
+    td = dk.bw / 2 + dk.gap
+    if getattr(L, "plan", None) is not None:
+        tops = []
+        for sd in (-1, 1):
+            ys = [r.y1 for r in L.plan.rows if (r.right if sd < 0 else r.left) == "divider" and abs((r.x1 if sd < 0 else r.x0) - (dx + sd * td)) < 0.1]
+            tops += [max(ys)] if ys else []
+        return (min(tops) if max(tops) - min(tops) <= 2 * td else max(tops)) if tops else None
+    edge = (dk.fascia_t + NOSE) if L.spec.decking.fascia else OVERHANG_NO_FASCIA
+    return max(z.wall_y + z.D for z in L.zones) + edge - dk.bw - dk.gap
+
+
+def zone_bays(z: "ZoneLayout", jb: float) -> List[Tuple[float, float]]:
+    """A zone's joist bays (plan y, in): ledger / rear rim face to the front rim face, split at its mid flush beams (as the 3D)."""
+    fr = z.frame
+    rim_t = fr.rim_plies * jb
+    mid = sorted([b for b in fr.beams if b.kind == "flush" and b.cl_y + b.width / 2 < z.D - 0.5], key=lambda b: b.cl_y)
+    front_t = max([rim_t] + [b.width for b in fr.beams if b.kind == "flush" and b.cl_y + b.width / 2 >= z.D - 0.5])
+    bays, ya = [], z.wall_y + (jb if fr.ledger else rim_t)
+    for b in mid:
+        bays.append((ya, z.wall_y + b.cl_y - b.width / 2 - 0.24)); ya = z.wall_y + b.cl_y + b.width / 2 + 0.24
+    return bays + [(ya, z.wall_y + z.D - front_t)]
+
+
+def zone_divider_framing(L, zi: int, bays: Optional[List[Tuple[float, float]]] = None):
+    """A zone framed on its own (no outline frame) at the breakers, plan inches: (every joist line (x, "joist" | "PF joist" |
+    "divider joist <lab>"), the breaker blocks (x0, x1, y center, label), the divider-joist pairs (x left, x right)). A breaker
+    inside the zone: a joist each side, its inside face under the field-board ends, the breaker on blocks between at the joist
+    spacing (16" max); a joist between the pair goes, one a divider joist lands on from outboard moves out to touch it. On a zone
+    line: the zone's picture-frame joist on that side moves tight inside its rim (no rail post in its gap there) and the board
+    ends bear on it, a field joist going in only where that opens its bay past the spacing; the breaker rides the two rims."""
+    z = L.zones[zi]; fr = z.frame
+    jb = actual(L.spec.framing.joist_size)[0]
+    rim_t = fr.rim_plies * jb
+    x0, x1 = z.x0, z.x0 + z.W
+    d_off = divider_joist_offset(z.decking, jb)
+    js = [(x0 + j, "joist") for j in fr.joist_x] + [(x0 + p, "PF joist") for p in fr.pf_x]
+    dv, cen = [], []
+    for dx, Ld, lab in L.divider_x:
+        zl = [q for q in (x0, x1) if abs(dx - q) < 0.6]
+        c, d = (zl[0], max(d_off, rim_t + jb / 2)) if zl else (dx, d_off)
+        got = [(c + sg * d, f"divider joist {lab}", dx, bool(zl)) for sg in (-1.0, 1.0) if x0 + 0.6 < c + sg * d < x1 - 0.6]
+        if got and zl:
+            js = [q for q in js if not (q[1] == "PF joist" and abs(q[0] - c) < rim_t + 1.5 + jb + 0.5)]
+        dv += got
+        cen += [(c, d)] if got else []
+    out = []
+    for X, lab in js:
+        hit = next(((c, d) for c, d in cen if abs(X - c) < d + jb - 1e-6), None)
+        if hit is None or abs(X - hit[0]) >= hit[1]:
+            out.append((X if hit is None else hit[0] + math.copysign(hit[1] + jb, X - hit[0]), lab))
+    out = sorted(out + [(X, lab) for X, lab, _, _ in dv])
+    sp_j = float(L.spec.joist_spacing)
+    for X, lab, _, zl_ in [q for q in dv if q[3]]:           # the moved picture-frame joist must not open its bay past the spacing
+        k = next(i for i, q in enumerate(out) if q[0] == X and q[1] == lab)
+        nb = out[k + 1] if X < (x0 + x1) / 2 and k + 1 < len(out) else (out[k - 1] if X >= (x0 + x1) / 2 and k > 0 else None)
+        if nb is not None and abs(nb[0] - X) > sp_j + 1e-6:
+            n_ = int(math.ceil(abs(nb[0] - X) / sp_j - 1e-6))
+            out = sorted(out + [(X + (nb[0] - X) * i / n_, "joist") for i in range(1, n_)])
+    bays = zone_bays(z, jb) if bays is None else bays
+    y_front = max(q.wall_y + q.D for q in L.zones)
+    sp_b = min(float(L.spec.joist_spacing), 16.0)
+    blocks, pairs = [], []
+    for dx, Ld, lab in L.divider_x:
+        pr = sorted(X for X, _, dx_, zl_ in dv if dx_ == dx and not zl_)
+        if len(pr) != 2:
+            continue
+        pairs.append((pr[0], pr[1]))
+        lo0, hi0 = next(((lo_, hi_) for x_, lo_, hi_, _ in (L.plan.dividers if L.plan is not None else []) if abs(x_ - dx) < 0.6), (y_front - Ld, y_front))
+        be = breaker_board_end(L, dx)
+        hi0 = hi0 if be is None else min(hi0, be + 0.75)          # the last block takes the breaker's own end 3/4" in
+        for ya, yb in bays:
+            lo, hi = max(ya, lo0), min(yb, hi0)
+            if hi - lo < jb:
+                continue
+            k_ = max(1, int(math.ceil((hi - lo - jb) / sp_b - 1e-9)))
+            blocks += [(pr[0] + jb / 2, pr[1] - jb / 2, lo + jb / 2 + (hi - lo - jb) * k / k_, f"divider block {lab}") for k in range(k_ + 1)]
+    return out, blocks, pairs
 
 
 def size_frame_to_boards(D: float, bw: float, gap: float, fascia_t: float, fit: bool) -> Tuple[float, int, float, str]:
@@ -373,7 +483,7 @@ def decking_layout(spec: DeckSpec, W: float, D: float, n_bearing: int) -> Deckin
     f = decking_facts(dk.collection)
     bw, bt, gap = f["width"], f["thick"], spec.deck_gap
     fas = FASCIA[f["material"]]
-    ft_ = fas["thick"] if dk.fascia else 0.0
+    ft_ = (hardie_thick(spec) or fas["thick"]) if dk.fascia else 0.0      # HardieTrim 4/4 is 3/4", not the decking fascia's 0.58"
     nose = NOSE if dk.fascia else OVERHANG_NO_FASCIA
     deck_w = W + 2 * (ft_ + nose)
     deck_d = D + ft_ + nose
@@ -389,6 +499,9 @@ def decking_layout(spec: DeckSpec, W: float, D: float, n_bearing: int) -> Deckin
         rows = int(round((avail - gap) / (bw + gap))) if spec.geometry.fit_frame_to_boards else int(math.floor((avail - gap) / (bw + gap)))
         rows = max(rows, 1)
         dev = (gap + rows * (bw + gap) + (bw if pf else 0)) - deck_d
+        if dev > max(0.5, rows / 32.0) and rows > 1:     # a zone at its drawn depth (no frame resize): no row the gaps can't make room for
+            rows -= 1                                    # (1/32" a gap at most) — a rip at the house instead
+            dev -= bw + gap
     else:
         field_len = deck_d - (bw + gap) if pf else deck_d     # boards run out from the house to the front border
         avail = deck_w - (2 * bw if pf else 0)
@@ -1013,6 +1126,14 @@ class OutlineFrame:
     rim_ledger: List[str] = field(default_factory=list)                                         # each of them by the angle it meets: square | skew45 | field
     notch_hangers: int = 0       # inset-stair notches: concealed-flange double hangers (trimmer ends, headers on the trimmer)
     notches: List[dict] = field(default_factory=list)   # per framed notch: side, trimmer (x, y_a, y_b, ends), headers, PF joist
+    block_quads: dict = field(default_factory=dict)       # {index in blocks: 4 plan points} a block beveled to an angled member
+
+
+def _open_span(poly, y, xa, xb) -> Optional[Tuple[float, float]]:
+    """The stretch of [xa, xb] at plan y inside poly (the frame's inset outline: open between the members' faces), else None."""
+    cr = _row_cross(poly, y)
+    s = next(((a, b) for (a, _), (b, _) in zip(cr[0::2], cr[1::2]) if a < xb and b > xa), None)
+    return None if s is None else (max(xa, s[0]), min(xb, s[1]))
 
 
 def _col_cross(poly, x) -> List[Tuple[float, int]]:
@@ -1086,9 +1207,23 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
                 xs.append((z.x0 + z.frame.pf_x[0], "PF joist"))
             if zi == last:
                 xs.append((z.x0 + z.frame.pf_x[-1], "PF joist"))
-    for dx, Ld, lab in (L.divider_x or []):
-        xs += [(dx - jb, f"divider joist {lab}"), (dx + jb, f"divider joist {lab}")]
-    xs.sort()
+    # the doubled joist at a divider: one joist each side of the breaker, its inside face where the field boards stop (bw/2 + gap off
+    # the line), so every board end bears a full joist width (TimberTech: board ends on a joist, each end on its own clip); a joist
+    # between the pair is replaced by it, one a divider joist lands on from outboard moves out to touch it (no bay grows)
+    d_off = divider_joist_offset(L.zones[0].decking, jb)
+    dvl = [(dx, lab) for dx, Ld, lab in (L.divider_x or [])]
+    xs_ = []
+    for X, lab in xs:
+        c_ = next((dx for dx, _ in dvl if abs(X - dx) < d_off + jb - 1e-6), None)
+        if c_ is None or abs(X - c_) >= d_off:
+            xs_.append((X if c_ is None else c_ + math.copysign(d_off + jb, X - c_), lab))
+    xs = sorted(xs_ + [(dx + sg * d_off, f"divider joist {lab}") for dx, lab in dvl for sg in (-1.0, 1.0)])
+    # no bay over the joist spacing: a zone line drops both zones' picture-frame joists (no border there), which leaves the joists
+    # either side more than a bay apart, and a zone's last bay before its picture-frame joist can run 3" over — field joists go in
+    # evenly between (Prentice: 144" to 157-5/16", one at 150-11/16"; Fillmore lower: 81-1/32" and 337-7/8")
+    sp_j = float(spec.joist_spacing)
+    fill = [(xa + (xb - xa) * k / n_, "joist") for (xa, _), (xb, _) in zip(xs, xs[1:]) for n_ in [int(math.ceil((xb - xa) / sp_j - 1e-6))] for k in range(1, n_)]
+    xs = sorted(xs + fill)
     for X, lab in xs:
         cr = _col_cross(ins, X)
         for (ya, ia), (yb, ib) in zip(cr[0::2], cr[1::2]):
@@ -1152,11 +1287,51 @@ def outline_framing(spec: DeckSpec, L) -> Optional[OutlineFrame]:
                 ya = y0 + (y1 - y0) * (a - x0) / (x1 - x0); yb = y0 + (y1 - y0) * (b - x0) / (x1 - x0)
                 of.blocks.append((a, ya, b, yb, f"PF block side {i + 1}"))
     _frame_notches(spec, of, poly, ins, jb, plies)        # inset stairs: trimmer, headers, PF joist in the notch they sit in
+    # the breaker rides 2x blocks between its two divider joists: tight to the ledger / beam at each end of the pair (at the front,
+    # under the breaker's own end) and evenly between at the joist spacing (TimberTech picture frame: blocking 16" OC max)
+    sp_b = min(float(spec.joist_spacing), 16.0)
+    brk = [(x_, lo_, hi_) for x_, lo_, hi_, _ in (L.plan.dividers if getattr(L, "plan", None) is not None else [])]
+    n_db = n_de = 0
+    for dx, Ld, lab in (L.divider_x or []):
+        y_lo, y_hi = next(((lo_, hi_) for x_, lo_, hi_ in brk if abs(x_ - dx) < 0.6), (-1e9, 1e9))
+        # the breaker's board ends at the front border, not the frame face: the last block takes that end 3/4" in, not tight to the
+        # rim under the border (Fillmore: 0.22" short of it, the breaker's end 9-1/2" past its last support)
+        be = breaker_board_end(L, dx) if brk else None
+        y_hi = y_hi if be is None else min(y_hi, be + 0.75)
+        pcs = [(X, a, b) for X, a, b, ea, eb, lab_ in of.joists if lab_ == f"divider joist {lab}"]
+        for X1, a1, b1 in [q for q in pcs if q[0] < dx]:
+            for X2, a2, b2 in [q for q in pcs if q[0] > dx]:
+                lo, hi = max(a1, a2, y_lo), min(b1, b2, y_hi)
+                if hi - lo < jb:
+                    continue
+                k_ = max(1, int(math.ceil((hi - lo - jb) / sp_b - 1e-9)))
+                for k in range(k_ + 1):
+                    yc = lo + jb / 2 + (hi - lo - jb) * k / k_
+                    of.blocks.append((X1 + jb / 2, yc, X2 - jb / 2, yc, f"divider block {lab}"))
+                    n_db += 1
+                # one joist dies on an angled ledger / rim short of the breaker's end (Prentice DC/R at the bay): a block at that end
+                # from the other joist to the member's face, beveled to it, so the breaker overhangs no framing by over 1" (TimberTech)
+                for y_end, y_b, sg in ((max(y_lo, min(a1, a2)), lo, 1.0), (min(y_hi, max(b1, b2)), hi, -1.0)):
+                    if sg * (y_b - y_end) <= 1.0 + 1e-6:
+                        continue
+                    yc = y_end + sg * min(jb / 2, sg * (y_b - y_end) - jb / 2)      # at the end, else tight to the first block
+                    sp_ = [_open_span(ins, y_, X1 + jb / 2, X2 - jb / 2) for y_ in (yc, yc - jb / 2 + 0.01, yc + jb / 2 - 0.01)]
+                    if None in sp_ or sp_[0][1] - sp_[0][0] < jb:
+                        continue                  # the rim / ledger plies themselves are under that end
+                    of.block_quads[len(of.blocks)] = [(sp_[1][0], yc - jb / 2), (sp_[1][1], yc - jb / 2), (sp_[2][1], yc + jb / 2), (sp_[2][0], yc + jb / 2)]
+                    of.blocks.append((sp_[0][0], yc, sp_[0][1], yc, f"divider end block {lab}"))
+                    n_db += 1; n_de += 1
     n_sk = sum((ea in ("rim45", "bay45")) + (eb in ("rim45", "bay45")) for _, _, _, ea, eb, _ in of.joists)
     n_bf = sum((ea == "ledger45") + (eb == "ledger45") for _, _, _, ea, eb, _ in of.joists)
     of.notes.append(f"outline frame: {len(of.joists)} joist pieces, {sum(b - a for _, a, b, *_ in of.joists) / 12:.0f} LF; "
                     f"{n_sk} joist ends on 45-degree rims (skewed hangers)" + (f", {n_bf} on the bay faces (field-skewable hangers)" if n_bf else "")
-                    + f"; {len(of.blocks)} blocks under the angled borders")
+                    + f"; {len(of.blocks) - n_db} blocks under the angled borders"
+                    + (f"; {n_db - n_de} blocks ({ftin(2 * d_off - jb)}) between the divider joists, the breakers on them @ {sp_b:g}\" OC max" if n_db else "")
+                    + (f", {n_de} more at a breaker end where a divider joist stops short on an angled ledger or rim (beveled to it)" if n_de else "")
+                    + (f"; {len(fill)} field joist{'s' if len(fill) != 1 else ''} added where a bay ran over {sp_j:g}\" (at a zone line, or a zone's last bay)" if fill else ""))
+    if L.divider_x:
+        of.notes.append(f"divider joists: {ftin(d_off)} each side of the breaker line ({ftin(2 * d_off)} apart), their inside faces under the field-board "
+                        f"ends — every end bears {ftin(jb)} (TimberTech: board ends on a joist, each on its own clip)")
     return of
 
 
@@ -1340,7 +1515,7 @@ def step_skirt_layout(spec: DeckSpec) -> Optional[StepSkirt]:
         if getattr(s, "inset", False):
             nt = inset_notch(spec, s.side)
             if nt is not None:
-                r_t = RISER[f["material"]]["thick"] if s.closed_risers else 0.0
+                r_t = (hardie_thick(spec) or RISER[f["material"]]["thick"]) if s.closed_risers else 0.0
                 rise_ = s.total_rise_in or drop
                 geo_ = eng.stair_geometry(rise_, nt["width"], True, tread_w, flights=s.flights or None)
                 run_ = (nt["depth"] + fas_t - r_t) / max(1, geo_.treads)
@@ -1470,6 +1645,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
     f = decking_facts(spec.decking.collection)
     composite = f["material"] != "Wood"
     tread_w = 2 * dkl.bw + dkl.gap + NOSE          # two deck boards + gap + nosing over the riser
+    oc_t, oc_src = eng.tread_support_oc(spec.decking.collection, not composite)   # stringers / box-step cross members: the tread line's own max
     for s in spec.stairs:
         # an inset stair takes its width and its run from the notch it sits in: the treads span cheek skirt to cheek skirt and
         # the bottom riser lands flush with the skirt on the face the notch is cut in
@@ -1480,18 +1656,18 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
         if nt is not None:
             import copy as _copy
             skirt_t = FASCIA[f["material"]]["thick"] if spec.decking.fascia else 0.0
-            r_t = RISER[f["material"]]["thick"] if s.closed_risers else 0.0
+            r_t = (hardie_thick(spec) or RISER[f["material"]]["thick"]) if s.closed_risers else 0.0     # HardieTrim risers on a Hardie job
             clear = round((nt["width"] - 2 * skirt_t) * 8) / 8          # to the 1/8": the outline is in feet
             if abs(clear - s.width_in) > 0.5:
                 ins_notes.append(f"inset stair: the notch is {ftin(nt['width'])} wide, so the treads run {ftin(clear)} between the cheek skirts (the stair asks {ftin(s.width_in)})")
             s = _copy.copy(s)
             s.width_in = clear
         rise = s.total_rise_in if s.total_rise_in else spec.geometry.height_in
-        geo = eng.stair_geometry(rise, s.width_in, composite, tread_w, flights=s.flights or None)
+        geo = eng.stair_geometry(rise, s.width_in, composite, tread_w, stringer_oc=oc_t, flights=s.flights or None)
         if nt is not None:
             run_fit = (nt["depth"] + skirt_t - r_t) / max(1, geo.treads)
             if eng.TREAD_MIN <= run_fit <= tread_w + 1.0:
-                geo = eng.stair_geometry(rise, s.width_in, composite, round(run_fit, 3), flights=s.flights or None)
+                geo = eng.stair_geometry(rise, s.width_in, composite, round(run_fit, 3), stringer_oc=oc_t, flights=s.flights or None)
             else:
                 ins_notes.append(f"inset stair: the notch is {ftin(nt['depth'])} deep — {geo.treads} treads would run {run_fit:.2f}\"; make it "
                                  f"{ftin(geo.treads * tread_w + r_t - skirt_t)} deep for {tread_w:.2f}\" treads (bottom riser flush with the skirt)")
@@ -1554,9 +1730,11 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
                          + (f" — under each of {len(carriers)} flights" if len(carriers) > 1 else "")
                          + f"; {2 * n_car * max(1, len(carriers))} posts and footings in all")
         box = (s.build or "stringers") == "box"
+        ncm = int(math.ceil(s.width_in / oc_t - 1e-9)) + 1 if box else 0     # the tread boards span cross member to cross member (as the stringers)
         if box:
             notes = [n for n in notes if "stringer" not in n]
             notes.append(f"{geo.treads} framed 2x6 box{'es' if geo.treads > 1 else ''} {s.width_in:.0f}\" wide on a 4\" compacted 3/4\" base, fastened to the rim — no stringers;"
+                         f" {ncm} cross members a box, {ftin((s.width_in - 1.5) / (ncm - 1))} on center ({oc_t:g}\" max under {spec.decking.collection} treads: {oc_src});"
                          " fascia on the front and both ends, decked in the field board")
         elif s.skirts:
             notes.append("fascia skirts on both sides of the stair, stepped under each tread — the stringers never show")
@@ -1564,6 +1742,7 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
                                s.landing, opening, notes, mid and not box, (round(longest / 2.0, 1) if mid else 0.0) if not box else 0.0, frails, land_secs, land_posts, round(land_lf, 1),
                                carriers if not box else [], fracs, build="box" if box else "stringers", skirts=bool(s.skirts) or box))
         sl = out[-1]
+        sl.support_oc, sl.support_src, sl.cross_members = oc_t, oc_src, ncm
         sl.handrail, sl.handrail_side, sl.option = getattr(s, "handrail", "") or "", getattr(s, "handrail_side", "") or "right", getattr(s, "option", "") or ""
         lft_ = getattr(s, "landing_footing", "") or ""
         if lft_ in ("deck", "caisson12") and s.landings and len(geo.flights) > 1:
@@ -1600,7 +1779,19 @@ def stair_layouts(spec: DeckSpec, W: float, D: float, dkl: DeckingLayout) -> Lis
                 sl.notes.append(f"graspable handrail on the {sl.handrail_side} going down, bracketed to the deck guard's posts along that cheek, 34–38\" over the nosings, "
                                 f"top riser to bottom riser ({sl.handrail_lf:g}' of rail)")
         sl.notes += ins_notes
+    from .scene import box_step_free_ends           # a box step's end skirts: none at an end mitered into the next box step
+    for sl in out:
+        if sl.build == "box":
+            sl.notes = [n.replace("fascia on the front and both ends, decked in the field board", box_step_words(spec, box_step_free_ends(spec, out, sl))) for n in sl.notes]
     return out
+
+
+def box_step_words(spec: DeckSpec, free_ends: int, treads: bool = True) -> str:
+    """A box step's skin as the crew builds it: fascia on the front and on each free end (none at an end mitered into the next box
+    step), and the tread boards — square-shouldered where the field is grooved (the nosing shows), else the field board."""
+    ends = {2: "fascia on the front and both ends", 1: "fascia on the front and its free end (mitered into the next box step at the other)",
+            0: "fascia on the front (mitered into the next box steps at both ends)"}[max(0, min(2, free_ends))]
+    return ends + ((", decked in square-shouldered tread boards" if spec.decking.profile == "grooved" else ", decked in the field board") if treads else "")
 
 
 # ================================================================== beam lines across zones
@@ -2133,7 +2324,7 @@ def build_layout(spec: DeckSpec) -> Layout:
     g = spec.geometry
     f = decking_facts(spec.decking.collection)
     gap = spec.deck_gap
-    fas_t = FASCIA[f["material"]]["thick"] if spec.decking.fascia else 0.0
+    fas_t = (hardie_thick(spec) or FASCIA[f["material"]]["thick"]) if spec.decking.fascia else 0.0
     notes = []
     if g.zones:
         # ---- multi-zone: zone dimensions are frame dimensions as drawn; each zone framed on its own wall

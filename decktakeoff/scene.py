@@ -32,7 +32,7 @@ class Box:
     xg: float = 0.0     # extra lift in the exploded view (ft) on top of the phase gap: layers within one phase pull apart
     pts: Optional[list] = None   # shape "mesh": triangle vertices [[x, y, z], ...] in plan feet (3 per triangle) — shade sails
     layer: str = ""              # "site": the yard (lawn, beds, walls, plants, fences, neighbors) — the 3D views draw it, the drawing sheets leave it out
-    quad: Optional[list] = None  # a mitered board's true top outline, 4 plan points [x, y] (ft): the photoreal pass builds the prism from it, the viewer keeps the box
+    quad: Optional[list] = None  # a mitered board's true top outline, 4 plan points [x, y] (ft): the photoreal pass and the viewer (quadPrism) build the prism from it
 
 
 @dataclass
@@ -95,8 +95,15 @@ def _mitred_quads(borders, poly, sgn, edge, bw):
     return quads
 
 
+def _color_key(name) -> str:
+    """A color name the way the color tables key it: lower case, American spelling (a job's "Grey" / "Steel Grey" is gray)."""
+    return str(name or "").strip().lower().replace("grey", "gray")
+
+
 def _palette(collection: str, color: str) -> List[str]:
-    return BOARDS_PALETTE.get((collection, color), ["#8f6a42", "#a07a4d", "#b58a58", "#c49a68", "#d2ad7b"])
+    pal = BOARDS_PALETTE.get((collection, color)) or next(
+        (v for (c_, n_), v in BOARDS_PALETTE.items() if c_ == collection and _color_key(n_) == _color_key(color)), None)   # the name in another case or spelling
+    return pal or ["#8f6a42", "#a07a4d", "#b58a58", "#c49a68", "#d2ad7b"]
 
 
 HARDIE_HEX = {"timber bark": "#4b3f34", "arctic white": "#ecebe4", "cobble stone": "#a9a296", "navajo beige": "#cdbd9f", "khaki brown": "#8a7558",
@@ -105,7 +112,7 @@ HARDIE_HEX = {"timber bark": "#4b3f34", "arctic white": "#ecebe4", "cobble stone
 
 
 def _hardie_hex(name: str) -> str:
-    return HARDIE_HEX.get((name or "timber bark").lower().replace("(color tbd)", "").strip() or "timber bark", "#4b3f34")
+    return HARDIE_HEX.get(_color_key(name or "timber bark").replace("(color tbd)", "").strip() or "timber bark", "#4b3f34")
 
 
 def sun_vector(site) -> Optional[Tuple[float, float, float]]:
@@ -419,8 +426,10 @@ def build_scene(L) -> Scene:
             B.append(rot_box("rim", x0_ * IN, y0_ * IN, x1_ * IN, y1_ * IN, jbot, jtop, "timber", 5, jb, tag=f"rim side {i_ + 1} ply {k_ + 1}"))
         for X_, ya_, yb_, ea_, eb_, lab_ in OF.joists:
             add("joist", X_ * IN - jb / 2, X_ * IN + jb / 2, ya_ * IN, yb_ * IN, jbot, jtop, "timber", 5, tag=lab_)
-        for x0_, y0_, x1_, y1_, lab_ in OF.blocks:
+        for i_, (x0_, y0_, x1_, y1_, lab_) in enumerate(OF.blocks):
             B.append(rot_box("block", x0_ * IN, y0_ * IN, x1_ * IN, y1_ * IN, jbot, jtop, "timber", 5, jb, tag=lab_))
+            if i_ in OF.block_quads:              # beveled to an angled ledger / rim: its true outline
+                B[-1].quad = [[px * IN, py * IN] for px, py in OF.block_quads[i_]]
         if fascia:
             # fascia on every open side, outside the rim, mitered at the corners
             Pq = [(float(x), float(y)) for x, y in spec.geometry.outline]
@@ -468,13 +477,17 @@ def build_scene(L) -> Scene:
         for b in flush_mid:
             bays.append((ya, yw + (b.cl_y - b.width / 2) * IN - 0.02)); ya = yw + (b.cl_y + b.width / 2) * IN + 0.02
         bays.append((ya, yf - front_t))
-        xs = [x0 + jx * IN for jx in fr.joist_x] + [x0 + px * IN for px in fr.pf_x]
-        for dx, Ld, lab in L.divider_x:
-            if x0 - 0.05 <= dx * IN <= x0 + W_z + 0.05 and (dx * IN < x0 + W_z - 0.05 or zi == len(L.zones) - 1):
-                xs += [dx * IN - jb, dx * IN + jb]
-        for xj in xs:
+        # the joists (a pair at each breaker, the zone's picture-frame joist tight inside its rim at a breaker's zone line) and the
+        # blocks under the breakers: layout.zone_divider_framing — the takeoff counts the same members
+        from .layout import zone_divider_framing
+        jx_, blk_, prs_ = zone_divider_framing(L, zi, [(a / IN, b / IN) for a, b in bays])
+        xs = [X_ * IN for X_, _ in jx_]
+        for xj, (_, lab_) in zip(xs, jx_):
             for (ya_, yb_) in bays:
-                add("joist", xj - jb / 2, xj + jb / 2, ya_, yb_, jbot, jtop, "timber", 5)
+                add("joist", xj - jb / 2, xj + jb / 2, ya_, yb_, jbot, jtop, "timber", 5, tag="divider joist" if lab_.startswith("divider") else "")
+        for xa_, xb_, yc_, lab_ in blk_:
+            add("block", xa_ * IN, xb_ * IN, yc_ * IN - jb / 2, yc_ * IN + jb / 2, jbot, jtop, "timber", 5, tag=lab_)
+        pairs_ = [(a * IN, b * IN) for a, b in prs_]
         for k in range(fr.rim_plies):
             add("rim", x0 + k * jb, x0 + (k + 1) * jb, yw + rear_t, yf - front_t, jbot, jtop, "timber", 5, tag="side rim")
             add("rim", x0 + W_z - (k + 1) * jb, x0 + W_z - k * jb, yw + rear_t, yf - front_t, jbot, jtop, "timber", 5, tag="side rim")
@@ -485,7 +498,7 @@ def build_scene(L) -> Scene:
         for by in fr.blocking_rows_y:
             yy = yw + by * IN
             for a, b in zip(allx, allx[1:]):
-                if b - a > jb * 1.5:
+                if b - a > jb * 1.5 and not any(abs(a - p) < 1e-6 and abs(b - q) < 1e-6 for p, q in pairs_):      # a breaker's pair is blocked on its own (above)
                     add("block", a + jb / 2, b - jb / 2, yy - jb / 2, yy + jb / 2, jbot, jtop, "timber", 5)
         # fascia
         if fascia:
@@ -843,15 +856,16 @@ def build_scene(L) -> Scene:
         g = st.geo
         rise, run, width = g.riser_in * IN, g.tread_in * IN, st.width * IN
         side = st.side
+        # u0: where the stair leaves the deck; frame_: the deck's frame line on that side (an option stair's guard stands off it)
         if side in ("right", "end:right"):
-            zz = L.zones[-1]; direction = "+x"; u0 = (zz.x0 + zz.W) * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
+            zz = L.zones[-1]; direction = "+x"; u0 = frame_ = (zz.x0 + zz.W) * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
         elif side in ("left", "end:left"):
-            zz = L.zones[0]; direction = "-x"; u0 = zz.x0 * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
+            zz = L.zones[0]; direction = "-x"; u0 = frame_ = zz.x0 * IN; v_a = zz.wall_y * IN + st.opening.start_in * IN
         elif side.startswith("step:"):
             # the step between two zone fronts: the stair leaves the deeper zone's side edge and runs alongside the shallower zone
             na, nb = side.split(":")[1].split("-")
             za = next(q for q in L.zones if q.name == na); zb = next(q for q in L.zones if q.name == nb)
-            u0 = (za.x0 + za.W) * IN
+            u0 = frame_ = (za.x0 + za.W) * IN
             if zb.D > za.D:
                 direction = "-x"; v_a = (za.wall_y + za.D) * IN + edge + st.opening.start_in * IN
             else:
@@ -867,24 +881,24 @@ def build_scene(L) -> Scene:
                 ar_ = sum(op_[i][0] * op_[(i + 1) % len(op_)][1] - op_[(i + 1) % len(op_)][0] * op_[i][1] for i in range(len(op_)))
                 nx_, ny_ = (ty_, -tx_) if ar_ > 0 else (-ty_, tx_)            # outward: the right-hand normal of a counter-clockwise outline
                 diag_ = (e_.x0 * IN, e_.y0 * IN, tx_, ty_, nx_, ny_)
-                direction = "+y"; u0 = edge; v_a = st.opening.start_in * IN
+                direction = "+y"; frame_, u0 = 0.0, edge; v_a = st.opening.start_in * IN
             elif abs(e_.y1 - e_.y0) < 0.5:
                 direction = "+y" if e_.x1 > e_.x0 else "-y"
-                u0 = e_.y0 * IN + (edge if direction == "+y" else -edge)
+                frame_ = e_.y0 * IN; u0 = frame_ + (edge if direction == "+y" else -edge)
                 v_a = (min(e_.x0, e_.x1) + (st.opening.start_in if e_.x1 > e_.x0 else abs(e_.x1 - e_.x0) - st.opening.start_in - st.width)) * IN
             else:
                 direction = "-x" if e_.y1 > e_.y0 else "+x"
-                u0 = e_.x0 * IN + (-edge if direction == "-x" else edge)     # from the deck board's edge, outside the fascia (as a front stair)
+                frame_ = e_.x0 * IN; u0 = frame_ + (-edge if direction == "-x" else edge)     # from the deck board's edge, outside the fascia (as a front stair)
                 v_a = (min(e_.y0, e_.y1) + (st.opening.start_in if e_.y1 > e_.y0 else abs(e_.y1 - e_.y0) - st.opening.start_in - st.width)) * IN
         elif side.startswith("wall:"):
             # a freestanding zone's open rear edge: the stair leaves it away from the deck (-y); the opening is measured from the zone's right end
             zn = side.split(":")[1]
             zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "-y"
-            u0 = zz.wall_y * IN - edge; v_a = (zz.x0 + zz.W) * IN - st.opening.start_in * IN - width
+            frame_ = zz.wall_y * IN; u0 = frame_ - edge; v_a = (zz.x0 + zz.W) * IN - st.opening.start_in * IN - width
         else:
             zn = side.split(":")[1] if ":" in side else None
             zz = next((q for q in L.zones if q.name == zn), L.zones[0]); direction = "+y"
-            u0 = (zz.wall_y + zz.D) * IN + edge; v_a = zz.x0 * IN + st.opening.start_in * IN
+            frame_ = (zz.wall_y + zz.D) * IN; u0 = frame_ + edge; v_a = zz.x0 * IN + st.opening.start_in * IN
         v_b = v_a + width
         H_st = g.total_rise_in * IN            # the stair's own drop (to a lower deck or a pad), not the deck height
         z_low = zt - H_st
@@ -925,14 +939,17 @@ def build_scene(L) -> Scene:
             z_top_edge = z_top - rise - bt - 0.02 - math.tan(theta) * uc
             box_ = getattr(st, "build", "stringers") == "box"
             skirt_ = box_ or getattr(st, "skirts", False)
+            from .layout import hardie_thick
+            hk_t = hardie_thick(spec)                # HardieTrim risers + skirts at their real 3/4" (else the old 0.9" riser / 0.58" skirt)
+            r_t_ = (hk_t or 0.9) * IN
             if box_:
-                # a framed 2x6 box under each tread (front + back rims, cross members at 16"), on a compacted base — no stringers
+                # a framed 2x6 box under each tread (front + back rims, cross members at the tread line's max spacing), on a compacted base — no stringers
                 for k in range(1, n_t + 1):
                     zf1 = z_top - k * rise - bt; zf0 = max(zb0, zf1 - 5.5 * IN)
-                    ua, ub = (k - 1) * run, k * run - 0.9 * IN
+                    ua, ub = (k - 1) * run, k * run - r_t_
                     sb_("rim", ua, ua + 1.5 * IN, va_, vb_, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
                     sb_("rim", ub - 1.5 * IN, ub, va_, vb_, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
-                    ncm = int(math.ceil(width / (16 * IN))) + 1
+                    ncm = getattr(st, "cross_members", 0) or int(math.ceil(width / (16 * IN))) + 1
                     for i in range(ncm):
                         v = va_ + 0.75 * IN + (width - 1.5 * IN) * i / (ncm - 1)
                         sb_("joist", ua + 1.5 * IN, ub - 1.5 * IN, v - 0.75 * IN, v + 0.75 * IN, zf0, zf1, "timber", 4, tag=f"box step frame {tag_}")
@@ -946,17 +963,17 @@ def build_scene(L) -> Scene:
             ov_ = 0.1 if skirt_ else 0.02            # treads run 1" past the skirt faces
             for k in range(1, n_r + 1):
                 ztop = z_top - k * rise
-                sb_("riser", (k - 1) * run - 0.9 * IN, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tag=f"riser {k} {tag_}", tone_=tone())
+                sb_("riser", (k - 1) * run - r_t_, (k - 1) * run, va_, vb_, ztop, ztop + rise - 0.02, "fascia", 6, tag=f"riser {k} {tag_}", tone_=tone())
                 if k <= n_t:
                     sb_("tread", (k - 1) * run, k * run + NOSE * IN, va_ - ov_, vb_ + ov_, ztop - bt, ztop, "deck", 6, tag=f"tread {k} {tag_}", tone_=tone())
             if skirt_:
                 # stepped fascia skirts on both sides: under each tread, down to 1/2" off grade (a 12" fascia covers up to 12")
-                ft_ = 0.58 * IN
+                ft_ = (hk_t or 0.58) * IN
                 for k in range(1, n_t + 1):
                     ztop = z_top - k * rise
                     zs0 = max(zb0 + (0.005 if box_ else 0.04), ztop - bt - 11.95 * IN)      # a box step sits on its base; a stair skirt holds 1/2" off grade
                     for v0, v1 in ((va_ - ft_, va_), (vb_, vb_ + ft_)):
-                        sb_("fascia", (k - 1) * run - 0.9 * IN, k * run, v0, v1, zs0, ztop - bt, "fascia", 6, tag=f"stair skirt {tag_}", tone_=tone())
+                        sb_("fascia", (k - 1) * run - r_t_, k * run, v0, v1, zs0, ztop - bt, "fascia", 6, tag=f"stair skirt {tag_}", tone_=tone())
             if rail_sides and L.rail:
                 sysd = rail_system_for(spec.railing)
                 pw = sysd["post_w"] * IN
@@ -1206,8 +1223,7 @@ def build_scene(L) -> Scene:
                 bal_, bal_oc_ = prof_.get("baluster", 0.06), prof_.get("baluster_oc_in", 4.0) * IN
                 h_, RPf = L.rail.height * IN, _RP * IN
                 horiz_ = direction in ("+y", "-y")
-                frame_ = u0 - edge if direction == "+y" else (u0 + edge if direction == "-y" else u0)
-                line_ = frame_ + (-RPf if direction in ("+y", "+x") else RPf)
+                line_ = frame_ + (-RPf if direction in ("+y", "+x") else RPf)          # the deck rail's post line, RP inside the frame
                 ea_, eb_ = v_a - RPf, v_b + RPf
                 pts_ = [((q.x, q.y) if horiz_ else (q.y, q.x)) for q in L.rail.posts]
                 if any(abs(al * IN - e_) < 0.3 and abs(ac * IN - line_) < 0.3 for al, ac in pts_ for e_ in (ea_, eb_)):
@@ -1376,7 +1392,7 @@ def step_captions(L: Layout) -> Dict[int, str]:
            5: (f"Step 5 · Frame — CEMCO {__import__('decktakeoff.steel', fromlist=['names']).names(s)['joist']} C-joists at {L.frame.spacing:g}\" OC, {s.framing.steel_track} track rims, ledger track on a steel angle, clip angles, all G90" if s.framing.system == "steel" else
                f"Step 5 · Frame — {s.framing.joist_size} joists at {L.frame.spacing:g}\", rims, ledger" + (", blocking over the beam" if (L.frame.blocking_rows_y and L.beam_lines) else "")),
            6: f"Step 6 · Decking — {s.decking.brand} {s.decking.collection} {s.decking.color}" + (f", {s.decking.border_color} border" if s.decking.border_color else "") + (", hidden fasteners" if (s.decking.fastener_system or '') != 'Cap-Tor xd face screw' else ""),
-           7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + (", drink rail on top" if s.railing.drink_rail else "")) if L.rail else ("Step 7 · Rail — existing stucco parapet stays" if s.railing.existing_parapet else "Step 7 · (no rail)"),
+           7: (f"Step 7 · Rail — {L.rail.system} {L.rail.height:g}\" {L.rail.color}" + ((", drink rail on top" if (s.railing.drink_rail_mount or "between") == "over" else ", drink rail between the posts") if s.railing.drink_rail else "")) if L.rail else ("Step 7 · Rail — existing stucco parapet stays" if s.railing.existing_parapet else "Step 7 · (no rail)"),
            8: ("Step 8 · Roof covers — 6x6 Douglas fir posts, " + covers_of(s)[0].get("beam", "(2)2x10") + " beam, 2x8 rafters, OSB, underlayment, standing seam, Hardie soffit / fascia / rakes"
                if covers_of(s) and s.extras.cover_post_species.upper().startswith("DF") else "Step 8 · Your room" + (" — hot tub" if s.extras.hot_tub else ""))}
     return out
@@ -1709,7 +1725,7 @@ def apply_outline(boxes: List[Box], spec, zt, jbot, jtop, jb, bt, fas_t, add_rim
 
 def _sail_hex(spec) -> str:
     sl = (spec.geometry.sails or [{}])[0]
-    c = str(sl.get("color", "")).lower()
+    c = _color_key(sl.get("color", ""))
     return SAIL_COLORS.get(c, "#e6e1d2") if 'SAIL_COLORS' in globals() else "#e6e1d2"
 
 
@@ -1844,13 +1860,13 @@ SAIL_COLORS = {"sand": "#d9cdb0", "desert sand": "#d9cdb0", "white": "#f1efe9", 
 
 
 def _rail_hex(color: str) -> str:
-    c = (color or "").lower()
-    return "#4b3b2c" if "bronze" in c else "#ecebe6" if "white" in c else "#6b6e70" if ("gray" in c or "gray" in c) else "#141416"
+    c = _color_key(color)
+    return "#4b3b2c" if "bronze" in c else "#ecebe6" if "white" in c else "#6b6e70" if "gray" in c else "#141416"
 
 
 def _roof_hex(color: str) -> str:
-    c = (color or "").lower()
-    for k, v in (("black", "#1c1c1e"), ("charcoal", "#3a3c3f"), ("slate", "#4a4c48"), ("bronze", "#4a3a2a"), ("brown", "#4b3f34"), ("gray", "#6b6e70"), ("gray", "#6b6e70"), ("green", "#2f4a3a"), ("red", "#7a2a22"), ("white", "#e8e6e0")):
+    c = _color_key(color)
+    for k, v in (("black", "#1c1c1e"), ("charcoal", "#3a3c3f"), ("slate", "#4a4c48"), ("bronze", "#4a3a2a"), ("brown", "#4b3f34"), ("gray", "#6b6e70"), ("green", "#2f4a3a"), ("red", "#7a2a22"), ("white", "#e8e6e0")):
         if k in c:
             return v
     return "#3a3c3f"
@@ -1939,14 +1955,37 @@ def _df_mat(spec, species: str = "") -> str:
     return "dftimber" if (sp.startswith("DF") or (not species and spec.framing.post_rough)) else "timber"
 
 
-def box_plan_corners(b) -> List[Tuple[float, float]]:
-    """A box's four plan corners (ft), in order around: its miter outline when it has one, else its rectangle turned about z."""
-    if getattr(b, "quad", None):
+def box_plan_corners(b, miter: bool = True) -> List[Tuple[float, float]]:
+    """A box's four plan corners (ft), in order around: its miter outline when it has one (miter=False: never), else its
+    rectangle turned about z."""
+    if miter and getattr(b, "quad", None):
         return [(float(x), float(y)) for x, y in b.quad]
     cx, cy, hx, hy = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2
     r = b.rot if (b.rot and b.rot_axis == "z") else 0.0
     c, s_ = math.cos(r), math.sin(r)
     return [(cx + u * c - v * s_, cy + u * s_ + v * c) for u, v in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy))]
+
+
+def _side_span(b, frame, turned: bool = False) -> Tuple[float, float, float, float]:
+    """A box's own plan rectangle in an outline side's frame (v along the side from its start, u out from it) as (v0, v1, u0,
+    u1), never the outline a miter gave it. A piece pitched about x / y (a stair rail) by its center and its plan extents: off
+    an angled side (turned) the stair is drawn square and moved onto the side unturned, its x / y still along / out."""
+    (px, py), t, nrm, _ = frame
+    if not (b.rot and b.rot_axis in ("x", "y")):
+        loc = [((x - px) * t[0] + (y - py) * t[1], (x - px) * nrm[0] + (y - py) * nrm[1]) for x, y in box_plan_corners(b, miter=False)]
+        return min(q[0] for q in loc), max(q[0] for q in loc), min(q[1] for q in loc), max(q[1] for q in loc)
+    hx, hy, hz = (b.x1 - b.x0) / 2, (b.y1 - b.y0) / 2, (b.z1 - b.z0) / 2
+    c_, s_ = abs(math.cos(b.rot)), abs(math.sin(b.rot))
+    if b.rot_axis == "x":
+        hy = hy * c_ + hz * s_                 # the pitch shortens its run in plan
+    else:
+        hx = hx * c_ + hz * s_
+    ex, ey = (t, nrm) if turned else ((1.0, 0.0), (0.0, 1.0))
+    cx, cy = (b.x0 + b.x1) / 2 - px, (b.y0 + b.y1) / 2 - py
+    vc, uc = cx * t[0] + cy * t[1], cx * nrm[0] + cy * nrm[1]
+    hv = hx * abs(ex[0] * t[0] + ex[1] * t[1]) + hy * abs(ey[0] * t[0] + ey[1] * t[1])
+    hu = hx * abs(ex[0] * nrm[0] + ex[1] * nrm[1]) + hy * abs(ey[0] * nrm[0] + ey[1] * nrm[1])
+    return vc - hv, vc + hv, uc - hu, uc + hu
 
 
 def outline_side_frames(poly):
@@ -1993,12 +2032,24 @@ def box_step_miters(spec, stairs) -> Dict[str, Tuple[int, float]]:
     return out
 
 
+def box_step_free_ends(spec, stairs, st) -> int:
+    """How many of a box step's two ends take an end skirt: 2, less the ends mitered into a neighbor box step at an outline corner —
+    on the side's last non-option box step, the one box_step_miters reads and _miter_box_steps cuts."""
+    last = {s_.side: s_ for s_ in stairs if str(s_.side).startswith("edge:") and getattr(s_, "build", "stringers") == "box" and not getattr(s_, "option", "")}
+    return 2 - (box_step_miters(spec, stairs).get(st.side, (0, 0.0))[0] if last.get(st.side) is st else 0)
+
+
 def _miter_box_steps(B, edge_steps, poly) -> set:
     """Box steps on two neighboring outline sides that both reach their shared corner become one step that follows the
-    deck: every piece that runs to the corner (treads, risers, the box frame, the stone bed) is cut on the miter line —
-    the bisector of the corner — and the end skirts at the corner go (a miter has no exposed end). The cut pieces carry
-    their true outline (Box.quad), which the photoreal pass, the viewer, the isometrics and the plans draw. Returns the
-    indexes of the boxes to drop."""
+    deck: every piece that runs along the side to the corner (treads, risers, the box frame's rims, the stone bed) is cut
+    on the miter line — the bisector of the corner — and the end skirts at the corner go (a miter has no exposed end). A
+    piece across the step (a frame cross member, a stair rail's posts, balusters and pitched rail) is never cut: it stays
+    square. A cross member that would reach over the miter line is set back inside its own step, one to a tier (where
+    another already stands there it goes); at an inside corner, where the line cuts into both steps, a stair rail that
+    would reach over it goes as a whole and anything else on its own; at an outside corner the line runs clear of both
+    steps and nothing else goes. A step between two others is mitered at both ends. The cut pieces carry their true
+    outline (Box.quad), which the photoreal pass, the viewer, the isometrics and the plans draw. Returns the indexes of
+    the boxes to drop."""
     frames = outline_side_frames(poly)
     n = len(frames)
     by_side = {i: rec for rec in edge_steps for i in [rec[1]]}
@@ -2017,34 +2068,59 @@ def _miter_box_steps(B, edge_steps, poly) -> set:
         convex = nB[0] * tA[0] + nB[1] * tA[1] > 0       # the deck turns away from the step (an outside corner)
         k = math.tan(math.acos(dot) / 2) * (1 if convex else -1)    # how far the miter line runs along each side per foot out from it
 
-        def cut(rng, P, t, nrm, at_end):
-            for idx in range(*rng):
+        def cut(rng, frame, at_end, st_):
+            P, t, nrm, L_ = frame
+            vm = (lambda u: LA + u * k) if at_end else (lambda u: -u * k)        # the miter line: how far along the side, u out from it
+            xy = lambda v, u: [P[0] + v * t[0] + u * nrm[0], P[1] + v * t[1] + u * nrm[1]]
+            over = lambda s: s[1] - min(vm(s[2]), vm(s[3])) if at_end else max(vm(s[2]), vm(s[3])) - s[0]    # how far a piece reaches over the line
+            lo_, w_ = float(st_.opening.start_in) / 12.0, float(st_.width) / 12.0     # the step along the side
+            turned = min(abs(t[0]), abs(t[1])) * L_ * 12 >= 0.5                     # an angled side (the stair code's test)
+            # each box's own rectangle in the side's frame (v along it, u out), never the outline a miter at its other end gave it
+            span = {idx: _side_span(B[idx], frame, turned) for idx in range(*rng) if idx not in drop}
+            rail, cross = [], []
+            for idx, (v0, v1, u0, u1) in span.items():
                 b = B[idx]
-                if b.rot and b.rot_axis in ("x", "y"):
+                if b.kind == "fascia" and "skirt" in (b.tag or "") and (v0 >= LA - 0.15 if at_end else v1 <= 0.15):
+                    drop.add(idx)                            # the end skirt at the corner
+                elif b.kind in ("railpost", "toprail", "cable", "baluster"):
+                    rail.append(idx)
+                elif b.kind == "joist" and "box step frame" in (b.tag or ""):
+                    cross.append(idx)
+                elif v1 - v0 < w_ / 2 or (b.rot and b.rot_axis in ("x", "y")):
+                    if k < 0 and over(span[idx]) > 1e-6:
+                        drop.add(idx)                        # across the step and over the line: it would stand in the other step
+                elif (v1 >= LA - 0.3) if at_end else (v0 <= 0.3):
+                    # along the side to the corner: the outline runs (start, u0) (end, u0) (end, u1) (start, u1); this end's two
+                    # corners move onto the miter line, the other end keeps what it has (square, or its own miter)
+                    q = [list(p) for p in b.quad] if b.quad else [xy(v0, u0), xy(v1, u0), xy(v1, u1), xy(v0, u1)]
+                    for c_, u in (((1, u0), (2, u1)) if at_end else ((0, u0), (3, u1))):
+                        q[c_] = xy(vm(u), u)
+                    b.quad = q          # the box itself stays (lights, labels, elevations read it); the outline is the miter
+            if k < 0:
+                # a stair rail on either side of the step goes as a whole when any of it would stand over the line (one cut short
+                # of the corner would stop in mid-step)
+                for hi_side in (True, False):
+                    grp = [idx for idx in rail if ((span[idx][0] + span[idx][1]) / 2 > lo_ + w_ / 2) == hi_side]
+                    if any(over(span[idx]) > 1e-6 for idx in grp):
+                        drop.update(grp)
+            # a cross member that reaches over the line is set back inside its own step, the tread's mitered end bearing on it:
+            # one to a tier, so one that would land on another member of its tier (or outside the step) goes instead — only
+            # ever at an inside corner (at an outside one just a step that runs a hair past the corner reaches over the line)
+            for o_, idx in sorted((over(span[idx]), idx) for idx in cross):
+                if o_ <= 1e-6:
                     continue
-                pts = box_plan_corners(b)
-                loc = [((x - P[0]) * t[0] + (y - P[1]) * t[1], (x - P[0]) * nrm[0] + (y - P[1]) * nrm[1]) for x, y in pts]
-                v0, v1 = min(q[0] for q in loc), max(q[0] for q in loc)
-                u0, u1 = min(q[1] for q in loc), max(q[1] for q in loc)
-                skirt = b.kind == "fascia" and "skirt" in (b.tag or "")
-                if at_end:
-                    if skirt and v0 >= (LA if at_end else 0) - 0.15:
-                        drop.add(idx); continue
-                    if v1 < LA - 0.3:
-                        continue
-                    vm = lambda u: LA + u * k
-                    q = [(v0, u0), (vm(u0), u0), (vm(u1), u1), (v0, u1)]
-                else:
-                    if skirt and v1 <= 0.15:
-                        drop.add(idx); continue
-                    if v0 > 0.3:
-                        continue
-                    vm = lambda u: -u * k
-                    q = [(vm(u0), u0), (v1, u0), (v1, u1), (vm(u1), u1)]
-                w = [(P[0] + v * t[0] + u * nrm[0], P[1] + v * t[1] + u * nrm[1]) for v, u in q]
-                b.quad = [[x, y] for x, y in w]          # the box itself stays (lights, labels, elevations read it); the outline is the miter
-        cut((a0, a1), PA, tA, nA, True)
-        cut((b0, b1), PB, tB, nB, False)
+                b, (v0, v1, u0, u1) = B[idx], span[idx]
+                s_ = -o_ if at_end else o_
+                if v0 + s_ < lo_ - 1e-6 or v1 + s_ > lo_ + w_ + 1e-6 or any(
+                        j != idx and j not in drop and abs(B[j].z1 - b.z1) < 1e-6 and v0 + s_ < span[j][1] - 1e-6 and span[j][0] + 1e-6 < v1 + s_
+                        for j in cross):
+                    if k < 0:
+                        drop.add(idx)
+                    continue
+                b.x0, b.x1, b.y0, b.y1 = b.x0 + s_ * t[0], b.x1 + s_ * t[0], b.y0 + s_ * t[1], b.y1 + s_ * t[1]
+                span[idx] = (v0 + s_, v1 + s_, u0, u1)
+        cut((a0, a1), frames[i - 1], True, stA)
+        cut((b0, b1), frames[j - 1], False, stB)
     return drop
 
 
@@ -2149,7 +2225,7 @@ FURN_LAYER = "styling"
 FURN_KIND = "furn"
 FURN_PHASE = 8                                   # "Furnishings": the finished deck only
 FURN_HEX = {"teak": "#b07a4c", "charcoal": "#3b3c3e", "black": "#1f2022", "white": "#e9e8e3", "anodized": "#a4a6a7",
-            "gray": "#8e908c", "gray": "#8e908c",
+            "gray": "#8e908c",
             # Outer's cushion / canopy colors (our approximations of their swatches)
             "pacific fog gray": "#b7b8b2", "palisades cream": "#e3dccb", "deep sea navy": "#2b3651", "dark pebble gray": "#5d5e5a"}
 FURN_DEFAULT_COLOR = {"frame": "charcoal", "cushion": "Pacific Fog Gray", "canopy": "gray"}
@@ -2171,18 +2247,18 @@ FURNITURE = {   # type -> the defaults (inches) the model is built from; a piece
 
 
 def _furn_slug(name) -> str:
-    return "".join(ch if ch.isalnum() else "_" for ch in str(name).lower()).strip("_")
+    return "".join(ch if ch.isalnum() else "_" for ch in _color_key(name)).strip("_")
 
 
 def _furn_hex(color) -> str:
     c = str(color or "").strip()
-    return c if c.startswith("#") else FURN_HEX.get(c.lower(), "#8e908c")
+    return c if c.startswith("#") else FURN_HEX.get(_color_key(c), "#8e908c")
 
 
 def _furn_mat(role: str, color) -> str:
     """The material key of a part: teak -> furn_teak; an aluminum color -> furn_frame[_<color>]; a cushion / canopy color ->
     furn_cushion[_<color>] / furn_canopy[_<color>] (the default color keeps the plain key)."""
-    if str(color or "").strip().lower() == "teak":
+    if _color_key(color) == "teak":
         return "furn_teak"
     role = "frame" if role in ("frame", "top", "base", "arm_top") else role
     return f"furn_{role}" if _furn_slug(color) == _furn_slug(FURN_DEFAULT_COLOR.get(role, "")) else f"furn_{role}_{_furn_slug(color)}"

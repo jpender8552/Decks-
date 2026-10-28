@@ -65,7 +65,7 @@ def test_option_blocks_summary_viewer_link_and_internal_basis(tmp_path):
     h = Path(r["html"]).read_text()
     assert h.count('class="optblock"') == 2 and "The deck with every option" in h and "+$2,400" in h and "+$300" in h
     assert "const D = " not in h and "https://example.invalid/3d" in h          # the link, not the embedded viewer
-    r = render_page(base, str(tmp_path / "i"), mode="internal", key="t", render=False, options=options)
+    r = render_page(base, str(tmp_path / "i"), mode="cost", key="t", render=False, options=options)     # pricing lives in the cost stack
     h = Path(r["html"]).read_text()
     assert "Options in the proposal" in h and "owner-set price" in h and "engine delta" in h
 
@@ -154,7 +154,7 @@ def test_stair_rule_cost_on_internal_pages_price_only_for_the_client(tmp_path):
     s = DeckSpec.from_dict(d)
     p = run(s)[2]
     assert p.stair_sell > 0 and dict(p.allocation).get("Stairs") == round(p.stair_sell)
-    hi = Path(render_page(s, str(tmp_path / "i"), mode="internal", key="s", render=False)["html"]).read_text()
+    hi = Path(render_page(s, str(tmp_path / "i"), mode="cost", key="s", render=False)["html"]).read_text()     # the cost stack (the takeoff carries no pricing)
     assert "Stairs at the owner's rule" in hi and f"${p.stair_sell:,.0f}" in hi
     hp = re.sub(r"<(script|style)\b.*?</\1>", "", Path(render_page(s, str(tmp_path / "p"), mode="proposal", key="s", render=False, viewer_url="")["html"]).read_text(), flags=re.S)
     assert "owner's rule" not in hp and "their cost" not in hp

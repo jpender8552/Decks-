@@ -142,10 +142,12 @@ const MATC = {};
 function material(b) {
   const m = D.materials[b.mat] || {color: '#999999'};
   const variant = m.palette ? (b.tone < -0.33 ? 0 : (b.tone > 0.33 ? 2 : 1)) : 1;
-  const vertical = (b.y1 - b.y0) > (b.x1 - b.x0);
+  // a mitered piece (quadPrism) runs u along the board: the along-u grain, in a material of its own (it draws double-sided, the boxes don't)
+  const quad = !!(b.quad && b.quad.length === 4);
+  const vertical = !quad && (b.y1 - b.y0) > (b.x1 - b.x0);
   const long = Math.max(b.x1 - b.x0, b.y1 - b.y0);
   const rep = Math.max(1, Math.round(long / 8));
-  const key = b.mat + '|' + ((m.grain || m.pattern) ? (vertical ? 'V' : 'H') : '') + '|' + variant + '|' + rep + '|' + (m.pattern ? (b.shape === 'mesh' ? 'mesh' : Math.round(long) + 'x' + Math.round(b.z1 - b.z0)) : '');
+  const key = (quad ? 'q|' : '') + b.mat + '|' + ((m.grain || m.pattern) ? (vertical ? 'V' : 'H') : '') + '|' + variant + '|' + rep + '|' + (m.pattern ? (b.shape === 'mesh' ? 'mesh' : Math.round(long) + 'x' + Math.round(b.z1 - b.z0)) : '');
   if (MATC[key]) return MATC[key];
   const opts = {roughness: m.rough == null ? 0.8 : m.rough, metalness: m.metal || 0};
   if (m.grain) { const t = texFor(b.mat, vertical, variant).clone(); t.needsUpdate = true; t.repeat.set(vertical ? 1 : rep, vertical ? rep : 1); opts.map = t; opts.color = new THREE.Color(0xffffff); }
@@ -161,16 +163,25 @@ function material(b) {
 }
 const EDGE_KINDS = new Set(['beam', 'joist', 'post', 'rim', 'ledger', 'board', 'border', 'fascia', 'stone', 'stonecap', 'footing', 'base', 'block', 'drink', 'tub', 'tubrim', 'privacy', 'stringer', 'tread', 'riser', 'wblock']);
 const edgeMat = new THREE.LineBasicMaterial({color: 0x1a1612, transparent: true, opacity: 0.22});
-// a mitered piece: the prism over its 4-point plan outline (feet), centered on the outline's centroid
+// a mitered piece: the prism over its 4-point plan outline (feet), centered on the outline's centroid. UVs 0..1 each way like a
+// box face's (the material repeats the grain along u): on the top and bottom u along the board, v straight across it; on the
+// sides u as on the top (the grain wraps the edge), v up the height. The board runs along the outline's first edge q0 -> q1, v
+// the distance off that edge over the width (as cycles.add_quad_board); a fallback for a piece whose box (the longer side,
+// turned by its rot) runs across that edge: u and v swap, so the grain still runs with the box
 function quadPrism(b) {
   const q = b.quad, cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cz = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
   const h2 = (b.z1 - b.z0) / 2, L = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) || 1;
   const ux = (q[1][0] - q[0][0]) / L, uz = (q[1][1] - q[0][1]) / L;
-  const P = (k, top) => [q[k][0] - cx, top ? h2 : -h2, q[k][1] - cz];
-  const tris = [[P(0, 1), P(1, 1), P(2, 1)], [P(0, 1), P(2, 1), P(3, 1)], [P(0, 0), P(2, 0), P(1, 0)], [P(0, 0), P(3, 0), P(2, 0)]];
-  for (let k = 0; k < 4; k++) { const a = k, c = (k + 1) % 4; tris.push([P(a, 0), P(c, 0), P(c, 1)], [P(a, 0), P(c, 1), P(a, 1)]); }
+  const r = b.rot_axis === 'z' ? (b.rot || 0) : 0, run = (b.x1 - b.x0) >= (b.y1 - b.y0) ? [Math.cos(r), Math.sin(r)] : [-Math.sin(r), Math.cos(r)];
+  const sw = Math.abs(ux * run[0] + uz * run[1]) < Math.SQRT1_2;          // the box runs across the first edge (the fallback)
+  const al = q.map(p => (p[0] - q[0][0]) * ux + (p[1] - q[0][1]) * uz), ac = q.map(p => Math.abs((p[1] - q[0][1]) * ux - (p[0] - q[0][0]) * uz));
+  const a0 = Math.min(...al), len = (Math.max(...al) - a0) || 1, wid = Math.max(...ac) || 1;
+  const U = k => sw ? ac[k] / wid : (al[k] - a0) / len, V = k => sw ? (al[k] - a0) / len : ac[k] / wid;
   const pos = [], uv = [];
-  tris.forEach(t => t.forEach(p => { pos.push(p[0], p[1], p[2]); const al = ((p[0] + cx - q[0][0]) * ux + (p[2] + cz - q[0][1]) * uz) / L; uv.push(al, (p[1] + h2) / Math.max(2 * h2, 0.05)); }));
+  const put = (k, top, side) => { pos.push(q[k][0] - cx, top ? h2 : -h2, q[k][1] - cz); uv.push(U(k), side ? top : V(k)); };
+  for (const k of [0, 1, 2, 0, 2, 3]) put(k, 1, 0);                 // top
+  for (const k of [0, 2, 1, 0, 3, 2]) put(k, 0, 0);                 // bottom
+  for (let k = 0; k < 4; k++) { const c = (k + 1) % 4; put(k, 0, 1); put(c, 0, 1); put(c, 1, 1); put(k, 0, 1); put(c, 1, 1); put(k, 1, 1); }   // sides
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.computeVertexNormals(); g.userData.c = [cx, cz];
@@ -209,14 +220,16 @@ for (const b of D.boxes) {
   else mesh.position.set((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, (b.y0 + b.y1) / 2);
   if (b.rot && !b.quad) { if (b.rot_axis === 'x') mesh.rotation.x = b.rot; else if (b.rot_axis === 'z') mesh.rotation.y = -b.rot; else mesh.rotation.z = b.rot; }
   mesh.castShadow = b.kind !== 'ground' && b.kind !== 'gravel' && b.kind !== 'roof'; mesh.receiveShadow = true;
-  mesh.userData = {phase: b.phase, y0: mesh.position.y, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
+  mesh.userData = {phase: b.phase, y0: mesh.position.y, z0: b.z0, kind: b.kind, tag: b.tag, xg: b.xg || 0, tr0: !!mat_.transparent, op0: mat_.opacity};
   if (EDGE_KINDS.has(b.kind) && b.shape !== 'cyl' && w > 0.05 && d > 0.05) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat); mesh.add(e); }
   scene.add(mesh);
   if (b.layer === 'styling') FURN.push(mesh); else if (b.phase > 0) phased.push(mesh);
-  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree' || b.kind === 'fence') ctx.push(mesh);
+  if (b.kind === 'house' || b.kind === 'wall' || b.kind === 'roof' || b.kind === 'trim' || b.kind === 'glass' || b.kind === 'tree' || b.kind === 'fence' || b.kind === 'gutter') ctx.push(mesh);
 }
 const HIDE_TECH = new Set(['tree', 'fence']);          // trees and lot fences never stand in front of a technical still
-function ctxShown(o, on) { const k = o.userData.kind; if (HIDE_TECH.has(k)) return !on && !TECH; return k === 'roof' ? !on : true; }
+// the house's trim above its first floor (an eave fascia, a gutter) goes with the roof: from above it would lie across the deck
+function roofLike(o) { return o.userData.kind === 'roof' || o.userData.kind === 'gutter' || (o.userData.kind === 'trim' && o.userData.z0 > D.deck_top + 6); }
+function ctxShown(o, on) { const k = o.userData.kind; if (HIDE_TECH.has(k)) return !on && !TECH; return roofLike(o) ? !on : true; }
 if (TECH) for (const o of ctx) if (HIDE_TECH.has(o.userData.kind)) o.visible = false;
 const GAP = {1: 0, 2: 0, 3: 0, 4: 5, 5: 9, 6: 14, 7: 19, 8: 23};
 function applyPhase(n) { for (const o of phased) o.visible = o.userData.phase <= n; applyFurn(); }
@@ -228,7 +241,7 @@ function explode(on) {
   for (const o of phased) o.position.y = o.userData.y0 + (on ? (GAP[o.userData.phase] || 0) + o.userData.xg : 0);
   explodeCtx(on); applyFurn();
 }
-function explodeCtx(on) { for (const o of ctx) { if (o.userData.kind === 'roof' || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
+function explodeCtx(on) { for (const o of ctx) { if (roofLike(o) || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.3, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } } }
 function explodedTop() { let t = 0; for (const o of phased) if (o.visible) { o.geometry.computeBoundingBox(); t = Math.max(t, o.position.y + o.geometry.boundingBox.max.y); } return t; }
 // camera + orbit
 const persp = new THREE.PerspectiveCamera(40, W / H, 0.5, 2000);
@@ -271,7 +284,7 @@ if (q.get('cam') && q.get('at')) { const c_ = q.get('cam').split(',').map(Number
 })();
 function planMode(on) {
   if (renderer.shadowMap.enabled === on) { renderer.shadowMap.enabled = !on; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }   // a plan has no cast shadows
-  for (const o of ctx) { o.castShadow = !on && o.userData.kind !== 'glass'; if (o.userData.kind === 'roof' || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.28, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } }
+  for (const o of ctx) { o.castShadow = !on && o.userData.kind !== 'glass'; if (roofLike(o) || HIDE_TECH.has(o.userData.kind)) o.visible = ctxShown(o, on); else { const u = o.userData; o.material = o.material.clone(); o.material.transparent = on || u.tr0; o.material.opacity = on ? Math.min(0.28, u.op0) : u.op0; o.material.depthWrite = !(on || u.tr0); } }
 }
 let target = new THREE.Vector3(), sph = new THREE.Spherical();
 let curView = VIEW0;

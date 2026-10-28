@@ -5,7 +5,10 @@
   "lumber": {
     "2x6": {
       "per_lf": 1.83,
-      "source": "D&D quote 979610 11 Sep 2026 (2x6x12 #1 KDAT GC $21.90)"
+      "source": "EST — $1.83/LF from the 12' #1 KDAT GC (D&D quote 979610 11 Sep 2026, $21.90); no D&D price for this length",
+      "lengths": {
+        "12": {"each": 21.62, "source": "D&D Quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 26N12K 2x6x12 #1 KDAT GC"}
+      }
     },
     "2x8": {
       "per_lf": 1.6,
@@ -13,11 +16,21 @@
     },
     "2x10": {
       "per_lf": 3.88,
-      "source": "D&D quote 979610 11 Sep 2026 (2x10x12 $43.93 / x16 $62.03 / x20 $81.55)"
+      "source": "EST — $3.88/LF, D&D's 16' price per LF (quote 979610 11 Sep 2026); no GSEXT1 price for this length",
+      "lengths": {
+        "12": {"each": 43.93, "source": "D&D Quote 979610 (GSEXT1) 11 Sep 2026 — 210N12TFJ"},
+        "16": {"each": 62.03, "source": "D&D Quote 979610 (GSEXT1) 11 Sep 2026 — 210N16TFJ"},
+        "20": {"each": 80.51, "source": "D&D SO 6984405 (GSEXT1) 30 Sep 2026 — 210N20TFJ"}
+      }
     },
     "2x12": {
       "per_lf": 4.82,
-      "source": "D&D quote 979610 11 Sep 2026 (2x12x16 $77.06); SO 6645370 2x12x12 $52.86 / x20 $98.24"
+      "source": "EST — $4.82/LF, D&D's 16' price per LF (quote 979610 11 Sep 2026); no GSEXT1 price for this length",
+      "lengths": {
+        "12": {"each": 57.37, "source": "D&D Quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 212N12TFJ"},
+        "16": {"each": 77.06, "source": "D&D Quote 979610 (GSEXT1) 11 Sep 2026 — 2x12x16 TFJ"},
+        "20": {"each": 94.47, "source": "D&D Quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 212N20TFJ"}
+      }
     },
     "4x8": {
       "per_lf": 7.5,
@@ -89,7 +102,12 @@
     },
     "6x6_DF_rough": {
       "per_lf": 10.02,
-      "source": "D&D quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 66DF12RGHB 6x6x12 Douglas fir rough Brite $120.24 ($10.02/LF)"
+      "source": "EST — $10.02/LF from the 12' (D&D quote 990585, 66DF12RGHB $120.24); no D&D price for this length",
+      "lengths": {
+        "8": {"each": 90.73, "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — 66DF8RGH 6x6x8 Doug Fir rough Brite"},
+        "10": {"each": 114.38, "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — 66DF10RGH 6x6x10 Doug Fir rough Brite"},
+        "12": {"each": 120.24, "source": "D&D Quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — 66DF12RGHB 6x6x12 Doug Fir rough Brite"}
+      }
     }
   },
   "footings": {
@@ -137,12 +155,16 @@
     "ABA66Z": {
       "each": 27.85,
       "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — ABA66Z",
-      "desc": "Simpson ABA66Z adjustable post base 6x6"
+      "desc": "Simpson ABA66Z adjustable post base 6x6",
+      "screws": 8,
+      "screws_source": "Simpson C-C-2021 ABA table: (8) 0.162 x 3-1/2 nails or SD connector screws"
     },
     "ABA66RZ": {
-      "each": 18.0,
-      "source": "est.",
-      "desc": "Simpson ABA66RZ adjustable post base, rough 6x6"
+      "each": 28.97,
+      "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — ABA66RZ",
+      "desc": "Simpson ABA66RZ adjustable post base, rough 6x6",
+      "screws": 8,
+      "screws_source": "Simpson C-C-2021 ABA table: (8) 0.162 x 3-1/2 nails or SD connector screws"
     },
     "ABU66Z": {
       "each": 22.0,
@@ -356,6 +378,11 @@
       "source": "est.",
       "desc": "1/2\" x 4\" HDG lag screw + washer"
     },
+    "lag_3/8x6": {
+      "each": 1.5,
+      "source": "EST — ask D&D (on no D&D document; Henry to quote): one item for the DTT1Z lateral ties (IRC R507.9.2(2)) and the IRX rail posts (TimberTech IRX install guide: 4 construction lags per post, sold separately)",
+      "desc": "3/8\" x 6\" HDG lag screw + washer"
+    },
     "SD10212_100": {
       "each": 28.0,
       "source": "est.",
@@ -363,10 +390,16 @@
       "count": 100
     },
     "RSS_3-1/8_100": {
-      "each": 32.0,
-      "source": "est.",
+      "each": 31.76,
+      "source": "D&D Quote 978707 (GSEXT1) 9 Sep 2026 — GRK70191, 50/box at $15.88 (2 boxes = 100)",
       "desc": "GRK RSS #10 x 3-1/8\" structural screw 100 ct",
       "count": 100
+    },
+    "RSS_3-1/8_50": {
+      "each": 15.88,
+      "source": "D&D Quote 978707 (GSEXT1) 9 Sep 2026 — GRK70191",
+      "desc": "GRK RSS #10 x 3-1/8\" structural screw 50 ct (GRK70191)",
+      "count": 50
     },
     "bolt_7/16x4.5": {
       "each": 2.4,
@@ -495,8 +528,14 @@
     "nail_16d_5lb": {
       "each": 26.0,
       "source": "est.",
-      "desc": "16d HDG common nail 5 lb (~250)",
+      "desc": "16d HDG common hanger nail 0.162\" x 3-1/2\" 5 lb (~250)",
       "count": 250
+    },
+    "nail_16d_2.5_1lb": {
+      "each": 9.0,
+      "source": "EST — not on a D&D quote; confirm the hot-dip pack with Henry (Simpson's HDG N16 ships collated, N16HDGPT500)",
+      "desc": "HDG hanger nail 0.162\" x 2-1/2\" (Simpson N16 size) 1 lb (~60)",
+      "count": 60
     },
     "end_grain_sealer_gal": {
       "each": 60.0,
@@ -582,15 +621,22 @@
       "count": 50
     },
     "vycor_12x75": {
-      "each": 98.0,
-      "source": "EST",
-      "desc": "Grace Vycor Deck Protector 12\" x 75' (wall membrane behind ledger + side rims)",
+      "each": 62.6,
+      "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — GRVYPL1275",
+      "desc": "Grace Vycor Plus 12\" x 75' (wall membrane behind ledger + side rims)",
       "lf": 70
     },
     "lflash_10": {
       "each": 14.0,
       "source": "EST",
       "desc": "Aluminum L-flashing 10' (over ledger + side rims)"
+    },
+    "lflash_8_galv": {
+      "each": 9.65,
+      "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — LFLASH448G (D&D's 8' galvanized for the 10' aluminum)",
+      "desc": "Galvanized L-flashing 4\" x 4\" x 8', 26-gauge (over ledger + side rims)",
+      "lf": 7.75,
+      "_lf_note": "8' piece less a 3\" lap at each joint"
     },
     "wui_flash_10": {
       "each": 18.0,
@@ -640,9 +686,10 @@
     },
     "irx baluster_drink_rail_bracket_kit": {
       "each": 127.0,
-      "source": "D&D SO 6622045 (GSEXT1) 9 Jul 2026 — AZTIXDRCKITB $127.00 per kit of 12 clips",
-      "desc": "TimberTech Impression Rail Express drink rail clip kit AZTIXDRCKITB, black — 12 clips + screws (6 per 8' bay, 4 per 6')",
-      "clips": 12
+      "source": "D&D SO 6622045 (GSEXT1) 9 Jul 2026 — AZTIXDRCKITB $127.00 per kit of 12 clips (Black; other colors alike — confirm)",
+      "desc": "TimberTech Impression Rail Express drink rail clip kit, {color} — 12 clips + screws (6 per 8' bay, 4 per 6')",
+      "clips": 12,
+      "sku": "AZTIXDRCKIT{c}"
     },
     "HUC210-2Z": {
       "each": 37.96,
@@ -707,8 +754,8 @@
       "source": "est."
     },
     "TimberTech|Terrain+|per_lf": {
-      "each": 4.13,
-      "source": "D&D Henry Frederick 8 Jul 2026"
+      "each": 4.14,
+      "source": "D&D Pricing Sheet To Fit GS (Drive, created 8 Jul 2026) — Terrain+ $4.14/LF"
     },
     "TimberTech|Terrain+|fascia": {
       "each": 98.64,
@@ -719,8 +766,13 @@
       "source": "D&D Henry Frederick 8 Jul 2026 ($4.88/LF x 12')"
     },
     "TimberTech|Reserve|per_lf": {
-      "each": 4.6,
-      "source": "est. — get D&D quote"
+      "each": 5.6,
+      "source": "D&D Quote 973680 (GSEXT1) 21 Aug 2026 — Reserve 1x6x16 $89.60 ($5.60/LF, = the Pricing Sheet To Fit GS)"
+    },
+    "TimberTech|Reserve|16|square": {
+      "each": 89.6,
+      "source": "D&D Quote 973680 (GSEXT1) 21 Aug 2026 — TTR1616DR Reserve 1x6x16 Square $89.60 (Reserve colors priced alike: Antique Leather TTR1616AL, TimberTech RC5416AL)",
+      "sku": "TTR1616{cc}"
     },
     "TimberTech|Legacy|per_lf": {
       "each": 4.9,
@@ -771,10 +823,12 @@
       "source": "D&D Aug-26",
       "count": 90
     },
-    "CONCEALoc_500": {
-      "each": 165.0,
-      "source": "est.",
-      "count": 500
+    "CONCEALoc_100SF": {
+      "each": 172.96,
+      "source": "D&D Quote 990599 (GSEXT1) 16 Oct 2026 — CLOCFAST 'Concealoc Hidden Fastener - 100 Sq Ft' (same on 973680, 21 Aug); 175 clips + 184 screws per box (Home Depot listing) — D&D sells no 500-count box",
+      "count": 175,
+      "desc": "TimberTech CONCEALoc hidden fastener — 100 SF box (175 clips + 184 screws)",
+      "sku": "CLOCFAST"
     },
     "CapTor_xd_350": {
       "each": 73.0,
@@ -815,14 +869,22 @@
       "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZVRISER12EW 3/4 x 7-1/4 x 12'"
     },
     "Cortex_TimberTech_100lf": {
-      "each": 52.0,
-      "source": "est.",
+      "each": 97.82,
+      "source": "EST — ask D&D: CTC100LF.. is on no D&D document; carried at D&D's collated Cortex 100 SF kit (Quote 990585, GSEXT1, 16 Oct 2026, CTC100SFEW $97.82)",
       "count": 224,
-      "desc": "Cortex for TimberTech 2-1/2\" — 100 LF (224 screws + plugs), color-matched"
+      "desc": "Cortex for TimberTech Composite, 100 LF collated kit (224 screws + 300 plugs), color-matched",
+      "sku": "CTC100LF{cc}"
+    },
+    "Cortex_TimberTech_300sf": {
+      "each": 293.46,
+      "source": "EST — ask D&D: CTC300SF.. is on no D&D document; carried at 3 x D&D's collated Cortex 100 SF kit (Quote 990585, GSEXT1, 16 Oct 2026, CTC100SFEW $97.82); 1,050 screws + 1,200 plugs per box (TimberTech 2025 guide model numbers; Wausau Supply CTC300SF listings, 28 Oct 2026)",
+      "count": 1050,
+      "desc": "Cortex for TimberTech Composite, 300 SF collated kit (1,050 screws + 1,200 plugs), color-matched — the field kit",
+      "sku": "CTC300SF{cc}"
     },
     "Cortex_TimberTech_350": {
-      "each": 175.0,
-      "source": "D&D SO 6622045 (GSEXT1) 9 Jul 2026 — CTC100SFDH; English Walnut = CTC100SFEW",
+      "each": 97.82,
+      "source": "D&D Quote 990585 (GSEXT1) 16 Oct 2026, rev. 22 Oct — CTC100SFEW collated Cortex 100 SF $97.82 (the Jul SO 6622045 CTC100SFDH was $175.00)",
       "count": 350,
       "desc": "Cortex for TimberTech Advanced PVC, collated 100 SF (350 screws, 400 plugs, 3 bits), color-matched plugs"
     },
@@ -1011,84 +1073,112 @@
     },
     "IRX Baluster|panel|8|level": {
       "each": 278.14,
-      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP8B",
-      "desc": "TimberTech Impression Rail Express 36\" 8' level universal panel kit, 20 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}"
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP8B (Black; other colors alike — confirm)",
+      "desc": "TimberTech Impression Rail Express {h}\" 8' level universal panel kit, 20 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}",
+      "sku": "AZTIX{h}UNLP8{c}"
     },
     "IRX Baluster|panel|6|level": {
       "each": 199.5,
-      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP6B",
-      "desc": "TimberTech Impression Rail Express 36\" 6' level universal panel kit, 15 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}"
+      "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — AZTIX36UNLP6B (Black; other colors alike — confirm)",
+      "desc": "TimberTech Impression Rail Express {h}\" 6' level universal panel kit, 15 vertical aluminum balusters, bottom rail cover, foot block, brackets (top rail not incl.), {color}",
+      "sku": "AZTIX{h}UNLP6{c}"
     },
     "IRX Baluster|panel|8|stair": {
       "each": 227.5,
       "source": "D&D SO 6622045 9 Jul 2026 — AZTIX36UNSP8B",
-      "desc": "TimberTech Impression Rail Express 36\" 8' stair universal panel kit, 20 balusters, panel cover, foot block, hardware (top rail not incl.), {color}"
+      "desc": "TimberTech Impression Rail Express 36\" 8' stair universal panel kit, 20 balusters, panel cover, foot block, hardware (top rail not incl.), {color}",
+      "sku": "AZTIX{h}UNSP8{c}"
     },
     "IRX Baluster|panel|6|stair": {
       "each": 163.59,
       "source": "EST — 8' stair $227.50 x (6'/8' level 211.35/293.91); AZTIX36UNSP6B not quoted",
-      "desc": "TimberTech Impression Rail Express 36\" 6' stair universal panel kit, 15 balusters (top rail not incl.), {color}"
+      "desc": "TimberTech Impression Rail Express 36\" 6' stair universal panel kit, 15 balusters (top rail not incl.), {color}",
+      "sku": "AZTIX{h}UNSP6{c}"
     },
     "IRX Baluster|post|END": {
-      "each": 82.2,
-      "source": "D&D SO 6622045 9 Jul 2026 — AZTIX3X3PK38B"
+      "each": 87.0,
+      "source": "D&D Quote 963125 (GSEXT1) 17 Jul 2026 — AZTIX3X3PK38BR $87.00 (Dark Bronze; Black $82.20 on SO 6622045, 9 Jul) — confirm the job's color",
+      "sku": "AZTIX3X3PK38{c}"
     },
     "IRX Baluster|post|LINE": {
-      "each": 82.2,
-      "source": "D&D SO 6622045 9 Jul 2026 — AZTIX3X3PK38B"
+      "each": 87.0,
+      "source": "D&D Quote 963125 (GSEXT1) 17 Jul 2026 — AZTIX3X3PK38BR $87.00 (Dark Bronze; Black $82.20 on SO 6622045, 9 Jul) — confirm the job's color",
+      "sku": "AZTIX3X3PK38{c}"
     },
     "IRX Baluster|post|CORNER": {
-      "each": 82.2,
-      "source": "D&D SO 6622045 9 Jul 2026 — AZTIX3X3PK38B"
+      "each": 87.0,
+      "source": "D&D Quote 963125 (GSEXT1) 17 Jul 2026 — AZTIX3X3PK38BR $87.00 (Dark Bronze; Black $82.20 on SO 6622045, 9 Jul) — confirm the job's color",
+      "sku": "AZTIX3X3PK38{c}"
     },
     "IRX Baluster|post|STAIR": {
-      "each": 94.86,
-      "source": "EST — AZTIX3X3PK43B (43-1/2\" post for a 36\" stair) interpolated between D&D 38\" $82.20 and 48\" $105.22 (SO 6622045)"
+      "each": 96.06,
+      "source": "D&D Quote 979358 (CASH50) 10 Sep 2026, AZTIX3X3PK43B (43\" post for a 36\" stair) — the CASH50 account: get a GSEXT1 price",
+      "sku": "AZTIX3X3PK43{c}"
     },
     "IRX Baluster|post_kit": {
-      "each": 82.2,
-      "source": "D&D SO 6622045 9 Jul 2026 — AZTIX3X3PK38B (CASH50 quote 959545: $86.11)",
-      "desc": "TimberTech Impression Rail Express 3\" x 3\" x 38\" post kit (post, cap, skirt) for a 36\" rail, {color}"
+      "each": 87.0,
+      "source": "D&D Quote 963125 (GSEXT1) 17 Jul 2026 — AZTIX3X3PK38BR $87.00 (Dark Bronze; Black $82.20 on SO 6622045, 9 Jul) — confirm the job's color",
+      "desc": "TimberTech Impression Rail Express 3\" x 3\" x 38\" post kit (post, cap, skirt) for a 36\" rail, {color}",
+      "sku": "AZTIX3X3PK38{c}"
+    },
+    "IRX Baluster|post_kit|42": {
+      "each": 96.06,
+      "source": "EST — ask D&D for a GSEXT1 price: AZTIX3X3PK43_ (3\" x 3\" x 43\" post for a 42\" rail or a 36\" stair, IRX order form 2023) — AZTIX3X3PK43B $96.06 on D&D Quote 979358 (CASH50) 10 Sep 2026; confirm the color",
+      "desc": "TimberTech Impression Rail Express 3\" x 3\" x 43\" post kit (post, cap, skirt) for a 42\" rail, {color}",
+      "sku": "AZTIX3X3PK43{c}"
     },
     "IRX Baluster|handrail_kit": {
       "each": 188.72,
       "source": "D&D quote 990585 (GSEXT1, H. Frederick) 16 Oct 2026, rev. 22 Oct, valid to 16 Nov — AZTIXADAPR90DRKB ADA pipe rail + 90° return kit",
-      "desc": "TimberTech Impression aluminum ADA graspable handrail, pipe rail + 90-degree return kit, {color}"
+      "desc": "TimberTech Impression aluminum ADA graspable handrail, pipe rail + 90-degree return kit, {color}",
+      "sku": "AZTIXADAPR90DRK{c}"
     },
     "IRX Baluster|top_rail|8": {
       "each": 85.58,
       "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — Classic AZTIXCSTR8B",
-      "desc": "TimberTech Impression Rail Express top rail 8' (Classic; Modern priced alike — confirm), {color}"
+      "desc": "TimberTech Impression Rail Express top rail 8' (Classic; Modern priced alike — confirm), {color}",
+      "sku": "AZTIXMDTR8{c}"
     },
     "IRX Baluster|top_rail|6": {
       "each": 77.52,
       "source": "D&D SO 7083750 (GSEXT1, H. Frederick) 22 Oct 2026 — Classic AZTIXCSTR6B",
-      "desc": "TimberTech Impression Rail Express top rail 6' (Classic; Modern priced alike — confirm), {color}"
+      "desc": "TimberTech Impression Rail Express top rail 6' (Classic; Modern priced alike — confirm), {color}",
+      "sku": "AZTIXMDTR6{c}"
     },
     "IRX Baluster|post_kit|48": {
       "each": 105.22,
       "source": "D&D SO 6622045 9 Jul 2026 — AZTIX3X3PK48B",
-      "desc": "TimberTech Impression Rail Express 3\" x 3\" x 48\" post kit (post, cap, skirt), {color}"
+      "desc": "TimberTech Impression Rail Express 3\" x 3\" x 48\" post kit (post, cap, skirt), {color}",
+      "sku": "AZTIX3X3PK48{c}"
     },
     "IRX Baluster|panel_cover|8": {
       "each": 45.0,
-      "source": "EST — AZTBULKIXBR8B not quoted; Henry to quote",
-      "desc": "TimberTech Impression Rail Express 8' universal panel cover for drink rail (replaces the top rail), {color}"
+      "source": "EST — ask D&D (AZTBULKIXBR8_ is on no D&D document)",
+      "desc": "TimberTech Impression Rail Express 8' universal panel cover for drink rail (replaces the top rail), {color}",
+      "sku": "AZTBULKIXBR8{c}"
     },
     "IRX Baluster|panel_cover|6": {
       "each": 36.0,
-      "source": "EST — AZTBULKIXBR6B not quoted; Henry to quote",
-      "desc": "TimberTech Impression Rail Express 6' universal panel cover for drink rail (replaces the top rail), {color}"
+      "source": "EST — ask D&D (AZTBULKIXBR6_ is on no D&D document)",
+      "desc": "TimberTech Impression Rail Express 6' universal panel cover for drink rail (replaces the top rail), {color}",
+      "sku": "AZTBULKIXBR6{c}"
     },
     "IRX Baluster|accessory_kit": {
       "each": 38.09,
-      "source": "D&D quote 979610 11 Sep 2026 — AZTIXACCKITB",
-      "desc": "TimberTech Impression Rail Express touch-up paint + bracket jig, {color} (at least 1 per job)"
+      "source": "D&D quote 979610 11 Sep 2026 — AZTIXACCKITB (Black; other colors alike — confirm)",
+      "desc": "TimberTech Impression Rail Express touch-up paint + bracket jig, {color} (at least 1 per job)",
+      "sku": "AZTIXACCKIT{c}"
     },
     "IRX Baluster|post_insert_8": {
       "each": 40.0,
       "source": "EST — AZTIX3X3PPLG not quoted (over-the-post drink rail only)",
       "desc": "TimberTech Impression Rail Express drink-rail 3\" post insert, 8-pack"
+    },
+    "IRX Baluster|bracket_22": {
+      "each": 22.53,
+      "source": "EST — ask D&D (on no D&D document; The Deck Store $22.53, 28 Oct 2026)",
+      "desc": "TimberTech Impression Rail Express Level 22.5° Angle Bracket Pack AZTIXBKT22KIT (4 bracket clips + 16 screws)",
+      "sku": "AZTIXBKT22KIT"
     }
   },
   "labor": {
@@ -1327,9 +1417,16 @@
       "desc": "Camo 1-5/8\" #8 trim screw, 316SS, color-matched, 100 ct (Timber Bark)"
     },
     "hardie_touchup": {
-      "each": 22.0,
-      "source": "est. — not on quote 990599; confirm D&D",
-      "desc": "ColorPlus touch-up kit, Timber Bark"
+      "each": 45.0,
+      "source": "EST — ask D&D (asked on Quote 990599, not priced); retail $35–63 for the kit, 28 Oct 2026",
+      "desc": "James Hardie ColorPlus Touch-up Kit, Timber Bark — pint + Edge Sealer + Nail Concealer (1 kit per 1,600 SF of trim)",
+      "sf": 1600
+    },
+    "hardie_finish_nail_316_1000": {
+      "each": 51.31,
+      "source": "EST — ask D&D (on no D&D document): ring shank — confirm SKU with D&D (TR1509 p.3: ring shank, not smooth, with stainless nails; no ring-shank 16-ga Type 316 finish nail found at retail, 28 Oct 2026); $51.31 per 1,000 is a placeholder at a 2-1/2\" 16-ga S316 straight-strip retail price",
+      "desc": "2-1/2\" 16-ga Type 316 stainless ring-shank finish nail (2\" min, TR1509), straight strip, 1,000 ct",
+      "count": 1000
     },
     "hardie_soffit_nails_lb": {
       "each": 9.0,

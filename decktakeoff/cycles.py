@@ -1125,14 +1125,14 @@ def add_cards(g: Geo, P: np.ndarray, size: float, rng, up_bias=0.4, aspect=1.0, 
 def build(spec_path: str, out_dir: str, quick: bool = False, foliage: str = ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from decktakeoff.spec import DeckSpec
-    from decktakeoff.layout import build_layout
+    from decktakeoff.takeoff import build_takeoff
     from decktakeoff.scene import build_scene
     spec = DeckSpec.from_dict(json.load(open(spec_path)))
     if spec.geometry.parts:                 # a composite (two levels, a wrap): the parts placed in the global frame
         from decktakeoff.composite import build_composite
         sc = build_scene(build_composite(spec)[0].layout)
-    else:
-        sc = build_scene(build_layout(spec))
+    else:                                   # the takeoff's layout: its fascia stops at the stair openings the order cuts (L.fascia_gaps)
+        sc = build_scene(build_takeoff(spec).layout)
     D = sc.to_dict()
     if not STYLING:                         # --styling=0: the deck without the styling furniture
         D["boxes"] = [b for b in D["boxes"] if (b.get("layer") or "") != "styling"]

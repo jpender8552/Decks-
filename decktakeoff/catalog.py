@@ -15,40 +15,41 @@ with open(DATA / "pricebook.json") as f:
 # collection -> facts. width/thickness are actual inches. gap = GSX field gap. oc = joist spacing at GSX.
 DECKING = {
     "Vintage":  dict(material="PVC", width=5.5, thick=1.0, gap=0.1875, oc=12, profile="full", cap="4-sided",
-                     warranty="Limited Lifetime product / 50-yr fade & stain", fire="Ignition Resistant, Class A, WUI", wui=True, class_a=True,
+                     warranty="TimberTech lifetime limited product warranty and 50-year limited fade & stain warranty (residential; fade & stain prorated from year 11; labor not covered)", fire="Ignition Resistant, Class A, WUI", wui=True, class_a=True,
                      colors=["Weathered Teak", "Cypress", "Coastline", "Mahogany", "English Walnut", "Dark Hickory"]),
     "Landmark": dict(material="PVC", width=5.5, thick=1.0, gap=0.1875, oc=12, profile="full", cap="4-sided",
-                     warranty="Limited Lifetime product / 50-yr fade & stain", fire="Ignition Resistant, Class A, WUI", wui=True, class_a=True,
+                     warranty="TimberTech lifetime limited product warranty and 50-year limited fade & stain warranty (residential; fade & stain prorated from year 11; labor not covered)", fire="Ignition Resistant, Class A, WUI", wui=True, class_a=True,
                      colors=["French White Oak", "American Walnut", "Castle Gate", "Boardwalk"]),
     "Harvest+": dict(material="PVC", width=5.5, thick=1.0, gap=0.1875, oc=12, profile="full", cap="4-sided",
-                     warranty="Limited Lifetime product / 50-yr fade & stain", fire="Class A, WUI (not Ignition Resistant)", wui=True, class_a=True,
+                     warranty="TimberTech lifetime limited product warranty and 50-year limited fade & stain warranty (residential; fade & stain prorated from year 11; labor not covered)", fire="Class A, WUI (not Ignition Resistant)", wui=True, class_a=True,
                      colors=["Toasted Wheat", "Timber Gray"]),
     "Harvest":  dict(material="PVC", width=5.5, thick=1.0, gap=0.1875, oc=12, profile="full", cap="4-sided",
-                     warranty="Limited Lifetime product / 50-yr fade & stain", fire="Class B, WUI", wui=True, class_a=False,
+                     warranty="TimberTech lifetime limited product warranty and 50-year limited fade & stain warranty (residential; fade & stain prorated from year 11; labor not covered)", fire="Class B, WUI", wui=True, class_a=False,
                      colors=["Slate Gray", "Kona", "Brownstone"]),
     "Legacy":   dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided + Mold Guard",
-                     warranty="30-yr product / 30-yr fade & stain", fire="Class C, not WUI", wui=False, class_a=False,
+                     warranty="TimberTech 30-year limited product warranty and 30-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Class C, not WUI", wui=False, class_a=False,
                      colors=["Whitewash Cedar", "Ashwood", "Pecan", "Tigerwood", "Mocha", "Espresso"]),
     "Reserve":  dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided",
-                     warranty="30-yr product / 30-yr fade & stain", fire="Class C, not WUI", wui=False, class_a=False,
+                     warranty="TimberTech 30-year limited product warranty and 30-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Class C, not WUI", wui=False, class_a=False,
                      colors=["Antique Leather", "Dark Roast", "Driftwood", "Reclaimed Chestnut"]),
     "Terrain+": dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="scalloped", cap="4-sided",
-                     warranty="30-yr product / 30-yr fade & stain", fire="Not Class A; WUI status contradictory on timbertech.com — confirm with dealer", wui=False, class_a=False,
+                     warranty="TimberTech 30-year limited product warranty and 30-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Not Class A; WUI status contradictory on timbertech.com — confirm with dealer", wui=False, class_a=False,
                      colors=["Dark Oak", "Natural White Oak", "Weathered Oak"], cortex_ok=True),   # TimberTech: "the first scalloped-profile board to be compatible with ... CORTEX"
     "Terrain":  dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="full", cap="4-sided",
-                     warranty="30-yr product / 30-yr fade & stain", fire="Class C, not WUI", wui=False, class_a=False,
+                     warranty="TimberTech 30-year limited product warranty and 30-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Class C, not WUI", wui=False, class_a=False,
                      colors=["Silver Maple", "Brown Oak"], cortex_ok=False),
     "Premier+": dict(material="Composite", width=5.36, thick=0.89, gap=0.1875, oc=16, profile="full", cap="3-sided",
-                     warranty="30-yr product / 30-yr fade & stain", fire="Not rated for fire zones", wui=False, class_a=False,
+                     # Premier+: the 30 / 30 years this catalog held; its own warranty is not among the downloaded documents (no proration stated)
+                     warranty="TimberTech 30-year limited product warranty and 30-year limited fade & stain warranty (residential; labor not covered)", fire="Not rated for fire zones", wui=False, class_a=False,
                      colors=["Natural Oak"]),
     "Prime+":   dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="scalloped", cap="3-sided",
-                     warranty="25-yr product / 25-yr fade & stain", fire="Not rated for fire zones", wui=False, class_a=False,
+                     warranty="TimberTech 25-year limited product warranty and 25-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Not rated for fire zones", wui=False, class_a=False,
                      colors=["Coconut Husk", "Sea Salt Gray", "Dark Cocoa"], cortex_ok=False),
     "Prime":    dict(material="Composite", width=5.36, thick=0.94, gap=0.1875, oc=16, profile="scalloped", cap="3-sided",
-                     warranty="25-yr product / 25-yr fade & stain", fire="Not rated (see Premier for WUI)", wui=False, class_a=False,
+                     warranty="TimberTech 25-year limited product warranty and 25-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="Not rated (see Premier for WUI)", wui=False, class_a=False,
                      colors=["Dark Teak", "Maritime Gray"], cortex_ok=False),
     "Premier":  dict(material="Composite", width=5.36, thick=0.89, gap=0.1875, oc=16, profile="full", cap="3-sided",
-                     warranty="25-yr product / 25-yr fade & stain", fire="WUI compliant on square-shoulder boards only", wui=True, class_a=False,
+                     warranty="TimberTech 25-year limited product warranty and 25-year limited fade & stain warranty (residential; prorated from year 11; labor not covered)", fire="WUI compliant on square-shoulder boards only", wui=True, class_a=False,
                      colors=["Dark Teak", "Maritime Gray"]),
     # generic fallbacks
     "Wood":     dict(material="Wood", width=5.5, thick=1.0, gap=0.125, oc=16, profile="full", cap="none",
@@ -57,7 +58,11 @@ DECKING = {
 STOCK_LENGTHS_FT = [12, 16, 20]
 # lines that don't come in every GSX stock length, by (collection, profile). Vintage square-shoulder: 12 / 16 / 20' — the owner
 # buys 12' (27 Oct 2026), whatever the 2026 product guide lists; grooved 12 / 16 / 20'
-DECK_LENGTHS_FT = {("Vintage", "square"): (16, 20), ("Vintage", "grooved"): (12, 16, 20)}   # D&D: every 12' Vintage is grooved (AZV1612EWG)
+DECK_LENGTHS_FT = {("Vintage", "square"): (16, 20), ("Vintage", "grooved"): (12, 16, 20),   # D&D: every 12' Vintage is grooved (AZV1612EWG)
+                   ("Terrain+", "square"): (16, 20), ("Reserve", "square"): (16, 20)}     # 2026 guide: TC5416DO / TC5420DO, RC5416AL / RC5420AL — no 12' square shoulder
+# TimberTech's two-letter color codes in the composite model numbers (TC5416DO, RC5416AL, CTC100LFDO) — the order's SKUs
+COLOR_CODES = {"Dark Oak": "DO", "Natural White Oak": "NW", "Weathered Oak": "WO",
+               "Antique Leather": "AL", "Dark Roast": "DR", "Driftwood": "DW", "Reclaimed Chestnut": "RC"}
 
 
 def deck_lengths(collection: str, profile: str = "square") -> tuple:
@@ -188,7 +193,8 @@ RAIL_SYSTEMS["Fulton"]["max_ctc"] = 96.0
 RAIL_SYSTEMS["Impression Rail Express"] = RAIL_SYSTEMS["IRX"]
 RAIL_SYSTEMS["IRX Baluster"] = dict(profile=dict(top=(0.22, 0.13), bottom=(0.115, 0.10), baluster=0.0625, baluster_oc_in=4.5),   # Modern top rail 2-5/8" x 1-1/2"; 3/4" balusters, 20 per 8'
                                     panels={72: 70.0, 96: 94.0}, post_w=3.0, bracket_allow=0.25, heights=[36, 42], post_types=["END", "LINE", "CORNER", "STAIR"],
-                                    noncombustible=True, surface=True, display="Impression Rail Express, vertical balusters, modern top rail", max_ctc=96.0, brand="TimberTech", colors=["Black", "White", "Bronze"],
+                                    noncombustible=True, surface=True, post_lag=True,       # post_lag: (4) 3/8" x 6" HDG lags + washers per post into solid blocking (IRX install guide), not HeadLOK
+                                    display="Impression Rail Express, vertical aluminum balusters, modern top rail", max_ctc=96.0, brand="TimberTech", colors=["Black", "White", "Bronze"],
                                     note="TimberTech Impression Rail Express: 3\" aluminum posts (3\" x 38-1/4\" kits) on surface bases, Modern top rail (sold separately), vertical aluminum balusters, "
                                          "bottom rail; 6' / 8' level kits cut to bay, posts on the divider lines")
 
@@ -196,6 +202,24 @@ RAIL_SYSTEMS["IRX Baluster"] = dict(profile=dict(top=(0.22, 0.13), bottom=(0.115
 def rail_name(system: str) -> str:
     """How a rail system reads in client documents (the catalog key otherwise)."""
     return RAIL_SYSTEMS.get(system, {}).get("display", system)
+
+
+# the client documents' warranty words — the makers' published limited warranties, residential terms: TimberTech aluminum railing
+# (Impression Rail Express, V-102725: 25 years, prorated in years 11-25, no labor), TimberTech lighting (V100123: 5 years, no labor),
+# James Hardie trim (30-year substrate, ColorPlus 15-year finish); never "lifetime" for the rail
+RAIL_WARRANTY = {k: "TimberTech 25-year limited warranty (residential; prorated from year 11; labor not covered)"
+                 for k in ("IRX", "IRX Baluster", "Impression Rail Express")}
+RAIL_WARRANTY["Fulton"] = "TimberTech 15-year limited warranty (residential)"        # the owner's proposal template (gsx-deck-docs): 15-yr residential limited
+RAIL_WARRANTY["Cinch"] = "Cinch 15-year finish warranty"                                # the Cinch note above
+LIGHT_WARRANTY = "TimberTech 5-year limited warranty (labor not covered)"
+# TimberTech fastening systems (TOPLoc, CONCEALoc, Cortex) limited warranty 10.01.23: 25 years residential, against corrosion
+FASTENER_WARRANTY = "TimberTech 25-year limited warranty against corrosion (residential)"
+# ProWood TrueFrame Joist: "backed by ProWood's Lifetime Limited Warranty" (trueframe.html; the consolidated warranty: against rot,
+# fungal decay and termite damage, for the end tag's term); Diamond Pier (Pin Foundations): Product Performance Limited Lifetime
+# Warranty, to the original owner, for the original structure, once the project is registered within 30 days of completion
+TRUEFRAME_WARRANTY = "ProWood lifetime limited warranty against rot, fungal decay and termite damage"
+DIAMOND_PIER_WARRANTY = "Diamond Pier product performance limited lifetime warranty (original owner; the project registered within 30 days)"
+HARDIE_TRIM_WARRANTY = "James Hardie 30-year limited warranty (substrate) + ColorPlus 15-year limited finish warranty"
 
 
 def beam_words(sizes, species: str = "Douglas fir", n: int = 1) -> str:

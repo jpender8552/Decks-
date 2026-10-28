@@ -5,7 +5,7 @@ from decktakeoff.spec import DeckSpec
 from decktakeoff.page import render_page
 
 ROOT = Path(__file__).resolve().parent.parent
-INTERNAL = ["Design reads", "Site &amp; code flags", "The order", "Fastener &amp; connector schedule", "The stack", "The quote", "Renders", "Isometrics", "Exploded", "Drawing set", "Build set", "3D model"]
+INTERNAL = ["Design reads", "Site &amp; code flags", "The order", "Fastener &amp; connector schedule", "Cut list", "Renders", "Isometrics", "Exploded", "Drawing set", "Build set", "3D model"]
 CUSTOMER = ["At a glance", "What it is", "Renders", "Isometrics", "Exploded views", "Structure", "Drawing set", "Materials", "Fastening", "How it", "Investment", "3D model"]
 
 

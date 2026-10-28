@@ -5,9 +5,11 @@ its measured footprint."""
 from __future__ import annotations
 
 import copy
+import math
+import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .flags import Flag, run_flags
 from .layout import Layout, RailPost
@@ -259,7 +261,8 @@ def _pool_decking(spec: DeckSpec, parts: List[Part], lines: List[Line]) -> None:
     treads_ = [l for l in lines if l.category == "Stairs" and l.item.startswith(head) and (" — treads (" in l.item or " decking (" in l.item)]   # treads + stair landings: their pieces pool below
     pieces = [(f"{p.name} {c.member[len('Field boards '):]}", c.length_in + 0.25)
               for p in parts for c in p.takeoff.cut_list if c.member.startswith("Field boards") for _ in range(int(c.qty))]
-    tpieces = [(f"tread · {p.name} {st.side}", st.width + 0.25) for p in parts for st in p.layout.stairs for _ in range(int(st.tread_pieces))]
+    tpieces = [(f"tread · {p.name} {st.side}", st.width + 0.25) for p in parts for st in p.layout.stairs
+               if st.side not in (getattr(p.layout, "treads_in_borders", None) or ()) for _ in range(int(st.tread_pieces))]    # treads cut with a part's borders are ordered there
     if not (field_ and pieces):
         return
     stocks = field_lengths(spec)
@@ -323,13 +326,24 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
     # ---- merge the orders: same category + item -> one line, quantities summed, reasons joined
     merged: "OrderedDict[Tuple[str, str], Line]" = OrderedDict()
     whys: "OrderedDict[Tuple[str, str], OrderedDict[str, List[str]]]" = OrderedDict()
+    boxed: Dict[Tuple[str, str], List[Tuple[int, int, float]]] = {}       # a box line's (needed, supplied, boxes) in each part
     for p in parts:
         for ln in p.takeoff.lines:
             if ln.category == "Site":           # every part carries the job's extras: its site lines are added once, below
                 continue
             key = (ln.category, ln.item)
+            mn_, ms_ = re.match(r"\s*([\d,]+) (?:screws|clips|needed)", ln.why or ""), re.search(r"([\d,]+) supplied|needed of ~?([\d,]+)", ln.why or "")
+            if ln.unit in ("box", "pack") and mn_ and ms_ and ln.order:
+                boxed.setdefault(key, []).append((int(mn_.group(1).replace(",", "")), int((ms_.group(1) or ms_.group(2)).replace(",", "")), ln.order))
             if key in merged:
                 m = merged[key]
+                if getattr(m, "split", None) or getattr(ln, "split", None):     # a cost two categories share: weighted by each part's cost
+                    sp_ = {}
+                    for x_ in (m, ln):
+                        for c_, w_ in (getattr(x_, "split", None) or {x_.category: 1.0}).items():
+                            sp_[c_] = sp_.get(c_, 0.0) + w_ * x_.ext
+                    tot_ = sum(sp_.values())
+                    m.split = {c_: v_ / tot_ for c_, v_ in sp_.items()} if tot_ else getattr(m, "split", None)
                 m.net = round(m.net + ln.net, 3); m.order = round(m.order + ln.order, 3)
             else:
                 merged[key] = copy.copy(ln)
@@ -338,9 +352,22 @@ def build_composite(spec: DeckSpec) -> Tuple[Takeoff, List[Flag]]:
         culls = [w for w, nm in whys[key].items() for _ in nm]
         if key[0] == "Lumber" and len(culls) > 1 and all(w.startswith("+1 cull") for w in culls):
             m.order = round(m.net + 1, 3)          # the standard: 1 cull per length per job, not per part
+        spares2 = key[0] == "Hardware" and len(culls) > 1 and all(w.startswith("+2") for w in culls)
+        if spares2:
+            m.order = round(m.net + 2, 3)          # the standard: 2 spare bolts (lags, screws) per job, not per part
         m.why = " + ".join(f"{' + '.join(nm)}{' (each)' if len(nm) > 1 and w else ''}" + (f": {w}" if w else "") for w, nm in whys[key].items())
         if m.order == m.net + 1 and len(culls) > 1 and key[0] == "Lumber":
             m.why = "+1 cull (one per length per job) · " + m.why
+        if spares2:
+            m.why = "+2  (two spares per job) · " + m.why
+        bx_ = boxed.get(key, [])
+        per_ = {round(sup / n_b) for _, sup, n_b in bx_}
+        if len(bx_) > 1 and len(bx_) == len(culls) and len(per_) == 1:     # boxes for the whole job, not rounded up level by level
+            per1, need_ = per_.pop(), sum(n_ for n_, _, _ in bx_)
+            n_job = max(1, int(math.ceil(need_ / per1)))
+            if n_job < m.order:
+                m.net = m.order = n_job
+                m.why = f"{need_:,} needed for the job · {n_job * per1:,} supplied ({n_job} x {per1}) · " + m.why
     lines = list(merged.values())
     _pool_decking(spec, parts, lines)
     lines += site_lines(spec, sum(p.layout.deck_sf for p in parts))

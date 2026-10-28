@@ -358,6 +358,23 @@ def _title_parts(name: str, address: str):
     return name, ""
 
 
+def _hardie(spec, L, t=None):
+    """The James Hardie trim chip: (hex, "Fascia and risers" | "Fascia", "Hardie Trim Arctic White"), or None without a Hardie skirt."""
+    if not (getattr(spec.extras, "hardie_skirt", None) and spec.decking.fascia):
+        return None
+    from .report import hardie_risers, hardie_words
+    hc = hardie_words(spec).split("ColorPlus ", 1)[-1]
+    risers = hardie_risers(t) if t is not None else bool(L.stairs)
+    return HARDIE_HEX.get(_color_key(hc), "#cfc8bb"), ("Fascia and risers" if risers else "Fascia"), f"Hardie Trim {hc}"
+
+
+def _fin_short() -> str:
+    """The finance terms under a monthly price tile (the pricebook's): "120 monthly payments at 6.99% APR (10 years)"."""
+    from .catalog import PRICEBOOK
+    yrs = int(PRICEBOOK["finance_years"])
+    return f"{yrs * 12} monthly payments at {round(PRICEBOOK['finance_rate'] * 100, 2):g}% APR ({yrs} years)"
+
+
 def _levels_tele(spec, L, t, n_piers) -> list:
     """Telemetry for a deck on two or more levels: SF, each level's height, the columns, the rail, the lights."""
     from .report import levels_of, columns_of, lights_of
@@ -381,8 +398,8 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
     br = brand_of(spec)
     fr = L.zones[0].frame
     flush = all(b.kind == "flush" for b in (L.beam_lines or []))
-    tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
-            (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")),
+    tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), _height_words(t)),
+            (spec.framing.joist_size, (f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")) if L.beam_lines else f"joists {fr.spacing:g}\" apart"),
             (str(n_piers), {"diamond_pier": "Diamond Piers", "caisson": "caissons", "concrete": "concrete piers"}.get(spec.framing.footing_type, "existing caissons"))]
     rl = L.rail
     if hasattr(L, "parts") and t is not None:      # two levels: each level's height, the columns, the rail, the lights
@@ -397,16 +414,19 @@ def cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=No
         bp = BOARDS_PALETTE.get((spec.decking.border_collection or spec.decking.collection, spec.decking.border_color))
         chips.append((bp[len(bp) // 2] if bp else "#5a4632", "Picture frame", f"{spec.decking.border_collection or spec.decking.collection} · {spec.decking.border_color}"))
     if rl:
-        from .report import rail_words
-        chips.append((RAIL_HEX.get(_color_key(rl.color), "#141414"), "Rail", f"{spec.decking.brand} {rail_words(spec, rl.system)} · {rl.color}"))
-    if rl and spec.railing.drink_rail and hasattr(L, "parts"):
+        from .report import rail_product
+        chips.append((RAIL_HEX.get(_color_key(rl.color), "#141414"), "Rail", f"{rail_product(spec, rl.system)} · {rl.color}"))
+    if rl and spec.railing.drink_rail:
         dc = spec.railing.drink_rail_collection or spec.decking.collection
         dp = BOARDS_PALETTE.get((dc, spec.railing.drink_rail_color or spec.decking.color))
-        chips.append((dp[len(dp) // 2] if dp else "#5a4632", "Drink rail", f"{dc} · {spec.railing.drink_rail_color or spec.decking.color}"))
+        chips.append((dp[len(dp) // 2] if dp else "#5a4632", "Drink rail", f"{spec.decking.brand} {dc} {spec.railing.drink_rail_color or spec.decking.color}"))
+    hc = _hardie(spec, L, t)
+    if hc:
+        chips.append(hc)
     if spec.extras.show_financing:
-        prices = (f'<div class="prices"><div class="lead"><span class="pl">Check or ACH</span><span class="pv">{money(p.sell)}</span><span class="ps">{(1 - p.sell / p.retail) * 100:.0f}% below the financed price</span></div>'
-                  f'<div><span class="pl">Financed</span><span class="pv">{money(p.retail)}</span><span class="ps">no money down</span></div>'
-                  f'<div><span class="pl">Monthly</span><span class="pv">{money(p.monthly)}</span><span class="ps">6.99% · 10 years</span></div></div>')
+        prices = (f'<div class="prices"><div class="lead"><span class="pl">Check or ACH</span><span class="pv">{money(p.sell)}</span><span class="ps">{(1 - p.sell / p.retail) * 100:.0f}% less than the financed price</span></div>'
+                  f'<div><span class="pl">Financed price</span><span class="pv">{money(p.retail)}</span><span class="ps">with approved credit</span></div>'
+                  f'<div><span class="pl">Monthly</span><span class="pv">{money(p.monthly)}</span><span class="ps">{E(_fin_short())}</span></div></div>')
     else:
         prices = f'<div class="prices one"><div class="lead"><span class="pl">Price · check or ACH</span><span class="pv">{money(p.sell)}</span></div></div>'
     img = (f'<img class="hero-img" src="r/{key}-{hero}.jpg" alt="Rendering of the finished deck">' if hero in have else "")
@@ -493,16 +513,22 @@ def addon_cover(title, eyebrow, who, today, hero_html, tele, prices, chips, lede
             + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></div></header>")
 
 
+def _terms_html(c, f, m) -> str:
+    """The price tiles, facts only: the check or ACH price (and what it is against the financed price), the financed price, the
+    monthly payment on the pricebook's terms, the no-payment plans with approved credit."""
+    return ('<div class="terms">'
+            f'<div class="lead"><span class="pl">Check or ACH</span><span class="tv">{money(c)}</span><span class="ps">{(1 - c / f) * 100:.0f}% less than the financed price</span></div>'
+            f'<div><span class="pl">Financed price</span><span class="tv">{money(f)}</span><span class="ps">with approved credit</span></div>'
+            f'<div><span class="pl">Monthly</span><span class="tv">{money(m)}</span><span class="ps">{E(_fin_short())}</span></div>'
+            '<div><span class="pl">Also available with approved credit</span><span class="tv">12 or 18 months</span><span class="ps">with no payments</span></div></div>')
+
+
 def addon_invest(rows, terms, next_html: str, title: str = "The price", show_fin: bool = True) -> str:
     """Investment for a separately sold item: its price three ways and the financing (terms = (check, financed, monthly)),
     then each line (rows = [(label, check, financed, monthly, kind)], kind "item" | "addon" | "total") and the next step."""
     c, f, m = terms
     if show_fin:
-        tg = ('<div class="terms">'
-              f'<div class="lead"><span class="pl">Check or ACH</span><span class="tv">{money(c)}</span><span class="ps">{(1 - c / f) * 100:.0f}% savings</span></div>'
-              f'<div><span class="pl">Total investment</span><span class="tv">{money(f)}</span><span class="ps">financed, no money down</span></div>'
-              f'<div><span class="pl">About</span><span class="tv">{money(m)}/mo</span><span class="ps">6.99% for 10 years</span></div>'
-              '<div><span class="pl">Or</span><span class="tv">12 or 18 mo</span><span class="ps">no payments, no down payment</span></div></div>')
+        tg = _terms_html(c, f, m)
     else:
         tg = f'<div class="terms one"><div class="lead"><span class="pl">Price · check or ACH</span><span class="tv">{money(c)}</span></div></div>'
 
@@ -551,15 +577,11 @@ def wheel(spec, p, options_html: str, next_html: str) -> str:
            + f'<text class="wc-v" x="{cx}" y="{cy + 6}" text-anchor="middle">{money(p.sell)}</text>'
            + f'<text class="wc-l" x="{cx}" y="{cy + 26}" text-anchor="middle">CHECK OR ACH</text></svg>')
     if spec.extras.show_financing:
-        terms = ('<div class="terms">'
-                 f'<div class="lead"><span class="pl">Check or ACH</span><span class="tv">{money(p.sell)}</span><span class="ps">{(1 - p.sell / p.retail) * 100:.0f}% savings</span></div>'
-                 f'<div><span class="pl">Total investment</span><span class="tv">{money(p.retail)}</span><span class="ps">financed, no money down</span></div>'
-                 f'<div><span class="pl">About</span><span class="tv">{money(p.monthly)}/mo</span><span class="ps">6.99% for 10 years</span></div>'
-                 '<div><span class="pl">Or</span><span class="tv">12 or 18 mo</span><span class="ps">no payments, no down payment</span></div></div>')
+        terms = _terms_html(p.sell, p.retail, p.monthly)
     else:
         terms = f'<div class="terms one"><div class="lead"><span class="pl">Price · check or ACH</span><span class="tv">{money(p.sell)}</span></div></div>'
     return ('<section class="invest" aria-labelledby="inv-h"><div class="inv-head"><span class="eyebrow">Investment</span>'
-            '<h3 id="inv-h">Where every dollar goes</h3></div>'
+            '<h3 id="inv-h">Price breakdown</h3></div>'
             f'<div class="inv-grid"><figure class="wheel">{svg}</figure><ol class="legend">' + "".join(rows) + "</ol></div>"
             + terms
             + (f'<div class="opts"><h4>Options</h4>{options_html}</div>' if options_html else "")
@@ -576,7 +598,7 @@ def wheel(spec, p, options_html: str, next_html: str) -> str:
 
 PP_HERO_POS = {                      # object-position for the crops of the known views (the deck sits low in most frames)
     "yard": "50% 74%", "yard_dusk": "50% 72%", "corner": "70% 70%", "corner_dusk": "74% 70%", "corner2": "50% 66%",
-    "ondeck": "50% 72%", "ondeck_dusk": "50% 72%", "facade": "50% 82%", "isolow": "50% 70%", "detail": "50% 0%",
+    "ondeck": "50% 72%", "ondeck_dusk": "50% 72%", "facade": "50% 82%", "isolow": "50% 70%", "detail": "50% 62%",
     "iso": "50% 60%", "iso2": "50% 62%", "left": "50% 66%", "leftfront": "50% 66%", "leftlow": "50% 66%",
     "stairfront": "50% 70%", "ondeck_left": "50% 72%", "door": "50% 66%", "aerial_left": "50% 60%",
 }
@@ -592,9 +614,9 @@ PP_CAPS = {                          # fallback captions for the shoot's station
     "aerial_left": "From above, the left side", "detail": "Up close", "facade": "The whole back of the house",
     "corner2": "From the left corner of the yard",
 }
-# the price wheel on black: one gold hue, brightest for the largest share (validated as an ordinal ramp on #050608:
-# monotone lightness, adjacent steps >= 0.06 L apart, the darkest step 2.35:1 against the panel)
-PP_WHEEL = ["#fddb6f", "#ecc24e", "#dcaa26", "#c99200", "#b47c00", "#9e6600", "#895200", "#743e00"]
+# the price wheel on black: the owner's multi-color wheel from the launch-manifest redesign (WHEEL, validated on the same #050608
+# panel: adjacent slots and the wrap apart for color-vision deficiency, every slot >= 3:1), the largest share first from twelve o'clock
+PP_WHEEL = WHEEL
 HARDIE_HEX = {"arctic white": "#f1f0ea", "timber bark": "#5d4b3c", "iron gray": "#53565a", "cobble stone": "#a59c8b",
               "navajo beige": "#c9b99b", "khaki brown": "#8a7660", "monterey taupe": "#8f8574", "aged pewter": "#6f6e69"}
 
@@ -724,7 +746,8 @@ def _fig(key: str, n: str, caps: dict, cls: str = "") -> str:
 
 
 def _folio(left: str, right: str = "") -> str:
-    return f'<div class="folio"><span>{E(left)}</span><span>{E(right)}</span></div>'
+    """A page's folio (print only): the brand on the left, the section and the page number on the right (FIT_JS numbers it)."""
+    return f'<div class="folio"><span>{E(left)}</span><span>{E(right)}<b class="pno"></b></span></div>'
 
 
 _SWATCH = {}
@@ -764,10 +787,10 @@ def board_swatch(collection: str, color: str, boards: int = 1) -> str:
     return uri
 
 
-def materials(spec, L) -> list:
+def materials(spec, L, t=None) -> list:
     """The overview's materials: [(label, name, css background)] — decking (a rendered board strip), picture frame, rail,
-    drink rail, the HardieTrim skirt."""
-    from .report import rail_words
+    drink rail, the Hardie trim on the fascia (and the risers)."""
+    from .report import rail_product
     rows = []
     d = spec.decking
 
@@ -781,24 +804,31 @@ def materials(spec, L) -> list:
         rows.append(("Picture frame", f"{d.border_collection or d.collection} · {d.border_color}", bg(d.border_collection or d.collection, d.border_color)))
     rl = L.rail
     if rl:
-        rows.append(("Rail", f"{d.brand} {rail_words(spec, rl.system)} · {rl.color}", RAIL_HEX.get(_color_key(rl.color), "#141414")))
+        rows.append(("Rail", f"{rail_product(spec, rl.system)} · {rl.color}", RAIL_HEX.get(_color_key(rl.color), "#141414")))
         if spec.railing.drink_rail:
             dc = spec.railing.drink_rail_collection or d.collection
             dcol = spec.railing.drink_rail_color or d.color
-            rows.append(("Drink rail", f"{d.brand} {dc} · {dcol}", bg(dc, dcol)))
-    hs = getattr(spec.extras, "hardie_skirt", None)
-    if hs:
-        hc = getattr(spec.extras, "hardie_color", "") or re.sub(r"^[\d/ x.\"']+", "", hs).strip() or "Timber Bark"
-        rows.append(("Fascia", f"James Hardie HardieTrim · {hc}", HARDIE_HEX.get(_color_key(hc), "#cfc8bb")))
+            rows.append(("Drink rail", f"{d.brand} {dc} {dcol}", bg(dc, dcol)))
+    hc = _hardie(spec, L, t)
+    if hc:
+        rows.append((hc[1], hc[2], hc[0]))
     return rows
+
+
+def _height_words(t) -> str:
+    """The height stat's words: "above grade", at the stair it is measured from (report.height_words)."""
+    if t is None:
+        return "above grade"
+    from .report import height_words
+    return height_words(t)
 
 
 def telemetry(spec, L, n_piers, t=None) -> list:
     """The deck's numbers for the overview strip: [(value, label)]."""
     fr = L.zones[0].frame
     flush = all(b.kind == "flush" for b in (L.beam_lines or []))
-    tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), "above grade"),
-            (spec.framing.joist_size, f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush and L.beam_lines else "")),
+    tele = [(f"{L.deck_sf:,.0f}", "square feet"), (ftin(L.finished_w), "across the house"), (ftin(spec.geometry.height_in), _height_words(t)),
+            (spec.framing.joist_size, (f"joists @ {fr.spacing:g}\" OC" + (", all flush" if flush else "")) if L.beam_lines else f"joists {fr.spacing:g}\" apart"),
             (str(n_piers), {"diamond_pier": "Diamond Piers", "caisson": "caissons", "concrete": "concrete piers"}.get(spec.framing.footing_type, "existing caissons"))]
     if hasattr(L, "parts") and t is not None:
         return _levels_tele(spec, L, t, n_piers)
@@ -819,7 +849,8 @@ def _split_lede(lede: str) -> tuple:
 
 
 # Run by page.render_pdf in the print layout before the PDF is made: a page section that runs past its Letter page takes
-# the tighter classes it names in data-fit, one at a time, until it fits (the overview's "tight", the investment's "dense").
+# the tighter classes it names in data-fit, one at a time, until it fits (the overview's "tight", the investment's "dense");
+# then every printed section is counted in Letter pages (a flow that runs long takes two) and its folio gets its page number.
 FIT_JS = """() => { var H = 11 * 96 + 1, n = 0;
   document.querySelectorAll('[data-fit]').forEach(function (el) {
     var steps = el.getAttribute('data-fit').split(' ');
@@ -828,6 +859,13 @@ FIT_JS = """() => { var H = 11 * 96 + 1, n = 0;
       el.classList.add(steps[i]); n++;
     }
   });
+  var secs = [], pages = 0;
+  document.querySelectorAll('.pg').forEach(function (el) {
+    if (getComputedStyle(el).display === 'none') return;
+    var k = Math.max(1, Math.ceil((Math.max(el.scrollHeight, el.getBoundingClientRect().height) - 2) / (11 * 96)));
+    secs.push([el, pages + k]); pages += k;
+  });
+  secs.forEach(function (s) { s[0].querySelectorAll('.folio .pno').forEach(function (b) { b.textContent = s[1] + ' / ' + pages; }); });
   return n; }"""
 
 
@@ -850,7 +888,7 @@ def pp_overview(spec, L, key, img, caps, lede, n_piers, t=None, foot="") -> str:
     """Page 2, your deck: the view from the yard, the lede (its first sentence large), the numbers, the materials."""
     stand, body = _split_lede(lede)
     tele = telemetry(spec, L, n_piers, t)
-    mats = materials(spec, L)
+    mats = materials(spec, L, t)
     h = [f'<section class="pg pp-over flow{"" if (stand or body) else " nolede"}" data-fit="tight tighter" id="g-reads" aria-label="The project">']
     if img:
         h.append(f'<figure class="po-fig">{_img(key, img, caps)}<figcaption>{E(pp_caption(img, caps))}</figcaption></figure>')
@@ -916,14 +954,18 @@ def _inline(s: str) -> str:
     return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
 
 
-def pp_included(key, img, caps, rows, foot: str = "") -> str:
-    """What's included: a close-up across the top, then every row of the price's scope as a card."""
-    n = len([r for r in rows if len(r) >= 2])
-    h = [f'<section class="pg pp-sheet pp-inc flow {"rows-s" if n <= 8 else "rows-m" if n <= 10 else "rows-l"}{"" if img else " noimg"}" data-fit="rows-m rows-l" id="g-what" aria-label="What\'s included">']
+def pp_included(key, img, caps, rows, foot: str = "", excl=()) -> str:
+    """What's included: a close-up across the top, every row of the price's scope as a card, then what the price does not
+    include as a list (excl: extras.exclusions; the quote's own "Not included" row is that list, so it is not a card)."""
+    rows = [r for r in rows if not (r and r[0].strip().lower() == "not included")]
+    n = len([r for r in rows if len(r) >= 2]) + (2 if excl else 0)
+    h = [f'<section class="pg pp-sheet pp-inc flow {"rows-s" if n <= 8 else "rows-m" if n <= 10 else "rows-l"}{"" if img else " noimg"}" data-fit="rows-m rows-l rows-x" id="g-what" aria-label="What\'s included">']
     if img:
         h.append(f'<figure class="pi-fig">{_img(key, img, caps)}<figcaption>{E(pp_caption(img, caps))}</figcaption></figure>')
     h.append('<div class="pin"><header class="sh"><span class="eyebrow">What\'s included</span><h2>Included in the price</h2></header>'
              '<div class="cards">' + "".join(f'<div class="card"><h3>{_inline(r[0])}</h3><p>{_inline(r[1])}</p></div>' for r in rows if len(r) >= 2) + "</div>")
+    if excl:
+        h.append('<div class="excl"><h3>Not included</h3><ul>' + "".join(f"<li>{E(x)}</li>" for x in excl) + "</ul></div>")
     h.append("</div>" + _folio(foot, "What's included") + "</section>")
     return "".join(h)
 
@@ -954,31 +996,36 @@ def pp_more(key, names, caps, foot: str = "") -> str:
 
 
 def _label_split(k: str) -> tuple:
-    """A price line as (head, qualifier): "Lighting — 9 post-cap lights, ..." -> ("Lighting", "9 post-cap lights, ..."); a line
-    that joins several items with "+" stays whole."""
+    """A price line as (head, qualifier): "Lighting — 9 post-cap lights, ..." -> ("Lighting", "9 post-cap lights, ..."), "5 LED riser
+    lights — 3 in the center stair, ... — included at no charge" -> ("5 LED riser lights", "3 in ... — included at no charge"); a
+    line that joins several items with "+" stays whole."""
     if " — " in k and "+" not in k:
-        head, _, sub = k.rpartition(" — ")
+        head, _, sub = k.partition(" — ")
         return head, sub
     return k, ""
 
 
-def pp_invest(spec, p, options_html: str, next_html: str, foot: str = "") -> str:
-    """Investment on black: the two ways to pay, then where every dollar goes (a gold wheel, largest share brightest, the
-    legend with each part's dollars and share; what is included at no charge listed with it), the options, the next step."""
+def pp_invest(spec, p, options_html: str, next_html: str, foot: str = "", alloc=None) -> str:
+    """Investment on black: the two ways to pay (the check or ACH price, the financed price on the pricebook's terms), then the
+    price breakdown (the wheel, largest share first, the legend with each part's dollars and share; what is included at no charge
+    listed with it at $0), the options, the next step. alloc: the allocation in the homeowner's words (report.client_allocation)."""
+    from .report import finance_words
     show_fin = spec.extras.show_financing
     if show_fin:
         ways = ('<div class="ways">'
-                f'<div class="way lead"><span class="wl">Check or ACH</span><span class="wv">{money(p.sell)}</span>'
-                f'<span class="ws">{(1 - p.sell / p.retail) * 100:.0f}% below the financed price</span></div>'
-                f'<div class="way"><span class="wl">Financed · no money down</span><span class="wv">{money(p.retail)}</span>'
-                f'<span class="ws">About <b>{money(p.monthly)}/month</b> at 6.99% for 10 years</span>'
-                '<span class="ws">Or 12 or 18 months with no payments, no down payment</span></div></div>')
+                f'<div class="way lead"><span class="wl">Check or ACH price</span><span class="wv">{money(p.sell)}</span>'
+                f'<span class="ws">{(1 - p.sell / p.retail) * 100:.0f}% less than the financed price</span>'
+                '<span class="ws">Applies to payment by check or ACH</span></div>'
+                f'<div class="way"><span class="wl">Financed price</span><span class="wv">{money(p.retail)}</span>'
+                f'<span class="ws"><b>{E(finance_words(p.monthly))}</b></span>'
+                '<span class="ws">Also available with approved credit: 12 or 18 months with no payments</span></div></div>')
         title = "Two ways to pay"
     else:
         ways = f'<div class="ways one"><div class="way lead"><span class="wl">Price · check or ACH</span><span class="wv">{money(p.sell)}</span></div></div>'
         title = "The price"
-    paid = sorted(((k, v) for k, v in p.allocation if v > 0), key=lambda kv: -kv[1])
-    free = [k for k, v in p.allocation if v <= 0]
+    alloc = list(alloc if alloc is not None else p.allocation)
+    paid = sorted(((k, v) for k, v in alloc if v > 0), key=lambda kv: -kv[1])
+    free = [k for k, v in alloc if v <= 0]
     if len(paid) > len(PP_WHEEL):
         rest = sum(v for _, v in paid[len(PP_WHEEL) - 1:])
         paid = paid[:len(PP_WHEEL) - 1] + [("Everything else", rest)]
@@ -1007,7 +1054,7 @@ def pp_invest(spec, p, options_html: str, next_html: str, foot: str = "") -> str
            + f'<text class="wc-l" x="{cx}" y="{cy + 28}" text-anchor="middle">CHECK OR ACH</text></svg>')
     return (f'<section class="pg pp-invest flow{" has-opts" if options_html else ""}" data-fit="dense" id="g-investment" aria-labelledby="inv-h"><div class="pin">'
             f'<header class="sh"><span class="eyebrow">Investment</span><h2 id="inv-h">{title}</h2></header>' + ways
-            + '<div class="where"><h3>Where every dollar goes</h3>'
+            + '<div class="where"><h3>Price breakdown</h3>'
             + f'<div class="inv-grid"><figure class="wheel">{svg}</figure><ol class="legend">' + "".join(rows) + "</ol></div></div>"
             + (f'<div class="opts"><h3>Options</h3>{options_html}</div>' if options_html else "")
             + (f'<div class="next"><h3>Next step</h3>{next_html}</div>' if next_html else "")
@@ -1015,18 +1062,83 @@ def pp_invest(spec, p, options_html: str, next_html: str, foot: str = "") -> str
 
 
 def pp_back(spec, key, img, caps, today, viewer_url=None, foot_note: str = "") -> str:
-    """The back cover: a dusk view when one is left, the logo, the fine print."""
+    """The back cover: a dusk view when one is left, the logo, who to call, the fine print, the link to the 3D model."""
     br = brand_of(spec)
-    online = (f'The interactive 3D model: <a href="{E(viewer_url)}">{E(viewer_url)}</a>' if viewer_url else
+    online = (f'Open the 3D model: <a href="{E(viewer_url)}">{E(viewer_url)}</a>' if viewer_url else
               "The interactive 3D model lives at the online version of this document.")
+    ct = _contact(br)
     return (f'<footer class="pg pp-back{"" if img else " bare"}" aria-label="Back cover">' + (f'<div class="pb-hero">{_img(key, img, caps, "pb-img")}<div class="pc-shade"></div></div>' if img else "")
             + f'<div class="pb-in">{brand_logo(br)}<p class="pb-name">{E(brand_footer(spec))}</p>'
+            + (f'<p class="pb-call">{E(ct["name"])} · {E(ct["role"])} · {E(ct["phone"])}</p>' if ct else "")
             + f'<p class="pb-fine">{E(foot_note)}</p><p class="pb-fine">{online}</p></div></footer>')
 
 
+# who is building it — the owner's own proposal template (gsx-deck-docs scripts/build_proposal.py, the last page): the company in
+# his words, the credentials, who to call, the address. Another brand carries its own in brand.json ("about", "tagline",
+# "credentials" [[value, label]], "contact" {name, role, phone, address}) or shows none of it.
+GS_ABOUT = ("GS Exterior Experts began in 1999 as a siding contractor for Colorado home builders and grew into a full exterior partner — "
+            "siding, windows, roofing, stucco, stone and decking — for residential, multi-family and commercial clients across the state. "
+            "Deck projects are designed, documented and built by the Deck Division.")
+GS_TAGLINE = "Colorado natives. Family-owned since 1999."
+GS_CREDENTIALS = [("1999", "Family-owned and operated since"), ("A+", "Better Business Bureau rating"), ("5-Star", "Google rating"),
+                  ("Elite Preferred", "James Hardie Contractor"), ("President's Club", "James Hardie award"), ("Best of Houzz", "Houzz"),
+                  ("GuildQuality", "Member"), ("Top Rated", "HomeAdvisor"), ("Super Service", "Angi (Angie's List) award")]
+GS_CONTACT = dict(name="Jade Pender", role="Head of Deck Division", phone="303-550-9558",
+                  address="GS Exterior Experts · 9083 W. Parkview Dr, Unit 2, Littleton, CO 80123")
+
+
+def _contact(br: dict):
+    return br.get("contact") or (GS_CONTACT if br["key"] == "gs" else None)
+
+
+def pp_materials(rows, foot: str = "") -> str:
+    """Materials and warranties: every component by name (report.materials_rows: component, product, what it is, the maker's
+    limited warranty — "—" where none of the makers' downloaded documents gives one)."""
+    if not rows:
+        return ""
+    return (_sheet("Materials & warranties", "Every component, by name", cls="pp-mat flow", sid="g-materials").replace("<section ", '<section data-fit="dense" ', 1)
+            + '<div class="tw"><table class="mat"><thead><tr><th>Component</th><th>Product</th><th>What it is</th><th>Warranty</th></tr></thead><tbody>'
+            + "".join(f"<tr><td><b>{E(a)}</b></td><td>{E(b)}</td><td>{E(c)}</td>" + (f"<td>{E(d)}</td>" if d else '<td class="nw">—</td>') + "</tr>" for a, b, c, d in rows)
+            + "</tbody></table></div><p class=\"fine\">Warranty terms are the manufacturers' published limited warranties.</p>"
+            + "</div>" + _folio(foot, "Materials & warranties") + "</section>")
+
+
+def pp_schedule(title: str, gantt_html: str, pays=None, foot: str = "", tag: str = "") -> str:
+    """The schedule: the working days as a Gantt (page._timeline's list), then the payments on the check or ACH price
+    (report.payment_schedule: [(share, milestone, amount)])."""
+    h = [_sheet("Schedule", title, tag=tag, cls="pp-sched flow", sid="g-schedule").replace("<section ", '<section data-fit="dense" ', 1), gantt_html]
+    if pays:
+        h.append('<div class="pays"><h3>Payments <span>on the check or ACH price</span></h3><div class="tw"><table class="pay"><thead><tr><th>Share</th><th>When</th>'
+                 '<th class="num">Amount</th></tr></thead><tbody>' + "".join(f"<tr><td>{E(s_)}</td><td>{E(w_)}</td><td class='num'>{money(a_)}</td></tr>" for s_, w_, a_ in pays)
+                 + f"<tr class='total'><td>100%</td><td>The check or ACH price</td><td class='num'>{money(sum(a_ for _, _, a_ in pays))}</td></tr></tbody></table></div></div>")
+    h.append("</div>" + _folio(foot, "Schedule") + "</section>")
+    return "".join(h)
+
+
+def pp_company(spec, foot: str = "") -> str:
+    """Who is building it: the company in the owner's words, the credentials, who to call and the address (GS's from the owner's
+    template; another brand's from its brand.json, or no page)."""
+    br = brand_of(spec)
+    gs = br["key"] == "gs"
+    about, creds, ct = br.get("about") or (GS_ABOUT if gs else ""), br.get("credentials") or (GS_CREDENTIALS if gs else []), _contact(br)
+    if not (about or creds or ct):
+        return ""
+    h = [_sheet("Who is building it", br.get("tagline") or (GS_TAGLINE if gs else br["name"]), cls="pp-co", sid="g-company")]
+    if about:
+        h.append(f'<p class="co-about">{E(about)}</p>')
+    if creds:
+        h.append('<div class="creds">' + "".join(f'<div><b>{E(v)}</b><span>{E(k)}</span></div>' for v, k in creds) + "</div>")
+    if ct:
+        h.append(f'<div class="call"><h3>Who to call</h3><p class="who-name">{E(ct["name"])}</p><p>{E(ct["role"])} · {E(ct["phone"])}</p>'
+                 + (f'<p class="addr">{E(ct["address"])}</p>' if ct.get("address") else "") + "</div>")
+    h.append("</div>" + _folio(foot, "Who is building it") + "</section>")
+    return "".join(h)
+
+
 PP_CSS = """<style>
-/* The photo-led proposal: black, cream and GS gold, Nunito Sans throughout; one deliberate page per section in print. */
-body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black:#050608; --pp-cream:#f7f3ea;
+/* The photo-led proposal: black, cream and GS gold; headings and numbers in Saira Semi Condensed (the owner's choice from the
+   launch-manifest redesign), text in Nunito Sans; one deliberate page per section in print. */
+body.pp { --display:"Saira Semi Condensed", "Arial Narrow", "Nunito Sans", sans-serif; --pp-black:#050608; --pp-cream:#f7f3ea;
   --pp-gold:#d49e1b; --pp-gold-hi:#ffe28d; --pp-gold-text:#e9b23c; --pp-mute-dk:#a9a69e; --pp-line-dk:rgba(244,242,236,.16);
   margin:0; background:var(--ground); }
 .pp main.pdoc { display:block; }
@@ -1035,7 +1147,7 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp .pin { max-width:980px; margin:0 auto; padding:0 16px; }
 .pp .eyebrow { display:block; font-family:var(--display); font-weight:800; font-size:12px; letter-spacing:.3em; text-transform:uppercase; color:var(--gold-ink); }
 .pp .sh { display:flex; flex-direction:column; gap:6px; margin:0 0 18px; }
-.pp .sh h2 { font-family:var(--display); font-weight:900; font-size:clamp(28px, 4.4vw, 40px); line-height:1.02; letter-spacing:-.015em; margin:0; color:var(--ink); }
+.pp .sh h2 { font-family:var(--display); font-weight:800; font-size:clamp(28px, 4.4vw, 40px); line-height:1; letter-spacing:.02em; text-transform:uppercase; margin:0; color:var(--ink); }
 .pp .sh .tag { margin:0; color:var(--ink-3); font-size:14px; }
 .pp figure { margin:0; }
 .pp .ph { position:relative; overflow:hidden; }
@@ -1052,7 +1164,7 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp-cover .mission { font-family:var(--display); font-weight:700; font-size:11px; letter-spacing:.3em; text-transform:uppercase; color:#f4f2ec; text-align:right; line-height:1.8; }
 .pp-cover .pc-title { position:relative; margin-top:-22vw; padding:0 max(16px, 4vw) 28px; display:flex; flex-direction:column; gap:12px; }
 .pp-cover .eyebrow { color:var(--pp-gold-hi); }
-.pp-cover h1 { font-family:var(--display); font-weight:900; font-size:clamp(40px, 8.4vw, 84px); line-height:.94; letter-spacing:-.02em; margin:0; color:#fff; text-wrap:balance; }
+.pp-cover h1 { font-family:var(--display); font-weight:800; font-size:clamp(40px, 8.4vw, 84px); line-height:.92; letter-spacing:.02em; text-transform:uppercase; margin:0; color:#fff; text-wrap:balance; }
 .pp-cover .who { margin:0; color:var(--pp-mute-dk); font-size:15px; }
 .pp-cover .pc-foot { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:14px max(16px, 4vw) 22px; border-top:1px solid var(--pp-line-dk); margin:0 max(16px, 4vw); padding-left:0; padding-right:0;
   font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--pp-mute-dk); }
@@ -1063,11 +1175,11 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp .po-fig figcaption, .pp .pi-fig figcaption, .pp .ph figcaption { position:absolute; left:0; right:0; bottom:0; margin:0; padding:40px max(16px, 4vw) 14px;
   color:#fff; font-size:12.5px; font-weight:600; letter-spacing:.02em; background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.55)); }
 .pp-over .pin { padding-top:30px; display:flex; flex-direction:column; gap:20px; }
-.pp-over .stand { margin:0; font-family:var(--display); font-weight:700; font-size:clamp(19px, 2.6vw, 24px); line-height:1.32; color:var(--ink); max-width:46ch; text-wrap:pretty; }
+.pp-over .stand { margin:0; font-family:"Nunito Sans", "Segoe UI", system-ui, sans-serif; font-weight:700; font-size:clamp(19px, 2.6vw, 24px); line-height:1.32; color:var(--ink); max-width:46ch; text-wrap:pretty; }
 .pp .stats { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); border-top:2px solid var(--pp-gold); }
 .pp .stats > div { display:flex; flex-direction:column; gap:4px; padding:12px 10px 0 0; min-width:0; }
 .pp .stats > div + div { padding-left:12px; border-left:1px solid var(--line); }
-.pp .stats .sv { font-family:var(--display); font-weight:900; font-size:clamp(20px, 2.8vw, 28px); line-height:1; color:var(--ink); white-space:nowrap; }
+.pp .stats .sv { font-family:var(--display); font-weight:700; font-size:clamp(20px, 2.8vw, 28px); line-height:1; color:var(--ink); white-space:nowrap; }
 .pp .stats .sl { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:800; line-height:1.35; }
 .pp-over .po-cols { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(0, 1fr); gap:28px; align-items:start; }
 .pp-over .po-lede p { margin:0; font-size:15px; line-height:1.6; color:var(--ink-2); font-weight:400; }
@@ -1123,7 +1235,7 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp-invest .way { border:1px solid var(--pp-line-dk); padding:20px 22px; display:flex; flex-direction:column; gap:6px; }
 .pp-invest .way.lead { border-color:var(--pp-gold); box-shadow:inset 0 3px 0 var(--pp-gold); }
 .pp-invest .wl { font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--pp-mute-dk); font-weight:800; }
-.pp-invest .wv { font-family:var(--display); font-weight:900; font-size:clamp(38px, 6vw, 56px); line-height:1; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; margin:4px 0 6px; }
+.pp-invest .wv { font-family:var(--display); font-weight:800; font-size:clamp(38px, 6vw, 56px); line-height:1; letter-spacing:0; color:#fff; font-variant-numeric:tabular-nums; margin:4px 0 6px; }
 .pp-invest .way.lead .wv { color:var(--pp-gold-text); }
 .pp .opt-prices .lead .pv, .pp .prices .lead .pv, .pp .terms .lead .tv { background:none; -webkit-text-fill-color:currentColor; color:var(--pp-gold-text); }
 .pp-invest .ws { font-size:14px; color:#d9d6ce; line-height:1.45; }
@@ -1132,7 +1244,7 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp-invest .inv-grid { display:grid; grid-template-columns:minmax(0, 260px) minmax(0, 1fr); gap:34px; align-items:center; }
 .pp-invest .wheel svg { display:block; width:100%; max-width:260px; height:auto; margin:0 auto; }
 .pp-invest .wheel path { fill:none; stroke-width:24; }
-.pp-invest .wheel .wc-v { font-family:var(--display); font-weight:900; font-size:30px; fill:#ffffff; }
+.pp-invest .wheel .wc-v { font-family:var(--display); font-weight:800; font-size:30px; fill:#ffffff; }
 .pp-invest .wheel .wc-l { font-family:"Nunito Sans", system-ui, sans-serif; font-weight:800; font-size:9.5px; letter-spacing:.24em; fill:#a9a69e; }
 .pp-invest .inv-grid.hover .wheel path:not(.on) { opacity:.3; }
 .pp-invest .inv-grid .wheel path.on { stroke-width:30; }
@@ -1164,6 +1276,25 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
 .pp-back .pb-name { margin:6px 0 0; font-family:var(--display); font-weight:800; font-size:13px; letter-spacing:.3em; text-transform:uppercase; color:#f4f2ec; }
 .pp-back .pb-fine { margin:0; font-size:12.5px; color:var(--pp-mute-dk); max-width:70ch; }
 .pp-back .pb-fine a { color:var(--pp-gold-hi); }
+.pp-back .pb-call { margin:0; font-size:13.5px; font-weight:700; color:#f4f2ec; letter-spacing:.02em; }
+/* materials and warranties, not included, the schedule's payments, who is building it */
+.pp .mat { font-size:13.5px; }
+.pp .mat td:first-child { white-space:nowrap; }
+.pp .mat td:last-child { color:var(--ink-2); }
+.pp .fine { margin:8px 0 0; color:var(--ink-3); font-size:12.5px; }
+.pp .excl, .pp .pays, .pp .call { margin-top:26px; border-top:2px solid var(--pp-gold); padding-top:12px; }
+.pp .excl h3, .pp .pays h3, .pp .call h3 { margin:0 0 10px; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold-ink); font-weight:800; }
+.pp .pays h3 span { letter-spacing:.02em; text-transform:none; color:var(--ink-3); font-weight:600; margin-left:8px; }
+.pp .excl ul { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px; font-size:14.5px; }
+.pp .pay tr.total td { font-weight:800; border-top:1px solid var(--ink-3); border-bottom:0; }
+.pp .co-about { margin:0 0 22px; max-width:72ch; font-size:15px; line-height:1.6; color:var(--ink-2); }
+.pp .creds { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+.pp .creds > div { background:var(--pp-black); padding:14px 16px; display:flex; flex-direction:column; gap:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.pp .creds b { font-family:var(--display); font-weight:800; font-size:24px; line-height:1.05; color:#fff; text-transform:uppercase; letter-spacing:.02em; }
+.pp .creds span { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--pp-gold-hi); font-weight:800; }
+.pp .call .who-name { margin:0 0 2px; font-family:var(--display); font-weight:800; font-size:22px; text-transform:uppercase; letter-spacing:.02em; color:var(--ink); }
+.pp .call p { margin:2px 0; font-size:15px; color:var(--ink-2); }
+.pp .folio .pno { margin-left:12px; }
 /* the rest of the proposal's blocks (options, schedule, confirm, the option renders, 3D) sit on cream sheets */
 .pp .pp-flow { background:var(--ground); padding:48px 0 40px; }
 .pp .pp-flow .gal { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -1173,6 +1304,11 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
   .pp-over .po-cols, .pp-invest .ways, .pp-invest .inv-grid, .pp .cards { grid-template-columns:minmax(0, 1fr); }
   .pp .grid, .pp .pp-flow .gal { grid-template-columns:minmax(0, 1fr); }
   .pp .sunrow { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .pp .creds { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .pp .mat thead { display:none; }
+  .pp .mat tr { display:block; padding:10px 0; border-bottom:1px solid var(--line); }
+  .pp .mat td { display:block; padding:1px 0; border:0; white-space:normal !important; }
+  .pp .mat td.nw { display:none; }
   .pp-cover .pc-img { aspect-ratio:4/5; }
   .pp-cover .pc-title { margin-top:-38vw; }
   .pp-cover .gslogo { height:40px; }
@@ -1253,7 +1389,11 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
   .pp-inc.noimg { padding-top:0.62in; }
   .pp-inc .pi-fig { margin-bottom:0.3in; }
   .pp-inc .pi-fig img { aspect-ratio:auto; height:4.7in; max-height:none; }
-  .pp-inc.rows-m .pi-fig img { height:3.6in; } .pp-inc.rows-l .pi-fig img { height:2.6in; }
+  .pp-inc.rows-m .pi-fig img { height:3.6in; }
+  .pp-inc.rows-l .pi-fig img { height:2.6in; }
+  .pp-inc.rows-x .cards { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0.1in; }
+  .pp-inc.rows-x .card { padding:0.11in 0.13in 0.12in; }
+  .pp-inc.rows-x .card p { font-size:10.2px; line-height:1.42; }
   .pp .cards { gap:0.12in; }
   .pp .card { padding:0.14in 0.17in 0.16in; break-inside:avoid; background:#fffdf8; }
   .pp .card h3 { font-size:8.5px; margin-bottom:0.06in; }
@@ -1319,6 +1459,33 @@ body.pp { --display:"Nunito Sans", "Segoe UI", system-ui, sans-serif; --pp-black
   .pp-back .gslogo { height:0.9in; margin-bottom:0.12in; }
   .pp-back .pb-name { font-size:10px; }
   .pp-back .pb-fine { font-size:9px; }
+  .pp-back .pb-call { font-size:10.5px; }
+  /* materials and warranties, the schedule's payments, who is building it */
+  .pp .mat { font-size:10.8px; line-height:1.42; }
+  .pp .mat th { font-size:8px; }
+  .pp .mat td, .pp .mat th { padding:7px 12px 7px 0; }
+  .pp .mat th:nth-child(1) { width:1.15in; }
+  .pp .mat th:nth-child(2) { width:1.6in; }
+  .pp .mat th:nth-child(4) { width:2.05in; }
+  .pp .fine { font-size:9px; }
+  .pp .excl, .pp .pays, .pp .call { margin-top:0.24in; padding-top:0.1in; }
+  .pp .excl h3, .pp .pays h3, .pp .call h3 { font-size:8.5px; margin-bottom:0.08in; }
+  .pp .pays h3 span { font-size:8.5px; }
+  .pp .excl ul { font-size:11px; gap:3px; }
+  .pp .pay { font-size:11px; }
+  .pp .pay td, .pp .pay th { padding:4px 8px 4px 0; }
+  .pp-mat.dense .mat { font-size:9.2px; }
+  .pp-mat.dense .mat td { padding-top:3px; padding-bottom:3px; }
+  .pp-sched.dense .gantt li { font-size:10px; }
+  .pp-sched.dense .gantt .g-lab { padding:2px 0; }
+  .pp-sched.dense .pay td { padding-top:2px; padding-bottom:2px; }
+  .pp .co-about { font-size:11.5px; margin-bottom:0.22in; }
+  .pp .creds { gap:0.1in; }
+  .pp .creds > div { padding:0.14in 0.16in; }
+  .pp .creds b { font-size:18px; }
+  .pp .creds span { font-size:7.5px; }
+  .pp .call .who-name { font-size:18px; }
+  .pp .call p { font-size:11.5px; }
   /* the other blocks */
   .pp .pp-flow { padding:0.62in 0 0.6in; }
   .pp .pp-flow h2.kicker { break-before:auto; page-break-before:auto; margin-top:0; }

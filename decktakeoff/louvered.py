@@ -1088,7 +1088,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
         o.append(LN(X(ax_), Y(ay_), X(bx_), Y(by_), "#5b6e8c", 2.0, "2 2"))
         side_ = sc["plane"] == "x"
         right_ = side_ and ax_ > (x0 + x1) / 2
-        o.append(TH((X((ax_ + bx_) / 2) + (-4 if right_ else 4)) if side_ else X(ax_ + (bx_ - ax_) * 0.78), (Y(ay_ + (by_ - ay_) * 0.22) if side_ else Y(ay_) - 4),
+        o.append(TH((X((ax_ + bx_) / 2) + (-4 if right_ else 4)) if side_ else X(ax_ + (bx_ - ax_) * 0.78), (Y(ay_ + (by_ - ay_) * 0.22) if side_ else Y(ay_) - 15),   # over the front beam's words
                     f"{sc['side']} screen (option)", 6.0, 800, ("end" if right_ else "start") if side_ else "middle", "#3d4f6b", halo="#fff"))
     for zi, c in enumerate(q["zones"]):
         cx_, cy_ = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
@@ -1110,7 +1110,7 @@ def sheet(L, S, t, meta) -> Optional[str]:
     dim_v(o, Y, X(x1) + 18, y0, y1, ftin(q["D"] * 12), 8, left=False)
     if front_posts:
         fp = front_posts[0]
-        cxp, cyp = X(fp["x"]) + 16, Y(fp["y"]) + 13
+        cxp, cyp = X(fp["x"]) - 16, Y(fp["y"]) + 13          # outside the post, clear of the rail-line words under the front
         o.append(C(cxp, cyp, 6.5, "#fff", INK, 0.8)); o.append(T(cxp, cyp + 3, "1", 7.2, 900, "middle"))
     rail_n = sum(1 for pt in q["posts"] if pt["on_rail"])
     if rail_n:
@@ -1185,7 +1185,8 @@ def sheet(L, S, t, meta) -> Optional[str]:
     dim_v(o, Zs, xr, zb, zt, f"{h * 12:g}\"", 6.2, left=False)
     dim_v(o, Zs, xr + 22, zd, zt, f"{ftin((zt - zd) * 12)} deck to top", 7, left=False)
     dim_h(o, Xs, Zs(zt + 1.05), y0, y1, f"{ftin(q['D'] * 12)} wall to front of frame", 7)
-    o.append(T(Xs(y1) + 8, Zs(zt) + 9, f"TOP OF FRAME {ftin(zt * 12)}", 6.2, 800, "start", MUTE))
+    for k_, w_ in enumerate(("TOP OF FRAME", ftin(zt * 12))):        # two short lines, clear of the dimensions at the right
+        o.append(T(Xs(y1) + 8, Zs(zt) + 9 + k_ * 11.4, w_, 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) - 4, f"DECK {ftin(zd * 12)}", 6.2, 800, "start", MUTE))
     o.append(T(Xs(yf) + 8, Zs(zd) + 6, "above the patio" if zd > 3 else "above grade", 6.0, 600, "start", MUTE))
     _lead(o, Xs(eave_y + 0.2), Zs(z_eave - 0.1), Xs(y0 + 2.6), Zs(zt + 3.15),

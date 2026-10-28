@@ -1,7 +1,7 @@
 """The GSX job page — one template for every job, two audiences.
 
-    internal: the takeoff + build set page (Eagle's Nest layout): reads, flags, the order, schedule, stack, quote, renders,
-              isometrics, drawings, build set, live 3D.
+    internal: the takeoff + build set page (Eagle's Nest layout): reads, flags, the order, schedule, cut list, renders,
+              isometrics, drawings, build set, live 3D. No pricing: the cost stack (mode="cost") is its own one or two pages.
     customer: the proposal: black cover with the hero render and the price, then reads, what it is, renders, isometrics,
               explosions, structure, drawings (no internal block), materials without prices, fastening, build steps,
               investment, live 3D. Nothing internal, no names.
@@ -13,7 +13,7 @@ import html, json, math, re, shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from .spec import DeckSpec
-from .report import quote_markdown, timeline_of
+from .report import quote_markdown, timeline_of, engine_timeline, payment_schedule, materials_rows, client_allocation, price_holds_through
 from .units import ftin
 from .takeoff import CATEGORIES, inches_frac
 from .catalog import rail_name, beam_words, beam_species_words
@@ -30,6 +30,7 @@ CAP = {"yard": "From the yard", "corner": "From the front corner", "ondeck": "St
 CAP0 = dict(CAP)
 CAP_NO_BEAM = {"under": "Under the deck — posts, footings", "frame-iso2": "Frame only — joists, rims, ledger",
                "structure-underiso": "Posts on the footings, the doubled rims on the posts"}
+CLIENT_FOOT = "Renders show the design. We confirm every measurement on site before we build, and sample boards set the colors."   # the client documents' fine print
 
 
 def money(v, cents=False):
@@ -206,6 +207,64 @@ h2.pb{break-before:page;page-break-before:always;} footer{padding-bottom:0.4in;}
 .sheets .sheet:first-child{break-before:auto;page-break-before:auto;} .sheets .sheet svg{width:100%;height:auto;max-height:7.3in;display:block;}
 </style>"""
 
+# the internal documents (takeoff + build set, the supplier take-off, the cost stack: <body class="doc">): page margins with a
+# running footer (named pages, so the proposal's full-bleed pages keep theirs), headings kept with what follows, short tables
+# and blocks whole, at least 3 rows either side of a split, one column grid down the order, no disclosure markers
+DOC_CSS = """<style>
+.strip.n4 { grid-template-columns:repeat(4, 1fr); } body.doc h1 .nw { white-space:nowrap; } body.doc .band h1.long { font-size:clamp(22px, 4vw, 30px); }
+@media (max-width: 640px) { .strip.n4 { grid-template-columns:repeat(2, 1fr); } body.doc h1 .nw { white-space:normal; } }
+@media print {
+  body.doc { --ink-3:#6b665e; } body.doc .sev-info .sev { background:#7a7366; }      /* small gray type and the INFO badge at 4.5:1 or better */
+  body.doc > header.band, body.doc > main.wrap { page:doc; }
+  body.doc .sheets, body.doc h2.kicker:has(+ .sheets) { page:docsheet; }
+  body.doc .sheets summary { display:none; } body.doc .sheets .sheet svg { max-height:7.05in; margin:0 auto; }
+  body.doc summary { list-style:none; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-ink); font-weight:800; margin:18px 0 6px; }
+  body.doc summary::-webkit-details-marker { display:none; }
+  body.doc h2.kicker, body.doc h3, body.doc h4, body.doc summary { break-after:avoid; page-break-after:avoid; }
+  body.doc .keep, body.doc .strip, body.doc .gal { break-inside:avoid; page-break-inside:avoid; }
+  body.doc tbody tr:nth-child(-n+2):not(:last-child), body.doc dl.reads > div:nth-child(-n+2):not(:last-child), body.doc .flags li:nth-child(-n+2):not(:last-child),
+  body.doc .notes li:nth-child(-n+2):not(:last-child), body.doc .step li:first-child:not(:last-child) { break-after:avoid; page-break-after:avoid; }
+  body.doc tbody tr:nth-last-child(-n+2):not(:first-child), body.doc dl.reads > div:nth-last-child(-n+2):not(:first-child), body.doc .flags li:nth-last-child(-n+2):not(:first-child),
+  body.doc .notes li:nth-last-child(-n+2):not(:first-child), body.doc .step li:last-child:not(:first-child) { break-before:avoid; page-break-before:avoid; }
+  body.doc dl.reads { display:block; } body.doc dl.reads > div { display:grid; grid-template-columns:96px 1fr; gap:0 14px; margin:0 0 6px; break-inside:avoid; }
+  body.doc .flags { display:block; } body.doc .flags li { break-inside:avoid; } body.doc .notes li { break-inside:avoid; }
+  body.doc table.netorder { table-layout:fixed; } body.doc table.netorder th:nth-child(1) { width:7%; } body.doc table.netorder th:nth-child(2) { width:8%; }
+  body.doc table.netorder th:nth-child(3) { width:7%; } body.doc table.netorder th:nth-child(4) { width:40%; } body.doc table.netorder td { overflow-wrap:anywhere; }
+  body.doc .step { border-bottom:0; padding-bottom:0; margin-bottom:22px; grid-template-columns:0.82fr 1.18fr; gap:14px; }
+  body.doc .step ul { font-size:11.5px; line-height:1.36; } body.doc .step li { margin:1px 0; } body.doc .step h4 { margin:6px 0 1px; }
+  body.doc footer { margin-top:18px; padding-bottom:0; break-inside:avoid; } body.doc main.wrap { padding-bottom:0; }
+}
+</style>"""
+
+
+def _foot(name: str, n: int = 64) -> str:
+    """A running footer's job name: no parenthetical, cut at a clean break (", ", " · ", " — ") within n characters."""
+    j = re.sub(r"\s*\([^)]*\)", "", name or "").strip()
+    while len(j) > n:
+        cut = max(j.rfind(", ", 0, n), j.rfind(" · ", 0, n), j.rfind(" — ", 0, n))
+        if cut <= 0:
+            return j[:n - 1].rstrip() + "…"
+        j = j[:cut]
+    return j
+
+
+def _page_box(sel: str, size: str, margin: str, left: str, pad: str, bg: str = "#f7f3ea", important: bool = True) -> str:
+    """One @page rule with the running footer: the job and the document on the left, "page n of N" on the right. Size and
+    margin are !important for render_page's documents (render_pdf adds PRINT_CSS's generic @page, margin 0, after these and
+    Chromium lets it win); important=False where a wrapper's later @page must win (render_permit_set: messner_ext's sheet size)."""
+    q = '"' + left.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
+    imp = " !important" if important else ""
+    box = "font-family:'Nunito Sans','Segoe UI',system-ui,sans-serif; font-size:7.5pt; font-weight:600; color:#6b665e; letter-spacing:.03em; vertical-align:middle;"
+    return (f'@page {sel} {{ size:{size}{imp}; margin:{margin}{imp}; background:{bg}; @bottom-left {{ content:{q}; {box} padding-left:{pad}; }} '
+            f'@bottom-right {{ content:"page " counter(page) " of " counter(pages); {box} padding-right:{pad}; white-space:nowrap; }} }}')
+
+
+def _doc_page_css(left: str) -> str:
+    """The internal documents' pages: Letter portrait with 0.5 in top and 0.6 in bottom margins (the first page's band runs to
+    the top edge), the drawing sheets on Letter landscape, cream to the paper edge, the running footer on every page."""
+    return ("<style>@media print { " + _page_box("doc", "Letter", "0.5in 0 0.6in", left, "0.5in") + " @page doc:first { margin-top:0 !important; } "
+            + _page_box("docsheet", "Letter landscape", "0.4in 0.3in 0.55in", left, "0") + " }</style>")
+
 
 def _reads(t, L, sm, n_piers, customer):
     reads = [("Frame", sm["finished_frame"]), ("Deck", sm["finished_deck"] + f" · {sm['deck_sf']:g} SF · {sm['height']} above grade")]
@@ -223,15 +282,18 @@ def _reads(t, L, sm, n_piers, customer):
     return '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in reads) + "</dl>"
 
 
+def _part_no(sku: str) -> bool:
+    """A maker's or the yard's part number (AZTDL3X3LEDCAP, CLOCFAST, LUS210Z), not one of the pricebook's own keys (lv_staples_100)."""
+    return bool(re.fullmatch(r"[A-Z0-9][A-Z0-9./-]{2,}", sku or ""))
+
+
 def _order_internal(t):
     out = []
     if t.order_ref:
         out.append('<h2 class="kicker">The order <span class="tag">' + E(t.order_ref) + " · as quoted</span></h2>")
-        for cat, lines in t.by_category().items():
+        for cat, lines in t.by_category().items():           # quantities only: the prices live in the cost stack
             out.append(f"<h3>{E(cat)}</h3>")
-            rows = [[E(l.sku), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), money(l.unit_cost, True), money(l.ext, True)] for l in lines]
-            rows.append(["", "", "", f"<i>{E(cat)} subtotal</i>", "", f"<b>{money(sum(l.ext for l in lines), True)}</b>"])
-            out.append(table(["SKU", "Qty", "Unit", "Item", "Unit", "Ext"], rows, "order", ["l", "r", "l", "l", "r", "r"]))
+            out.append(table(["SKU", "Qty", "Unit", "Item"], [[E(l.sku), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item)] for l in lines], "order", ["l", "r", "l", "l"]))
         if t.model_lines:
             out.append('<details><summary>Model cross-check — what the engine counts from the drawing (the order above governs)</summary>')
             by = {}
@@ -240,13 +302,13 @@ def _order_internal(t):
             for cat in CATEGORIES:
                 if cat in by:
                     out.append(f"<h3>{E(cat)}</h3>")
-                    out.append(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in by[cat]], "order", ["r", "r", "l", "l", "l"]))
+                    out.append(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in by[cat]], "order netorder", ["r", "r", "l", "l", "l"]))
             out.append("</details>")
     else:
         out.append('<h2 class="kicker">The order <span class="tag">Decks &amp; Docks · GSEXT1 · ship to the job</span></h2>')
         for cat, lines in t.by_category().items():
             out.append(f"<h3>{E(cat)}</h3>")
-            out.append(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in lines], "order", ["r", "r", "l", "l", "l"]))
+            out.append(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in lines], "order netorder", ["r", "r", "l", "l", "l"]))
     return "".join(out)
 
 
@@ -263,60 +325,342 @@ def _order_customer(t):
     return "".join(out)
 
 
-def _stack(p, sold: float = None):
-    out = ['<h2 class="kicker" id="g-stack">' + (f"The stack — cost + margin <span class=\"tag\">sold at {money(sold)} · internal</span>" if sold else 'The stack <span class="tag">internal</span>') + '</h2>']
-    stack = [("Materials (raw)", money(p.materials, True)), (f"Materials × {p.material_factor:g}", money(p.materials_factored, True)),
-             (f"Sales tax {p.tax_rate:.2%}" + (" on factored materials" if p.material_factor != 1 else ""), money(p.tax, True)), ("Labor (rate card)", money(p.labor, True)),
-             ("Work — carries the margin", money(p.work, True)), (gc_name(p.gc_lines, "General conditions") + " at cost", money(p.gc, True)), ("Cost", money(p.cost, True)),
-             (f"Sell — check or ACH at {p.gm:.1%} GM" + (f" ({p.rail_note})" if p.rail_note else ""), f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF"), ("Sell at the 40% floor" + (" (the deck at 40%, rail at its rate)" if p.rail_note else ""), money(p.sell_floor)),
-             ("Financed", f"<b>{money(p.retail)}</b> · {money(p.monthly)}/mo at 6.99% × 10 yr"), ("Gross profit", money(p.gp))]
-    ss_, sw_ = float(getattr(p, "stair_sell", 0) or 0), float(getattr(p, "stair_work", 0) or 0)
-    if ss_:                                  # the owner's stair rule (extras.stair_rule): what the stairs sell for, their cost, their margin
-        stack.append(("Stairs at the owner's rule — sell · their cost · margin", f"{money(ss_)} · {money(sw_)} · {1 - sw_ / ss_:.1%}"))
-    if sold:
-        stack[7] = ("SOLD — check or ACH", f"<b>{money(p.sell)}</b> · {money(p.sell_per_sf, True)}/SF")
-        stack += [("Margin on the sold price (gross profit ÷ sell, GC at cost)", f"<b>{p.gp / p.sell:.1%}</b>"),
-                  ("Margin on the work (the GM the engine prices with)", f"{p.gm:.1%}"),
-                  ("Markup on cost", f"{p.gp / p.cost:.1%}"),
-                  ("Commission 10% of sell", money(p.commission)), ("Gross profit after commission", f"<b>{money(p.gp - p.commission)}</b> · {(p.gp - p.commission) / p.sell:.1%} of sell")]
-    if p.engineering:
-        stack.append(("Engineering — outside the price, at cost", f"{money(p.engineering[0])}–{money(p.engineering[1])}"))
-    out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in stack) + "</tbody></table></div>")
-    out.append("<h3>Labor</h3>")
-    out.append(table(["Line", "Qty", "Unit", "Rate", "Ext"], [[E(i), qfmt(q), E(u), money(r, True), money(e, True)] for i, q, u, r, e in p.labor_lines], "", ["l", "r", "l", "r", "r"]))
-    if p.gc_lines:
-        out.append(f"<h3>{E(gc_name(p.gc_lines, 'General conditions'))} — at cost, no margin</h3>")
-        out.append(table(["Item", "Amount", "Why"], [[E(i), money(a), E(why)] for i, a, why in p.gc_lines], "", ["l", "r", "l"]))
-    out.append("<h3>What the price includes — sell values</h3>")
-    out.append(table(["Item", "Value"], [[E(k), money(v)] for k, v in p.allocation] + [["<b>Total, check or ACH</b>", f"<b>{money(p.sell)}</b>"], ["<b>Total, financed</b>", f"<b>{money(p.retail)}</b>"]], "", ["l", "r"]))
-    if p.options:
-        out.append("<h3>Options — full installed deltas</h3>")
-        out.append(table(["Option", "Cost Δ", "Check / ACH", "Financed"], [[E(o.name), f"{o.cost:+,.0f}", f"{o.check:+,.0f}", f"{o.financed:+,.0f}"] for o in p.options], "", ["l", "r", "r", "r"]))
-    return "".join(out)
+def _m(v, cents=False) -> str:
+    """Money with a true minus sign ahead of the dollar sign: −$820.60, never $-820.60."""
+    return ("−" if round(v, 2 if cents else 0) < 0 else "") + money(abs(v), cents)
 
 
-def _cost_stack(p, t):
-    """The sold job: what it costs to build, everything in, no margin lines."""
-    tax_raw = round(p.materials * p.tax_rate, 2)
-    total = round(p.materials + tax_raw + p.labor + p.gc, 2)
-    out = ['<h2 class="kicker">Cost to build <span class="tag">materials at invoice · labor at the rate card · site services at cost</span></h2>']
-    rows = [("Materials — every line of the order", money(p.materials, True)), (f"Sales tax {p.tax_rate:.2%} on materials", money(tax_raw, True)),
-            ("Labor", money(p.labor, True)), (gc_name(p.gc_lines, "Site & project services") + " at cost", money(p.gc, True)), ("<b>Total cost to build</b>", f"<b>{money(total, True)}</b>")]
-    ss_, sw_ = float(getattr(p, "stair_sell", 0) or 0), float(getattr(p, "stair_work", 0) or 0)
-    if ss_:                                  # the owner's stair rule: the stairs' cost inside the total, what they sold for, their margin
-        rows.append((f"of which the stairs — sold at the owner's rule for {money(ss_)}, {1 - sw_ / ss_:.1%} margin", money(sw_, True)))
-    out.append('<div class="tw"><table class="ledger"><tbody>' + "".join(f"<tr><td>{k}</td><td class='num'>{v}</td></tr>" for k, v in rows) + "</tbody></table></div>")
+def _pct(v) -> str:
+    """A margin the way the owner says it: 30%, 42.5%, 28.4% (a loss with a true minus sign)."""
+    s_ = f"{100 * v:.1f}".replace("-", "−")
+    return (s_[:-2] if s_.endswith(".0") else s_) + "%"
+
+
+def _mw(v) -> str:
+    """An amount the owner set, as he set it: $1,000 whole, $820.60 with its cents."""
+    return money(v, round(v, 2) != round(v))
+
+
+def _h1(name: str) -> str:
+    """An internal document's <h1>: it breaks after a " · ", never before the dot, and a short part (24 characters or less, "19105
+    E Prentice Cir", "Deck Replacement") stays whole on a page or a wide screen; a long part wraps as text does, and on a phone
+    every part wraps (DOC_CSS). A long job line (over 64 characters, the CLI's default name) drops its parenthesis (the
+    materials; the <title> keeps the whole name) and sets smaller (h1.long)."""
+    n = re.sub(r"\s*\([^()]*\)", "", name or "").strip() if len(name or "") > 64 else (name or "")
+    xs = n.split(" · ")
+    pt = [E(x) + ("&nbsp;·" if i < len(xs) - 1 else "") for i, x in enumerate(xs)]
+    return (('<h1 class="long">' if len(n) > 64 else "<h1>") + " ".join(f'<span class="nw">{v}</span>' if len(x) <= 24 else v for x, v in zip(xs, pt))
+            + "</h1>")
+
+
+_M1 = r"[+−-]?\$\s?\d(?:[\d,]*\d)?(?:\.\d+)?(?:\s?[KkM]\b)?(?:/[A-Za-z]+\b)?"          # $17.8K, $2/SF, -$820.60, $100k
+_MONEY = rf"(?:[~≈]\s*)?{_M1}(?:\s*(?:–|-|to)\s*(?:[~≈]\s*)?{_M1})?"                     # with ≈ / ~ ahead, a range
+_SRC = r"(?:\s+(?:from|per|on|in) the [^;,()]*?(?:quote|pricebook|price list|invoice)(?: note)?)?"   # where the figure came from
+_PRICE_ONLY = {"no", "pricebook", "price", "priced", "key", "quote", "quoted", "note", "from", "per", "the", "d&d", "cost", "at", "each", "ea", "about",
+               "approx", "total", "->", "→", "=", "+", "~", "≈", "and", "or", "a", "of", "est", "sell", "budget"}
+
+
+def _strip_money(s: str) -> str:
+    """A flag's words without its dollar figures: "the owner's $15,000" reads "the owner's price", "the card's $2/SF" "the card's
+    rate"; any other figure goes with its "at" / "≈" and where it came from ("$193.48 from the D&D quote note"); a clause, or a
+    parenthesis, left with nothing but price words ("no pricebook key", "($100k -> ~$3,015)") goes whole. Parentheses stay paired."""
+    s = re.sub(rf"\b([Tt]he (?:[\w&]+['’]s |D&D )?){_MONEY}{_SRC}", lambda m: m.group(1) + ("rate" if "/" in m.group(0) else "price"), s)
+    s = re.sub(rf"\s*(?:\b(?:at|for|of|about|approx\.?|around)\s+)?{_MONEY}{_SRC}", "\x00", s)
+
+    def bare(c, cut=True):                   # price words only, once the figures are out (outside a parenthesis: one a figure was cut from)
+        return (not cut or "\x00" in c) and all(w.strip(".,:;()'\"").lower() in _PRICE_ONLY | {""} for w in c.replace("\x00", " ").split())
+
+    def paren(m):                            # a parenthesis that held a figure keeps only its clauses with words of their own
+        parts = [c for c in m.group(2).split(";") if not bare(c, False)]
+        return (m.group(1) + "(" + ";".join(parts).strip() + ")") if parts else ""
+
+    def split0(x, sep):                      # split at sep outside any parenthesis
+        out, depth, cur = [], 0, ""
+        for ch in x:
+            depth += (ch == "(") - (ch == ")")
+            if ch == sep and depth == 0:
+                out.append(cur); cur = ""
+            else:
+                cur += ch
+        return out + [cur]
+    for _ in range(3):                       # innermost first
+        s = re.sub(r"(\s*)\(([^()]*\x00[^()]*)\)", paren, s)
+    s = ";".join(",".join(p for p in split0(c, ",") if not bare(p)) for c in split0(s, ";") if not bare(c))
+    s = re.sub(r"\(\s*\x00\s*", "(", s)
+    s = re.sub(r"\s*\x00\s*(?=[;,.:)]|$)", "", s)
+    s = re.sub(r"\s*\x00\s*", " ", s).replace("$", "")
+    s = re.sub(r"[;,:]\s*(?=[;.])", "", s).strip(" ;,:")
+    return s[:1].upper() + s[1:] if s else s
+
+
+def _money_clauses(s: str) -> str:
+    """The clauses of a flag that carry a dollar figure (split at ";" and at a sentence's end, outside any parenthesis): the cost
+    stack's half of a flag the takeoff prints without its figures."""
+    out, depth, cur = [], 0, ""
+    for i, ch in enumerate(s or ""):
+        depth += (ch == "(") - (ch == ")")
+        cur += ch
+        if depth == 0 and (ch == ";" or (ch == "." and s[i + 1:i + 2] in ("", " "))):
+            out.append(cur); cur = ""
+    keep = "; ".join(c.strip(" ;.") for c in out + [cur] if "$" in c)
+    return (keep[:1].upper() + keep[1:] + ".") if keep else (s or "")
+
+
+def _no_money(f):
+    """A flag for the takeoff, which carries no pricing: its dollar figures go (_strip_money) and it points to the cost stack,
+    which lists the clauses that carry them (_money_clauses). -> (flag, whether it had money)."""
+    if "$" not in f.text and "$" not in (f.ref or ""):
+        return f, False
+    from dataclasses import replace
+    keep = _strip_money(f.text)
+    keep = (keep + ("" if keep.endswith((".", "!", "?")) else ".") + " ") if keep else ""
+    return replace(f, text=keep + "Its cost note is in the cost stack.", ref=_strip_money(f.ref) if "$" in (f.ref or "") else f.ref), True
+
+
+def _sheet_letters(sheets) -> str:
+    """The series in a drawing set, in set order: "G · C · S · A · D"."""
+    have = [n[:1] for n, *_ in sheets]
+    return " · ".join(dict.fromkeys([c for c in "GCSAD" if c in have] + have))
+
+
+def _ledger(rows) -> str:
+    """A money column: [(label HTML, amount, row class)] — "sub" a subtotal, "big" the price."""
+    return ('<div class="tw"><table class="stack keep"><tbody>' + "".join(f'<tr class="{c}"><td>{k}</td><td class="num">{v}</td></tr>' for k, v, c in rows)
+            + "</tbody></table></div>")
+
+
+def _labor_rows(t, p) -> Tuple[str, list, str]:
+    """The labor at the rate card, then the owner's change on lines of its own — the card credits he asked for (the under-3'
+    credit) and extras.labor_adjust / labor_total spread over the lines above — footing to the labor in the price. A line not at
+    the card's own rate is tagged: owner rate, owner-set, estimate, job rate (extras.labor_rates).
+    -> (title, rows, footnote). Every Ext is the printed qty x the printed rate."""
+    from .pricing import labor_lines_for
+    x = t.spec.extras
+    card, fin = labor_lines_for(t), p.labor_lines
+    std, note_of, rate_of = {}, {c[0]: str(c[4] or "") for c in card}, {c[0]: c[3] for c in card}
+    if x.labor_rates:                        # the card's lines without the job's own rates: which lines they changed
+        lr_ = x.labor_rates
+        try:
+            x.labor_rates = {}
+            std = {c[0]: c[3] for c in labor_lines_for(t)}
+        finally:
+            x.labor_rates = lr_
+
+    def line(i):
+        n, r = note_of.get(i, ""), rate_of.get(i)
+        w_ = ("owner-set" if n.startswith("owner-set") else "owner rate" if n.startswith("owner rate") else "estimate" if re.match(r"(?i)est(imate)?\b", n)
+              else "job rate" if std and r is not None and (i not in std or abs(std[i] - r) > 1e-9) else "")
+        return E(i) + (f' <span class="cs-tag">{w_}</span>' if w_ else "")
+    tail = ["<b>Labor in the price</b>", "", "", "", f"<b>{_m(p.labor, True)}</b>"]
+    if len(card) != len(fin) or any(c[0] != f[0] or c[1] != f[1] for c, f in zip(card, fin)):    # not the card's lines: as priced
+        return "Labor", [[line(i), qfmt(q), E(u), _m(r, True), _m(e, True)] for i, q, u, r, e in fin] + [tail], ""
+    plus, cred = [c for c in card if c[3] >= 0], [c for c in card if c[3] < 0]   # the card's credits apply only on the owner's word
+    card_tot = round(sum(round(q * r, 2) for i, q, u, r, n in plus), 2)
+    cred_tot = round(sum(round(q * r, 2) for i, q, u, r, n in cred), 2)
+    spread = round(p.labor - card_tot - cred_tot, 2)          # labor_adjust / labor_total on the lines above, as applied
+    adj, tot = float(x.labor_adjust or 0), x.labor_total
+    rows = [[line(i), qfmt(q), E(u), _m(r, True), _m(round(q * r, 2), True)] for i, q, u, r, n in plus]
+    if not cred and abs(spread) < 0.005:
+        return "Labor — rate card", rows + [tail], ""
+    k = next((f[3] / c[3] for c, f in zip(card, fin) if c[3] > 0 and abs(f[3] - c[3]) > 1e-9), 1.0)
+    each = ("−" if k < 1 else "+") + f"{abs(k - 1):.1%}"
+    cut = -(cred_tot + adj)
+    who = f"The owner's {_mw(abs(cut))} {'cut' if cut >= 0 else 'add'}" if tot is None else "The owner's change"
+    title = (f"Labor — rate card, scaled to the owner's {_mw(tot)} total" if tot is not None else
+             f"Labor — rate card, {'less' if cut >= 0 else 'plus'} the owner's {_mw(abs(cut))} {'cut' if cut >= 0 else 'add'}")
+    parts = len(cred) + (abs(spread) >= 0.005)
+    rows.append(["<b>Before the owner's change</b>", "", "", "", f"<b>{_m(card_tot, True)}</b>"])
+    for j, (i, q, u, r, n) in enumerate(cred, 1):
+        rows.append([f"{who}{f', {j} of {parts}' if parts > 1 else ''}: {E(i)}", qfmt(q), E(u), _m(r, True), _m(round(q * r, 2), True)])
+    if abs(spread) >= 0.005:
+        lots = ", the owner-set lots as set" if any(n.startswith("owner-set") for i, q, u, r, n in plus) else ""
+        what = (f"scaled to the owner's {_mw(tot)} total, {each} on each line above{lots}" if tot is not None else
+                f"{money(abs(adj), True)} spread over the lines above in proportion, {each} on each{lots}")
+        rows.append([f"{who}{f', {parts} of {parts}' if parts > 1 else ''}: {what}", "", "", "", _m(spread, True)])
+    note = (f"The spread applies as {_m(spread, True)} against the {_m(adj, True)} set: the engine rounds each scaled rate to 4 places."
+            if tot is None and adj and abs(spread - adj) >= 0.005 else "")
+    return title, rows + [tail], note
+
+
+COST_CSS = """<style>
+/* the cost stack (mode="cost"): one or two Letter pages — the sell, the stack, how the sell is set, labor, what the price includes */
+.cs-hero { display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); gap:16px 30px; margin-top:16px; align-items:end; }
+.cs-hero .l { display:block; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:800; }
+.cs-hero .v { display:block; font-size:clamp(46px, 8vw, 66px); font-weight:900; letter-spacing:-.02em; line-height:1; margin:6px 0 8px; color:#fff; }
+.cs-hero .v2 { display:block; font-size:26px; font-weight:900; line-height:1.1; margin:3px 0 3px; color:#fff; }
+.cs-hero .s { display:block; font-size:12.5px; line-height:1.4; color:#ecddb6; font-weight:400; }
+.cs-side { display:grid; gap:14px; }
+table.stack td { padding:6px 8px 6px 0; } table.stack td.num { width:9em; }
+table.stack tr.sub td { font-weight:800; border-top:1px solid var(--ink-3); }
+table.stack tr.big td { font-weight:900; font-size:16px; background:var(--sand); }
+.cs-two { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:0 26px; align-items:start; }
+.cs-note { color:var(--ink-2); font-size:14px; margin:10px 0 0; max-width:88ch; }
+.cs-notes { margin:8px 0 0; padding-left:18px; color:var(--ink-2); font-size:13px; } .cs-notes li { margin:3px 0; }
+.cs-tag { margin-left:6px; font-size:.78em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); white-space:nowrap; }
+@media (max-width:640px) { .cs-hero, .cs-two { grid-template-columns:1fr; } }
+@media print {
+  body.doc.cs .band { padding:0.42in 0.5in 0.3in; } body.doc.cs .band h1 { font-size:30px; } body.doc.cs .band h1.long { font-size:24px; } body.doc.cs .cs-hero .v { font-size:60px; }
+  body.doc.cs .kicker { margin:14px 0 6px; } body.doc.cs h3 { margin:10px 0 3px; font-size:13px; }
+  body.doc.cs table { font-size:10.5px; line-height:1.3; } body.doc.cs td, body.doc.cs th { padding-top:2px; padding-bottom:2px; }
+  body.doc.cs table.stack tr.big td { font-size:12.5px; } body.doc.cs .cs-note { font-size:11.5px; } body.doc.cs .cs-notes { font-size:10.5px; }
+  body.doc.cs footer { font-size:9.5px; margin-top:10px; padding-top:6px; } body.doc.cs footer span:first-child { display:none; }   /* the running footer names GSX */
+}
+</style>"""
+
+
+def _cost_doc(spec, t, flags, p, out: Path, key: str, name: Optional[str], renders_dir: Optional[str], pdf: bool, date_line: Optional[str],
+              options: Optional[list]) -> dict:
+    """mode="cost": the cost stack — Jade's one or two pages: the check / ACH sell large, financed and the monthly with the
+    terms, gross profit, the stack (materials, x factor, tax, labor, the work, at-cost items, cost, sell), how the sell is set
+    (the job margin, what is given free or priced on its own, the blended margin), the labor with the owner's cut in its
+    parts, what the price includes, materials by category, the 40% floor. A sold job (extras.sell_override) reads its sold
+    price and its cost to build at invoice. No drawings, no build set, no order; every number from the pricing object."""
+    from datetime import date
+    from .catalog import PRICEBOOK as PB
+    L, s, x = t.layout, spec, spec.extras
+    name = name or s.job
+    today = date_line or date.today().strftime("%B %d, %Y")
+    addr = ", ".join(v for v in (s.site.address, s.site.city, f"{s.site.state} {s.site.zip}".strip()) if v)
+    sold = bool(x.sell_override)
+    gcn = gc_name(p.gc_lines, "General conditions")
+    mat_f, tax, lab, gc = round(p.materials_factored, 2), round(p.tax, 2), round(p.labor, 2), round(p.gc, 2)
+    work = round(mat_f + tax + lab, 2)                       # the printed lines foot
+    cost = round(work + gc, 2)
+    gp = p.sell - cost
+    gmj = float(getattr(p, "gm_job", p.gm))
+    per_sf = float(getattr(p, "per_sf", 0) or 0)
+    free = float(p.light_work) if (getattr(p, "light_work", 0) and not getattr(p, "light_sell", 0)) else 0.0     # lights given free
+    n_free = int(getattr(getattr(t, "lighting", None), "n_riser", 0) or 0)
+    own_w = max(0.0, p.work - p.margin_work - free)          # the rail at its $/LF, built-ins, lights at a set price, the drink rail
+    st_w, st_s = float(getattr(p, "stair_work", 0) or 0), float(getattr(p, "stair_sell", 0) or 0)
+    base = round(work - free - own_w - st_w, 2)               # the work at the job margin
+    at_gm = base / (1 - gmj)
+    own_s = p.sell - at_gm - gc - st_s                         # what the parts priced on their own sell for (and the rounding)
+    note = re.sub(r"^blended — |,? everything else at [\d.]+% GM", "", p.rail_note or "")
+    note = " · ".join(v for v in note.split(" · ") if v and "riser lights free" not in v and not v.startswith("stairs at the owner's rule"))
+    many = " · " in note or bool(re.match(r"(\d+) (?!LF\b|SF\b)", note) and int(re.match(r"\d+", note).group()) > 1)    # "14 lights", "2 bench sections"
+    quoted_tax = bool(s.quoted_order and s.quoted_tax is not None)
+    gc_at = f" · {gcn.lower()} at cost" if gc else ""         # no at-cost items, no words for them (Parkview)
+    fin_rule = (f"check + {x.retail_markup:.1%}" if x.retail_markup is not None else f"check ÷ {PB['retail_factor']:g}") + " on the whole price" + (
+        f", the {gcn.lower()} included" if gc else "")
+    terms = f"about {money(p.monthly)}/mo at {PB['finance_rate']:.2%} for {PB['finance_years']:g} years, or 12 or 18 months with no payments"
+    sell_sub = (f"sold at the owner's price · {money(p.sell_per_sf, True)}/SF" if sold else
+                f"the owner's {money(per_sf, True)}/SF × {L.deck_sf:g} SF" if per_sf else
+                f"{_pct(gmj)} gross on the work{gc_at} · {money(p.sell_per_sf, True)}/SF")
+    head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div>{_h1(name)}'
+            f'<p>{" · ".join(v for v in (E(addr), f"{L.deck_sf:g} SF", E(today)) if v)}</p><div class="cs-hero">'
+            f'<div><span class="l">{"Sold" if sold else "Sell"} · check or ACH</span><span class="v">{money(p.sell)}</span><span class="s">{E(sell_sub)}</span></div>'
+            f'<div class="cs-side"><div><span class="l">Retail · financed</span><span class="v2">{money(p.retail)}</span><span class="s">{E(terms)} · financed = {E(fin_rule)}</span></div>'
+            f'<div><span class="l">Gross profit</span><span class="v2">{_m(gp)}</span><span class="s">{_pct(gp / p.sell)} of the {"sold price" if sold else "sell"} · '
+            f'{_pct(p.gm)} on the work' + (" (the sell less the at-cost items)" if gc else "") + '</span></div></div></div></div></header>')
+    lt, lrows, lnote = _labor_rows(t, p)
+    n_lines = sum(1 for l in t.lines if l.category != "Site")
+    o = []; w = o.append
+    w(f'<section class="job" id="job-{key}">')
+    w('<h2 class="kicker" id="g-stack">The stack <span class="tag">materials at cost · tax · labor' + E(gc_at) + ' · internal</span></h2>')
+    rows = [(f"Materials — the order at cost, {n_lines} lines" + (f", {E(t.order_ref)}" if t.order_ref else ""), _m(p.materials, True), "")]
+    if p.material_factor != 1:
+        rows.append((f"× {p.material_factor:g} material factor", _m(mat_f, True), ""))
+    rows += [("Sales tax — as quoted" if quoted_tax else f"Sales tax {p.tax_rate:.2%} on the {'factored ' if p.material_factor != 1 else ''}materials", _m(tax, True), ""),
+             (f"{E(lt)} (below)", _m(lab, True), ""), ("Work — carries the margin", _m(work, True), "sub")]
+    if gc:
+        rows.append((f"{E(gcn)} — at cost, no margin", _m(gc, True), ""))
+    rows += [("Cost", _m(cost, True), "sub"), (f"{'Sold' if sold else 'Sell'} — check or ACH", money(p.sell), "big"),
+             (f"Gross profit — {_pct(gp / p.sell)} of the {'sold price' if sold else 'sell'}", _m(gp), "sub")]
+    w(_ledger(rows))
+    if sold or per_sf:                       # a set price: the margin is what it carries
+        w('<h2 class="kicker" id="g-margin">The margin <span class="tag">' + ("the owner's sold price" if sold else "the owner's price per SF") + "</span></h2>")
+        w(f'<p class="cs-note">{"Sold at" if sold else "Set at"} {money(p.sell)}' + (f" (the owner's {money(per_sf, True)}/SF × {L.deck_sf:g} SF)" if per_sf and not sold else "")
+          + f": the work carries {_pct(p.gm)} (1 − work ÷ the price" + (" less the at-cost items" if gc else "") + f"); gross profit {_m(gp)} is {_pct(gp / p.sell)} of it"
+          + f" and a {_pct(gp / cost)} markup on cost.</p>")
+    else:                                    # the job margin on the work, what is given free or priced on its own, the at-cost items
+        w('<h2 class="kicker" id="g-margin">How the sell is set <span class="tag">' + f"{_pct(gmj)} gross on the work{E(gc_at)}</span></h2>")
+        br = [("Work — carries the margin", _m(work, True), "")]
+        if free >= 0.005:
+            br.append((f"less the {n_free} riser light{'s' if n_free != 1 else ''}, free to the owner — the cost stays in the job, nothing in the price", _m(-free, True), ""))
+        if own_w >= 0.005:
+            br.append(("less the work priced on its own" + (f" — {E(note)}" if note else ""), _m(-own_w, True), ""))
+        if st_w:
+            br.append(("less the stairs at the owner's rule — their cost", _m(-st_w, True), ""))
+        if len(br) > 1:
+            br.append(("Work at the job margin", _m(base, True), "sub"))
+        br.append((f"÷ (1 − {_pct(gmj)}) — {_pct(gmj)} gross on the work", _m(at_gm, True), ""))
+        if st_s:
+            br.append((f"+ Stairs at the owner's rule — {money(st_s)} sell, {money(st_w)} their cost, {_pct(1 - st_w / st_s)} margin", money(st_s), ""))
+        if abs(own_s) >= 1:
+            br.append(("+ the parts priced on their own, at their price" + (f" — {E(note)}" if note else ""), money(own_s), ""))
+        if gc:
+            br.append((f"+ {E(gcn)} at cost", _m(gc, True), ""))
+        br.append(("Sell — check or ACH, to the dollar", money(p.sell), "big"))
+        w(_ledger(br))
+        why = ([f"the {n_free} riser light{'s are' if n_free != 1 else ' is'} free to the owner: {'their' if n_free != 1 else 'its'} {money(free)} cost stays in the job and "
+                 "nothing goes in the price"] if free >= 0.005 else []) + ([f"{note} {'are' if many else 'is'} priced on {'their' if many else 'its'} own"]
+                                                                        if own_w >= 0.005 and note else []) + (["the stairs sell at the owner's per-riser rule"] if st_s else [])
+        why = "; ".join(why)
+        w(f'<p class="cs-note">Priced at {_pct(gmj)} gross on the work.' + (f" {E(why[:1].upper() + why[1:])}" if why else "")
+          + (f", so the margin on the work blends to {_pct(p.gm)}." if abs(p.gm - gmj) >= 0.0005 else "." if why else "") + f" Gross profit, {_m(gp)}, is {_pct(gp / p.sell)} of the "
+          + f"{money(p.sell)} sell" + (f"; the {money(gc)} {E(gcn.lower())} {'are' if gcn.endswith('s') else 'is'} carried at cost." if gc else ".") + "</p>")
+    if sold:                                 # what it costs to build: materials and tax at invoice, no factor
+        tax_i = tax if quoted_tax else round(p.materials * p.tax_rate, 2)
+        tot = round(p.materials + tax_i + lab + gc, 2)
+        cb = [("Materials — every line of the order, at invoice", _m(p.materials, True), ""), (f"Sales tax {p.tax_rate:.2%} on the materials" if not quoted_tax else "Sales tax — as quoted", _m(tax_i, True), ""),
+              ("Labor", _m(lab, True), "")] + ([(f"{E(gcn)} at cost", _m(gc, True), "")] if gc else []) + [("Cost to build", _m(tot, True), "big")]
+        if st_s:
+            cb.append((f"of which the stairs — sold at the owner's rule for {money(st_s)}, {_pct(1 - st_w / st_s)} margin", _m(st_w, True), ""))
+        w('<h3>Cost to build — materials at invoice, labor' + (", at-cost items" if gc else "") + '</h3>' + _ledger(cb))
+    keep = lambda n: "keep" if n <= 12 else ""             # a short table whole; a long one breaks, 3 rows or more either side (DOC_CSS)
+    w(f'<h2 class="kicker" id="g-labor">{E(lt)}</h2>')
+    w(table(["Line", "Qty", "Unit", "Rate", "Ext"], lrows, keep(len(lrows)), ["l", "r", "l", "r", "r"]))
+    if lnote:
+        w(f'<p class="cs-note">{E(lnote)}</p>')
     cats = t.by_category()
-    out.append("<h3>Materials by category</h3>")
-    out.append(table(["Category", "Lines", "Cost"], [[E(c), str(len(ls)), money(sum(l.ext for l in ls), True)] for c, ls in cats.items()] + [["<b>Materials</b>", "", f"<b>{money(p.materials, True)}</b>"]], "", ["l", "r", "r"]))
-    out.append("<h3>Labor</h3>")
-    out.append(table(["Line", "Qty", "Unit", "Rate", "Ext"], [[E(i), qfmt(q), E(u), money(r, True), money(e, True)] for i, q, u, r, e in p.labor_lines] + [["<b>Labor</b>", "", "", "", f"<b>{money(p.labor, True)}</b>"]], "", ["l", "r", "l", "r", "r"]))
-    if p.gc_lines:
-        out.append(f"<h3>{E(gc_name(p.gc_lines, 'Site & project services'))} — at cost</h3>")
-        out.append(table(["Item", "Amount", "Why"], [[E(i), money(a), E(why)] for i, a, why in p.gc_lines], "", ["l", "r", "l"]))
+    w('<div class="cs-two"><div><h3>What the price includes — sell values</h3>'
+      + table(["Item", "Value"], [[E(k), money(v)] for k, v in client_allocation(t, p)] + [["<b>Total, check or ACH</b>", f"<b>{money(p.sell)}</b>"], ["<b>Total, financed</b>", f"<b>{money(p.retail)}</b>"]], "keep", ["l", "r"])
+      + "</div><div><h3>Materials by category — at cost</h3>"
+      + table(["Category", "Lines", "Cost"], [[E(c), str(len(cats.get(c, []))), _m(v, True)] for c, v in p.categories.items()] + [["<b>Materials</b>", "", f"<b>{_m(p.materials, True)}</b>"]], "keep", ["l", "r", "r"])
+      + "</div></div>")
+    if len(p.gc_lines) > 1:
+        w(f"<h3>{E(gcn)} — at cost, no margin</h3>" + table(["Item", "Amount", "Why"], [[E(i), _m(a, True), E(why)] for i, a, why in p.gc_lines], keep(len(p.gc_lines)), ["l", "r", "l"]))
+    blocks = [o_ for o_ in (options or []) if isinstance(o_, dict)]      # the proposal's option blocks: how each is priced, estimates called out
+    if blocks:
+        w(_options_internal(_option_blocks(spec, t, p, blocks, key, Path(renders_dir) if renders_dir else out / "buildset" / "renders", {})))
+    if p.options:
+        sg = lambda v: ("+" if v >= 0 else "−") + money(abs(v))
+        w("<h3>Options — full installed deltas</h3>" + table(["Option", "Cost", "Check / ACH", "Financed"], [[E(o_.name), sg(o_.cost), sg(o_.check), sg(o_.financed)] for o_ in p.options],
+                                                             keep(len(p.options)), ["l", "r", "r", "r"]))
+    floor = float(PB.get("gm_floor", 0.40))
+    held = [v for v, on in (("the riser lights still free", free >= 0.005), ("the parts priced on their own still at their price", own_w >= 0.005),   # sell_floor's terms
+                            ("the stairs still at the owner's rule", bool(st_s))) if on]
+    notes = [f"At the {_pct(floor)} floor the sell would be {money(p.sell_floor)}" + (f" ({', '.join(held)})" if held else "")
+             + (f"; this job is set at {_pct(gmj)}, under the floor, by the owner" if x.gm_below_floor and gmj < floor and not (sold or per_sf) else "") + "."]
+    fee = PB.get("dealer_fee_financed")
+    if fee and p.dealer_fee_note:
+        notes.append(f"Dealer fee — {p.dealer_fee_note}. If the financed price absorbs the {_pct(fee)} fee, a financed sale nets {money(p.retail * (1 - fee))} "
+                     f"and gross profit is {_m(p.retail * (1 - fee) - cost)}.")
+    if sold:
+        notes.append(f"Commission 10% of the sold price: {money(p.commission)}; gross profit after commission {_m(gp - p.commission)} ({_pct((gp - p.commission) / p.sell)} of the sold price).")
     if p.engineering:
-        out.append(f"<p><b>Engineering and permit</b> — {money(p.engineering[0])} to {money(p.engineering[1])}, billed at cost on top of the above.</p>")
-    return "".join(out), total, tax_raw
+        notes.append(f"Engineering — outside the price, at cost: {money(p.engineering[0])}–{money(p.engineering[1])}.")
+    w('<h3>Notes</h3><ul class="cs-notes">' + "".join(f"<li>{E(v)}</li>" for v in notes) + "</ul>")
+    cnote = [f for f in flags if _no_money(f)[1]]          # the flags whose dollar figures the takeoff leaves out: those clauses here
+    if cnote:
+        w('<h3>Flags with a cost note — the clauses the takeoff prints without their figures</h3><ul class="cs-notes">'
+          + "".join(f"<li><b>{E(f.severity)} · {E(f.topic)}</b> {E(_money_clauses(f.text))}" + (f" <em>{E(_money_clauses(f.ref))}</em>" if "$" in (f.ref or "") else "") + "</li>"
+                    for f in cnote) + "</ul>")
+    w("</section>")
+    lab_w = "labor as priced" if lt == "Labor" else "labor at the " + lt.split(" — ", 1)[1]        # "labor at the rate card, less the owner's $1,000 cut"
+    body = (head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division</span><span>Cost stack: materials at the order'
+            + (f" × {p.material_factor:g}" if p.material_factor != 1 else "") + f", tax, {E(lab_w)}" + (f", {E(gcn.lower())} at cost" if gc else "")
+            + ". Internal — not for the homeowner.</span></footer></main>")
+    title = f"{name} — Cost Stack"
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
+            + DOC_CSS + COST_CSS + _doc_page_css(f"GS Exterior Experts · {_foot(name)} · Cost stack · internal · {today}") + '</head><body class="doc cs">' + body + "</body></html>\n")
+    (out / "page.html").write_text(page)
+    json.dump({}, open(out / "files.json", "w"), indent=1)
+    result = dict(html=str(out / "page.html"), files={}, pricing=p, takeoff=t)
+    if pdf:
+        result["pdf"] = render_pdf(page, {}, str(out / "page.pdf"), key)
+    return result
 
 
 def _dusk_html(key, have) -> str:
@@ -335,7 +679,7 @@ def _steps(key, steps, cap, customer):
     out = []
     for st in steps:
         title = f"Step {st['n']} · {E(st['title'])}" if customer else f"{st['code']} · Step {st['n']} · {E(st['title'])}"
-        fc = re.sub(r"^Step \d+ · ", f"Step {st['n']} · ", cap[st["still"]])     # the model's phase number -> the step as built (phases skip)
+        fc = re.sub(r"^Step \d+ · ", f"Step {st['n']} · ", st.get("cap") or cap[st["still"]])     # the model's phase number -> the step as built (phases skip); a step on a borrowed still: its own caption
         out.append(f'<div class="step"><figure><img src="r/{key}-{st["still"]}.jpg" alt="step {st["n"]}" loading="lazy"><figcaption>{E(fc)}</figcaption></figure>'
                    f'<div><h3>{title}</h3><h4>Goes in</h4><ul>' + "".join(f"<li>{E(g)}</li>" for g in st["goes_in"]) + "</ul>"
                    + '<h4>How</h4><ul>' + "".join(f"<li>{E(h)}</li>" for h in st["how"] if h) + "</ul><h4>Check</h4><ul>" + "".join(f"<li>{E(c)}</li>" for c in st["check"]) + "</ul></div></div>")
@@ -362,9 +706,9 @@ def _reads_levels(t, L, sm):
                     + (f"{s.decking.border_collection or s.decking.collection} {s.decking.border_color}" if s.decking.border_color else "the same color"))
     decking += f", matching fascia · {fsys} fasteners" + (" with color-matched plugs" if fsys == "Cortex" else "")
     rl = L.rail
-    from .report import rail_words
-    rail = (f"{s.decking.brand} {rail_words(s, rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
-            + (f" · {s.railing.drink_rail_collection + ' ' if s.railing.drink_rail_collection else ''}{s.railing.drink_rail_color} drink rail on top" if s.railing.drink_rail else "")) if rl else "None"
+    from .report import rail_product, drink_rail_words
+    rail = (f"{rail_product(s, rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+            + (f" · {drink_rail_words(s)}" if s.railing.drink_rail else "")) if rl else "None"
     reads += [("Decking", decking), ("Rail", rail)]
     for ss, st in zip(stair_specs(t), L.stairs):
         reads.append((getattr(ss, "name", None) or "Stair", stair_words(ss, st, True)))
@@ -406,12 +750,17 @@ def _reads_rows(t, L, sm):
     elif s.railing.existing_parapet:
         rail = "The existing stucco parapet stays" + (f"; {rl.system} {rl.color} {rl.height:g}\" rail on the new stair and landings" if rl and L.stairs else "")
     elif rl:
-        from .report import rail_words
-        rail = f"{s.decking.brand} {rail_words(s, rl.system)}, {rl.color}, {rl.height:g}\" · {rl.rail_lf:g} LF"
+        from .report import rail_product, drink_rail_words
+        rail = f"{rail_product(s, rl.system)}, {rl.color}, {rl.height:g}\"" + (f"; {drink_rail_words(s)}" if s.railing.drink_rail else "") + f" · {rl.rail_lf:g} LF"
     else:
         rail = "None"
+    from .report import stair_groups, stair_rows, frame_words, posts_on_words
     stairs = []
-    for st, ss in zip(L.stairs, s.stairs):
+    for grp, row in zip(stair_groups(t), stair_rows(t)):
+        if len(grp["members"]) > 1:            # box steps that wrap a corner read as one step, its width along each side
+            stairs.append(row)
+            continue
+        ss, st = grp["members"][0]
         g = st.geo
         txt = f"{g.risers} risers at {inches_frac(g.riser_in)}, {ftin(st.width)} wide"
         if len(g.flights) > 1:
@@ -422,11 +771,10 @@ def _reads_rows(t, L, sm):
                 txt += f" · guard rail on the landings"
         stairs.append((getattr(ss, "name", None) or "Stair", txt))
     fr = L.zones[0].frame
-    beams = sorted({b.size for b in s.framing.beams}) if s.framing.beams else []
-    structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on center, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; {sm['posts']}" if s.framing.system == "steel" else
-                 f"{s.framing.joist_size} {'pressure-treated' if not s.is_timber else 'Douglas fir'} frame at {fr.spacing:g}\" on center"
-                 + (f", {beam_words(beams, beam_species_words(s.framing.beams), len(s.framing.beams))}" if beams else "") + f"; {sm['posts']}"
-                 + ("; joist tape on every member" if s.framing.joist_tape else ""))
+    from .report import steel_posts_words
+    structure = (f"CEMCO cold-formed steel frame, {s.framing.steel_joist} C-joists at {fr.spacing:g}\" on center, {s.framing.steel_track} track, boxed {s.framing.steel_joist} beams, all G90; "
+                 + (steel_posts_words(t) or sm['posts']) if s.framing.system == "steel" else
+                 frame_words(t, tape=False)[:-1] + "; " + posts_on_words(t) + ("; joist tape on every member" if s.framing.joist_tape else ""))
     return [("Deck", deck), ("Decking", decking), ("Rail", rail)] + stairs + [("Structure", structure), ("Design load", sm["design_load"].replace(" · engineered", ", stamped by a Colorado engineer"))]
 
 
@@ -447,8 +795,10 @@ def _added_facts(t0, t1) -> list:
         if ss not in s0:
             rows.append((getattr(ss, "name", None) or "Stair", stair_words(ss, st, hasattr(t1.layout, "parts"))))
     l0, l1 = lights_of(t0), lights_of(t1)
-    if l1["riser"] > l0["riser"]:
-        rows.append(("Riser lights", f"{l1['riser'] - l0['riser']} LED lights, one in every riser"))
+    if l1["riser"] > l0["riser"]:                # where they go, in the lighting plan's own words (riser_where; box steps that wrap a corner as one)
+        from .report import riser_where_words
+        rw = riser_where_words(t1) if not l0["riser"] else ""
+        rows.append(("Riser lights", f"{l1['riser'] - l0['riser']} {'more ' if l0['riser'] else ''}LED lights" + (f", {rw}" if rw else "")))
     if l1["post_cap"] > l0["post_cap"]:
         from .report import post_light_terms
         _pl, _pw = post_light_terms(t1)          # cap lights, or accent lights below an over-the-post drink rail
@@ -547,7 +897,7 @@ def _option_blocks(spec, t, p, blocks, key, rd, files) -> dict:
             t2, _, p2 = run(o["spec"])
             c, f, m = option_delta(p, p2)
             basis = f"engine delta: work {p2.work - p.work:+,.0f}" + (f" at the job margin {p.options_gm:.1%} (the deck sells per SF)" if getattr(p, "per_sf", 0)
-                                                                      else f", the deck's {p.gm:.1%} margin")
+                                                                      else f", the deck's {getattr(p, 'options_gm', p.gm):.1%} margin")    # what an option prices at (not the blend)
         elif o.get("roof") is not None:          # a louvered roof: its own price per SF x its area (or a set price), outside the deck's margin
             from .louvered import roofs_of, resolve, surfaces_of, scope_words
             rs = o.get("roof_spec") or spec      # the spec that carries the roof (the deck's, or a copy with the roof on it)
@@ -733,10 +1083,11 @@ def _timeline_days(tl: dict) -> int:
     return int(m.group(1)) if m else 0
 
 
-def _timeline(tl: dict, opts: Optional[list] = None) -> str:
-    """The proposal's Schedule from the job's own timeline (report.timeline_of): the time before day 1 and a bar per stretch
-    of work on the working days it takes (column 0 is before day 1; day d spans [d, d+1)), then what each option does to it
-    (opts = [(label, the option's timeline | None, note)]). A line with permit / inspection / vendor words stops the build."""
+def _timeline(tl: dict, opts: Optional[list] = None, head: bool = True) -> str:
+    """The proposal's Schedule from the job's own timeline (report.timeline_of, or the engine's day plan: engine_timeline): the
+    time before day 1 and a bar per stretch of work on the working days it takes (column 0 is before day 1; day d spans [d, d+1)),
+    then what each option does to it (opts = [(label, the option's timeline | None, note)]); head=False leaves the heading and
+    the title to the page around it. A line with permit / inspection / vendor words stops the build."""
     rows = list(tl.get("rows") or [])
     pre = tl.get("precon") or None
     said = ([pre.get("text", "")] if pre else []) + [r.get("title") or r.get("label") or "" for r in rows] + [tl.get("title") or ""]
@@ -760,8 +1111,8 @@ def _timeline(tl: dict, opts: Optional[list] = None) -> str:
         g = r.get("gantt_x") or [r.get("first_day", 1), (r.get("last_day") or r.get("first_day", 1)) + 1]
         items.append(f'<li><span class="g-lab"><b>{E(r.get("days", ""))}</b>{E(r.get("title") or r.get("label") or "")}</span>'
                      f'<span class="g-bar">{bar(float(g[0]), float(g[1]), "" if r.get("option", "base") == "base" else "opt")}</span></li>')
-    h = ['<h2 class="kicker pb" id="g-schedule">Schedule <span class="tag">working days on site · the deck as proposed</span></h2>',
-         f'<p class="sched-title">{E(tl.get("title") or f"{nd} working days on site, weather permitting")}</p>',
+    h = (['<h2 class="kicker pb" id="g-schedule">Schedule <span class="tag">working days on site · the deck as proposed</span></h2>',
+          f'<p class="sched-title">{E(tl.get("title") or f"{nd} working days on site, weather permitting")}</p>'] if head else []) + [
          f'<ol class="gantt" style="--n:{n}">' + "".join(items) + "</ol>"]
     ol = []
     for lab, o_, note in opts or []:
@@ -846,6 +1197,10 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     out = Path(out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     t, flags, p = run(spec)
     L, sm = t.layout, t.summary
+    if cost_only:                            # the cost stack: a document of its own, one or two pages, no build set
+        return _cost_doc(spec, t, flags, p, out, key, name, renders_dir, pdf, date_line, options)
+    if not (customer or supplier):           # the takeoff carries no money: a flag's dollar clauses go to the cost stack
+        flags = [_no_money(f)[0] for f in flags]
     r = build_set(t, flags, str(out / "buildset"), render=render, customer=customer or supplier)
     S = r["scene"]
     rd = Path(renders_dir) if renders_dir else (out / "buildset" / "renders")
@@ -871,7 +1226,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     addr = ", ".join(x for x in (spec.site.address, spec.site.city, f"{spec.site.state} {spec.site.zip}".strip()) if x)
     n_piers = int(sum(l.order for l in t.lines if l.item.lower().startswith("diamond pier"))) or L.n_footings
     today = date_line or date.today().strftime("%B %d, %Y")
-    qmd = quote_markdown(t, p)
+    qmd = quote_markdown(t, p, today)        # the price holds 30 days from the document's date
+    holds = ("This quote holds through " if spec.extras.engineered else "This price holds through ") + price_holds_through(today) + "."
     o = []
     w = o.append
     w(f'<section class="job" id="job-{key}" data-job="{key}">')
@@ -887,16 +1243,17 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             if cat == "Site":
                 continue
             w(f"<h3>{E(cat)}</h3>")
-            w(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item), E(l.why)] for l in lines], "order", ["r", "r", "l", "l", "l"]))
+            w(table(["NET", "ORDER", "Unit", "Item", "Why"], [[qfmt(l.net), f"<b>{qfmt(l.order)}</b>", E(l.unit), E(l.item) + (f" · part no. {E(l.sku)}" if _part_no(l.sku) else ""), E(l.why)] for l in lines],
+                    "order netorder", ["r", "r", "l", "l", "l"]))      # the maker's part number where the order carries one (not an internal pricebook key)
         w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
         w('<h2 class="kicker">Cut list</h2>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]))
-        w('<h2 class="kicker pb">Drawing set <span class="tag">G · C · S · A · D sheets</span></h2><div class="sheets">')
+        w(f'<h2 class="kicker pb">Drawing set <span class="tag">{_sheet_letters(r["sheets"])} sheets</span></h2><div class="sheets">')
         for num, ttl, svg in r["sheets"]:
             w(f'<details class="sheet" open><summary><b>{num}</b> {E(ttl)}</summary>{svg}</details>')
         w("</div>")
         w('<h2 class="kicker pb">Exploded views</h2>')
-        w(_gallery(key, ["exploded", "exploded2", "structure-underiso", "frame-iso2"], have))
+        w(_gallery(key, [n_ for n_ in ("exploded", "exploded2", "structure-underiso", "frame-iso2", "exploded-corner", "exploded-low") if n_ in have][:4], have))
         w('<h2 class="kicker pb">Build set <span class="tag">T-400 series · goes in · how · check</span></h2>')
         w(_steps(key, r["steps"], cap, False))
         w('<h2 class="kicker">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>')
@@ -912,7 +1269,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         beams = sorted({b.size for b in spec.framing.beams}) if spec.framing.beams else []
         frame_lite = (f"{sm['joists']}; {sm['rims']}" + ((f"; {beam_words(beams, beam_species_words(spec.framing.beams), len(spec.framing.beams))}" if beams else "") if spec.framing.system != "steel" else "; boxed steel beams")
                       + (("; joist tape on every joist, rim and beam" if L.beam_lines else "; joist tape on every joist and rim") if spec.framing.joist_tape else "") + ".")
-        if not hasattr(L, "parts"):           # a deck on two levels already reads its frame level by level, in the homeowner's words
+        if not hasattr(L, "parts") and spec.framing.system == "steel":   # the quote reads a wood frame (report.frame_words) and two levels in the homeowner's words already
             inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         inc_rows = PL.md_rows(inc)
         light_note = next((r[1] for r in inc_rows if len(r) >= 2 and r[0].strip().lower() == "lighting"), "")
@@ -923,24 +1280,26 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w(f'<section class="pg pp-flow flow"><div class="pin">{alt_html}</div></section>')
         w(PL.pp_above(key, V["aerial"], V["plan"], V["sun"], CAP, ("the real sun at this address · " + sun_tag) if V["sun"] else "", foot=foot))
         w(PL.pp_more(key, V["more"], CAP, foot=foot))
-        w(PL.pp_included(key, V["detail"], CAP, inc_rows, foot=foot))
+        w(PL.pp_included(key, V["detail"], CAP, inc_rows, foot=foot, excl=list(spec.extras.exclusions or [])))
         big = next((n for n in ("exploded", "exploded-corner", "exploded2", "exploded-low") if n in have), None)
         small = [n for n in ("frame-iso2", "structure-underiso", "exploded-corner", "exploded2", "under", "underiso") if n in have and n != big][:2]
         reads = (_reads_levels(t, L, sm) if hasattr(L, "parts") else
                  '<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in _reads_rows(t, L, sm) if k not in ("Decking", "Rail")) + "</dl>")
         w(PL.pp_built(key, big, small, CAP, reads, foot=foot))
+        w(PL.pp_materials(materials_rows(t), foot=foot))
         ob = _option_blocks(spec, t, p, blocks, key, rd, files) if blocks else None
         if ob:
             w(f'<section class="pg pp-flow flow"><div class="pin">{ob["html"]}</div></section>')
-        tl = timeline_of(spec)
-        if tl:                               # the job's own timeline (a schedule model); a job without one shows none, as before
-            w(f'<section class="pg pp-flow flow"><div class="pin">{_timeline(tl, _option_timelines(spec, tl, blocks))}</div></section>')
+        tl = timeline_of(spec) or engine_timeline(t)    # the job's own timeline (a schedule model), else the engine's own day plan
+        pays = None if spec.extras.engineered else payment_schedule(p.sell)   # an engineered quote gets its payment terms with the fixed-price proposal
+        w(PL.pp_schedule(tl.get("title") or f"{_timeline_days(tl)} working days on site, weather permitting", _timeline(tl, _option_timelines(spec, tl, blocks), head=False),
+                         pays, foot=foot))
         for i, names in enumerate(V["night"]):     # after dark: the last pictures before the price
             w(PL.pp_photos(key, names, CAP, "After dark", night=True, note=light_note if i == 0 else "", foot=foot, sid="g-dusk" if i == 0 else ""))
         opt_html = _options_table(p, opts) + (_options_summary(ob) if ob else "")
         nxt = md_to_html(re.sub(r"^## NEXT STEP\n", "", qmd[qmd.index("## NEXT STEP"):]))
         if spec.extras.price_breakdown:
-            w(PL.pp_invest(spec, p, opt_html, nxt, foot=foot))
+            w(PL.pp_invest(spec, p, opt_html, nxt, foot=foot, alloc=client_allocation(t, p)))
         else:
             q2 = qmd[qmd.index("## PRICE"):qmd.index("## INCLUDED")]
             w('<section class="pg pp-flow flow" id="g-investment"><div class="pin"><h2 class="kicker">Investment</h2><div class="quote" style="break-before:auto;page-break-before:auto">'
@@ -948,13 +1307,14 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         cb = _confirm_box(spec)              # the client's "Still to confirm" box (extras.confirm), outside the scope and the price
         if cb:
             w(f'<section class="pg pp-flow flow"><div class="pin">{cb}</div></section>')
+        w(PL.pp_company(spec, foot=foot))    # who is building it: the company, the credentials, who to call
         if viewer_url is not None:           # the interactive 3D page instead of the embedded viewer (PDF-first documents)
             if viewer_url:
                 w(f'<section class="pg pp-flow pp-3d"><div class="pin">{_viewer_link(viewer_url, viewer_note)}</div></section>')
         else:                                # the live viewer on the web page; print leaves it out (the back cover points to it)
             w('<section class="pg pp-flow pp-3d"><div class="pin"><h2 class="kicker" id="g-3d">3D model <span class="tag">drag to orbit · wheel or pinch to zoom · steps · exploded</span></h2>'
               + viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}") + "</div></section>")
-        w(PL.pp_back(spec, key, V["back"], CAP, today, viewer_url or None, "Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days."))
+        w(PL.pp_back(spec, key, V["back"], CAP, today, viewer_url or None, f"{CLIENT_FOOT} {holds}"))
     elif customer:
         w('<h2 class="kicker" id="g-reads">At a glance</h2>')
         w(_gallery(key, ["yard", "iso2"], have))
@@ -1000,32 +1360,15 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_reads(t, L, sm, n_piers, False))
         notes = [n for n in t.notes if not n.startswith(f"{len(L.zones)} zones")]
         if notes:
-            w('<ul class="notes">' + "".join(f"<li>{E(n)}</li>" for n in notes) + "</ul>")
+            w('<h3>Layout notes</h3><ul class="notes">' + "".join(f"<li>{E(n[:1].upper() + n[1:])}</li>" for n in notes) + "</ul>")
         w('<h2 class="kicker" id="g-flags">Site &amp; code flags <span class="tag">internal</span></h2><ul class="flags">')
         for f in flags:
             w(f'<li class="sev-{f.severity.lower()}"><span class="sev">{f.severity}</span><span class="topic">{E(f.topic)}</span><span class="txt">{E(f.text)}{(" <em>" + E(f.ref) + "</em>") if f.ref else ""}</span></li>')
         w("</ul>")
-        w(_order_internal(t))
+        w(_order_internal(t))                # quantities only: no pricing in the takeoff + build set (the cost stack carries it)
         w('<h2 class="kicker">Fastener &amp; connector schedule</h2>')
         w('<dl class="reads">' + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in t.schedule.items()) + "</dl>")
-        w('<details><summary>Cut list</summary>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]) + "</details>")
-        blocks = [o_ for o_ in (options or []) if isinstance(o_, dict)]      # the proposal's option blocks: how each is priced, estimates called out
-        if cost_only and not spec.extras.sell_override:      # a bid: the cost stack with its margin (a sold job gets cost-to-build only)
-            w(_stack(p, None))
-            cats = t.by_category()
-            w("<h3>Materials by category</h3>")
-            w(table(["Category", "Lines", "Cost"], [[E(c), str(len(ls)), money(sum(l.ext for l in ls), True)] for c, ls in cats.items()] + [["<b>Materials (raw)</b>", "", f"<b>{money(p.materials, True)}</b>"]], "", ["l", "r", "r"]))
-            if blocks:
-                w(_options_internal(_option_blocks(spec, t, p, blocks, key, rd, {})))
-        elif cost_only:
-            cost_html, cost_total, tax_raw = _cost_stack(p, t)
-            w(cost_html)
-        else:
-            w(_stack(p, spec.extras.sell_override))
-            if blocks:
-                w(_options_internal(_option_blocks(spec, t, p, blocks, key, rd, {})))
-            w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
-            w('<div class="quote">' + md_to_html(qmd) + "</div>")
+        w('<h2 class="kicker">Cut list</h2>' + table(["Member", "Stock", "Length", "Qty", "Note"], [[E(c.member), E(c.nominal), ftin(c.length_in), str(c.qty), E(c.note)] for c in t.cut_list], "", ["l", "l", "r", "r", "l"]))
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
         w(_gallery(key, ["yard", "corner", "corner2", "ondeck", "detail", "facade", "under"], have))
         w(_dusk_html(key, have))
@@ -1035,7 +1378,7 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(_gallery(key, ["iso", "iso2", "isolow", "underiso", "plan"], have))
         w('<h2 class="kicker">Exploded</h2>')
         w(_gallery(key, ["exploded", "exploded2", "exploded-corner", "exploded-low"], have))
-        w('<h2 class="kicker">Drawing set <span class="tag">G · S · A · D sheets — permit set with G-001 on top</span></h2><div class="sheets">')
+        w(f'<h2 class="kicker">Drawing set <span class="tag">{_sheet_letters(r["sheets"])} sheets</span></h2><div class="sheets">')
         for num, ttl, svg in r["sheets"]:
             w(f'<details class="sheet" {"open" if num == "S-101" else ""}><summary><b>{num}</b> {E(ttl)}</summary>{svg}</details>')
         w("</div>")
@@ -1045,15 +1388,11 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         w(viewer_html(S, None, title=f"{name} — 3D", standalone=False, uid=f"v3d-{key}"))
     w("</section>")
     section = "".join(o)
-    strip = ('<div class="strip"><div><span class="sl">Check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Financed</span><span class="sv">%s</span></div>'
-             '<div><span class="sl">Monthly</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div>'
-             '<div><span class="sl">Footings</span><span class="sv">%d</span></div><div><span class="sl">Rail</span><span class="sv">%g LF</span></div></div>'
-             % (money(p.sell), money(p.retail), money(p.monthly), L.deck_sf, n_piers, (L.rail.rail_lf if L.rail else 0)))
-    if spec.extras.sell_override:
-        strip = ('<div class="strip"><div><span class="sl">Sold · check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Cost</span><span class="sv">%s</span></div>'
-                 '<div><span class="sl">Gross profit</span><span class="sv">%s</span></div><div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div>'
-                 '<div><span class="sl">Financed</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
-                 % (money(p.sell), money(p.cost), money(p.gp), 100 * p.gm, money(p.retail), L.deck_sf))
+    lp_ = getattr(t, "lighting", None)            # the crew's numbers on the takeoff's cover: no prices
+    n_r = sum(st.geo.risers for st in L.stairs)
+    strip = ('<div class="strip">' + "".join(f'<div><span class="sl">{a}</span><span class="sv">{v}</span></div>' for a, v in (
+        ("Square feet", f"{L.deck_sf:g}"), ("Height", ftin(spec.geometry.height_in)), ("Footings", n_piers), ("Rail", f"{L.rail.rail_lf:g} LF" if L.rail else "none"),
+        ("Stair risers", n_r or "none"), ("Lights", lp_.fixtures) if getattr(lp_, "fixtures", 0) else ("Order lines", sum(1 for l in t.lines if l.category != "Site")))) + "</div>")
     if proposal:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
         head = PL.pp_cover(spec, key, V["cover"], CAP, name, who, today)
@@ -1062,47 +1401,25 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     elif customer:
         who = ("Prepared for " + spec.client if spec.client else "Prepared for the owner") + (f" · {addr}" if addr else "")
         head = PL.cover(spec, L, sm, p, key, hero, have, name, who, lede, today, n_piers, t=t)
-        body = head + '<main class="wrap">' + section + f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
+        body = head + '<main class="wrap">' + section + f'<footer><span>{E(PL.brand_footer(spec))}</span><span>{E(CLIENT_FOOT)} {E(holds)}</span></footer></main>'
         title = f"{name} — Proposal"
     elif supplier:
-        strip = ('<div class="strip"><div><span class="sl">Square feet</span><span class="sv">%g</span></div><div><span class="sl">Footings</span><span class="sv">%d</span></div>'
+        strip = ('<div class="strip n4"><div><span class="sl">Square feet</span><span class="sv">%g</span></div><div><span class="sl">Footings</span><span class="sv">%d</span></div>'
                  '<div><span class="sl">Order lines</span><span class="sv">%d</span></div><div><span class="sl">Height</span><span class="sv">%s</span></div></div>'
                  % (L.deck_sf, n_piers, sum(1 for l in t.lines if l.category != "Site"), ftin(spec.geometry.height_in)))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · take-off + build set for Decks &amp; Docks</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · take-off + build set for Decks &amp; Docks</div>{_h1(name)}'
                 f'<p>{E(sub or addr)} · {E(today)}</p><p>Account GSEXT1 · ship to {E(addr)} · please quote every line; call Jade Pender 303-550-9558 with substitutions.</p></div></header>')
         body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Quantities from the drawings' + ("; the stamped engineering set governs structure" if spec.extras.engineered else "") + '. Quote requested — no pricing on this sheet.</span></footer></main>'
-        title = f"{name} — Take-off + Build Set"
-    elif cost_only and not spec.extras.sell_override:
-        strip = ('<div class="strip"><div><span class="sl">Check or ACH</span><span class="sv">%s</span></div><div><span class="sl">Financed</span><span class="sv">%s</span></div>'
-                 '<div><span class="sl">Cost</span><span class="sv">%s</span></div><div><span class="sl">Gross profit</span><span class="sv">%s</span></div>'
-                 '<div><span class="sl">Margin</span><span class="sv">%.1f%%</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
-                 % (money(p.sell), money(p.retail), money(p.cost), money(p.gp), 100 * p.gm, L.deck_sf))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · cost stack · internal</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
-                f'<p>{E(sub or addr)}</p></div></header>')
-        body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Cost stack: materials at the order x {p.material_factor:g}, tax, labor at the rate card, site services at cost; {p.gm:.1%} GM on the work. Internal — not for the homeowner.</span></footer></main>'
-        title = f"{name} — Cost Stack"
-    elif cost_only:
-        tax_raw = round(p.materials * p.tax_rate, 2)
-        cost_total = round(p.materials + tax_raw + p.labor + p.gc, 2)
-        strip = ('<div class="strip"><div><span class="sl">Cost to build</span><span class="sv">%s</span></div><div><span class="sl">Materials</span><span class="sv">%s</span></div>'
-                 '<div><span class="sl">Tax</span><span class="sv">%s</span></div><div><span class="sl">Labor</span><span class="sv">%s</span></div>'
-                 '<div><span class="sl">Site services</span><span class="sv">%s</span></div><div><span class="sl">Square feet</span><span class="sv">%g</span></div></div>'
-                 % (money(cost_total), money(p.materials), money(tax_raw), money(p.labor), money(p.gc), L.deck_sf))
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · sold — cost to build</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
-                f'<p>{E(sub or addr)}</p></div></header>')
-        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Cost to build: materials at invoice, labor at the rate card, site services at cost. Internal.</span></footer></main>'
-        title = f"{name} — Cost to Build"
+        title = f"{name} — Decks & Docks Take-off + Build Set"
     else:
-        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
+        head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · takeoff + build set</div>{_h1(name)}'
                 f'<p>{E(sub or addr)}</p></div></header>')
-        gm_note = (f"sold at {money(p.sell)} · {p.gp / p.sell:.1%} margin on the sold price ({p.gm:.1%} on the work)" if spec.extras.sell_override else
-                   f"{p.gm:.1%} GM" + (" (owner-set, under the 40% floor)" if spec.extras.gm_below_floor else ""))
-        body = head + '<main class="wrap">' + strip + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>Prices: rate card · {E(gc_name(p.gc_lines, "GC"))} at cost · {gm_note} · financed ÷ 0.93 unless the job says otherwise. Internal — not for the homeowner.</span></footer></main>'
+        body = head + '<main class="wrap">' + strip + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Takeoff + build set: quantities, drawings and build steps; no pricing (the cost stack carries it). Internal — not for the homeowner.</span></footer></main>'
         title = f"{name} — Takeoff + Build Set"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}"
-            + ((("" if proposal else PL.FONT) + PL.CSS + PL.brand_css(spec)) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")
+            + ((PL.FONT + PL.CSS + PL.brand_css(spec)) if customer else "") + (LEVELS_CSS if hasattr(L, "parts") else "")     # Saira for the headings (owner)
             + (PL.OPTIONS_CSS if customer and (viewer_url is not None or any(isinstance(o_, dict) for o_ in (options or []))) else "")
-            + (PL.TIMELINE_CSS if proposal and timeline_of(spec) else "") + (PL.CONFIRM_CSS if proposal and getattr(spec.extras, "confirm", None) else "")
+            + (PL.TIMELINE_CSS if proposal else "") + (PL.CONFIRM_CSS if proposal and getattr(spec.extras, "confirm", None) else "")
             + (PL.PP_CSS if proposal else "")
             + "</head>" + ('<body class="proposal pp">' if proposal else '<body class="proposal">' if customer else "<body>")
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script>" + (PL.JS if customer else "") + "</body></html>\n")
@@ -1112,10 +1429,12 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
     for sc in scripts:
         page = page.replace(sc, "", 1)
     page = page.replace(CDN, CDN + "\n" + "\n".join(scripts) + "\n", 1)
-    if supplier:
+    if not customer:                         # the internal documents: page margins, a running footer, page breaks (DOC_CSS)
+        page = page.replace("</head>", DOC_CSS + _doc_page_css(f"GS Exterior Experts · {_foot(name)} · " + ("Decks & Docks take-off · account GSEXT1" if supplier else "Takeoff + Build Set")
+                                                               + f" · {today}") + "</head>", 1).replace("<body>", '<body class="doc">', 1)
         txt = re.sub(r"<(script|style)\b.*?</\1>", "", page, flags=re.S)
-        for bad in ("$", "margin", "Margin", "Check or ACH", "Financed", "rate card"):
-            assert bad not in txt, f"supplier sheet carries pricing wording: {bad}"
+        for bad in ("$", "Check or ACH", "Financed", "Gross profit", "rate card") + (("margin", "Margin") if supplier else ()):
+            assert bad not in txt, f"{'supplier sheet' if supplier else 'takeoff + build set'} carries pricing wording: {bad}"
     if customer:
         txt = re.sub(r"<script.*?</script>", "", page, flags=re.S)
         txt = re.sub(r"data:[a-z]+/[a-z+.-]+;base64,[A-Za-z0-9+/=]+", "", txt)     # an embedded logo's bytes are not words
@@ -1246,8 +1565,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     rail_posts = sum(1 for pt in q["posts"] if pt["on_rail"])
     tele = [(f"{Ap:g}", "square feet"), (ftin(Wp * 12), "along the house"), (ftin(Dp * 12), "out from the house"),
             (ftin(q["clear_ft"] * 12), "clear under the beams"), (str(len(q["blades"])), "louver blades"), (str(len(q["posts"])), "posts on the deck")]
-    prices = ([("Check or ACH", money(c), f"{(1 - c / f) * 100:.0f}% below the financed price"), ("Financed", money(f), "no money down"),
-               ("Monthly", money(m), "6.99% · 10 years")] if show_fin else [("Price · check or ACH", money(c), "")])
+    prices = ([("Check or ACH", money(c), f"{(1 - c / f) * 100:.0f}% less than the financed price"), ("Financed price", money(f), "with approved credit"),
+               ("Monthly", money(m), PL._fin_short())] if show_fin else [("Price · check or ACH", money(c), "")])
     chips = [(q["hex"], "Roof", f"{q['brand']} {q['product']} · {str(q['color']).capitalize()}")]
     if has_screens and scr:
         sc0 = scr[0]
@@ -1330,7 +1649,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
         tf = f + sc_f
         from .pricing import _monthly
         rows.append(("The roof with the screens", c + sc_c, tf, _monthly(tf), "total"))
-    terms = ["This is a fixed-price proposal on the selections above. Check or ACH, or financed with approved credit. Numbers hold 30 days.",
+    terms = ["This is a fixed-price proposal on the selections above. The check or ACH price applies to payment by check or ACH"
+             + ("; the financed price applies with approved credit" if show_fin else "") + f". This price holds through {price_holds_through(today)}.",
              "The roof is priced on its own; the deck's price does not include it."] + list(a.get("terms") or [])
     w(PL.addon_invest(rows, (c, f, m), "".join(f"<p>{E(x)}</p>" for x in terms), title="The roof's price", show_fin=show_fin))
     lvl = next((b[0] for b in _plan_boxes(L) if f"{b[0]} {b[1]}" in under), "")
@@ -1344,8 +1664,8 @@ def render_addon(spec: DeckSpec, out_dir: str, key: str = "roof", name: Optional
     if viewer_url is not None:
         w(_viewer_link(viewer_url, viewer_note))
     w("</section>")
-    body = head + '<main class="wrap">' + "".join(o) + (f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders are design intent. '
-                                                       f'{E(q["brand"])} product details per the manufacturer. Numbers hold 30 days.</span></footer></main>')
+    body = head + '<main class="wrap">' + "".join(o) + (f'<footer><span>{E(PL.brand_footer(spec))}</span><span>Renders show the design. '
+                                                       f'{E(q["brand"])} product details per the manufacturer. This price holds through {E(price_holds_through(today))}.</span></footer></main>')
     title_ = f"{name} — Proposal"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title_)}</title>{FONT}{CSS}"
             + PL.FONT + PL.CSS + PL.brand_css(spec) + LEVELS_CSS + PL.OPTIONS_CSS + "</head><body class=\"proposal\">" + body + "</body></html>\n")
@@ -1533,7 +1853,7 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
         have = {q.stem for q in rd.glob("*.jpg")}
         files.update({f"r/{pt['key']}-{q.stem}.jpg": str(q) for q in rd.glob("*.jpg")})
         opts = [(lab, run(sp_)[2]) for lab, sp_ in pt.get("options", [])]
-        built.append(dict(pt, t=t, p=p, L=t.layout, sm=t.summary, S=r["scene"], have=have, opts=opts, qmd=quote_markdown(t, p)))
+        built.append(dict(pt, t=t, p=p, L=t.layout, sm=t.summary, S=r["scene"], have=have, opts=opts, qmd=quote_markdown(t, p, date_line)))
     spec0 = parts[0]["spec"]
     addr = ", ".join(x for x in (spec0.site.address, spec0.site.city, f"{spec0.site.state} {spec0.site.zip}".strip()) if x)
     today = date_line or date.today().strftime("%B %d, %Y")
@@ -1557,9 +1877,10 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
         qmd = b["qmd"]
         inc = qmd[qmd.index("## INCLUDED"):qmd.index("## PLAN")].replace("## INCLUDED — what it is\n", "")
         sp_ = b["spec"]
-        beams = sorted({bm.size for bm in sp_.framing.beams}) if sp_.framing.beams else []
-        frame_lite = f"{b['sm']['joists']}; {b['sm']['rims']}" + (f"; {beam_words(beams)}" if beams else "") + "."
-        inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
+        if sp_.framing.system == "steel":    # the quote reads a wood frame in the homeowner's words already (report.frame_words), as render_page
+            frame_lite = (f"{b['sm']['joists']}; {b['sm']['rims']}; boxed steel beams"
+                          + (("; joist tape on every joist, rim and beam" if b["L"].beam_lines else "; joist tape on every joist and rim") if sp_.framing.joist_tape else "") + ".")
+            inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w('<h3>What it is</h3>' + md_to_html(inc))
     # the choices
     if any(b["opts"] for b in built):
@@ -1580,7 +1901,8 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
     w('<div class="tw"><table class="bigtab"><thead><tr><th>Deck</th><th class="num">Check or ACH</th><th class="num">Financed</th><th class="num">Monthly</th></tr></thead><tbody>'
       + "".join(f"<tr><td>{r_[0]}</td><td class='num'>{r_[1]}</td><td class='num'>{r_[2]}</td><td class='num'>{r_[3]}</td></tr>" for r_ in rows)
       + f"<tr class='total'><td>Both decks</td><td class='num'>{money(sell)}</td><td class='num'>{money(retail)}</td><td class='num'>{money(monthly)}</td></tr></tbody></table></div>")
-    w('<p>Financed: no money down, 12 or 18 months with no payments, then 6.99% for 10 years. Check or ACH saves 7%. Each deck can be done on its own at its own price.</p>')
+    w(f'<p>Financed price, with approved credit: {E(PL._fin_short())}. Also available with approved credit: 12 or 18 months with no payments. '
+      f'The check or ACH price is {(1 - sell / retail) * 100:.0f}% less than the financed price and applies to payment by check or ACH. Each deck can be done on its own at its own price.</p>')
     for b in built:
         if b["opts"]:
             w(f'<h3>{E(b["title"])} — choices</h3>' + _options_table(b["p"], b["opts"]).replace("<h3>Options</h3>", ""))
@@ -1599,11 +1921,11 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
     who = "Prepared for the owner" + (f" · {addr}" if addr else "") + f" · {today}"
     have0 = built[hero_from]["have"]
     head = (f'<header class="cover"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · Proposal</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1><p class="who">{E(who)}</p>'
-            f'<div class="pricebar"><div><span class="l">Both decks · check or ACH</span><span class="v">{money(sell)}</span></div><div><span class="l">Financed</span><span class="v">{money(retail)}</span><span class="s">no money down</span></div>'
-            f'<div><span class="l">Monthly</span><span class="v">{money(monthly)}</span><span class="s">6.99% · 10 years</span></div></div>'
+            f'<div class="pricebar"><div><span class="l">Both decks · check or ACH</span><span class="v">{money(sell)}</span></div><div><span class="l">Financed price</span><span class="v">{money(retail)}</span><span class="s">with approved credit</span></div>'
+            f'<div><span class="l">Monthly</span><span class="v">{money(monthly)}</span><span class="s">{E(PL._fin_short())}</span></div></div>'
             + (f'<img class="herofig" src="r/{hk}-{hero}.jpg" alt="rendering">' if hero in have0 else "")
             + (f'<p class="lede">{E(lede)}</p>' if lede else "") + "</div></header>")
-    body = head + '<main class="wrap">' + section + '<footer><span>GS Exterior Experts · Deck Division</span><span>Renders and drawings are design intent; dimensions on the sheets govern. Numbers hold 30 days.</span></footer></main>'
+    body = head + '<main class="wrap">' + section + f'<footer><span>GS Exterior Experts · Deck Division</span><span>{E(CLIENT_FOOT)} This price holds through {E(price_holds_through(today))}.</span></footer></main>'
     title = f"{name} — Proposal"
     page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{EXTRA_CSS}</head><body>"
             + body + CDN + "<script>window.addEventListener('load', function(){ window.dispatchEvent(new Event('resize')); });</script></body></html>\n")
@@ -1627,9 +1949,9 @@ def render_combined(parts: list, out_dir: str, key: str, name: str, lede: str, h
 PERMIT_CSS = """<style>
 .sheet-page{margin:0 0 28px;} .sheet-page svg{width:100%;height:auto;display:block;border:1px solid var(--line);background:#fff;}
 .index{columns:2;column-gap:28px;font-size:14px;} .index li{break-inside:avoid;}
-.vpage h3{margin:0 0 12px;} .vgal{display:block;} .vgal figure{margin:0;} .vgal img{width:100%;height:auto;display:block;}
-@media print{.vpage{break-inside:avoid;} .vpage~.vpage{break-before:page;page-break-before:always;} .vgal img{width:auto;max-width:100%;max-height:6.4in;margin:0 auto;} @page{size:Letter landscape;margin:0.3in;} .band{padding:0.35in 0.5in;} .wrap{padding:0 0.2in;} .sheet-page{break-after:page;page-break-after:always;margin:0;} .sheet-page svg{border:0;max-height:7.6in;}
-  .cover-list{break-after:page;page-break-after:always;} h2.kicker{margin-top:10px;} figure{break-inside:avoid;} .gal{gap:8px;}}
+@media print{.band{padding:0.35in 0.5in;} .wrap{padding:0 0.2in;} .sheet-page{break-after:page;page-break-after:always;margin:0;} .sheet-page svg{border:0;max-height:7.25in;margin:0 auto;}
+  .solo .sheet-page h3{display:none;} .solo .sheet-page svg{max-height:7.6in;} .sheet-page:last-child{break-after:auto;page-break-after:auto;}
+  .cover-list{break-after:page;page-break-after:always;} h2.kicker{margin-top:10px;} footer{display:none;}}
 </style>"""
 
 
@@ -1672,6 +1994,7 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
     sheet_html = []
     for pi, pt in enumerate(parts):
         t, flags, p = run(pt["spec"])
+        L0 = t.layout if pi == 0 else L0         # the render sheets carry the first part's sheet band
         r = build_set(t, flags, str(out / f"buildset-{pi + 1}"), render=False, customer=True)   # no internal flags block on G-001
         r["sheets"] = list(r["sheets"]) + (__import__("decktakeoff.calcs", fromlist=["calc_sheets"]).calc_sheets(pt["spec"] if pt["calcs"] is True else pt["calcs"]) if pt.get("calcs") else [])   # structural calcs S-901… when the part asks: calcs=True or a calcs.Package (calcs agent)
         for num, ttl, svg in r["sheets"]:
@@ -1680,32 +2003,39 @@ def render_permit_set(parts: list, out_dir: str, key: str, name: str, sub: str =
             svg = re.sub(r" — the cut list is on T-\d+", "", svg)                                  # nor is the cut list
             index.append((pt["title"], num, ttl))
             sheet_html.append(f'<div class="sheet-page" id="s-{pi + 1}-{num}"><h3>{E(pt["title"])} · {num} · {E(ttl)}</h3>{svg}</div>')
-    w(f'<section class="job" id="job-{key}">')
+    w(f'<section class="job{" solo" if len(parts) == 1 else ""}" id="job-{key}">')
+    n_v = sum(len(v) for v in (renders or {}).values())
     if renders:
-        index.append((parts[0]["title"], "A-001", "Isometric · renders (3D views, design intent)"))
+        index.append((parts[0]["title"], "A-001" if n_v == 1 else f"A-001.1–.{n_v}", f"Isometric · renders ({n_v} 3D view{'s' if n_v != 1 else ''}, design intent)"))
     w('<div class="cover-list"><h2 class="kicker" id="g-index">Sheet index</h2><ol class="index">' + "".join(f"<li>{E(a)} · <b>{b}</b> {E(c)}</li>" for a, b, c in index) + "</ol>")
     eng_any = any(pt_["spec"].extras.engineered for pt_ in parts) and not no_engineering
     w('<p>' + ("Design intent. The stamped engineering set governs structure, dimensions and locations. " if eng_any else "Design intent per the 2021 IRC R507 prescriptive provisions. ")
       + 'Field verify. Do not scale. This set carries no pricing.</p></div>')
     w("".join(sheet_html))
     if renders:
-        # the 3D views as sheet A-001: one view to a page, large, each page headed, nothing split across a page break
+        # the 3D views as sheets A-001.1, .2 …: one view to a landscape page, with the drawing sheets' band and footer
+        from .drawings import sheet as _sheet, sheet_meta
+        meta, k = sheet_meta(L0, customer=True), 0
         w('<span id="g-views"></span>')
         for gi, (ttl, items) in enumerate(renders.items()):
-            chunks = [items[k:k + 1] for k in range(0, len(items))]
-            for ci, chunk in enumerate(chunks):
-                w(f'<div class="vpage"><h3>{E(ttl)} · <b>A-001</b> Isometric · renders <span class="tag">design intent · {ci + 1} of {len(chunks)}</span></h3><div class="gal vgal">')
-                for cap, path in chunk:
-                    fn = f"r/{key}-{Path(path).stem}.jpg" if len(renders) == 1 else f"r/{key}{gi + 1}-{Path(path).stem}.jpg"   # one file per deck
-                    files[fn] = str(Path(path).resolve())
-                    w(f'<figure><img src="{fn}" alt="{E(cap)}" loading="lazy"><figcaption>{E(cap)}</figcaption></figure>')
-                w("</div></div>")
+            for cap, path in items:
+                k += 1
+                fn = f"r/{key}-{Path(path).stem}.jpg" if len(renders) == 1 else f"r/{key}{gi + 1}-{Path(path).stem}.jpg"   # one file per deck
+                files[fn] = str(Path(path).resolve())
+                num = "A-001" if n_v == 1 else f"A-001.{k}"
+                svg = _sheet(num, "Isometric · renders", f"{cap} · 3D view of the model, design intent · {k} of {n_v}",
+                             [f'<image href="{E(fn)}" x="18" y="6" width="964" height="600" preserveAspectRatio="xMidYMid meet"/>'],
+                             "3D view · design intent · not to scale · the drawing sheets govern", meta)
+                svg = re.sub(r"GS Exterior Experts · ([A-Z][a-z]+ \d{1,2}, \d{4}) · Rev 0", r"GSX · Jade Pender 303-550-9558 · \1 · Rev 0 · PERMIT SET", svg)
+                w(f'<div class="sheet-page" id="s-r{k}"><h3>{E(parts[0]["title"] if len(renders) == 1 and len(parts) == 1 else ttl)} · {num} · Isometric · renders</h3>{svg}</div>')
     w("</section>")
     head = (f'<header class="band"><div class="in"><div class="kick">GS Exterior Experts · Deck Division · permit set</div><h1>{E(name).replace(" · ", "&nbsp;· ")}</h1>'
             f'<p>{E(sub or addr)} · {E(today)}</p></div></header>')
     body = head + '<main class="wrap">' + "".join(o) + '<footer><span>GS Exterior Experts · Deck Division · Jade Pender 303-550-9558</span><span>Permit set — drawings only. ' + ("Design intent; the stamped engineering set governs." if eng_any else "Design intent; 2021 IRC R507 prescriptive.") + '</span></footer></main>'
     title = f"{name} — Permit Set"
-    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{PERMIT_CSS}</head><body>"
+    page = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{E(title)}</title>{FONT}{CSS}{PERMIT_CSS}"
+            + "<style>@media print { " + _page_box("", "Letter landscape", "0.35in 0.3in 0.55in", f"{_foot(name)} · permit set · {today}", "0", "#fbf9f4", important=False)
+            + " }</style></head><body>"
             + body + "</body></html>\n")
     if unbranded:
         page = _unbrand(page)

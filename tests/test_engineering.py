@@ -35,7 +35,7 @@ def test_stairs():
     assert g.risers == 4 and g.treads == 3 and g.handrail_required and not g.guard_required
     g = eng.stair_geometry(54, 48)
     assert g.risers == 7 and abs(g.riser_in - 54 / 7) < 0.01 and g.guard_required
-    assert g.stringers == 5
+    assert g.stringers == 6          # 48" of treads at the 10" fallback with no tread line given (eng.STRINGER_OC_COMPOSITE); 5 under the old 12" rule
 
 
 def test_deep_deck_adds_a_beam():
