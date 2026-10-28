@@ -250,7 +250,7 @@ BOARDS_PALETTE = {
     ("Reserve", "Dark Roast"): ["#26190f", "#3a2a1f", "#4c3a2d", "#5e4a3b", "#6e5a4a", "#7d6a5a"],
     ("Reserve", "Driftwood"): ["#5c5954", "#77736c", "#979289", "#aea9a1", "#bdb8b0", "#cac6bf", "#d6d2cb"],
     ("Reserve", "Reclaimed Chestnut"): ["#6e5238", "#88694c", "#a08260", "#b39674", "#c3a888", "#d0b99c"],
-    ("Terrain+", "Dark Oak"): ["#62523c", "#6b5b44", "#73624a", "#7b6a51", "#86745a"],
+    ("Terrain+", "Dark Oak"): ["#6c553c", "#6e573e", "#796248", "#846c51", "#856e51"],   # 28 Oct: TimberTech's swatch read color-managed (its files are Adobe RGB): p03 / p10 / median / p90 / p97
     ("Terrain+", "Natural White Oak"): ["#ad966a", "#b8a275", "#bfaa7d", "#c5b085", "#cdb98e"],
     ("Terrain+", "Weathered Oak"): ["#85806d", "#8e8977", "#96907f", "#9d9786", "#a5a08e"],
     ("Terrain", "Silver Maple"): ["#8a8a88", "#959593", "#a0a09e", "#aaaaa8"], ("Terrain", "Brown Oak"): ["#6b4d36", "#76573e", "#816147", "#8b6b50"],
