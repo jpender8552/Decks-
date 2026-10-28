@@ -319,6 +319,14 @@ def _cost_stack(p, t):
     return "".join(out), total, tax_raw
 
 
+def _dusk_html(key, have) -> str:
+    """The dusk renders (station_dusk stills), when the job has them: the deck at the blue hour with its lights on."""
+    names = [n for n in ("corner_dusk", "yard_dusk", "ondeck_dusk", "corner2_dusk", "facade_dusk") if n in have]
+    if not names:
+        return ""
+    return '<h2 class="kicker" id="g-dusk">At dusk <span class="tag">the lights on · design intent</span></h2>' + _gallery(key, names, have)
+
+
 def _gallery(key, names, have):
     return '<div class="gal">' + "".join(f'<figure><img src="r/{key}-{n}.jpg" alt="{E(CAP.get(n, n))}" loading="lazy"><figcaption>{E(CAP.get(n, n))}</figcaption></figure>' for n in names if n in have) + "</div>"
 
@@ -904,7 +912,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             inc = re.sub(r"\| Frame \| .*? \|\n", f"| Frame | {frame_lite} |\n", inc, count=1)
         w(md_to_html(inc))
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
-        w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "isolow", "under"], have))
+        w(_gallery(key, ["corner", "corner2", "ondeck", "detail", "facade", "isolow", "under"], have))
+        w(_dusk_html(key, have))
         w(alt_html)
         w(sun_html)
         w('<h2 class="kicker" id="g-iso">Isometrics <span class="tag">the model from above</span></h2>')
@@ -943,7 +952,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
         if spec.extras.engineering_note:
             w(f'<p><b>Engineering and permit.</b> {E(spec.extras.engineering_note)}</p>')
         w('<h2 class="kicker pb" id="g-renders">Renders <span class="tag">3D model · design intent</span></h2>')
-        w(_gallery(key, ["corner", "corner2", "ondeck", "facade", "under", "isolow"], have))
+        w(_gallery(key, ["corner", "corner2", "ondeck", "detail", "facade", "under", "isolow"], have))
+        w(_dusk_html(key, have))
         w(alt_html)
         w(sun_html)
         w('<h2 class="kicker pb" id="g-iso">Isometrics <span class="tag">the model from above</span></h2>')
@@ -1004,7 +1014,8 @@ def render_page(spec: DeckSpec, out_dir: str, mode: str = "internal", key: str =
             w('<h2 class="kicker">The quote <span class="tag">homeowner-facing · facts only</span></h2>')
             w('<div class="quote">' + md_to_html(qmd) + "</div>")
         w('<h2 class="kicker">Renders <span class="tag">3D model · design intent · ' + ("timbers shown with the optional oil finish" if S.meta["timber"] and not S.meta["oiled"] else "frame shown as specified") + "</span></h2>")
-        w(_gallery(key, ["yard", "corner", "corner2", "ondeck", "facade", "under"], have))
+        w(_gallery(key, ["yard", "corner", "corner2", "ondeck", "detail", "facade", "under"], have))
+        w(_dusk_html(key, have))
         w(alt_html)
         w(sun_html)
         w('<h2 class="kicker">Isometrics</h2>')
