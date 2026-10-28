@@ -567,6 +567,9 @@ def price(t: Takeoff, gm: float = None, tax_rate: float = None, with_options: bo
         _lp = t.lighting
         pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"{_lp.fixtures} lights at ${float(_lp.cfg['sell_each']):,.0f} installed (${light_sell:,.0f}; "
                         f"their cost ${light_work:,.0f}, {1 - light_work / light_sell:.0%} margin)" + ("" if rail_sell else f", everything else at {gm_base:.1%} GM"))
+    if drink_sell and not set_sell:
+        pr.rail_note = (pr.rail_note + " · " if getattr(pr, "rail_note", "") else "") + (f"drink rail at ${drink_sell:,.0f} installed (its cost ${drink_work:,.0f}, "
+                        f"{1 - drink_work / drink_sell:.0%} margin)")
     if with_options and s.extras.options:
         pr.options = price_options(t, pr, pr.options_gm)
     return pr
