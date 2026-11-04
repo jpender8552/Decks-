@@ -5,3 +5,7 @@ out/
 *.egg-info/
 build/
 dist/
+
+# Private job data: never commit (CLAUDE.md). Kept locally only.
+jobs/messner_site/
+jobs/*_photos/
